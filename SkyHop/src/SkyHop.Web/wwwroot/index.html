@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta name="theme-color" content="#6cc4f5" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <title>SkyHop</title>
+    <base href="/" />
+    <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+    <link rel="preload" id="webassembly" />
+    <link rel="stylesheet" href="css/app.css" />
+    <script type="importmap"></script>
+    <script>
+        // Safe localStorage access: storage can be missing or throw (private mode, blocked site data).
+        window.skyhopStorage = {
+            get(key) {
+                try { return window.localStorage.getItem(key); } catch { return null; }
+            },
+            set(key, value) {
+                try { window.localStorage.setItem(key, value); } catch { /* best effort */ }
+            }
+        };
+    </script>
+</head>
+
+<body>
+    <div id="app">
+        <div class="loading">
+            <div class="loading-bird"></div>
+            <p>Loading SkyHop…</p>
+        </div>
+    </div>
+
+    <div id="blazor-error-ui">
+        Something went wrong.
+        <a href="." class="reload">Reload</a>
+        <span class="dismiss">✕</span>
+    </div>
+    <script src="_framework/blazor.webassembly#[.{fingerprint}].js"></script>
+</body>
+
+</html>

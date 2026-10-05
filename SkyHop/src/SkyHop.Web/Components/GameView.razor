@@ -1,0 +1,84 @@
+<div class="stage">
+    <div class="frame" @ref="_frame">
+        <canvas class="screen" role="img" aria-label="SkyHop game"></canvas>
+
+        @if (State is GameState.Paused or GameState.GameOver)
+        {
+            <div class="backdrop"></div>
+        }
+
+        <div class="hud">
+            @if (State is GameState.Playing)
+            {
+                <button class="icon-button" title="Pause (P)" aria-label="Pause" @onclick="Pause">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1" /><rect x="14" y="5" width="4" height="14" rx="1" /></svg>
+                </button>
+            }
+            else
+            {
+                <span></span>
+            }
+            <button class="icon-button" title="@(_muted ? "Unmute (M)" : "Mute (M)")" aria-label="@(_muted ? "Unmute" : "Mute")" @onclick="ToggleMute">
+                @if (_muted)
+                {
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4z" /><path d="M16 9l5 6M21 9l-5 6" class="stroke" /></svg>
+                }
+                else
+                {
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4z" /><path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12" class="stroke" /></svg>
+                }
+            </button>
+        </div>
+
+        @* The world box is the fixed 9:16 playfield; overlays are positioned inside it so they line up with the game. *@
+        <div class="world">
+            @switch (State)
+            {
+                case GameState.Start:
+                    <div class="overlay start">
+                        <h1 class="title">Sky<span>Hop</span></h1>
+                        <p class="prompt">Tap / Space to Start</p>
+                        <div class="start-footer">
+                            <p class="best-line">Best <strong>@_game.Score.Best</strong></p>
+                            <p class="hint">Space, ↑, click or tap to flap · P pause · M mute</p>
+                        </div>
+                    </div>
+                    break;
+
+                case GameState.Paused:
+                    <div class="overlay centered">
+                        <div class="panel">
+                            <h2>Paused</h2>
+                            <button class="action" @onclick="Resume">Resume</button>
+                            <p class="prompt small">Tap / Space to Resume</p>
+                        </div>
+                    </div>
+                    break;
+
+                case GameState.GameOver:
+                    <div class="overlay centered">
+                        <div class="panel game-over">
+                            <h2>Game Over</h2>
+                            <div class="scores">
+                                <div>
+                                    <span class="label">Score</span>
+                                    <span class="value">@_game.Score.Score</span>
+                                </div>
+                                <div>
+                                    <span class="label">Best</span>
+                                    <span class="value">@_game.Score.Best</span>
+                                </div>
+                            </div>
+                            @if (_game.Score.IsNewBest)
+                            {
+                                <p class="badge">New best!</p>
+                            }
+                            <button class="action" @onclick="Restart">Restart</button>
+                            <p class="prompt small @(_game.CanRestart ? "" : "waiting")">Tap / Space to Restart</p>
+                        </div>
+                    </div>
+                    break;
+            }
+        </div>
+    </div>
+</div>
