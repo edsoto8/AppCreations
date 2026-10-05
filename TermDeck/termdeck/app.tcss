@@ -1,0 +1,217 @@
+/* ---------- shared ---------- */
+.dialog {
+    background: $surface;
+    border: thick $primary;
+    padding: 1 2;
+}
+
+ModalScreen {
+    align: center middle;
+    background: $background 60%;
+}
+
+.panel {
+    height: auto;
+    border: round $primary;
+    border-title-color: $accent;
+    padding: 0 1;
+    margin: 1 0 0 0;
+}
+
+/* ---------- dashboard ---------- */
+#dashboard-body {
+    padding: 0 1;
+}
+
+#stat-row {
+    height: auto;
+}
+
+.stat-card {
+    width: 1fr;
+    height: auto;
+    border: round $primary;
+    border-title-align: center;
+    align-horizontal: center;
+    margin: 0 1 0 0;
+}
+
+.stat-card Digits {
+    width: auto;
+}
+
+#card-healthy { border: round $success; border-title-color: $success; }
+#card-healthy Digits { color: $success; }
+#card-degraded { border: round $warning; border-title-color: $warning; }
+#card-degraded Digits { color: $warning; }
+#card-down { border: round $error; border-title-color: $error; margin-right: 0; }
+#card-down Digits { color: $error; }
+
+#cpu-spark {
+    height: 4;
+}
+
+#insight-row {
+    height: auto;
+}
+
+#insight-row .panel {
+    width: 1fr;
+}
+
+#insight-row .panel:first-of-type {
+    margin-right: 1;
+}
+
+#deploy-progress {
+    margin: 1 0 0 0;
+}
+
+#deploy-label {
+    color: $text-muted;
+}
+
+/* ---------- services ---------- */
+#filter {
+    margin: 0 0 1 0;
+}
+
+#services-table {
+    height: 1fr;
+}
+
+#table-status {
+    height: 1;
+    color: $text-muted;
+    padding: 0 1;
+}
+
+/* ---------- tasks ---------- */
+#tasks-body {
+    height: 1fr;
+}
+
+#task-list {
+    width: 2fr;
+    height: 1fr;
+}
+
+#task-side {
+    width: 1fr;
+    padding: 0 0 0 2;
+}
+
+#task-side Button {
+    width: 100%;
+    margin: 0 0 1 0;
+}
+
+#task-summary {
+    border: round $primary;
+    padding: 0 1;
+    height: auto;
+}
+
+/* ---------- form ---------- */
+#form-body {
+    padding: 0 1;
+}
+
+#form-columns {
+    height: auto;
+}
+
+.form-column {
+    width: 1fr;
+    height: auto;
+    padding: 0 1;
+}
+
+.form-column > Label {
+    margin: 1 0 0 0;
+}
+
+.switch-row {
+    height: auto;
+    margin: 1 0 0 0;
+}
+
+.switch-row Label {
+    margin: 1 0 0 1;
+}
+
+#form-terms {
+    margin: 1 0 0 0;
+}
+
+#form-errors {
+    margin: 1 0 0 0;
+    height: auto;
+}
+
+#form-buttons {
+    height: auto;
+    margin: 1 0;
+}
+
+#form-buttons Button {
+    margin: 0 1 0 0;
+}
+
+/* ---------- modals ---------- */
+#help-dialog {
+    width: 66;
+    height: 85%;
+}
+
+#help-body {
+    height: auto;
+}
+
+#confirm-dialog {
+    grid-size: 2;
+    grid-gutter: 1 2;
+    grid-rows: auto 3;
+    width: 50;
+    height: auto;
+}
+
+#confirm-question {
+    column-span: 2;
+    width: 1fr;
+    content-align: center middle;
+}
+
+#confirm-dialog Button {
+    width: 100%;
+}
+
+#quick-dialog {
+    width: 70;
+    height: 24;
+}
+
+#quick-results {
+    height: 1fr;
+    margin: 1 0 0 0;
+}
+
+#quick-count {
+    color: $text-muted;
+    height: 1;
+}
+
+#detail-dialog {
+    width: 50;
+    height: auto;
+}
+
+#detail-buttons {
+    height: auto;
+    align-horizontal: right;
+    margin: 1 0 0 0;
+}
+
+#detail-buttons Button {
+    margin: 0 0 0 1;
+}
