@@ -75,11 +75,15 @@ the file untouched.
 | `Enter` in a quick-add box | Add the card and keep the box open for the next one |
 | `Ctrl+F` (`Cmd+F`) | Focus the search box |
 | `Escape` | Cancel the dialog, close the side panel, close quick-add, or clear the focused search |
-| `Enter` in a dialog | Confirm the dialog |
+| `Enter` in a dialog's text box | Confirm the dialog (on a focused button, Enter presses that button) |
 | `Ctrl+Enter` in the card panel | Save the card |
 | `Ctrl+↑` / `Ctrl+↓` on a focused card | Move the card up / down in its column |
 | `Ctrl+←` / `Ctrl+→` on a focused card | Move the card to the previous / next column |
 | `Tab` / `Shift+Tab`, then `Enter` | Move between controls and cards; open the focused card |
+| `F1` | Show the shortcut list (also in the sidebar and the board `…` menu) |
+
+Dialogs and side panels keep keyboard focus inside themselves while open. Delete/discard
+confirmations start with **Cancel** focused, so pressing Enter by reflex never destroys anything.
 
 ## Project structure
 
@@ -97,7 +101,8 @@ Dependency rule: `Core` depends on nothing; `Data` depends on `Core`; `App` depe
 ## Design decisions
 
 - **Dapper, not EF Core.** SQL lives in the repositories. Dapper type handlers store timestamps as
-  ISO-8601 UTC text and due dates as `yyyy-MM-dd`.
+  ISO-8601 UTC text (`2026-03-10T09:00:00.0000000Z`) and due dates as `yyyy-MM-dd`, independent of
+  the machine's time zone. Search matching is culture-invariant.
 - **Versioned schema.** Migrations are an ordered list; the applied version is stored in
   `PRAGMA user_version`. Each migration runs in a transaction, and an existing database is backed up
   with `VACUUM INTO` before it is upgraded.
@@ -129,5 +134,7 @@ Dependency rule: `Core` depends on nothing; `Data` depends on `Core`; `App` depe
 - Boards cannot be reordered in the sidebar (they are listed in creation order).
 - Card descriptions are plain text (no Markdown rendering).
 - Search and filtering apply to the open board only.
+- Ctrl+↑/↓ with a search or filter active moves the card past its *visible* neighbour; hidden cards
+  keep their relative order.
 - There is no undo; destructive actions ask for confirmation instead.
 - Light theme only.

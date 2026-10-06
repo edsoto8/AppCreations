@@ -28,7 +28,6 @@ public sealed partial class BoardView : UserControl
         AddHandler(PointerPressedEvent, OnPointerPressed, RoutingStrategies.Tunnel, handledEventsToo: true);
         AddHandler(PointerMovedEvent, OnPointerMoved, RoutingStrategies.Tunnel | RoutingStrategies.Bubble, handledEventsToo: true);
         AddHandler(PointerReleasedEvent, OnPointerReleased, RoutingStrategies.Tunnel, handledEventsToo: true);
-        AddHandler(PointerCaptureLostEvent, (_, _) => CancelDrag(), RoutingStrategies.Bubble, handledEventsToo: true);
         AddHandler(Button.ClickEvent, OnButtonClick, RoutingStrategies.Bubble);
         AddHandler(KeyDownEvent, OnKeyDownTunnel, RoutingStrategies.Tunnel);
     }
@@ -90,8 +89,25 @@ public sealed partial class BoardView : UserControl
 
     // ---- Pointer drag ---------------------------------------------------------------------------
 
+    /// <summary>
+    /// Capture is lost when another window or the OS takes the mouse mid-drag (PointerCaptureLost is a
+    /// direct event, raised on this control because the drag captured to it). Cancel instead of leaving
+    /// a drag that would drop on the next unrelated click.
+    /// </summary>
+    protected override void OnPointerCaptureLost(PointerCaptureLostEventArgs e)
+    {
+        base.OnPointerCaptureLost(e);
+        CancelDrag();
+    }
+
     private void OnPointerPressed(object? sender, PointerPressedEventArgs e)
     {
+        if (_drag is not null)
+        {
+            // A press while "dragging" means the release was never seen; drop nothing.
+            CancelDrag();
+        }
+
         _pending = null;
         if (_drag is not null || !e.GetCurrentPoint(this).Properties.IsLeftButtonPressed || e.Source is not Visual source)
         {
@@ -114,6 +130,12 @@ public sealed partial class BoardView : UserControl
     private void OnPointerMoved(object? sender, PointerEventArgs e)
     {
         var point = e.GetPosition(this);
+        if (_drag is not null && !e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
+        {
+            CancelDrag();
+            return;
+        }
+
         if (_drag is null)
         {
             if (_pending is not { } pending || !e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)

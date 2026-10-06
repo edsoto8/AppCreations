@@ -112,7 +112,7 @@ public sealed class CardWorkflowTests
         var card = Seed.AddCard(s, 0, "Archive me");
 
         await s.Board.OpenCardCommand.ExecuteAsync(s.Board.FindCard(card.Id)!);
-        await ((CardEditorViewModel)s.Main.Panels.Current!).ToggleArchiveCommand.ExecuteAsync(null);
+        ((CardEditorViewModel)s.Main.Panels.Current!).ArchiveCommand.Execute(null);
 
         Assert.Equal(["Keep"], s.Board.Columns[0].Cards.Select(c => c.Title));
         Assert.Equal(1, s.Board.ArchivedCount);

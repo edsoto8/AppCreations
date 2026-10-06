@@ -182,8 +182,12 @@ public sealed class ColumnRepository(BoardFlowDatabase database, IClock clock, I
         var targetIds = CardRepository.ActiveCardIds(c, t, targetId);
         var movingIds = CardRepository.ActiveCardIds(c, t, source.Id);
         var now = Clock.UtcNow;
+        // Archived cards keep their UpdatedAt: the archive browser shows it as the archive date.
         c.Execute(
-            "UPDATE Cards SET ColumnId = @targetId, UpdatedAt = @now WHERE ColumnId = @sourceId",
+            """
+            UPDATE Cards SET ColumnId = @targetId, UpdatedAt = CASE WHEN IsArchived = 0 THEN @now ELSE UpdatedAt END
+            WHERE ColumnId = @sourceId
+            """,
             new { targetId, sourceId = source.Id, now }, t);
         CardRepository.WriteOrder(c, t, [.. targetIds, .. movingIds], now);
         Logger.LogInformation(

@@ -1,4 +1,6 @@
+using Avalonia;
 using Avalonia.Controls;
+using Avalonia.VisualTree;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Input;
@@ -16,10 +18,16 @@ public sealed class BoardInteractionTests
     {
         using var s = new TestSession();
         s.Main.Initialize();
-        s.Show();
+        var window = s.Show();
         s.Screenshot("01-welcome");
 
-        Assert.True(s.Main.ShowNoWorkspace);
+        var create = window.GetVisualDescendants().OfType<Button>()
+            .Single(b => b.Content is "Create your first workspace");
+        Assert.True(create.IsEffectivelyVisible);
+        Assert.True(create.Bounds.Width > 0 && create.Bounds.Height > 0);
+        Assert.False(window.Named<DockPanel>("BoardPage").IsEffectivelyVisible);
+        using var frame = window.CaptureRenderedFrame();
+        Assert.NotNull(frame);
     }
 
     [AvaloniaFact]
@@ -173,7 +181,17 @@ public sealed class BoardInteractionTests
         var window = s.Show(960, 600);
         s.Screenshot("05-min-size");
 
-        Assert.True(window.Named<TextBox>("SearchBox").IsEffectivelyVisible);
-        Assert.True(window.Named<ScrollViewer>("BoardScroller").Extent.Width > window.Bounds.Width - 252);
+        // Header controls and the first column's card are fully on screen; extra columns scroll.
+        var visibleArea = new Rect(window.Bounds.Size);
+        foreach (var name in new[] { "SearchBox", "BoardActions" })
+        {
+            var control = window.Named<Control>(name);
+            Assert.True(visibleArea.Contains(new Rect(control.At(window, 0, 0), control.Bounds.Size)), name);
+        }
+
+        var card = window.CardButton(s.Board.Columns[0].Cards[0].Id);
+        Assert.True(visibleArea.Contains(new Rect(card.At(window, 0, 0), card.Bounds.Size)));
+        var scroller = window.Named<ScrollViewer>("BoardScroller");
+        Assert.True(scroller.Extent.Width > scroller.Viewport.Width);
     }
 }

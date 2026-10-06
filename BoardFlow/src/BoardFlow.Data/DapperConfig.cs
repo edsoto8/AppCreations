@@ -5,8 +5,9 @@ using Dapper;
 namespace BoardFlow.Data;
 
 /// <summary>
-/// Dapper type handlers so dates round-trip through SQLite's TEXT storage without losing the UTC kind.
-/// Timestamps are stored as ISO-8601 round-trip strings, due dates as <c>yyyy-MM-dd</c>.
+/// Dapper type handlers so dates round-trip through SQLite's TEXT storage independent of the machine's
+/// time zone. Timestamps are stored as ISO-8601 UTC text (<c>2026-03-10T09:00:00.0000000Z</c>), due
+/// dates as <c>yyyy-MM-dd</c>.
 /// </summary>
 public static class DapperConfig
 {
@@ -19,6 +20,10 @@ public static class DapperConfig
             return;
         }
 
+        // Dapper maps DateTime parameters itself unless the built-in mapping is removed first; without
+        // this, SetValue below is never called and values are written in the provider's own format.
+        SqlMapper.RemoveTypeMap(typeof(DateTime));
+        SqlMapper.RemoveTypeMap(typeof(DateTime?));
         SqlMapper.AddTypeHandler(new UtcDateTimeHandler());
         SqlMapper.AddTypeHandler(new DateOnlyHandler());
     }
@@ -36,8 +41,15 @@ public static class DapperConfig
             parameter.Value = FormatTimestamp(value);
         }
 
+        /// <summary>
+        /// Reads ISO-8601 with a <c>Z</c> and also text without a zone marker (e.g. Microsoft.Data.Sqlite's
+        /// default <c>yyyy-MM-dd HH:mm:ss.fff</c>), which BoardFlow only ever wrote from UTC values.
+        /// </summary>
         public override DateTime Parse(object value) =>
-            DateTime.Parse((string)value, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind).ToUniversalTime();
+            DateTime.Parse(
+                (string)value,
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal);
     }
 
     private sealed class DateOnlyHandler : SqlMapper.TypeHandler<DateOnly>

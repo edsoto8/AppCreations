@@ -5,6 +5,7 @@ using BoardFlow.Core.Rules;
 using BoardFlow.Data.Repositories;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Microsoft.Extensions.Logging;
 
 namespace BoardFlow.App.ViewModels;
 
@@ -12,6 +13,7 @@ namespace BoardFlow.App.ViewModels;
 public sealed partial class MainViewModel(BoardServices services) : ViewModelBase(services)
 {
     private bool _loading;
+    private DateOnly _today = services.Clock.Today;
 
     public DialogHost Dialogs => Services.Dialogs;
 
@@ -63,22 +65,62 @@ public sealed partial class MainViewModel(BoardServices services) : ViewModelBas
 
     protected override void OnStaleData() => LoadWorkspaces(SelectedWorkspace?.Id, SelectedBoard?.Id);
 
-    partial void OnSelectedWorkspaceChanged(Workspace? value)
+    partial void OnSelectedWorkspaceChanged(Workspace? oldValue, Workspace? newValue)
     {
         if (!_loading)
         {
-            LoadBoards(null);
+            _ = SwitchAsync(() => LoadBoards(null), () => SelectedWorkspace = oldValue);
         }
     }
 
-    partial void OnSelectedBoardChanged(Board? value)
+    partial void OnSelectedBoardChanged(Board? oldValue, Board? newValue)
     {
-        if (_loading)
+        if (!_loading)
         {
-            return;
+            _ = SwitchAsync(() => OpenBoard(newValue), () => SelectedBoard = oldValue);
         }
+    }
 
-        OpenBoard(value);
+    /// <summary>
+    /// Switching away must not strand an open panel (e.g. a card editor with unsaved changes) on the old
+    /// board: the panel is asked to close first, and if it refuses the selection is put back.
+    /// </summary>
+    private async Task SwitchAsync(Action switchTo, Action restoreSelection)
+    {
+        try
+        {
+            if (await Services.Panels.CloseAsync())
+            {
+                switchTo();
+                return;
+            }
+
+            _loading = true;
+            try
+            {
+                restoreSelection();
+            }
+            finally
+            {
+                _loading = false;
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Switching workspace or board failed");
+            Services.Notifier.Error("Could not switch: something unexpected went wrong. Details are in the log file.");
+        }
+    }
+
+    /// <summary>Called periodically: refreshes due-date badges and filters when the date changes.</summary>
+    public void CheckDateRollover()
+    {
+        var today = Services.Clock.Today;
+        if (today != _today)
+        {
+            _today = today;
+            CurrentBoard?.Reload();
+        }
     }
 
     // ---- Workspaces -------------------------------------------------------------------------------
@@ -127,7 +169,7 @@ public sealed partial class MainViewModel(BoardServices services) : ViewModelBas
 
         var message = contents!.Boards == 0
             ? $"Delete the empty workspace '{workspace.Name}'?"
-            : $"'{workspace.Name}' contains {Plural(contents.Boards, "board")} and {Plural(contents.Cards, "card")}. " +
+            : $"'{workspace.Name}' contains {Text.Plural(contents.Boards, "board")} and {Text.Plural(contents.Cards, "card")}. " +
               "Everything in it, including its labels, will be permanently deleted.";
         if (!await Services.Dialogs.ConfirmAsync("Delete workspace?", message, "Delete workspace", isDestructive: true))
         {
@@ -200,8 +242,8 @@ public sealed partial class MainViewModel(BoardServices services) : ViewModelBas
         }
 
         var message = contents!.Cards == 0
-            ? $"Delete the board '{board.Name}' and its {Plural(contents.Columns, "column")}?"
-            : $"'{board.Name}' has {Plural(contents.Columns, "column")} and {Plural(contents.Cards, "card")} " +
+            ? $"Delete the board '{board.Name}' and its {Text.Plural(contents.Columns, "column")}?"
+            : $"'{board.Name}' has {Text.Plural(contents.Columns, "column")} and {Text.Plural(contents.Cards, "card")} " +
               "(including archived). They will be permanently deleted.";
         if (!await Services.Dialogs.ConfirmAsync("Delete board?", message, "Delete board", isDestructive: true))
         {
@@ -224,6 +266,16 @@ public sealed partial class MainViewModel(BoardServices services) : ViewModelBas
         if (Services.Dialogs.Current is null && Services.Panels.Current is null)
         {
             CurrentBoard?.BeginQuickAdd();
+        }
+    }
+
+    /// <summary>F1: list the keyboard shortcuts.</summary>
+    [RelayCommand]
+    private async Task ShowShortcuts()
+    {
+        if (Services.Dialogs.Current is null)
+        {
+            await Services.Dialogs.ShowAsync(new ShortcutsDialogViewModel());
         }
     }
 
@@ -302,9 +354,14 @@ public sealed partial class MainViewModel(BoardServices services) : ViewModelBas
         }, "load the boards");
     }
 
+    /// <summary>Shows <paramref name="board"/>. Callers have already closed (or never opened) any side panel.</summary>
     private void OpenBoard(Board? board)
     {
-        _ = Services.Panels.CloseAsync();
+        if (Services.Panels.Current is { } stale)
+        {
+            Services.Panels.ForceClose(stale);
+        }
+
         if (board is null)
         {
             CurrentBoard = null;
@@ -324,6 +381,4 @@ public sealed partial class MainViewModel(BoardServices services) : ViewModelBas
             Services.Settings.Set(SettingsRepository.LastBoardId, board?.Id.ToString(System.Globalization.CultureInfo.InvariantCulture));
         }, "remember the open board");
     }
-
-    private static string Plural(int n, string noun) => n == 1 ? $"1 {noun}" : $"{n} {noun}s";
 }

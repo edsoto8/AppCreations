@@ -58,8 +58,11 @@ public sealed class CardRepository(BoardFlowDatabase database, IClock clock, ILo
         return Get(id) ?? throw Missing("Card", id);
     }
 
-    /// <summary>Replaces every editable field of the card, including its labels.</summary>
-    public Card Update(long id, CardInput input)
+    /// <summary>
+    /// Replaces every editable field of the card, including its labels. When <paramref name="targetColumnId"/>
+    /// names a different column the card also moves to the bottom of it, in the same transaction.
+    /// </summary>
+    public Card Update(long id, CardInput input, long? targetColumnId = null)
     {
         var card = ToCard(input);
         Write("save the card", (c, t) =>
@@ -73,6 +76,10 @@ public sealed class CardRepository(BoardFlowDatabase database, IClock clock, ILo
                 WHERE Id = @id
                 """, new { id, card.Title, card.Description, card.Priority, card.DueDate, now = Clock.UtcNow }, t);
             ReplaceLabels(c, t, id, card.LabelIds);
+            if (targetColumnId is { } target && target != existing.ColumnId)
+            {
+                MoveCore(c, t, existing, target, null);
+            }
         });
         return Get(id) ?? throw Missing("Card", id);
     }
@@ -119,42 +126,8 @@ public sealed class CardRepository(BoardFlowDatabase database, IClock clock, ILo
     /// transaction computed from the current database state, so repeated or rapid moves cannot duplicate
     /// or lose cards.
     /// </summary>
-    public void Move(long id, long targetColumnId, long? beforeCardId)
-    {
-        Write("move the card", (c, t) =>
-        {
-            var card = GetCard(c, t, id) ?? throw Missing("Card", id);
-            if (card.IsArchived)
-            {
-                throw new ValidationException("Archived cards cannot be moved. Restore the card first.");
-            }
-
-            var sourceBoard = BoardOfColumn(c, t, card.ColumnId);
-            if (BoardOfColumn(c, t, targetColumnId) != sourceBoard)
-            {
-                throw new ValidationException("Cards can only be moved between columns of the same board.");
-            }
-
-            var targetIds = ActiveCardIds(c, t, targetColumnId);
-            if (beforeCardId is { } before && (before == id || !targetIds.Contains(before)))
-            {
-                // The anchor moved or was archived since the UI rendered; fall back to the bottom of the column.
-                beforeCardId = before == id ? NextActive(targetIds, id) : null;
-            }
-
-            var now = Clock.UtcNow;
-            var newTargetOrder = Ordering.MoveBefore(targetIds, id, beforeCardId);
-            if (targetColumnId != card.ColumnId)
-            {
-                c.Execute("UPDATE Cards SET ColumnId = @targetColumnId, UpdatedAt = @now WHERE Id = @id",
-                    new { id, targetColumnId, now }, t);
-                var sourceIds = ActiveCardIds(c, t, card.ColumnId);
-                WriteOrder(c, t, sourceIds, now);
-            }
-
-            WriteOrder(c, t, newTargetOrder, now);
-        });
-    }
+    public void Move(long id, long targetColumnId, long? beforeCardId) =>
+        Write("move the card", (c, t) => MoveCore(c, t, GetCard(c, t, id) ?? throw Missing("Card", id), targetColumnId, beforeCardId));
 
     /// <summary>Copies a card (fields and labels) directly below the original, titled "… (copy)".</summary>
     public Card Duplicate(long id)
@@ -185,6 +158,40 @@ public sealed class CardRepository(BoardFlowDatabase database, IClock clock, ILo
         });
         Logger.LogInformation("Duplicated card {CardId} as {CopyId}", id, copyId);
         return Get(copyId) ?? throw Missing("Card", copyId);
+    }
+
+    private void MoveCore(SqliteConnection c, SqliteTransaction t, Card card, long targetColumnId, long? beforeCardId)
+    {
+        var id = card.Id;
+        if (card.IsArchived)
+        {
+            throw new ValidationException("Archived cards cannot be moved. Restore the card first.");
+        }
+
+        var sourceBoard = BoardOfColumn(c, t, card.ColumnId);
+        if (BoardOfColumn(c, t, targetColumnId) != sourceBoard)
+        {
+            throw new ValidationException("Cards can only be moved between columns of the same board.");
+        }
+
+        var targetIds = ActiveCardIds(c, t, targetColumnId);
+        if (beforeCardId is { } before && (before == id || !targetIds.Contains(before)))
+        {
+            // The anchor moved or was archived since the UI rendered; fall back to the bottom of the column.
+            beforeCardId = before == id ? NextActive(targetIds, id) : null;
+        }
+
+        var now = Clock.UtcNow;
+        var newTargetOrder = Ordering.MoveBefore(targetIds, id, beforeCardId);
+        if (targetColumnId != card.ColumnId)
+        {
+            c.Execute("UPDATE Cards SET ColumnId = @targetColumnId, UpdatedAt = @now WHERE Id = @id",
+                new { id, targetColumnId, now }, t);
+            WriteOrder(c, t, ActiveCardIds(c, t, card.ColumnId), now);
+        }
+
+        WriteOrder(c, t, newTargetOrder, now);
+        Logger.LogDebug("Moved card {CardId} to column {ColumnId} before {BeforeCardId}", id, targetColumnId, beforeCardId);
     }
 
     internal static List<long> ActiveCardIds(SqliteConnection c, SqliteTransaction t, long columnId) =>

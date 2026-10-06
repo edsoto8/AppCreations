@@ -28,17 +28,18 @@ public sealed class DatabaseInitializer(
     public InitializationResult Initialize()
     {
         var path = database.DatabasePath;
-        var directory = Path.GetDirectoryName(path);
-        if (!string.IsNullOrEmpty(directory))
-        {
-            Directory.CreateDirectory(directory);
-        }
-
-        var isNewFile = !File.Exists(path) || new FileInfo(path).Length == 0;
         var latest = _migrations[^1].Version;
 
         try
         {
+            var directory = Path.GetDirectoryName(path);
+            if (!string.IsNullOrEmpty(directory))
+            {
+                Directory.CreateDirectory(directory);
+            }
+
+            var isNewFile = !File.Exists(path) || new FileInfo(path).Length == 0;
+
             int current;
             using (var connection = database.Open())
             {
@@ -94,7 +95,7 @@ public sealed class DatabaseInitializer(
                 "Database {Path} {Outcome} from schema {From} to {To}", path, outcome, current, latest);
             return new InitializationResult(outcome, current, latest, backupPath);
         }
-        catch (SqliteException ex)
+        catch (Exception ex) when (ex is SqliteException or IOException or UnauthorizedAccessException)
         {
             logger.LogError(ex, "Could not open or migrate database {Path}", path);
             throw new PersistenceException(

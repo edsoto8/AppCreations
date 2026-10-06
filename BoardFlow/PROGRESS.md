@@ -20,12 +20,12 @@ Last updated: 2026-10-06 (session 1)
 -   [x] Milestone 7 --- Search and Filtering
 -   [x] Milestone 8 --- Productivity Features
 -   [x] Milestone 9 --- Polish and Resilience
--   [~] Milestone 10 --- Final Validation and Handoff
+-   [x] Milestone 10 --- Final Validation and Handoff
 
 ## Current Milestone
 
-**Milestone:** 10 --- Final Validation and Handoff\
-**Status:** In progress (independent review running; final clean build/test pending)
+**Milestone:** All required milestones complete. Next: stretch goals (none started).\
+**Status:** MVP done per the Definition of Done in `SPEC.md`.
 
 ## Acceptance Criteria — Evidence
 
@@ -139,8 +139,46 @@ verification history.
 - [x] Empty boards/workspaces look intentional — reviewed screenshots of each empty state.
 - [x] Consistent styling — own palette, control themes and typography (`Styles/Theme.axaml`);
       distinct logo/identity (no Trello branding).
-- Accessibility names on icon buttons, cards (summarised), inputs; keyboard navigation and card moves.
+- Accessibility names on icon buttons, cards (summarised), inputs; keyboard navigation and card moves;
+  focus is kept inside open dialogs/panels and restored when they close (`ReviewRegressionUiTests`).
 - Busy indicators: not added — every operation is a sub-millisecond local SQLite call (decision below).
+
+### Milestone 10 --- Final Validation and Handoff
+
+- [x] Clean build succeeds — all `bin/` and `obj/` deleted, `dotnet restore` + `dotnet build`: 0 warnings, 0 errors.
+- [x] Full test suite passes — 348/348 (299 Core/Data + 49 App), also under `TZ=America/Los_Angeles`
+      with a Turkish locale (`tr_TR`) to catch time-zone and culture bugs.
+- [x] README describes the actual implementation (commands re-run, shortcuts, decisions, limitations).
+- [x] PROGRESS.md reflects reality (this file); every criterion above was checked against a test or a
+      recorded manual run.
+- [x] Independent review performed and every finding addressed (below).
+- [x] SCORECARD.md completed.
+
+## Independent Review (Milestone 10)
+
+A fresh Opus sub-agent reviewed the code read-only against SPEC.md and verified its findings with
+throwaway tests. All findings were fixed by the lead, each with a regression test
+(`Data/ReviewRegressionTests`, `Ui/ReviewRegressionUiTests`). The five view-layer regression tests were
+confirmed to **fail** against the pre-fix code before the fix was restored.
+
+| # | Severity | Finding | Fix |
+|---|---|---|---|
+| 1 | High | Enter on a focused **Cancel** confirmed destructive dialogs (data loss); Tab escaped dialogs | Enter only confirms from a single-line text box; destructive dialogs open with Cancel focused; Tab trapped in dialog/panel; focus restored on close |
+| 2 | Medium | Lost pointer capture left a "stuck" drag that dropped on the next click | Override `OnPointerCaptureLost` (direct event); cancel when a move arrives without the button or a new press starts |
+| 3 | Medium | Dapper ignored the DateTime handler on write; times read back shifted by the UTC offset | Remove Dapper's built-in DateTime map so the handler writes ISO-8601 `Z` text; parse with AssumeUniversal (reads both formats) |
+| 4 | Low-Med | Ctrl+↑/↓ with a filter swapped with hidden cards (no visible change) | Neighbour taken from the visible list |
+| 5 | Low-Med | Switching board with unsaved edits could strand the editor | Await panel close; restore selection if the user keeps editing |
+| 6 | Low | Two repository calls outside the error boundary | Wrapped in `Try` |
+| 7 | Low | Unwritable data folder crashed instead of showing the start-up error | IO errors → `PersistenceException`; `AppSession` shows the error window for any start-up failure |
+| 8 | Low | Card save and column change were two transactions | `CardRepository.Update(id, input, targetColumnId)` does both atomically; dead "restore" path removed |
+| 9 | Low | New column hidden while a column filter was active | New column options are auto-selected when a column filter is active |
+| 10 | Low | Deleting a column (moving cards) changed archived cards' archive date | Archived rows keep `UpdatedAt` |
+| 11 | Low | Search was culture-sensitive (Turkish İ/ı) | Invariant-culture case-insensitive matching |
+| 12 | Low | Due badges stale after midnight | Minute timer calls `CheckDateRollover`, which reloads the board when the date changes |
+
+Also from the review: a keyboard-shortcuts dialog (F1, sidebar, board menu) makes Ctrl+N and the
+Ctrl+arrow moves discoverable; weak UI tests (`WelcomeScreen_Renders`, `MinimumWindowSize_…`) now
+assert on rendered controls and bounds; duplicated helpers removed.
 
 ## Work Log
 
@@ -151,6 +189,7 @@ verification history.
 - Sub-agent wrote the Core/Data test suite in an isolated worktree; lead verified (288 passing) and
   merged it, then fixed the three edge cases it reported (see decisions).
 - Lead wrote view-model and headless UI tests; ran the real app under Xvfb and drove it with `xdotool`.
+- Independent Opus review → 12 findings, all fixed with regression tests; final clean validation.
 
 ## Architecture Decisions
 
@@ -178,7 +217,7 @@ verification history.
 |---|---|---|---|---|
 | 1–10 | Lead | Opus | Architecture, all production code, view-model/UI tests, docs, integration | Builds and tests below |
 | 6 | Implementation | Sonnet (worktree) | Core + Data xUnit suite (12 classes) | 288 passing; re-run by lead; no production edits; 3 edge cases reported and fixed by lead |
-| 10 | Review | Opus (fresh context) | Independent review against SPEC | See review section |
+| 10 | Review | Opus (fresh context, read-only) | Independent review against SPEC | 12 findings (1 high); all verified by lead and fixed with regression tests |
 
 ## Verification History
 
@@ -188,10 +227,14 @@ verification history.
 | S1 | 6 | — | Core/Data 291/291 | Sub-agent suite re-run by lead + 3 new edge-case tests | Pass |
 | S1 | 1–5 | `dotnet build` clean | App 15/15 | Real app under Xvfb: welcome screen, DB + log created; caught and fixed missing DI registration | Pass |
 | S1 | 2–9 | clean | App 39/39 | Real X11 run with `xdotool`: create workspace/board, Ctrl+N quick-add ×2, drag card to Todo, restart process → card still in Todo | Pass |
+| S1 | 10 (review fixes) | clean | Core/Data 299/299, App 49/49 | 5 new UI regression tests shown failing on pre-fix code | Pass |
+| S1 | 10 (final) | clean restore + build, 0 warnings | 348/348; again 348/348 under `TZ=America/Los_Angeles` + `tr_TR` | Real X11 end-to-end re-run; DB inspected: ISO `…Z` timestamps, moved card in Todo after restart | Pass |
 
 ## Known Issues
 
-None open (see review section for anything found in final review).
+No known defects. Limitations (by design, documented in README): single window/user, boards not
+reorderable in the sidebar, plain-text descriptions, no undo, light theme only, search scoped to the
+open board. Avalonia logs harmless platform warnings on headless Linux (no DBus/GLX) at start-up.
 
 ## Blockers
 
@@ -212,4 +255,55 @@ Not started (stretch-goal rule: only after Milestone 10 is verified).
 
 ## Final Handoff
 
-To be completed at the end of Milestone 10.
+### Completed milestones
+
+-   1–10, each checked criterion by criterion above.
+
+### Partial milestones
+
+-   None.
+
+### Blocked milestones
+
+-   None.
+
+### Build result
+
+Clean restore and `dotnet build` of `BoardFlow.sln`: **0 warnings, 0 errors** (`TreatWarningsAsErrors`).
+
+### Test result
+
+`dotnet test`: **348 passed, 0 failed, 0 skipped** — `BoardFlow.Tests` 299, `BoardFlow.App.Tests` 49.
+Same result under `TZ=America/Los_Angeles` with a Turkish locale.
+
+### Known defects
+
+None known.
+
+### Important architectural decisions
+
+See the decisions table above and README "Design decisions": Core/Data/App split, Dapper
+repositories with one transaction per write, versioned migrations with backup and never-reset policy,
+dense sort orders, reload-from-database UI, pointer-based drag and drop, in-window dialogs/panels.
+
+### Meaningful model/sub-agent usage
+
+-   Sonnet (isolated worktree): Core/Data test suite — 288 tests, verified and merged by the lead.
+-   Opus (fresh context): independent read-only review — 12 findings, all fixed by the lead.
+-   Lead (Opus): architecture, all production code, app tests, real-app verification, docs.
+
+### Human-review areas
+
+-   `src/BoardFlow.App/Views/BoardView.axaml.cs` — drag-and-drop hit testing; worth a manual try on
+    Windows and macOS with real mice/trackpads (verified headless and on Linux X11 only).
+-   Visual design (`Styles/Theme.axaml`) — reviewed via screenshots only, on Linux.
+-   `src/BoardFlow.Data/DapperConfig.cs` — relies on `SqlMapper.RemoveTypeMap(DateTime)`; keep the
+    `Timestamps_AreStoredAsIsoUtcText` test when upgrading Dapper.
+
+### Recommended next 3 actions
+
+1.  Run the app on Windows and macOS (`dotnet run --project src/BoardFlow.App`) and try drag and
+    drop, dialogs and shortcuts with real input devices.
+2.  Start stretch goals in spec order: JSON import/export, then board templates.
+3.  Add CI (GitHub Actions: `dotnet build` + `dotnet test` on Windows/macOS/Linux; the UI tests are
+    headless and need no display).

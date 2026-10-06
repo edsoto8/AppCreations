@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using BoardFlow.App.ViewModels.Dialogs;
 using BoardFlow.Core.Domain;
 using BoardFlow.Core.Rules;
+using BoardFlow.Data.Repositories;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
@@ -218,15 +219,21 @@ public sealed partial class BoardViewModel : ViewModelBase
     private void SyncFilterOptions(IReadOnlyList<Label> labels, IReadOnlyList<BoardColumn> columns)
     {
         _suppressFilter = true;
-        Sync(LabelOptions, labels.Select(l => (l.Id, l.Name, (string?)l.DisplayColor)));
-        Sync(ColumnOptions, columns.Select(c => (c.Id, c.Name, (string?)null)));
+        Sync(LabelOptions, labels.Select(l => (l.Id, l.Name, (string?)l.DisplayColor)), selectNew: false);
+
+        // A column added while a column filter is active is selected too, so it does not appear to vanish.
+        Sync(ColumnOptions, columns.Select(c => (c.Id, c.Name, (string?)null)), selectNew: ColumnOptions.Any(o => o.IsSelected));
         _suppressFilter = false;
         OnPropertyChanged(nameof(HasLabelOptions));
 
-        void Sync(ObservableCollection<FilterOption> options, IEnumerable<(long Id, string Name, string? Color)> items)
+        void Sync(ObservableCollection<FilterOption> options, IEnumerable<(long Id, string Name, string? Color)> items, bool selectNew)
         {
+            var known = options.Select(o => o.Key).ToHashSet();
             var selected = options.Where(o => o.IsSelected).Select(o => o.Key).ToHashSet();
-            var fresh = items.Select(i => new FilterOption(i.Id, i.Name, i.Color, ApplyFilter) { IsSelected = selected.Contains(i.Id) }).ToList();
+            var fresh = items.Select(i => new FilterOption(i.Id, i.Name, i.Color, ApplyFilter)
+            {
+                IsSelected = selected.Contains(i.Id) || (selectNew && !known.Contains(i.Id)),
+            }).ToList();
             options.Clear();
             foreach (var option in fresh)
             {
@@ -309,9 +316,14 @@ public sealed partial class BoardViewModel : ViewModelBase
     [RelayCommand]
     private async Task DeleteColumn(ColumnViewModel column)
     {
-        var count = Services.Columns.CountCards(column.Id);
+        ColumnCardCount? count = null;
+        if (!Try(() => count = Services.Columns.CountCards(column.Id), "check the column"))
+        {
+            return;
+        }
+
         var others = Columns.Where(c => c.Id != column.Id).Select(c => c.Column).ToList();
-        var choice = await Services.Dialogs.ShowAsync(new DeleteColumnDialogViewModel(column.Column, count, others));
+        var choice = await Services.Dialogs.ShowAsync(new DeleteColumnDialogViewModel(column.Column, count!, others));
         if (choice is not null
             && Try(() => Services.Columns.Delete(column.Id, choice.Handling, choice.TargetColumnId), "delete the column"))
         {
@@ -393,23 +405,40 @@ public sealed partial class BoardViewModel : ViewModelBase
         }
     }
 
-    /// <summary>Keyboard reorder: move the card up (-1) or down (+1) within its column.</summary>
+    /// <summary>
+    /// Keyboard reorder: move the card up (-1) or down (+1) past its visible neighbour. With a search or
+    /// filter active, hidden cards are skipped so every key press visibly moves the card.
+    /// </summary>
     public void MoveCardVertically(CardItemViewModel card, int direction)
     {
-        if (!_activeOrder.TryGetValue(card.ColumnId, out var order))
+        var column = Columns.FirstOrDefault(c => c.Id == card.ColumnId);
+        if (column is null || !_activeOrder.TryGetValue(card.ColumnId, out var order))
         {
             return;
         }
 
-        var index = order.IndexOf(card.Id);
+        var visible = column.Cards;
+        var index = visible.IndexOf(card);
         var target = index + direction;
-        if (index < 0 || target < 0 || target >= order.Count)
+        if (index < 0 || target < 0 || target >= visible.Count)
         {
             return;
         }
 
-        // Moving down by one means "before the card two places below", or the end of the column.
-        long? before = direction < 0 ? order[target] : (target + 1 < order.Count ? order[target + 1] : null);
+        var neighbour = visible[target].Id;
+        long? before;
+        if (direction < 0)
+        {
+            before = neighbour;
+        }
+        else
+        {
+            // Going down: land directly after the neighbour, i.e. before whatever follows it in the full order.
+            var rest = order.Where(id => id != card.Id).ToList();
+            var after = rest.IndexOf(neighbour) + 1;
+            before = after < rest.Count ? rest[after] : null;
+        }
+
         MoveCard(card.Id, card.ColumnId, before);
     }
 
@@ -432,7 +461,12 @@ public sealed partial class BoardViewModel : ViewModelBase
     [RelayCommand]
     private async Task OpenCard(CardItemViewModel card)
     {
-        var fresh = Services.Cards.Get(card.Id);
+        Card? fresh = null;
+        if (!Try(() => fresh = Services.Cards.Get(card.Id), "open the card"))
+        {
+            return;
+        }
+
         if (fresh is null)
         {
             Services.Notifier.Error("That card no longer exists. The board has been refreshed.");

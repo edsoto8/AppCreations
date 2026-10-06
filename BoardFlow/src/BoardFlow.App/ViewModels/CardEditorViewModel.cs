@@ -54,10 +54,6 @@ public sealed partial class CardEditorViewModel : ViewModelBase, IPanel
 
     public bool HasLabelChoices => LabelChoices.Count > 0;
 
-    public bool IsArchived => _card?.IsArchived == true;
-
-    public string ArchiveText => IsArchived ? "Restore" : "Archive";
-
     public string? MetaText => _card is null
         ? null
         : $"Created {Local(_card.CreatedAt)} · Updated {Local(_card.UpdatedAt)}";
@@ -108,25 +104,21 @@ public sealed partial class CardEditorViewModel : ViewModelBase, IPanel
     [RelayCommand]
     private void ClearDueDate() => DueDate = null;
 
+    /// <summary>Saves pending edits, then archives the card (the editor only ever shows active cards).</summary>
     [RelayCommand]
-    private async Task ToggleArchive()
+    private void Archive()
     {
         if (_card is null || (IsDirty && !SaveCore()))
         {
             return;
         }
 
-        var archive = !_card.IsArchived;
-        if (Try(() => Services.Cards.SetArchived(_card.Id, archive), archive ? "archive the card" : "restore the card"))
+        if (Try(() => Services.Cards.SetArchived(_card.Id, true), "archive the card"))
         {
             Services.Panels.ForceClose(this);
             _board.Reload();
-            Services.Notifier.Info(archive
-                ? $"Archived '{_card.Title}'. Restore it from the Archive."
-                : $"Restored '{_card.Title}'.");
+            Services.Notifier.Info($"Archived '{_card.Title}'. Restore it from the Archive.");
         }
-
-        await Task.CompletedTask;
     }
 
     [RelayCommand]
@@ -216,12 +208,7 @@ public sealed partial class CardEditorViewModel : ViewModelBase, IPanel
             }
             else
             {
-                _card = Services.Cards.Update(_card.Id, input);
-                if (_card.ColumnId != column.Id && !_card.IsArchived)
-                {
-                    Services.Cards.Move(_card.Id, column.Id, null);
-                    _card = Services.Cards.Get(_card.Id) ?? _card;
-                }
+                _card = Services.Cards.Update(_card.Id, input, column.Id);
             }
         }, IsNew ? "create the card" : "save the card");
 

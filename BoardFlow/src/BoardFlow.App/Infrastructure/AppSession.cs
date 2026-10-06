@@ -42,10 +42,11 @@ public sealed class AppSession : IDisposable
         {
             services.GetRequiredService<DatabaseInitializer>().Initialize();
         }
-        catch (PersistenceException ex)
+        catch (Exception ex)
         {
             log.Error(ex, "Start-up stopped: the database could not be used");
-            return new AppSession(services, new StartupErrorWindow(ex.Message, paths), log, null);
+            var message = ex is PersistenceException ? ex.Message : $"Unexpected error while opening the database: {ex.Message}";
+            return new AppSession(services, new StartupErrorWindow(message, paths), log, null);
         }
 
         var main = services.GetRequiredService<MainViewModel>();

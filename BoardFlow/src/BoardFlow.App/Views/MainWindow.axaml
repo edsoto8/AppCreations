@@ -17,6 +17,7 @@
   <Window.KeyBindings>
     <KeyBinding Gesture="Ctrl+N" Command="{Binding QuickAddCardCommand}" />
     <KeyBinding Gesture="Cmd+N" Command="{Binding QuickAddCardCommand}" />
+    <KeyBinding Gesture="F1" Command="{Binding ShowShortcutsCommand}" />
   </Window.KeyBindings>
 
   <Window.DataTemplates>
@@ -25,6 +26,21 @@
     <DataTemplate DataType="vm:ArchiveViewModel"><views:ArchiveView /></DataTemplate>
     <DataTemplate DataType="vm:LabelsViewModel"><views:LabelsView /></DataTemplate>
     <!-- Dialogs -->
+    <DataTemplate DataType="dlg:ShortcutsDialogViewModel">
+      <ItemsControl ItemsSource="{Binding Shortcuts}">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate DataType="dlg:Shortcut">
+            <Grid ColumnDefinitions="168,*" Margin="0,3">
+              <Border HorizontalAlignment="Left" Background="{DynamicResource AppBackgroundBrush}" BorderBrush="{DynamicResource BorderBrush}"
+                      BorderThickness="1" CornerRadius="4" Padding="6,1">
+                <TextBlock Text="{Binding Keys}" FontSize="12" FontWeight="SemiBold" />
+              </Border>
+              <TextBlock Grid.Column="1" Text="{Binding Action}" Classes="secondary" TextWrapping="Wrap" VerticalAlignment="Center" />
+            </Grid>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </DataTemplate>
     <DataTemplate DataType="dlg:ConfirmDialogViewModel">
       <TextBlock Text="{Binding Message}" TextWrapping="Wrap" Classes="secondary" />
     </DataTemplate>
@@ -106,6 +122,13 @@
               <StackPanel Orientation="Horizontal" Spacing="8">
                 <PathIcon Data="{StaticResource IconTag}" />
                 <TextBlock Text="Labels" />
+              </StackPanel>
+            </Button>
+            <Button Classes="sidebar" Command="{Binding ShowShortcutsCommand}" AutomationProperties.Name="Keyboard shortcuts"
+                    ToolTip.Tip="F1">
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <TextBlock Text="⌨" FontSize="15" Width="16" TextAlignment="Center" />
+                <TextBlock Text="Keyboard shortcuts" />
               </StackPanel>
             </Button>
             <Button Classes="sidebar" Command="{Binding NewWorkspaceCommand}" AutomationProperties.Name="New workspace">
@@ -209,7 +232,7 @@
         </StackPanel>
 
         <!-- Open board -->
-        <DockPanel IsVisible="{Binding HasBoard}">
+        <DockPanel Name="BoardPage" IsVisible="{Binding HasBoard}">
           <Border DockPanel.Dock="Top" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}"
                   BorderThickness="0,0,0,1" Padding="20,12">
             <Grid ColumnDefinitions="*,Auto">
@@ -248,13 +271,14 @@
                   </StackPanel>
                 </Button>
 
-                <Button Classes="icon" ToolTip.Tip="Board actions" AutomationProperties.Name="Board actions">
+                <Button Name="BoardActions" Classes="icon" ToolTip.Tip="Board actions" AutomationProperties.Name="Board actions">
                   <PathIcon Data="{StaticResource IconMore}" />
                   <Button.Flyout>
                     <MenuFlyout Placement="BottomEdgeAlignedRight">
                       <MenuItem Header="Edit board…" Command="{Binding EditBoardCommand}" />
                       <MenuItem Header="Add column…" Command="{Binding CurrentBoard.AddColumnCommand, FallbackValue={x:Null}}" />
                       <MenuItem Header="Add default columns" Command="{Binding CurrentBoard.AddDefaultColumnsCommand, FallbackValue={x:Null}}" />
+                      <MenuItem Header="Keyboard shortcuts" InputGesture="F1" Command="{Binding ShowShortcutsCommand}" />
                       <Separator />
                       <MenuItem Header="Delete board…" Command="{Binding DeleteBoardCommand}" />
                     </MenuFlyout>
@@ -284,7 +308,7 @@
     <!-- ============ Side panel layer ============ -->
     <Panel IsVisible="{Binding Panels.Current, Converter={x:Static ObjectConverters.IsNotNull}}">
       <Border Name="PanelBackdrop" Background="{DynamicResource PanelBackdropBrush}" />
-      <Border HorizontalAlignment="Right" Width="500" Background="{DynamicResource SurfaceBrush}"
+      <Border Name="PanelCard" HorizontalAlignment="Right" Width="500" Background="{DynamicResource SurfaceBrush}"
               BoxShadow="-8 0 24 0 #331F2937">
         <ContentControl Content="{Binding Panels.Current}" />
       </Border>
@@ -293,14 +317,14 @@
     <!-- ============ Dialog layer ============ -->
     <Panel IsVisible="{Binding Dialogs.Current, Converter={x:Static ObjectConverters.IsNotNull}}">
       <Border Background="{DynamicResource BackdropBrush}" />
-      <Border Classes="dialog" Width="460" HorizontalAlignment="Center" VerticalAlignment="Center"
+      <Border Name="DialogCard" Classes="dialog" Width="460" HorizontalAlignment="Center" VerticalAlignment="Center"
               DataContext="{Binding Dialogs.Current}" x:DataType="dlg:DialogViewModel">
         <StackPanel Spacing="16">
           <TextBlock Classes="h2" Text="{Binding Title}" TextWrapping="Wrap" />
           <ContentControl Content="{Binding}" />
           <TextBlock Classes="error" Text="{Binding Error}" IsVisible="{Binding Error, Converter={x:Static ObjectConverters.IsNotNull}}" />
           <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
-            <Button Classes="ghost" Content="Cancel" Command="{Binding CancelCommand}" />
+            <Button Name="DialogCancel" Classes="ghost" Content="Cancel" Command="{Binding CancelCommand}" IsVisible="{Binding ShowCancel}" />
             <Button Name="DialogConfirm" Content="{Binding ConfirmText}" Command="{Binding ConfirmCommand}"
                     Classes.primary="{Binding !IsDestructive}" Classes.danger="{Binding IsDestructive}" />
           </StackPanel>

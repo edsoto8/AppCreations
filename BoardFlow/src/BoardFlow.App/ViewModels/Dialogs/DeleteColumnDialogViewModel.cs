@@ -71,8 +71,6 @@ public sealed partial class DeleteColumnDialogViewModel : DialogViewModel<Delete
 
     private static string Describe(ColumnCardCount count) =>
         count.Archived == 0
-            ? Plural(count.Active, "card")
-            : $"{Plural(count.Active, "card")} and {Plural(count.Archived, "archived card")}";
-
-    private static string Plural(int n, string noun) => n == 1 ? $"1 {noun}" : $"{n} {noun}s";
+            ? Text.Plural(count.Active, "card")
+            : $"{Text.Plural(count.Active, "card")} and {Text.Plural(count.Archived, "archived card")}";
 }

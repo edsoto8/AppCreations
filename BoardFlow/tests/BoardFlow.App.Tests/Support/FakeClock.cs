@@ -9,4 +9,6 @@ public sealed class FakeClock : IClock
     public DateTime UtcNow => _now = _now.AddMilliseconds(1);
 
     public DateOnly Today => DateOnly.FromDateTime(_now);
+
+    public void Advance(TimeSpan by) => _now += by;
 }

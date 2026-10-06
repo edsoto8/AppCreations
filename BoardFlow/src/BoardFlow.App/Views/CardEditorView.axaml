@@ -32,10 +32,10 @@
             <StackPanel.Styles>
               <Style Selector="Button"><Setter Property="Padding" Value="8,6" /></Style>
             </StackPanel.Styles>
-            <Button Classes="ghost" Command="{Binding ToggleArchiveCommand}" ToolTip.Tip="Hide the card from the board; restore it any time">
+            <Button Classes="ghost" Command="{Binding ArchiveCommand}" ToolTip.Tip="Hide the card from the board; restore it any time">
               <StackPanel Orientation="Horizontal" Spacing="6">
                 <PathIcon Data="{StaticResource IconArchive}" Width="14" Height="14" />
-                <TextBlock Text="{Binding ArchiveText}" />
+                <TextBlock Text="Archive" />
               </StackPanel>
             </Button>
             <Button Classes="ghost" Command="{Binding DuplicateCommand}" ToolTip.Tip="Create a copy below this card">

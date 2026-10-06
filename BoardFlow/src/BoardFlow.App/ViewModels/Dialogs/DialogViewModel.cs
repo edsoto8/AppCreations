@@ -13,6 +13,9 @@ public abstract partial class DialogViewModel(string title) : ObservableObject
 
     public virtual bool IsDestructive => false;
 
+    /// <summary>False for information-only dialogs that have a single button.</summary>
+    public virtual bool ShowCancel => true;
+
     /// <summary>Inline validation message; the dialog stays open while this is set.</summary>
     [ObservableProperty]
     public partial string? Error { get; set; }

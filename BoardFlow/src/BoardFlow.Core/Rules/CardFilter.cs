@@ -24,7 +24,10 @@ public sealed record CardFilter
 {
     public static CardFilter None { get; } = new();
 
-    /// <summary>Whitespace-separated terms; every term must appear in the title or description (case-insensitive).</summary>
+    /// <summary>
+    /// Whitespace-separated terms; every term must appear in the title or description. Matching ignores
+    /// case using invariant rules, so results do not depend on the machine's language settings.
+    /// </summary>
     public string SearchText { get; init; } = "";
 
     public IReadOnlySet<Priority> Priorities { get; init; } = new HashSet<Priority>();
@@ -82,7 +85,7 @@ public sealed record CardFilter
     {
         var terms = SearchText.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
         return terms.All(term =>
-            card.Title.Contains(term, StringComparison.CurrentCultureIgnoreCase)
-            || card.Description.Contains(term, StringComparison.CurrentCultureIgnoreCase));
+            card.Title.Contains(term, StringComparison.InvariantCultureIgnoreCase)
+            || card.Description.Contains(term, StringComparison.InvariantCultureIgnoreCase));
     }
 }
