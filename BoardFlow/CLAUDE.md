@@ -1,4 +1,61 @@
-# CLAUDE.md --- Autonomous Build Instructions
+# CLAUDE.md
+
+BoardFlow is a local-first Trello-style desktop app (.NET 10, Avalonia 12, SQLite + Dapper, Serilog,
+Microsoft DI, xUnit v3). `SPEC.md` is the authoritative product spec, `PROGRESS.md` the build/handoff
+record, `SCORECARD.md` the evaluation sheet, and `README.md` covers usage, shortcuts and design decisions.
+
+## Commands
+
+Run from this `BoardFlow/` folder:
+
+```bash
+dotnet build                                                   # whole solution (warnings are errors)
+dotnet test                                                    # all tests
+dotnet test tests/BoardFlow.Tests                              # Core + Data only (fast, no UI)
+dotnet test --filter "FullyQualifiedName~CardRepositoryTests"  # one test class
+dotnet run --project src/BoardFlow.App -- --data-dir ./tmp-data
+BOARDFLOW_SCREENSHOTS=/tmp/shots dotnet test tests/BoardFlow.App.Tests   # save headless UI screenshots
+```
+
+On Linux without a display, run the real app under `xvfb-run -a`.
+
+## Architecture
+
+- **`BoardFlow.Core` has no dependencies.** Domain classes plus pure rules: `Validate` (every input
+  rule, throws `ValidationException` with a user-facing message), `Ordering` (dense list reordering),
+  `DueDates`, `CardFilter` (search/filter matching).
+- **`BoardFlow.Data` is the only place with SQL.** Dapper over Microsoft.Data.Sqlite. Each repository
+  method opens a pooled connection; writes go through `RepositoryBase.Write` (one transaction, SQLite
+  errors logged and rethrown as `PersistenceException`). Schema changes are new entries appended to
+  `Schema/Migrations.cs` — never edit a released migration. `DatabaseInitializer` must never delete,
+  reset or overwrite an existing database.
+- **Sort orders are dense** (0..n-1) for boards, columns and active cards; every reorder rewrites the
+  affected list in one transaction. Archived cards are outside the sequence.
+- **`BoardFlow.App`**: `Program` → `AppSession.Start` (DI, database check, main view model). View
+  models use CommunityToolkit.Mvvm partial properties and call repositories directly through the
+  `BoardServices` bundle; `ViewModelBase.Try` is the error boundary. After each change a view model
+  reloads from the database (`BoardViewModel.Reload`) and reuses item view models by id.
+- **Overlays**: `DialogHost` (modal dialogs) and `PanelHost` (side panels) are in-window layers in
+  `MainWindow.axaml`, chosen by `DataTemplate`s per view-model type.
+- **Drag and drop** is pointer-event based in `Views/BoardView.axaml.cs`; the view computes the drop
+  target and calls `BoardViewModel.MoveCard` / `MoveColumn`.
+- **Theme**: colours and control themes live in `Styles/Theme.axaml`, icons in `Styles/Icons.axaml`.
+  Use the button classes (`primary`, `secondary`, `ghost`, `danger`, `dangerText`, `icon`, `card`).
+
+## Conventions
+
+- C#, four-space indent, file-scoped namespaces `BoardFlow.*`, `sealed` classes by default.
+- Tests: real SQLite files in temp folders (no mocks of our own code). UI tests use `[AvaloniaFact]`
+  and `TestSession`, which starts the app exactly like `Program` does. Test names follow
+  `Subject_Condition_Outcome`.
+- Keep `README.md` (shortcuts, decisions, limitations) and `PROGRESS.md` truthful when behaviour changes.
+
+---
+
+# Autonomous Build Instructions
+
+The remainder of this file is the build brief this app was created under. It still governs further
+milestone and stretch-goal work.
 
 ## Mission
 
