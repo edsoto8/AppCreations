@@ -66,6 +66,18 @@ internal static class ReportAssets
 
         .description { margin: 6px 0 12px; overflow-wrap: anywhere; }
 
+        .badge {
+          display: inline-block;
+          margin-left: 6px;
+          padding: 0 8px;
+          border-radius: 10px;
+          background: var(--note-bg);
+          color: var(--note-text);
+          font-size: 0.8rem;
+          font-weight: 600;
+          vertical-align: 1px;
+        }
+
         .shot { margin: 0; }
         .shot-link {
           position: relative;

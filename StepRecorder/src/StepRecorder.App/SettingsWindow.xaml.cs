@@ -32,6 +32,7 @@ public partial class SettingsWindow : Window
         LeftClickBox.IsChecked = settings.Recording.CaptureLeftClick;
         RightClickBox.IsChecked = settings.Recording.CaptureRightClick;
         MergeDoubleClickBox.IsChecked = settings.Recording.MergeDoubleClicks;
+        IdentifyControlsBox.IsChecked = settings.Recording.IdentifyControls;
         FormatBox.SelectedIndex = settings.Screenshot.Format == ScreenshotFormat.Jpeg ? 1 : 0;
         QualityBox.Text = settings.Screenshot.JpegQuality.ToString(CultureInfo.CurrentCulture);
         MarkerBox.IsChecked = settings.Screenshot.ClickMarkerEnabled;
@@ -101,6 +102,7 @@ public partial class SettingsWindow : Window
                 CaptureLeftClick = LeftClickBox.IsChecked == true,
                 CaptureRightClick = RightClickBox.IsChecked == true,
                 MergeDoubleClicks = MergeDoubleClickBox.IsChecked == true,
+                IdentifyControls = IdentifyControlsBox.IsChecked == true,
             },
             Screenshot = original.Screenshot with
             {

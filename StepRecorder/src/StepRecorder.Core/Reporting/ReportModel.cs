@@ -22,9 +22,10 @@ public sealed record ReportStep(
     DateTimeOffset Timestamp,
     string ApplicationName,
     string? WindowTitle,
-    string Description,
+    StepDescription Description,
     ReportScreenshot? Screenshot,
-    string? ScreenshotNote)
+    string? ScreenshotNote,
+    bool IsSensitive = false)
 {
     /// <summary>For example "Step 7 — Visual Studio".</summary>
     public string Heading => $"Step {Number} — {ApplicationName}";

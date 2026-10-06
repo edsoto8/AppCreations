@@ -35,8 +35,9 @@ public static class ReportBuilder
             Timestamp: step.Timestamp,
             ApplicationName: StepDescriber.ApplicationName(step),
             WindowTitle: string.IsNullOrWhiteSpace(step.WindowTitle) ? null : step.WindowTitle.Trim(),
-            Description: StepDescriber.Describe(step),
+            Description: StepDescriber.DescribeRuns(step),
             Screenshot: screenshot,
-            ScreenshotNote: step.ScreenshotNote);
+            ScreenshotNote: step.ScreenshotNote,
+            IsSensitive: step.IsSensitive);
     }
 }

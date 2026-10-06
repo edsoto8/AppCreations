@@ -33,7 +33,17 @@ public sealed class MarkdownReportExporter : IReportExporter
         foreach (ReportStep step in report.Steps)
         {
             md.Append("## ").Append(Escape(step.Heading)).Append("\n\n");
-            md.Append(Escape(step.Description)).Append("  \n");
+            foreach (TextRun run in step.Description.Runs)
+            {
+                md.Append(run.Emphasis ? $"**{Escape(run.Text)}**" : Escape(run.Text));
+            }
+
+            if (step.IsSensitive)
+            {
+                md.Append(" *(password field)*");
+            }
+
+            md.Append("  \n");
             md.Append('*').Append(ReportText.Time(step.Timestamp)).Append("*\n\n");
 
             if (step.Screenshot is { } shot)

@@ -28,7 +28,8 @@ tests run anywhere.
 
 - **`StepRecorder.Core` (`net10.0`) must stay free of Windows APIs**, so it can be tested on any OS.
   Win32 code goes in `StepRecorder.Windows` (hooks, window lookup, capture, and later UI Automation),
-  behind Core interfaces (`IMouseClickSource`, `IWindowInspector`, `IWindowCapture`). UI goes in `StepRecorder.App`.
+  behind Core interfaces (`IMouseClickSource`, `IWindowInspector`, `IWindowCapture`,
+  `IUiElementInspector`, `IScreenshotAnnotator`). UI goes in `StepRecorder.App`.
 - **`Recorder` is the single state machine** (Idle → Recording ⇄ Paused → Idle). It is thread-safe,
   saves `session.json` on every transition, and raises `StateChanged` outside its lock. `TrayController`
   marshals that event and `StepsChanged` to the UI thread.
@@ -50,6 +51,10 @@ tests run anywhere.
 - **Click markers** come from one `MarkerGeometry` (DPI-scaled, in screenshot pixels), used by both
   the HTML SVG overlay and `IScreenshotAnnotator` copies in `screenshots/marked/`. Never modify original
   screenshots (ADR 0007).
+- **UI Automation** (ADR 0008): `UiaElementInspector` runs on a worker task alongside the capture, with a
+  1.5 s timeout and at most one lookup in flight. Read identifying properties only (never values),
+  and never log element names. `StepDescriber.DescribeRuns` turns them into `TextRun`s (bold names);
+  plain `Describe` is for tests and alt text.
 - **Repeat clicks**: the consumer merges a click that repeats the last one into that step's
   `ClickCount` (`RepeatClickDetector`, `Recorder.AddClickToLastStep`) before capturing.
 - **Persistence**: `FileSessionStore` writes `session.json` atomically (temp file + rename). The session
@@ -83,6 +88,6 @@ tests run anywhere.
   other apps' windows must not send them messages (a hung app would stall the recorder).
 - C# with four-space indentation, PascalCase public members, camelCase locals and private fields
   (no underscore prefix)
-- Namespace prefix `StepRecorder.*`; Core is split by folder: `Sessions`, `Recording`, `Input`, `Capture`, `Reporting`, `Settings`, `Storage`
+- Namespace prefix `StepRecorder.*`; Core is split by folder: `Sessions`, `Recording`, `Input`, `Capture`, `Automation`, `Reporting`, `Settings`, `Storage`
 - Tests: xUnit, class `RecorderTests`, method pattern `Stop_WhilePaused_CountsOpenPause`; use
   `ManualTimeProvider` and `TempDirectory` from `TestSupport.cs`

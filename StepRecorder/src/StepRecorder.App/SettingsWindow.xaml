@@ -27,6 +27,8 @@
                 <CheckBox x:Name="LeftClickBox" Content="Record _left clicks" Margin="0,2" />
                 <CheckBox x:Name="RightClickBox" Content="Record ri_ght clicks" Margin="0,2" />
                 <CheckBox x:Name="MergeDoubleClickBox" Content="_Double- and triple-clicks become one step" Margin="0,2" />
+                <CheckBox x:Name="IdentifyControlsBox" Margin="0,2"
+                          Content="_Identify the clicked button, tab, menu item… (UI Automation)" />
             </StackPanel>
         </GroupBox>
 

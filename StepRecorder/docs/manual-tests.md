@@ -116,3 +116,24 @@ Open the session's `screenshots/` folder next to `session.json`.
 | 5.12 | Click Calculator and Settings (UWP) | `applicationName` is "Calculator" / "Settings", not "Application Frame Host" | |
 | 5.13 | Maximized 4K window, several quick clicks; check the log | Any "Slow capture: N ms" lines show how long capture takes; note the numbers here | |
 | 5.14 | Settings window with keyboard only | All new controls reachable; Alt+L/G/D/F/Q/K/Z work | |
+
+## Phase 6 — UI Automation
+
+Look at the step descriptions in `report.html`, plus the `uiAutomation*` fields in `session.json`.
+
+| # | Check | Expected | Result |
+|---|---|---|---|
+| 6.1 | Notepad: click File, then Save As… | "Click the **File** menu item…" / "Select the **…Save as** menu item…" (record the menu path you see) | |
+| 6.2 | Classic dialog (e.g. Run, Win+R): click the text box, then OK | "Click the **Open:** text box…", "Click the **OK** button…" | |
+| 6.3 | Settings app: click a page in the left list; a toggle | "Select the **Bluetooth & devices** list item…"; toggle named | |
+| 6.4 | Explorer: select a file; double-click a folder; right-click a file | "Select the **x.txt** list item", "Double-click the **Docs** list item", "Right-click the **x.txt** list item" | |
+| 6.5 | A tabbed dialog (e.g. System Properties): switch tabs | "Select the **Advanced** tab…" | |
+| 6.6 | Check box and radio buttons in any dialog | "check box" / "option" wording | |
+| 6.7 | Desktop icon double-click; taskbar app button | "…list item on the desktop", "…button on the taskbar" | |
+| 6.8 | Chrome/Edge: click a link and a button on a web page (click twice: once to wake accessibility) | Second and later clicks name the link/button; first may use coordinates | |
+| 6.9 | A login page or Windows credential dialog password field | Step shows a "Password field" badge; nothing typed appears anywhere; `isSensitive: true` | |
+| 6.10 | Elevated app (Task Manager as admin) | Coordinates description; no hang | |
+| 6.11 | A hung app (e.g. a test app that sleeps on the UI thread): click it, then click Notepad | First step has no control details after ~1.5 s; recording keeps going; log says "UI Automation lookup took longer…" | |
+| 6.12 | Settings → turn off "Identify the clicked button…" → record | Coordinate descriptions only | |
+| 6.13 | Rapid clicking in a big app with UIA on | Clicks never feel delayed; screenshots still match their clicks | |
+| 6.14 | Search the log for control names you clicked | None appear (names are not logged) | |

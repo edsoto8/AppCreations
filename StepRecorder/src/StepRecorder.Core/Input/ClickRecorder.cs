@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Threading.Channels;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using StepRecorder.Core.Automation;
 using StepRecorder.Core.Capture;
 using StepRecorder.Core.Recording;
 using StepRecorder.Core.Sessions;
@@ -19,6 +20,12 @@ public sealed class ClickRecorder : IDisposable
 {
     public const int DefaultQueueCapacity = 256;
 
+    /// <summary>
+    /// How long a click waits for UI Automation, counted from when the lookup starts. The lookup runs
+    /// alongside the capture, so this only adds delay when UI Automation is slower than the capture.
+    /// </summary>
+    public static readonly TimeSpan DefaultElementLookupTimeout = TimeSpan.FromMilliseconds(1500);
+
     /// <summary>Captures slower than this are logged, to find windows that delay later screenshots (ADR 0003).</summary>
     public static readonly TimeSpan SlowCaptureThreshold = TimeSpan.FromMilliseconds(250);
 
@@ -29,6 +36,8 @@ public sealed class ClickRecorder : IDisposable
     private readonly IMouseClickSource source;
     private readonly IWindowInspector inspector;
     private readonly IWindowCapture capture;
+    private readonly IUiElementInspector? elementInspector;
+    private readonly TimeSpan elementLookupTimeout;
     private readonly int ownProcessId;
     private readonly TimeProvider time;
     private readonly ILogger logger;
@@ -39,6 +48,10 @@ public sealed class ClickRecorder : IDisposable
     // Consumer-thread only: the last click that produced or extended a step, for double-click merging.
     private (MouseClick Click, long? Window, int StepNumber)? lastRecorded;
 
+    // Consumer-thread only: the latest UI Automation lookup. One that is still running (a hung app) blocks
+    // new lookups, so hung calls can't pile up threads.
+    private Task<UiElementInfo?>? pendingLookup;
+
     public ClickRecorder(
         Recorder recorder,
         IMouseClickSource source,
@@ -47,8 +60,12 @@ public sealed class ClickRecorder : IDisposable
         int ownProcessId,
         TimeProvider? timeProvider = null,
         ILogger? logger = null,
-        int queueCapacity = DefaultQueueCapacity)
+        int queueCapacity = DefaultQueueCapacity,
+        IUiElementInspector? elementInspector = null,
+        TimeSpan? elementLookupTimeout = null)
     {
+        this.elementInspector = elementInspector;
+        this.elementLookupTimeout = elementLookupTimeout ?? DefaultElementLookupTimeout;
         this.recorder = recorder;
         this.source = source;
         this.inspector = inspector;
@@ -216,8 +233,60 @@ public sealed class ClickRecorder : IDisposable
             return;
         }
 
-        Step? step = recorder.AddStep(click, window, CaptureWindow(window, session.ScreenshotSettingsSnapshot));
+        // Element lookup and capture run at the same time, so both see the UI as close to the click as possible.
+        long lookupStarted = Stopwatch.GetTimestamp();
+        Task<UiElementInfo?>? lookup = StartElementLookup(click, session);
+        StepScreenshot screenshot = CaptureWindow(window, session.ScreenshotSettingsSnapshot);
+        UiElementInfo? element = FinishElementLookup(lookup, lookupStarted);
+
+        Step? step = recorder.AddStep(click, window, screenshot, element);
         lastRecorded = step is null ? null : (click, window?.Handle, step.StepNumber);
+    }
+
+    private Task<UiElementInfo?>? StartElementLookup(MouseClick click, Session session)
+    {
+        if (elementInspector is null || !session.RecordingSettingsSnapshot.IdentifyControls)
+        {
+            return null;
+        }
+
+        if (pendingLookup is { IsCompleted: false })
+        {
+            logger.LogWarning("UI Automation is still busy with an earlier click; recording this click without control details");
+            return null;
+        }
+
+        pendingLookup = Task.Run(() =>
+        {
+            try
+            {
+                return elementInspector.GetElementAt(click.X, click.Y);
+            }
+            catch (Exception ex)
+            {
+                // Element names are not logged: they can contain user content (list items, document titles).
+                logger.LogWarning(ex, "UI Automation lookup failed; recording the click without control details");
+                return null;
+            }
+        });
+        return pendingLookup;
+    }
+
+    private UiElementInfo? FinishElementLookup(Task<UiElementInfo?>? lookup, long started)
+    {
+        if (lookup is null)
+        {
+            return null;
+        }
+
+        TimeSpan remaining = elementLookupTimeout - Stopwatch.GetElapsedTime(started);
+        if (lookup.Wait(remaining > TimeSpan.Zero ? remaining : TimeSpan.Zero))
+        {
+            return lookup.Result;
+        }
+
+        logger.LogWarning("UI Automation lookup took longer than {Timeout} ms; recording the click without control details", (int)elementLookupTimeout.TotalMilliseconds);
+        return null;
     }
 
     private StepScreenshot CaptureWindow(WindowInfo? window, ScreenshotSettings settings)

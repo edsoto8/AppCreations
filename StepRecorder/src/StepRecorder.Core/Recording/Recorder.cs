@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using StepRecorder.Core.Automation;
 using StepRecorder.Core.Capture;
 using StepRecorder.Core.Input;
 using StepRecorder.Core.Sessions;
@@ -192,7 +193,7 @@ public sealed class Recorder(
     /// paused) are dropped. A screenshot that cannot be written leaves the step without one.
     /// </summary>
     /// <returns>The new step, or null when the click was dropped.</returns>
-    public Step? AddStep(MouseClick click, WindowInfo? window, StepScreenshot? screenshot = null)
+    public Step? AddStep(MouseClick click, WindowInfo? window, StepScreenshot? screenshot = null, UiElementInfo? element = null)
     {
         Step step;
         lock (gate)
@@ -202,7 +203,7 @@ public sealed class Recorder(
                 return null;
             }
 
-            step = StepFactory.FromClick(current!.Steps.Count + 1, click, window);
+            step = StepFactory.FromClick(current!.Steps.Count + 1, click, window, element);
             if (screenshot is not null)
             {
                 AttachScreenshot(current, step, screenshot);

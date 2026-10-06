@@ -183,7 +183,7 @@ public sealed partial class ReportTests : IDisposable
         Assert.True(first > 0 && second > first);
         Assert.Contains("<img src=\"screenshots/step-001.png\" width=\"800\" height=\"600\"", html);
         Assert.Contains("Step 2 — Notepad", html);
-        Assert.Contains("Click at (412, 218) in &quot;Untitled - Notepad&quot;.", html);
+        Assert.Contains("Click at (412, 218) in <strong>Untitled - Notepad</strong>.", html);
         Assert.Contains("<link rel=\"stylesheet\" href=\"assets/report.css\">", html);
         Assert.DoesNotContain("http://", html);
         Assert.DoesNotContain("https://", html);
@@ -277,7 +277,7 @@ public sealed partial class ReportTests : IDisposable
 
         string md = MarkdownReportExporter.Render(ReportBuilder.Build(SessionWith(step)));
 
-        Assert.Contains(@"in ""\*draft\* \[1\] \<b\> \`code\` \#tag line2"".", md);
+        Assert.Contains(@"in **\*draft\* \[1\] \<b\> \`code\` \#tag line2**.", md);
     }
 
     [Fact]

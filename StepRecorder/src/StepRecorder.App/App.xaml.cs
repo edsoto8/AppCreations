@@ -58,7 +58,8 @@ public partial class App : Application
             new Win32WindowInspector(),
             new Win32WindowCapture(),
             Environment.ProcessId,
-            logger: logging.CreateLogger(nameof(ClickRecorder)));
+            logger: logging.CreateLogger(nameof(ClickRecorder)),
+            elementInspector: new UiaElementInspector());
 
         tray = new TrayController(this, recorder, clickRecorder, sessionStore, settingsStore, logger);
         logger.LogInformation("Step Recorder {Version} started on {OperatingSystem}", AppPaths.Version, AppPaths.SessionEnvironment.OperatingSystem);

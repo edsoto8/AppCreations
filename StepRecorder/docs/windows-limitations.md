@@ -42,3 +42,16 @@ each step.
 | Windows 11 rounded corners | The corner pixels outside the rounded frame may be black or show the background. | Suspected cosmetic |
 | Desktop clicks | Not captured (`Skipped`): the desktop spans every monitor. | By design |
 | Very large windows (4K+) | Capture and encoding can take 100 ms or more, which delays the next click's screenshot. | Suspected; see ADR 0003 |
+
+## UI Automation (Phase 6)
+
+| Situation | Expected behavior | Status |
+|---|---|---|
+| Win32, WinForms, WPF, UWP/WinUI controls | Name, type and automation ID come back reliably. | Suspected |
+| Chromium / Electron / browsers | Chrome turns on its accessibility tree only when a UIA client asks, so the **first** click may only see "Chrome Legacy Window" (falls back to coordinates); later clicks should name page elements. Electron apps may not expose a tree at all. | Suspected |
+| Elevated (admin) apps | UIPI stops a non-elevated client from inspecting elevated windows, so steps fall back to coordinates. | Suspected |
+| Hung or very busy app | Lookup times out after 1.5 s; later clicks skip UIA until it returns. | By design |
+| WinUI 3 / XAML flyout menus (Windows 11 Notepad, Explorer) | Flyouts aren't linked to their menu bar item in the UIA tree, so the menu path may be just "Save as" rather than "File > Save as". | Suspected |
+| Custom-drawn apps (games, some Java/Qt apps, remote desktops) | No useful element: coordinates are used. | Expected |
+| Password boxes | Detected via `IsPassword`; never read. Web password inputs depend on the browser exposing `IsPassword`. | Suspected |
+| First lookup after start | Loading the UIA client takes about 100–300 ms; it runs alongside the capture. | Suspected |

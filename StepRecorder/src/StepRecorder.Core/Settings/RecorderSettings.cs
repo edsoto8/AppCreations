@@ -28,6 +28,12 @@ public sealed record RecordingSettings
     /// (with <c>clickCount</c> 2 or 3) instead of several identical ones.
     /// </summary>
     public bool MergeDoubleClicks { get; init; } = true;
+
+    /// <summary>
+    /// Ask UI Automation which control was clicked, for descriptions like "Click the Save button". Can be
+    /// turned off if an application misbehaves while being inspected.
+    /// </summary>
+    public bool IdentifyControls { get; init; } = true;
 }
 
 public enum ScreenshotFormat

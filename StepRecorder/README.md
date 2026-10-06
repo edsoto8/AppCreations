@@ -16,10 +16,12 @@ The full product spec is [`../StepRecorder-MultiModel-Spec.md`](../StepRecorder-
 | 3 — Window screenshots | **Built; Windows manual checks pending** |
 | 4 — HTML + Markdown reports with click markers | **Built; Windows manual checks pending** |
 | Phase 5 — click markers in image copies, double-click merging, screenshot format | **Built; Windows manual checks pending** |
-| 5+ — UI Automation, privacy, editor, smart processing, exports, AI | Not started |
+| Phase 6 — UI Automation: name the clicked control | **Built; Windows manual checks pending** |
+| 7+ — reliability/recovery, privacy, editor, smart processing, exports, AI | Not started |
 
 Each left or right click in another application becomes a step in `session.json`, with the window, app
-and click position, plus a PNG of just that window. When you stop, Step Recorder writes `report.html`
+and click position, the control that was clicked (via UI Automation, e.g. "Click the **Save** button in
+**Invoice Editor**"), plus a PNG of just that window. When you stop, Step Recorder writes `report.html`
 (click markers drawn over each screenshot) and `report.md`, and offers to open the report.
 
 ## Requirements
@@ -50,7 +52,7 @@ It never opens a main window. Right-click the icon for the menu:
 | Pause / Resume Recording | Pauses without ending the session |
 | Stop Recording | Finalizes the session and writes its reports; click the notification to open the report |
 | Open Last Recording | Opens the most recent report (writing it first for an interrupted session) |
-| Settings… | Recordings folder and name; which clicks to record and double-click merging; PNG/JPEG and quality; click markers and their size; report formats |
+| Settings… | Recordings folder and name; which clicks to record, double-click merging, control identification; PNG/JPEG and quality; click markers and their size; report formats |
 | Exit | Asks first if a recording is in progress, then stops and saves it |
 
 The icon shows the state: **grey** dot = not recording, **red** dot = recording, **amber** pause symbol = paused.
@@ -94,7 +96,7 @@ StepRecorder/
 │   │                          ClickRecorder pipeline, settings, file storage, reports
 │   │                          (HTML/Markdown exporters). No Windows APIs.
 │   ├── StepRecorder.Windows/  Win32 (net10.0-windows): low-level mouse hook, window lookup,
-│   │                          window capture
+│   │                          window capture, marker drawing, UI Automation
 │   └── StepRecorder.App/      WPF tray app (net10.0-windows): TrayController, SettingsWindow,
 │                              tray icons, file logger
 ├── tests/StepRecorder.Tests/  xUnit tests for Core
@@ -107,6 +109,7 @@ StepRecorder/
 ## Privacy
 
 Recording is local only, with no network access. The recorder does not log keystrokes, and its mouse
-hook is installed only while recording. Logs never
+hook is installed only while recording. UI Automation reads only control names and types, never field
+contents. Password fields are flagged in the report, and their contents are never read. Logs never
 contain typed text, passwords or image data. It runs without administrator rights and does not try to
 capture protected windows or secure desktops.

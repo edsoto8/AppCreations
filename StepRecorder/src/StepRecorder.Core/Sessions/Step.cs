@@ -67,8 +67,17 @@ public sealed class Step
 
     public string? UIAutomationAutomationId { get; set; }
 
+    public string? UIAutomationLocalizedControlType { get; set; }
+
+    /// <summary>The element's bounds in physical virtual-desktop pixels.</summary>
+    public ScreenRect? UIAutomationBounds { get; set; }
+
+    /// <summary>For menu items, the path from the top menu, such as <c>File &gt; Export</c>.</summary>
+    public string? UIAutomationMenuPath { get; set; }
+
     public string? GeneratedDescription { get; set; }
 
+    /// <summary>Set when the clicked element is a password field (UI Automation <c>IsPassword</c>).</summary>
     public bool IsSensitive { get; set; }
 
     public bool IsRedacted { get; set; }

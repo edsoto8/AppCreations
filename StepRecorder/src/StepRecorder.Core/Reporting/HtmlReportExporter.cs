@@ -90,7 +90,7 @@ public sealed class HtmlReportExporter : IReportExporter
             <h2><a href="#step-{step.Number}">{Encode(step.Heading)}</a></h2>
             <time datetime="{Encode(step.Timestamp.ToString("O", CultureInfo.InvariantCulture))}">{Encode(ReportText.Time(step.Timestamp))}</time>
             </header>
-            <p class="description">{Encode(step.Description)}</p>
+            <p class="description">{Runs(step.Description)}{(step.IsSensitive ? " <span class=\"badge\">Password field</span>" : "")}</p>
 
             """);
 
@@ -128,6 +128,9 @@ public sealed class HtmlReportExporter : IReportExporter
 
         html.Append("</article>\n</li>\n");
     }
+
+    private static string Runs(StepDescription description) => string.Concat(description.Runs.Select(run =>
+        run.Emphasis ? $"<strong>{Encode(run.Text)}</strong>" : Encode(run.Text)));
 
     private static string Number(double value) => value.ToString("0.###", CultureInfo.InvariantCulture);
 
