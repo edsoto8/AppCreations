@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <!-- Only for System.Windows.Forms.NotifyIcon (see docs/decisions/0001). -->
+    <UseWindowsForms>true</UseWindowsForms>
+    <!-- Lets the project build on macOS/Linux; it still only runs on Windows. -->
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <AssemblyName>StepRecorder</AssemblyName>
+    <RootNamespace>StepRecorder.App</RootNamespace>
+    <Version>0.1.0</Version>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+    <!-- WFO0003 wants DPI mode set via WinForms' Application.SetHighDpiMode. This is a WPF app that
+         never runs the WinForms startup path, so the manifest is the correct place for it. -->
+    <NoWarn>$(NoWarn);WFO0003</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- WPF types win; WinForms and System.Drawing types are always written fully qualified. -->
+    <Using Remove="System.Windows.Forms" />
+    <Using Remove="System.Drawing" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\StepRecorder.Core\StepRecorder.Core.csproj" />
+    <ProjectReference Include="..\StepRecorder.Windows\StepRecorder.Windows.csproj" />
+  </ItemGroup>
+
+</Project>
