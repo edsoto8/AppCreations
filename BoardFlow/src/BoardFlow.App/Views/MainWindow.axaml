@@ -1,0 +1,329 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:BoardFlow.App.ViewModels"
+        xmlns:dlg="using:BoardFlow.App.ViewModels.Dialogs"
+        xmlns:domain="using:BoardFlow.Core.Domain"
+        xmlns:views="using:BoardFlow.App.Views"
+        xmlns:infra="using:BoardFlow.App.Infrastructure"
+        xmlns:conv="using:BoardFlow.App.Converters"
+        x:Class="BoardFlow.App.Views.MainWindow"
+        x:DataType="vm:MainViewModel"
+        Title="BoardFlow"
+        Width="1320" Height="820" MinWidth="960" MinHeight="600"
+        WindowStartupLocation="CenterScreen"
+        Background="{DynamicResource AppBackgroundBrush}"
+        FontSize="13">
+
+  <Window.KeyBindings>
+    <KeyBinding Gesture="Ctrl+N" Command="{Binding QuickAddCardCommand}" />
+    <KeyBinding Gesture="Cmd+N" Command="{Binding QuickAddCardCommand}" />
+  </Window.KeyBindings>
+
+  <Window.DataTemplates>
+    <!-- Side panels -->
+    <DataTemplate DataType="vm:CardEditorViewModel"><views:CardEditorView /></DataTemplate>
+    <DataTemplate DataType="vm:ArchiveViewModel"><views:ArchiveView /></DataTemplate>
+    <DataTemplate DataType="vm:LabelsViewModel"><views:LabelsView /></DataTemplate>
+    <!-- Dialogs -->
+    <DataTemplate DataType="dlg:ConfirmDialogViewModel">
+      <TextBlock Text="{Binding Message}" TextWrapping="Wrap" Classes="secondary" />
+    </DataTemplate>
+    <DataTemplate DataType="dlg:TextPromptDialogViewModel">
+      <StackPanel Spacing="4">
+        <TextBlock Classes="fieldLabel" Text="{Binding Label}" />
+        <TextBox Text="{Binding Text}" infra:FocusBehavior.FocusWhenVisible="True"
+                 AutomationProperties.Name="{Binding Label}" />
+      </StackPanel>
+    </DataTemplate>
+    <DataTemplate DataType="dlg:BoardDialogViewModel">
+      <StackPanel Spacing="12">
+        <StackPanel Spacing="4">
+          <TextBlock Classes="fieldLabel" Text="Board name" />
+          <TextBox Text="{Binding Name}" infra:FocusBehavior.FocusWhenVisible="True" AutomationProperties.Name="Board name" />
+        </StackPanel>
+        <StackPanel Spacing="4">
+          <TextBlock Classes="fieldLabel" Text="Description (optional)" />
+          <TextBox Text="{Binding Description}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="72" MaxHeight="160"
+                   AutomationProperties.Name="Board description" />
+        </StackPanel>
+        <CheckBox IsVisible="{Binding IsNew}" IsChecked="{Binding AddDefaultColumns}">
+          <TextBlock Text="{Binding DefaultColumnsText}" TextWrapping="Wrap" />
+        </CheckBox>
+      </StackPanel>
+    </DataTemplate>
+    <DataTemplate DataType="dlg:DeleteColumnDialogViewModel">
+      <StackPanel Spacing="10">
+        <TextBlock Text="{Binding Message}" TextWrapping="Wrap" Classes="secondary" />
+        <StackPanel Spacing="8" IsVisible="{Binding HasCards}">
+          <RadioButton GroupName="ColumnCards" IsChecked="{Binding MoveCards}" IsEnabled="{Binding CanMoveCards}"
+                       Content="Move the cards to another column" />
+          <ComboBox Margin="28,0,0,0" MinWidth="220" ItemsSource="{Binding OtherColumns}" SelectedItem="{Binding SelectedTarget}"
+                    IsEnabled="{Binding MoveCards}" AutomationProperties.Name="Target column">
+            <ComboBox.ItemTemplate>
+              <DataTemplate DataType="domain:BoardColumn"><TextBlock Text="{Binding Name}" /></DataTemplate>
+            </ComboBox.ItemTemplate>
+          </ComboBox>
+          <RadioButton GroupName="ColumnCards" IsChecked="{Binding DeleteCards}"
+                       Content="Permanently delete the cards too" />
+        </StackPanel>
+      </StackPanel>
+    </DataTemplate>
+  </Window.DataTemplates>
+
+  <Window.Styles>
+    <!-- Light-on-dark workspace picker for the sidebar; the drop-down list itself keeps the light theme. -->
+    <Style Selector="ComboBox.sidebar">
+      <Setter Property="Background" Value="{DynamicResource SidebarHoverBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource SidebarTextBrush}" />
+      <Setter Property="BorderBrush" Value="Transparent" />
+    </Style>
+    <Style Selector="ComboBox.sidebar:pointerover /template/ Border#Background">
+      <Setter Property="Background" Value="{DynamicResource SidebarSelectedBrush}" />
+      <Setter Property="BorderBrush" Value="Transparent" />
+    </Style>
+    <Style Selector="ComboBox.sidebar /template/ ContentControl#ContentPresenter, ComboBox.sidebar:pointerover /template/ ContentControl#ContentPresenter">
+      <Setter Property="Foreground" Value="{DynamicResource SidebarTextBrush}" />
+    </Style>
+    <Style Selector="ComboBox.sidebar /template/ PathIcon#DropDownGlyph, ComboBox.sidebar:pointerover /template/ PathIcon#DropDownGlyph">
+      <Setter Property="Foreground" Value="{DynamicResource SidebarMutedBrush}" />
+    </Style>
+  </Window.Styles>
+
+  <Panel>
+    <Grid ColumnDefinitions="252,*">
+      <!-- ============ Sidebar ============ -->
+      <Border Background="{DynamicResource SidebarBrush}">
+        <DockPanel Margin="14,16,14,14">
+          <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="10" Margin="4,0,0,22">
+            <PathIcon Data="{StaticResource IconLogo}" Width="22" Height="22" Foreground="{DynamicResource AccentBrush}" />
+            <TextBlock Text="BoardFlow" FontSize="17" FontWeight="Bold" Foreground="{DynamicResource SidebarTextBrush}"
+                       VerticalAlignment="Center" />
+          </StackPanel>
+
+          <StackPanel DockPanel.Dock="Bottom" Spacing="2">
+            <Button Classes="sidebar" Command="{Binding ManageLabelsCommand}" IsEnabled="{Binding HasWorkspace}"
+                    AutomationProperties.Name="Manage labels">
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <PathIcon Data="{StaticResource IconTag}" />
+                <TextBlock Text="Labels" />
+              </StackPanel>
+            </Button>
+            <Button Classes="sidebar" Command="{Binding NewWorkspaceCommand}" AutomationProperties.Name="New workspace">
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <PathIcon Data="{StaticResource IconPlus}" />
+                <TextBlock Text="New workspace" />
+              </StackPanel>
+            </Button>
+          </StackPanel>
+
+          <StackPanel DockPanel.Dock="Top" Spacing="6" IsVisible="{Binding HasWorkspace}">
+            <Grid ColumnDefinitions="*,Auto">
+              <TextBlock Classes="sectionLabel" Text="WORKSPACE" VerticalAlignment="Center" Margin="4,0,0,0" />
+              <Button Grid.Column="1" Classes="icon" Foreground="{DynamicResource SidebarMutedBrush}"
+                      ToolTip.Tip="Workspace actions" AutomationProperties.Name="Workspace actions">
+                <PathIcon Data="{StaticResource IconMore}" />
+                <Button.Flyout>
+                  <MenuFlyout Placement="BottomEdgeAlignedLeft">
+                    <MenuItem Header="Rename workspace…" Command="{Binding RenameWorkspaceCommand}" />
+                    <MenuItem Header="Manage labels…" Command="{Binding ManageLabelsCommand}" />
+                    <Separator />
+                    <MenuItem Header="Delete workspace…" Command="{Binding DeleteWorkspaceCommand}" />
+                  </MenuFlyout>
+                </Button.Flyout>
+              </Button>
+            </Grid>
+            <ComboBox Name="WorkspacePicker" Classes="sidebar" HorizontalAlignment="Stretch" ItemsSource="{Binding Workspaces}"
+                      SelectedItem="{Binding SelectedWorkspace}" AutomationProperties.Name="Workspace">
+              <ComboBox.ItemTemplate>
+                <DataTemplate DataType="domain:Workspace">
+                  <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+                </DataTemplate>
+              </ComboBox.ItemTemplate>
+            </ComboBox>
+
+            <Grid ColumnDefinitions="*,Auto" Margin="0,18,0,0">
+              <TextBlock Classes="sectionLabel" Text="BOARDS" VerticalAlignment="Center" Margin="4,0,0,0" />
+              <Button Grid.Column="1" Classes="icon" Foreground="{DynamicResource SidebarMutedBrush}"
+                      Command="{Binding NewBoardCommand}" ToolTip.Tip="New board" AutomationProperties.Name="New board">
+                <PathIcon Data="{StaticResource IconPlus}" />
+              </Button>
+            </Grid>
+          </StackPanel>
+
+          <Panel IsVisible="{Binding HasWorkspace}" Margin="0,4,0,8">
+            <ListBox Name="BoardList" ItemsSource="{Binding Boards}" SelectedItem="{Binding SelectedBoard}"
+                     Background="Transparent" AutomationProperties.Name="Boards">
+              <ListBox.Styles>
+                <Style Selector="ListBoxItem">
+                  <Setter Property="Padding" Value="10,7" />
+                  <Setter Property="CornerRadius" Value="6" />
+                  <Setter Property="Margin" Value="0,1" />
+                  <Setter Property="Foreground" Value="{DynamicResource SidebarMutedBrush}" />
+                </Style>
+                <Style Selector="ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+                  <Setter Property="Background" Value="{DynamicResource SidebarHoverBrush}" />
+                  <Setter Property="Foreground" Value="{DynamicResource SidebarTextBrush}" />
+                </Style>
+                <Style Selector="ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+                  <Setter Property="Background" Value="{DynamicResource SidebarSelectedBrush}" />
+                  <Setter Property="Foreground" Value="{DynamicResource SidebarTextBrush}" />
+                </Style>
+              </ListBox.Styles>
+              <ListBox.ItemTemplate>
+                <DataTemplate DataType="domain:Board">
+                  <StackPanel Orientation="Horizontal" Spacing="9">
+                    <PathIcon Data="{StaticResource IconBoard}" Width="14" Height="14" />
+                    <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" MaxWidth="170" />
+                  </StackPanel>
+                </DataTemplate>
+              </ListBox.ItemTemplate>
+            </ListBox>
+            <TextBlock Text="No boards yet." Foreground="{DynamicResource SidebarMutedBrush}" Margin="6,4"
+                       IsVisible="{Binding !HasBoards}" />
+          </Panel>
+        </DockPanel>
+      </Border>
+
+      <!-- ============ Main area ============ -->
+      <Panel Grid.Column="1">
+        <!-- Welcome: no workspace yet -->
+        <StackPanel IsVisible="{Binding ShowNoWorkspace}" HorizontalAlignment="Center" VerticalAlignment="Center"
+                    Spacing="12" MaxWidth="420">
+          <PathIcon Data="{StaticResource IconLogo}" Width="56" Height="56" Foreground="{DynamicResource AccentBrush}" />
+          <TextBlock Classes="h1" Text="Welcome to BoardFlow" HorizontalAlignment="Center" />
+          <TextBlock Classes="secondary" TextWrapping="Wrap" TextAlignment="Center"
+                     Text="Organise your projects as boards of cards. Start with a workspace — for example 'Personal' or 'Work' — and add boards to it." />
+          <Button Classes="primary" HorizontalAlignment="Center" Margin="0,8,0,0" Command="{Binding NewWorkspaceCommand}"
+                  Content="Create your first workspace" />
+        </StackPanel>
+
+        <!-- Workspace without boards -->
+        <StackPanel IsVisible="{Binding ShowNoBoard}" HorizontalAlignment="Center" VerticalAlignment="Center"
+                    Spacing="12" MaxWidth="420">
+          <PathIcon Data="{StaticResource IconBoard}" Width="48" Height="48" Foreground="{DynamicResource TextMutedBrush}" />
+          <TextBlock Classes="h2" Text="This workspace has no boards yet" HorizontalAlignment="Center" />
+          <TextBlock Classes="secondary" TextWrapping="Wrap" TextAlignment="Center"
+                     Text="A board holds columns such as Todo, In Progress and Done, and the cards that move through them." />
+          <Button Classes="primary" HorizontalAlignment="Center" Margin="0,8,0,0" Command="{Binding NewBoardCommand}"
+                  Content="Create a board" />
+        </StackPanel>
+
+        <!-- Open board -->
+        <DockPanel IsVisible="{Binding HasBoard}">
+          <Border DockPanel.Dock="Top" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}"
+                  BorderThickness="0,0,0,1" Padding="20,12">
+            <Grid ColumnDefinitions="*,Auto">
+              <StackPanel VerticalAlignment="Center" Spacing="2" Margin="0,0,16,0">
+                <TextBlock Classes="h1" Text="{Binding CurrentBoard.Name, FallbackValue=''}" TextTrimming="CharacterEllipsis" />
+                <TextBlock Classes="muted" Text="{Binding CurrentBoard.Description, FallbackValue=''}" TextTrimming="CharacterEllipsis"
+                           IsVisible="{Binding CurrentBoard.HasDescription, FallbackValue=False}" MaxLines="1" />
+              </StackPanel>
+
+              <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                <TextBox Name="SearchBox" Width="230" Text="{Binding CurrentBoard.SearchText, FallbackValue=''}"
+                         PlaceholderText="Search cards  (Ctrl+F)" AutomationProperties.Name="Search cards">
+                  <TextBox.InnerLeftContent>
+                    <PathIcon Data="{StaticResource IconSearch}" Width="14" Height="14" Margin="10,0,0,0"
+                              Foreground="{DynamicResource TextMutedBrush}" />
+                  </TextBox.InnerLeftContent>
+                </TextBox>
+
+                <Button Classes="secondary" AutomationProperties.Name="Filter cards">
+                  <StackPanel Orientation="Horizontal" Spacing="6">
+                    <PathIcon Data="{StaticResource IconFilter}" Width="14" Height="14" />
+                    <TextBlock Text="{Binding CurrentBoard.FilterButtonText, FallbackValue='Filter'}" />
+                  </StackPanel>
+                  <Button.Flyout>
+                    <Flyout Placement="BottomEdgeAlignedRight">
+                      <views:FilterPanel DataContext="{Binding CurrentBoard}" />
+                    </Flyout>
+                  </Button.Flyout>
+                </Button>
+
+                <Button Classes="secondary" Command="{Binding CurrentBoard.OpenArchiveCommand, FallbackValue={x:Null}}"
+                        AutomationProperties.Name="Archived cards" ToolTip.Tip="Browse and restore archived cards">
+                  <StackPanel Orientation="Horizontal" Spacing="6">
+                    <PathIcon Data="{StaticResource IconArchive}" Width="14" Height="14" />
+                    <TextBlock Text="{Binding CurrentBoard.ArchiveText, FallbackValue='Archive'}" />
+                  </StackPanel>
+                </Button>
+
+                <Button Classes="icon" ToolTip.Tip="Board actions" AutomationProperties.Name="Board actions">
+                  <PathIcon Data="{StaticResource IconMore}" />
+                  <Button.Flyout>
+                    <MenuFlyout Placement="BottomEdgeAlignedRight">
+                      <MenuItem Header="Edit board…" Command="{Binding EditBoardCommand}" />
+                      <MenuItem Header="Add column…" Command="{Binding CurrentBoard.AddColumnCommand, FallbackValue={x:Null}}" />
+                      <MenuItem Header="Add default columns" Command="{Binding CurrentBoard.AddDefaultColumnsCommand, FallbackValue={x:Null}}" />
+                      <Separator />
+                      <MenuItem Header="Delete board…" Command="{Binding DeleteBoardCommand}" />
+                    </MenuFlyout>
+                  </Button.Flyout>
+                </Button>
+              </StackPanel>
+            </Grid>
+          </Border>
+
+          <!-- Active filter strip -->
+          <Border DockPanel.Dock="Top" Background="{DynamicResource AccentSoftBrush}" Padding="20,6"
+                  IsVisible="{Binding CurrentBoard.IsFilterActive, FallbackValue=False}">
+            <StackPanel Orientation="Horizontal" Spacing="12">
+              <PathIcon Data="{StaticResource IconFilter}" Width="13" Height="13" Foreground="{DynamicResource AccentBrush}" />
+              <TextBlock Text="{Binding CurrentBoard.FilterSummary, FallbackValue=''}" VerticalAlignment="Center"
+                         Foreground="{DynamicResource TextPrimaryBrush}" />
+              <Button Classes="ghost" Padding="8,2" MinHeight="24" Content="Clear filters"
+                      Command="{Binding CurrentBoard.ClearFiltersCommand, FallbackValue={x:Null}}" />
+            </StackPanel>
+          </Border>
+
+          <views:BoardView Name="BoardView" DataContext="{Binding CurrentBoard}" />
+        </DockPanel>
+      </Panel>
+    </Grid>
+
+    <!-- ============ Side panel layer ============ -->
+    <Panel IsVisible="{Binding Panels.Current, Converter={x:Static ObjectConverters.IsNotNull}}">
+      <Border Name="PanelBackdrop" Background="{DynamicResource PanelBackdropBrush}" />
+      <Border HorizontalAlignment="Right" Width="500" Background="{DynamicResource SurfaceBrush}"
+              BoxShadow="-8 0 24 0 #331F2937">
+        <ContentControl Content="{Binding Panels.Current}" />
+      </Border>
+    </Panel>
+
+    <!-- ============ Dialog layer ============ -->
+    <Panel IsVisible="{Binding Dialogs.Current, Converter={x:Static ObjectConverters.IsNotNull}}">
+      <Border Background="{DynamicResource BackdropBrush}" />
+      <Border Classes="dialog" Width="460" HorizontalAlignment="Center" VerticalAlignment="Center"
+              DataContext="{Binding Dialogs.Current}" x:DataType="dlg:DialogViewModel">
+        <StackPanel Spacing="16">
+          <TextBlock Classes="h2" Text="{Binding Title}" TextWrapping="Wrap" />
+          <ContentControl Content="{Binding}" />
+          <TextBlock Classes="error" Text="{Binding Error}" IsVisible="{Binding Error, Converter={x:Static ObjectConverters.IsNotNull}}" />
+          <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+            <Button Classes="ghost" Content="Cancel" Command="{Binding CancelCommand}" />
+            <Button Name="DialogConfirm" Content="{Binding ConfirmText}" Command="{Binding ConfirmCommand}"
+                    Classes.primary="{Binding !IsDestructive}" Classes.danger="{Binding IsDestructive}" />
+          </StackPanel>
+        </StackPanel>
+      </Border>
+    </Panel>
+
+    <!-- ============ Notification toast ============ -->
+    <Border HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,24" MaxWidth="640"
+            CornerRadius="8" Padding="16,10,8,10" Background="#1F2937" BoxShadow="0 6 20 0 #401F2937"
+            IsVisible="{Binding Notifier.IsVisible}" Classes.error="{Binding Notifier.IsError}">
+      <Border.Styles>
+        <Style Selector="Border.error">
+          <Setter Property="Background" Value="{DynamicResource DangerBrush}" />
+        </Style>
+      </Border.Styles>
+      <StackPanel Orientation="Horizontal" Spacing="12">
+        <TextBlock Name="ToastText" Text="{Binding Notifier.Message}" Foreground="White" TextWrapping="Wrap" MaxWidth="560"
+                   VerticalAlignment="Center" />
+        <Button Classes="icon" Foreground="White" Command="{Binding Notifier.DismissCommand}" AutomationProperties.Name="Dismiss">
+          <PathIcon Data="{StaticResource IconClose}" Width="12" Height="12" />
+        </Button>
+      </StackPanel>
+    </Border>
+  </Panel>
+</Window>

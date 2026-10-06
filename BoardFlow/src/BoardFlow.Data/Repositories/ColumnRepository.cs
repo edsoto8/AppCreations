@@ -78,8 +78,9 @@ public sealed class ColumnRepository(BoardFlowDatabase database, IClock clock, I
     }
 
     /// <summary>Moves the column so it sits immediately left of <paramref name="beforeColumnId"/>, or last when null.</summary>
+    /// <remarks>Placing a column before itself leaves the order unchanged.</remarks>
     public void Move(long id, long? beforeColumnId) =>
-        Reorder(id, ids => Ordering.MoveBefore(ids, id, beforeColumnId), beforeColumnId);
+        Reorder(id, ids => beforeColumnId == id ? ids : Ordering.MoveBefore(ids, id, beforeColumnId), beforeColumnId);
 
     /// <summary>Moves the column <paramref name="offset"/> places (negative = left), clamped to the board edges.</summary>
     public void MoveBy(long id, int offset) => Reorder(id, ids => Ordering.MoveBy(ids, id, offset), null);

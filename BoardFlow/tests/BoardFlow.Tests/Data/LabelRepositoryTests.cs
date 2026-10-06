@@ -221,4 +221,12 @@ public sealed class LabelRepositoryTests
         Assert.Equal("Bug", stored.Name);
         Assert.Equal("#E5534B", stored.DisplayColor);
     }
+
+    [Fact]
+    public void Create_InMissingWorkspace_ThrowsNotFound()
+    {
+        using var db = new TestDatabase();
+
+        Assert.Throws<NotFoundException>(() => db.Labels.Create(9999, "Orphan", "#123456"));
+    }
 }

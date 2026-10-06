@@ -1,0 +1,84 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:BoardFlow.App.ViewModels"
+             xmlns:conv="using:BoardFlow.App.Converters"
+             xmlns:sys="using:System"
+             x:Class="BoardFlow.App.Views.LabelsView"
+             x:DataType="vm:LabelsViewModel">
+  <DockPanel>
+    <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="24,18,14,10">
+      <StackPanel Spacing="2">
+        <TextBlock Classes="h2" Text="Labels" />
+        <TextBlock Classes="muted" Text="{Binding WorkspaceName, StringFormat='Shared by every board in {0}'}" />
+      </StackPanel>
+      <Button Grid.Column="1" Classes="icon" Command="{Binding CloseCommand}" ToolTip.Tip="Close (Esc)"
+              AutomationProperties.Name="Close labels" VerticalAlignment="Top">
+        <PathIcon Data="{StaticResource IconClose}" />
+      </Button>
+    </Grid>
+
+    <!-- New label -->
+    <Border DockPanel.Dock="Top" Margin="24,0,24,12" Padding="12" CornerRadius="8" Background="{DynamicResource AppBackgroundBrush}">
+      <StackPanel Spacing="8">
+        <TextBlock Classes="fieldLabel" Text="New label" />
+        <Grid ColumnDefinitions="*,Auto">
+          <TextBox Text="{Binding NewName}" PlaceholderText="Label name" AutomationProperties.Name="New label name">
+            <TextBox.KeyBindings><KeyBinding Gesture="Enter" Command="{Binding AddCommand}" /></TextBox.KeyBindings>
+          </TextBox>
+          <Button Grid.Column="1" Classes="primary" Margin="8,0,0,0" Content="Add" Command="{Binding AddCommand}" />
+        </Grid>
+        <ListBox ItemsSource="{Binding Palette}" SelectedItem="{Binding NewColor}" Background="Transparent"
+                 AutomationProperties.Name="New label colour">
+          <ListBox.ItemsPanel><ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate></ListBox.ItemsPanel>
+          <ListBox.Styles>
+            <Style Selector="ListBoxItem"><Setter Property="Padding" Value="3" /><Setter Property="CornerRadius" Value="12" /></Style>
+          </ListBox.Styles>
+          <ListBox.ItemTemplate>
+            <DataTemplate DataType="sys:String">
+              <Ellipse Width="20" Height="20" Fill="{Binding Converter={x:Static conv:HexToBrushConverter.Instance}}" />
+            </DataTemplate>
+          </ListBox.ItemTemplate>
+        </ListBox>
+      </StackPanel>
+    </Border>
+
+    <Panel>
+      <TextBlock IsVisible="{Binding IsEmpty}" Classes="secondary" Margin="24,8" TextWrapping="Wrap"
+                 Text="No labels yet. Labels let you tag cards (for example Bug, Design, Waiting) and filter by them." />
+      <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+        <ItemsControl ItemsSource="{Binding Labels}" Margin="24,0,24,20">
+          <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Spacing="8" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate DataType="vm:LabelRowViewModel">
+              <Grid ColumnDefinitions="Auto,*,Auto,Auto">
+                <ComboBox ItemsSource="{Binding $parent[UserControl].((vm:LabelsViewModel)DataContext).Palette}"
+                          SelectedItem="{Binding Color}" Width="64" AutomationProperties.Name="{Binding SavedName, StringFormat='Colour of {0}'}">
+                  <ComboBox.ItemTemplate>
+                    <DataTemplate DataType="sys:String">
+                      <Ellipse Width="16" Height="16" Fill="{Binding Converter={x:Static conv:HexToBrushConverter.Instance}}" />
+                    </DataTemplate>
+                  </ComboBox.ItemTemplate>
+                </ComboBox>
+                <TextBox Grid.Column="1" Margin="8,0" Text="{Binding Name}" AutomationProperties.Name="Label name">
+                  <TextBox.KeyBindings>
+                    <KeyBinding Gesture="Enter" Command="{Binding $parent[UserControl].((vm:LabelsViewModel)DataContext).SaveCommand}"
+                                CommandParameter="{Binding}" />
+                  </TextBox.KeyBindings>
+                </TextBox>
+                <Button Grid.Column="2" Classes="primary" Content="Save" IsVisible="{Binding IsChanged}" Margin="0,0,4,0"
+                        Command="{Binding $parent[UserControl].((vm:LabelsViewModel)DataContext).SaveCommand}" CommandParameter="{Binding}" />
+                <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                  <TextBlock Classes="muted" Text="{Binding UsageText}" VerticalAlignment="Center" MinWidth="50" TextAlignment="Right" />
+                  <Button Classes="icon" ToolTip.Tip="Delete label" AutomationProperties.Name="{Binding SavedName, StringFormat='Delete label {0}'}"
+                          Command="{Binding $parent[UserControl].((vm:LabelsViewModel)DataContext).DeleteCommand}" CommandParameter="{Binding}">
+                    <PathIcon Data="{StaticResource IconTrash}" Width="14" Height="14" />
+                  </Button>
+                </StackPanel>
+              </Grid>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </ScrollViewer>
+    </Panel>
+  </DockPanel>
+</UserControl>

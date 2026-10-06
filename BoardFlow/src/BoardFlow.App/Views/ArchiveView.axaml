@@ -1,0 +1,62 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:BoardFlow.App.ViewModels"
+             xmlns:conv="using:BoardFlow.App.Converters"
+             x:Class="BoardFlow.App.Views.ArchiveView"
+             x:DataType="vm:ArchiveViewModel">
+  <DockPanel>
+    <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="24,18,14,10">
+      <StackPanel Spacing="2">
+        <TextBlock Classes="h2" Text="Archived cards" />
+        <TextBlock Classes="muted" Text="{Binding BoardName, StringFormat='On board {0}'}" />
+      </StackPanel>
+      <Button Grid.Column="1" Classes="icon" Command="{Binding CloseCommand}" ToolTip.Tip="Close (Esc)"
+              AutomationProperties.Name="Close archive" VerticalAlignment="Top">
+        <PathIcon Data="{StaticResource IconClose}" />
+      </Button>
+    </Grid>
+
+    <Panel>
+      <StackPanel IsVisible="{Binding IsEmpty}" Spacing="8" Margin="24,40" HorizontalAlignment="Center">
+        <PathIcon Data="{StaticResource IconArchive}" Width="40" Height="40" Foreground="{DynamicResource TextMutedBrush}" />
+        <TextBlock Classes="h2" Text="Nothing archived" HorizontalAlignment="Center" />
+        <TextBlock Classes="secondary" TextWrapping="Wrap" TextAlignment="Center" MaxWidth="300"
+                   Text="Archive a card from its detail panel to hide it from the board without deleting it." />
+      </StackPanel>
+      <ScrollViewer IsVisible="{Binding !IsEmpty}" HorizontalScrollBarVisibility="Disabled">
+        <ItemsControl ItemsSource="{Binding Items}" Margin="24,0,24,20">
+          <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Spacing="8" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate DataType="vm:ArchivedCardItem">
+              <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12,10">
+                <Grid ColumnDefinitions="*,Auto">
+                  <StackPanel Spacing="3">
+                    <TextBlock Text="{Binding Title}" TextWrapping="Wrap" FontWeight="Medium" />
+                    <TextBlock Classes="muted">
+                      <Run Text="{Binding ColumnName}" /><Run Text=" · " /><Run Text="{Binding ArchivedText}" />
+                    </TextBlock>
+                  </StackPanel>
+                  <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                    <Button Classes="secondary" Padding="10,4" MinHeight="28"
+                            Command="{Binding $parent[UserControl].((vm:ArchiveViewModel)DataContext).RestoreCommand}"
+                            CommandParameter="{Binding}" AutomationProperties.Name="{Binding Title, StringFormat='Restore {0}'}">
+                      <StackPanel Orientation="Horizontal" Spacing="6">
+                        <PathIcon Data="{StaticResource IconRestore}" Width="13" Height="13" />
+                        <TextBlock Text="Restore" />
+                      </StackPanel>
+                    </Button>
+                    <Button Classes="icon" Command="{Binding $parent[UserControl].((vm:ArchiveViewModel)DataContext).DeleteCommand}"
+                            CommandParameter="{Binding}" ToolTip.Tip="Delete permanently"
+                            AutomationProperties.Name="{Binding Title, StringFormat='Delete {0} permanently'}">
+                      <PathIcon Data="{StaticResource IconTrash}" Width="14" Height="14" />
+                    </Button>
+                  </StackPanel>
+                </Grid>
+              </Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </ScrollViewer>
+    </Panel>
+  </DockPanel>
+</UserControl>

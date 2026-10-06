@@ -156,6 +156,25 @@ public sealed class DatabaseInitializerTests
     }
 
     [Fact]
+    public void ForeignSqliteDatabase_FailsAndIsLeftUntouched()
+    {
+        using var dir = new TempDirectory();
+        using (var connection = OpenRaw(dir.DatabasePath))
+        {
+            connection.Execute("CREATE TABLE Recipes (Id INTEGER PRIMARY KEY, Name TEXT); INSERT INTO Recipes (Name) VALUES ('Soup');");
+        }
+
+        SqliteConnection.ClearAllPools();
+        var before = Hash(dir.DatabasePath);
+
+        Assert.Throws<PersistenceException>(() => InitializerFor(new BoardFlowDatabase(dir.DatabasePath)).Initialize());
+
+        SqliteConnection.ClearAllPools();
+        Assert.Equal(before, Hash(dir.DatabasePath));
+        Assert.Equal(0, UserVersion(dir.DatabasePath));
+    }
+
+    [Fact]
     public void Upgrade_AppliesNewMigrationKeepsDataAndWritesBackup()
     {
         using var dir = new TempDirectory();

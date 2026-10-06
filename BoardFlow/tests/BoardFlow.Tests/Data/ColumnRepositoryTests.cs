@@ -110,6 +110,17 @@ public sealed class ColumnRepositoryTests
     }
 
     [Fact]
+    public void Move_BeforeItself_LeavesOrderUnchanged()
+    {
+        using var db = new TestDatabase();
+        var fixture = db.CreateBoard(columns: 4);
+
+        db.Columns.Move(fixture[2].Id, fixture[2].Id);
+
+        Assert.Equal(["Todo", "Doing", "Review", "Done"], Names(db, fixture.Board.Id));
+    }
+
+    [Fact]
     public void Move_BeforeAnotherColumn_Forward()
     {
         using var db = new TestDatabase();

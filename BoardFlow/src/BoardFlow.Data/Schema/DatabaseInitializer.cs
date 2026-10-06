@@ -15,7 +15,7 @@ public sealed record InitializationResult(InitializationOutcome Outcome, int Fro
 
 /// <summary>
 /// Creates the database on first run and applies pending migrations. It never deletes or recreates an
-/// existing file: an unreadable, corrupt or newer-than-supported database stops start-up with an error.
+/// existing file: an unreadable, corrupt, foreign or newer-than-supported database stops start-up with an error.
 /// Before upgrading an existing database a copy is saved next to it.
 /// </summary>
 public sealed class DatabaseInitializer(
@@ -49,6 +49,13 @@ public sealed class DatabaseInitializer(
                     throw new PersistenceException(
                         $"The database at {path} was created by a newer version of BoardFlow (schema {current}, " +
                         $"this version supports {latest}). It has not been changed.");
+                }
+
+                if (!isNewFile && current == 0
+                    && connection.ExecuteScalar<long>("SELECT COUNT(*) FROM sqlite_master WHERE type = 'table'") > 0)
+                {
+                    throw new PersistenceException(
+                        $"The file at {path} is a SQLite database that was not created by BoardFlow. It has not been changed.");
                 }
 
                 if (!isNewFile)

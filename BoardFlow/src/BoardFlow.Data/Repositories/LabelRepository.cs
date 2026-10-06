@@ -22,6 +22,11 @@ public sealed class LabelRepository(BoardFlowDatabase database, IClock clock, IL
         var label = new Label { WorkspaceId = workspaceId, Name = Validate.LabelName(name), DisplayColor = Validate.Color(color) };
         label.Id = Write("create the label", (c, t) =>
         {
+            if (c.ExecuteScalar<long>("SELECT COUNT(*) FROM Workspaces WHERE Id = @workspaceId", new { workspaceId }, t) == 0)
+            {
+                throw Missing("Workspace", workspaceId);
+            }
+
             EnsureUniqueName(c, t, workspaceId, label.Name, null);
             return c.ExecuteScalar<long>(
                 "INSERT INTO Labels (WorkspaceId, Name, DisplayColor) VALUES (@WorkspaceId, @Name, @DisplayColor) RETURNING Id",
