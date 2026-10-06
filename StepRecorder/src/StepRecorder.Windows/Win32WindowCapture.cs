@@ -5,6 +5,7 @@ using System.Runtime.InteropServices;
 using StepRecorder.Core.Capture;
 using StepRecorder.Core.Input;
 using StepRecorder.Core.Sessions;
+using StepRecorder.Core.Settings;
 using static StepRecorder.Windows.NativeMethods;
 
 namespace StepRecorder.Windows;
@@ -28,7 +29,7 @@ public sealed class Win32WindowCapture : IWindowCapture
     // Grid of pixels sampled to decide whether an image is blank (all black).
     private const int BlankSampleGrid = 48;
 
-    public CaptureResult Capture(WindowInfo window)
+    public CaptureResult Capture(WindowInfo window, ScreenshotSettings settings)
     {
         var hwnd = new IntPtr(window.Handle);
         if (!IsWindow(hwnd))
@@ -60,7 +61,7 @@ public sealed class Win32WindowCapture : IWindowCapture
             using Bitmap? printed = TryPrintWindow(hwnd, frame);
             if (printed is not null && !IsBlank(printed))
             {
-                return Encode(printed, PrintWindowMethod, note: null);
+                return Encode(printed, PrintWindowMethod, settings, note: null);
             }
 
             printWindowProblem = printed is null ? "PrintWindow failed" : "PrintWindow returned a blank image";
@@ -75,7 +76,7 @@ public sealed class Win32WindowCapture : IWindowCapture
         string note = IsBlank(copied)
             ? $"The image may be blank: {printWindowProblem}, and the screen copy is black (protected content or a GPU surface)."
             : $"Copied from the screen because {printWindowProblem}; overlapping windows may show.";
-        return Encode(copied, ScreenCopyMethod, note);
+        return Encode(copied, ScreenCopyMethod, settings, note);
     }
 
     private static Bitmap? TryPrintWindow(IntPtr hwnd, ScreenRect frame)
@@ -166,10 +167,9 @@ public sealed class Win32WindowCapture : IWindowCapture
         }
     }
 
-    private static CaptureResult Encode(Bitmap bitmap, string method, string? note)
+    private static CaptureResult Encode(Bitmap bitmap, string method, ScreenshotSettings settings, string? note)
     {
-        using var stream = new MemoryStream();
-        bitmap.Save(stream, ImageFormat.Png);
-        return CaptureResult.Success(new CapturedImage(stream.ToArray(), bitmap.Width, bitmap.Height, method, note));
+        byte[] data = ImageEncoding.Encode(bitmap, settings.Format, settings.JpegQuality);
+        return CaptureResult.Success(new CapturedImage(data, bitmap.Width, bitmap.Height, method, settings.Format, note));
     }
 }

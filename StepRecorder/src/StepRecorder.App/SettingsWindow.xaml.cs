@@ -1,5 +1,7 @@
+using System.Globalization;
 using System.IO;
 using System.Windows;
+using System.Windows.Controls;
 using Microsoft.Win32;
 using StepRecorder.Core.Settings;
 
@@ -27,9 +29,19 @@ public partial class SettingsWindow : Window
             : settings.Storage.RecordingsDirectory;
         FolderHint.Text = $"Each recording gets its own sub-folder here. Leave empty to use {defaultFolder}.";
         NameBox.Text = settings.Storage.DefaultSessionName;
+        LeftClickBox.IsChecked = settings.Recording.CaptureLeftClick;
+        RightClickBox.IsChecked = settings.Recording.CaptureRightClick;
+        MergeDoubleClickBox.IsChecked = settings.Recording.MergeDoubleClicks;
+        FormatBox.SelectedIndex = settings.Screenshot.Format == ScreenshotFormat.Jpeg ? 1 : 0;
+        QualityBox.Text = settings.Screenshot.JpegQuality.ToString(CultureInfo.CurrentCulture);
+        MarkerBox.IsChecked = settings.Screenshot.ClickMarkerEnabled;
+        MarkerSizeBox.Text = settings.Screenshot.ClickMarkerSize.ToString(CultureInfo.CurrentCulture);
         HtmlBox.IsChecked = settings.Reports.GenerateHtml;
         MarkdownBox.IsChecked = settings.Reports.GenerateMarkdown;
     }
+
+    private void FormatBox_SelectionChanged(object sender, SelectionChangedEventArgs e) =>
+        QualityBox.IsEnabled = FormatBox.SelectedIndex == 1;
 
     private void Browse_Click(object sender, RoutedEventArgs e)
     {
@@ -70,6 +82,12 @@ public partial class SettingsWindow : Window
             return;
         }
 
+        if (!TryReadNumber(QualityBox, ScreenshotSettings.MinJpegQuality, ScreenshotSettings.MaxJpegQuality, "JPEG quality", out int quality)
+            || !TryReadNumber(MarkerSizeBox, ScreenshotSettings.MinMarkerSize, ScreenshotSettings.MaxMarkerSize, "Marker size", out int markerSize))
+        {
+            return;
+        }
+
         string name = NameBox.Text.Trim();
         RecorderSettings updated = original with
         {
@@ -77,6 +95,19 @@ public partial class SettingsWindow : Window
             {
                 RecordingsDirectory = folder,
                 DefaultSessionName = name.Length == 0 ? StorageSettings.DefaultName : name,
+            },
+            Recording = original.Recording with
+            {
+                CaptureLeftClick = LeftClickBox.IsChecked == true,
+                CaptureRightClick = RightClickBox.IsChecked == true,
+                MergeDoubleClicks = MergeDoubleClickBox.IsChecked == true,
+            },
+            Screenshot = original.Screenshot with
+            {
+                Format = FormatBox.SelectedIndex == 1 ? ScreenshotFormat.Jpeg : ScreenshotFormat.Png,
+                JpegQuality = quality,
+                ClickMarkerEnabled = MarkerBox.IsChecked == true,
+                ClickMarkerSize = markerSize,
             },
             Reports = original.Reports with { GenerateHtml = html, GenerateMarkdown = markdown },
         };
@@ -88,6 +119,19 @@ public partial class SettingsWindow : Window
         }
 
         Close();
+    }
+
+    private bool TryReadNumber(TextBox box, int min, int max, string label, out int value)
+    {
+        if (int.TryParse(box.Text.Trim(), NumberStyles.Integer, CultureInfo.CurrentCulture, out value) && value >= min && value <= max)
+        {
+            return true;
+        }
+
+        ShowError($"{label} must be a whole number from {min} to {max}.");
+        box.Focus();
+        box.SelectAll();
+        return false;
     }
 
     private void ShowError(string message)

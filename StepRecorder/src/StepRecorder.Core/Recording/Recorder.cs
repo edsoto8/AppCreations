@@ -64,7 +64,11 @@ public sealed class Recorder(
 
     /// <exception cref="InvalidOperationException">A session is already recording or paused.</exception>
     /// <exception cref="IOException">The session folder or file could not be created.</exception>
-    public Session Start(string recordingsDirectory, string? name, RecordingSettings settings)
+    public Session Start(
+        string recordingsDirectory,
+        string? name,
+        RecordingSettings settings,
+        ScreenshotSettings? screenshotSettings = null)
     {
         Session session;
         lock (gate)
@@ -85,6 +89,7 @@ public sealed class Recorder(
                 ApplicationVersion = environment.ApplicationVersion,
                 OperatingSystem = environment.OperatingSystem,
                 RecordingSettingsSnapshot = settings,
+                ScreenshotSettingsSnapshot = (screenshotSettings ?? new ScreenshotSettings()).Clamped(),
                 Directory = store.CreateSessionDirectory(recordingsDirectory, startedAt, displayName),
             };
             store.Save(session);
@@ -212,6 +217,28 @@ public sealed class Recorder(
     }
 
     /// <summary>
+    /// Counts another click (double/triple-click) on the last step instead of adding a new one.
+    /// </summary>
+    /// <returns>False when <paramref name="stepNumber"/> is no longer the last step or not recording.</returns>
+    public bool AddClickToLastStep(int stepNumber)
+    {
+        lock (gate)
+        {
+            if (state != RecordingState.Recording || current!.Steps.Count == 0 || current.Steps[^1].StepNumber != stepNumber)
+            {
+                return false;
+            }
+
+            Step step = current.Steps[^1];
+            step.ClickCount = (step.ClickCount ?? 1) + 1;
+            TrySave(current);
+        }
+
+        StepsChanged?.Invoke(this, EventArgs.Empty);
+        return true;
+    }
+
+    /// <summary>
     /// Removes steps from the end of the session while <paramref name="shouldRemove"/> matches them, then
     /// saves. Step numbers stay contiguous because only trailing steps are removed.
     /// </summary>
@@ -259,7 +286,7 @@ public sealed class Recorder(
 
         try
         {
-            step.ScreenshotPath = store.SaveScreenshot(session, step.StepNumber, image.Png);
+            step.ScreenshotPath = store.SaveScreenshot(session, step.StepNumber, image.Data, image.Format);
             step.ScreenshotWidth = image.Width;
             step.ScreenshotHeight = image.Height;
             step.ScreenshotMethod = image.Method;

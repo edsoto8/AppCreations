@@ -22,7 +22,49 @@
                    Foreground="{DynamicResource {x:Static SystemColors.GrayTextBrushKey}}"
                    Text="Used in each recording's folder name, after the date and time. Changes apply to the next recording." />
 
-        <GroupBox Header="Reports written when a recording stops" Margin="0,16,0,0" Padding="8,6">
+        <GroupBox Header="Recording (applies to the next recording)" Margin="0,16,0,0" Padding="8,6">
+            <StackPanel>
+                <CheckBox x:Name="LeftClickBox" Content="Record _left clicks" Margin="0,2" />
+                <CheckBox x:Name="RightClickBox" Content="Record ri_ght clicks" Margin="0,2" />
+                <CheckBox x:Name="MergeDoubleClickBox" Content="_Double- and triple-clicks become one step" Margin="0,2" />
+            </StackPanel>
+        </GroupBox>
+
+        <GroupBox Header="Screenshots" Margin="0,12,0,0" Padding="8,6">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="110" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition />
+                    <RowDefinition />
+                    <RowDefinition />
+                    <RowDefinition />
+                </Grid.RowDefinitions>
+
+                <Label Grid.Row="0" Content="Image _format" Target="{Binding ElementName=FormatBox}" />
+                <ComboBox Grid.Row="0" Grid.Column="1" x:Name="FormatBox" Margin="0,2" SelectionChanged="FormatBox_SelectionChanged">
+                    <ComboBoxItem Content="PNG" />
+                    <ComboBoxItem Content="JPEG" />
+                </ComboBox>
+                <TextBlock Grid.Row="0" Grid.Column="2" Margin="8,0,0,0" VerticalAlignment="Center" TextWrapping="Wrap"
+                           Foreground="{DynamicResource {x:Static SystemColors.GrayTextBrushKey}}"
+                           Text="PNG is sharp; JPEG files are smaller." />
+
+                <Label Grid.Row="1" Content="JPEG _quality (10–100)" Target="{Binding ElementName=QualityBox}" />
+                <TextBox Grid.Row="1" Grid.Column="1" x:Name="QualityBox" Margin="0,2" Padding="2" />
+
+                <CheckBox Grid.Row="2" Grid.ColumnSpan="3" x:Name="MarkerBox" Margin="5,6,0,2"
+                          Content="Show click mar_kers in reports (originals are never changed)" />
+
+                <Label Grid.Row="3" Content="Marker si_ze (12–96 px)" Target="{Binding ElementName=MarkerSizeBox}" />
+                <TextBox Grid.Row="3" Grid.Column="1" x:Name="MarkerSizeBox" Margin="0,2" Padding="2" />
+            </Grid>
+        </GroupBox>
+
+        <GroupBox Header="Reports written when a recording stops" Margin="0,12,0,0" Padding="8,6">
             <StackPanel>
                 <CheckBox x:Name="HtmlBox" Content="_HTML report (report.html), opens in a browser" Margin="0,2" />
                 <CheckBox x:Name="MarkdownBox" Content="_Markdown report (report.md), for wikis, tickets and pull requests" Margin="0,2" />

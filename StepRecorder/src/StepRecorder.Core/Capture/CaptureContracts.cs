@@ -1,10 +1,17 @@
 using StepRecorder.Core.Input;
 using StepRecorder.Core.Sessions;
+using StepRecorder.Core.Settings;
 
 namespace StepRecorder.Core.Capture;
 
-/// <summary>A PNG-encoded screenshot held in memory until its step number is known.</summary>
-public sealed record CapturedImage(byte[] Png, int Width, int Height, string Method, string? Note = null);
+/// <summary>An encoded screenshot (PNG or JPEG) held in memory until its step number is known.</summary>
+public sealed record CapturedImage(
+    byte[] Data,
+    int Width,
+    int Height,
+    string Method,
+    ScreenshotFormat Format = ScreenshotFormat.Png,
+    string? Note = null);
 
 /// <summary>The outcome of a capture attempt: an image, or the reason there is none.</summary>
 public sealed record CaptureResult(CapturedImage? Image, string? FailureReason)
@@ -20,7 +27,8 @@ public sealed record CaptureResult(CapturedImage? Image, string? FailureReason)
 /// </summary>
 public interface IWindowCapture
 {
-    CaptureResult Capture(WindowInfo window);
+    /// <param name="settings">Image format and JPEG quality to encode with.</param>
+    CaptureResult Capture(WindowInfo window, ScreenshotSettings settings);
 }
 
 /// <summary>What to attach to a new step: a captured image, or why there is none.</summary>

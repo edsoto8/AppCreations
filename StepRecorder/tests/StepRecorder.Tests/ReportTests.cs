@@ -141,7 +141,7 @@ public sealed partial class ReportTests : IDisposable
 
         ReportScreenshot shot = report.Steps[0].Screenshot!;
         Assert.Equal("screenshots/step-001.png", shot.RelativePath);
-        Assert.Equal(new ClickMarker(200, 450, 25, 75), shot.Marker);
+        Assert.Equal(new ClickMarker(200, 450, 32, 3), shot.Marker);
     }
 
     [Theory]
@@ -206,7 +206,7 @@ public sealed partial class ReportTests : IDisposable
     }
 
     [Fact]
-    public void Html_MarkerUsesInvariantPercentagesInAnyCulture()
+    public void Html_MarkerIsSvgInScreenshotPixels_InAnyCulture()
     {
         CultureInfo original = CultureInfo.CurrentCulture;
         try
@@ -214,7 +214,8 @@ public sealed partial class ReportTests : IDisposable
             CultureInfo.CurrentCulture = new CultureInfo("de-DE");
             string html = HtmlReportExporter.Render(ReportBuilder.Build(SessionWith(NotepadClick(1, x: 401, y: 1))));
 
-            Assert.Contains("style=\"left: 50.125%; top: 0.167%\"", html);
+            Assert.Contains("<svg class=\"click-marker\" viewBox=\"0 0 800 600\"", html);
+            Assert.Contains("<circle class=\"ring\" cx=\"401\" cy=\"1\" r=\"14.5\" stroke-width=\"3\" />", html);
             Assert.Contains("aria-label=\"Click position (401, 1)\"", html);
         }
         finally
@@ -311,7 +312,7 @@ public sealed partial class ReportTests : IDisposable
 
         IReadOnlyList<string> written = new ReportGenerator().Generate(
             session,
-            new ReportSettings { GenerateHtml = html, GenerateMarkdown = markdown });
+            new RecorderSettings { Reports = new ReportSettings { GenerateHtml = html, GenerateMarkdown = markdown } });
 
         Assert.Equal(expected, written.Select(Path.GetFileName));
         Assert.All(written, path => Assert.True(File.Exists(path)));
@@ -322,7 +323,7 @@ public sealed partial class ReportTests : IDisposable
     public void Generate_MovedSessionFolder_StillResolvesEveryLink()
     {
         Session session = SavedSessionWithScreenshots(NotepadClick(1), NotepadClick(2));
-        new ReportGenerator().Generate(session, new ReportSettings());
+        new ReportGenerator().Generate(session, new RecorderSettings());
 
         string moved = Path.Combine(temp.Path, "elsewhere", "copied session");
         Directory.CreateDirectory(Path.GetDirectoryName(moved)!);
@@ -350,10 +351,10 @@ public sealed partial class ReportTests : IDisposable
     public void Generate_OverwritesPreviousReport()
     {
         Session session = SavedSessionWithScreenshots(NotepadClick(1));
-        new ReportGenerator().Generate(session, new ReportSettings());
+        new ReportGenerator().Generate(session, new RecorderSettings());
         session.Name = "Renamed";
 
-        new ReportGenerator().Generate(session, new ReportSettings());
+        new ReportGenerator().Generate(session, new RecorderSettings());
 
         Assert.Contains("<h1>Renamed</h1>", File.ReadAllText(Path.Combine(session.Directory, "report.html")));
         Assert.Empty(Directory.GetFiles(session.Directory, "*.tmp", SearchOption.AllDirectories));

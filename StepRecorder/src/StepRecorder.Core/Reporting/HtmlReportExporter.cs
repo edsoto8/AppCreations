@@ -106,8 +106,13 @@ public sealed class HtmlReportExporter : IReportExporter
 
             if (shot.Marker is { } marker)
             {
+                // Drawn in screenshot pixels and scaled with the image, so it matches the burned-in copies.
+                string r = Number(marker.Radius);
                 html.Append($"""
-                    <span class="click-marker" style="left: {Percent(marker.LeftPercent)}; top: {Percent(marker.TopPercent)}" role="img" aria-label="Click position ({marker.X}, {marker.Y})"></span>
+                    <svg class="click-marker" viewBox="0 0 {shot.Width} {shot.Height}" preserveAspectRatio="none" role="img" aria-label="Click position ({marker.X}, {marker.Y})">
+                    <circle class="halo" cx="{marker.X}" cy="{marker.Y}" r="{r}" stroke-width="{marker.StrokeWidth + 3}" />
+                    <circle class="ring" cx="{marker.X}" cy="{marker.Y}" r="{r}" stroke-width="{marker.StrokeWidth}" />
+                    </svg>
 
                     """);
             }
@@ -124,7 +129,7 @@ public sealed class HtmlReportExporter : IReportExporter
         html.Append("</article>\n</li>\n");
     }
 
-    private static string Percent(double value) => value.ToString("0.###", CultureInfo.InvariantCulture) + "%";
+    private static string Number(double value) => value.ToString("0.###", CultureInfo.InvariantCulture);
 
     private static string Encode(string? value) => WebUtility.HtmlEncode(value ?? "");
 }

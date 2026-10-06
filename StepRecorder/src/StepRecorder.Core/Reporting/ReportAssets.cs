@@ -67,27 +67,24 @@ internal static class ReportAssets
         .description { margin: 6px 0 12px; overflow-wrap: anywhere; }
 
         .shot { margin: 0; }
-        .shot-link { position: relative; display: inline-block; max-width: 100%; line-height: 0; }
-        .shot img {
+        .shot-link {
+          position: relative;
+          display: inline-block;
           max-width: 100%;
-          height: auto;
+          line-height: 0;
           border: 1px solid var(--border);
           border-radius: 4px;
-          cursor: zoom-in;
+          overflow: hidden;
         }
+        .shot img { display: block; max-width: 100%; height: auto; cursor: zoom-in; }
         .shot.zoomed .shot-link { overflow-x: auto; }
         .shot.zoomed img { max-width: none; cursor: zoom-out; }
 
-        .click-marker {
-          position: absolute;
-          width: 34px;
-          height: 34px;
-          margin: -17px 0 0 -17px;
-          border: 3px solid var(--accent);
-          border-radius: 50%;
-          box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.85), inset 0 0 0 2px rgba(255, 255, 255, 0.85);
-          pointer-events: none;
-        }
+        /* Same colors as the burned-in marker (ScreenshotAnnotator). */
+        .click-marker { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+        .click-marker circle { fill: none; }
+        .click-marker .halo { stroke: rgba(255, 255, 255, 0.85); }
+        .click-marker .ring { stroke: #e3262f; }
 
         .shot-note {
           margin: 10px 0 0;

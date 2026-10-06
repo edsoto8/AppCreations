@@ -8,6 +8,7 @@ using StepRecorder.Core.Reporting;
 using StepRecorder.Core.Sessions;
 using StepRecorder.Core.Settings;
 using StepRecorder.Core.Storage;
+using StepRecorder.Windows;
 using Forms = System.Windows.Forms;
 
 namespace StepRecorder.App;
@@ -57,7 +58,7 @@ internal sealed class TrayController : IDisposable
         this.sessionStore = sessionStore;
         this.settingsStore = settingsStore;
         this.logger = logger;
-        reportGenerator = new ReportGenerator(logger);
+        reportGenerator = new ReportGenerator(new ScreenshotAnnotator(), logger);
         settings = settingsStore.Load();
 
         statusItem = new Forms.ToolStripMenuItem { Enabled = false };
@@ -136,7 +137,7 @@ internal sealed class TrayController : IDisposable
         string directory = AppPaths.RecordingsDirectory(settings);
         try
         {
-            recorder.Start(directory, settings.Storage.DefaultSessionName, settings.Recording);
+            recorder.Start(directory, settings.Storage.DefaultSessionName, settings.Recording, settings.Screenshot);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
@@ -205,7 +206,7 @@ internal sealed class TrayController : IDisposable
     {
         try
         {
-            return reportGenerator.Generate(session, settings.Reports).FirstOrDefault();
+            return reportGenerator.Generate(session, settings).FirstOrDefault();
         }
         catch (Exception ex)
         {

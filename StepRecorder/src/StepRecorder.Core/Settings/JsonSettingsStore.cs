@@ -47,6 +47,7 @@ public sealed class JsonSettingsStore(string filePath, ILogger? logger = null)
             : settings with
             {
                 Recording = settings.Recording ?? new RecordingSettings(),
+                Screenshot = (settings.Screenshot ?? new ScreenshotSettings()).Clamped(),
                 Storage = settings.Storage ?? new StorageSettings(),
                 Reports = settings.Reports ?? new ReportSettings(),
             };

@@ -9,6 +9,8 @@ public sealed record RecorderSettings
 {
     public RecordingSettings Recording { get; init; } = new();
 
+    public ScreenshotSettings Screenshot { get; init; } = new();
+
     public StorageSettings Storage { get; init; } = new();
 
     public ReportSettings Reports { get; init; } = new();
@@ -20,6 +22,44 @@ public sealed record RecordingSettings
     public bool CaptureLeftClick { get; init; } = true;
 
     public bool CaptureRightClick { get; init; } = true;
+
+    /// <summary>
+    /// Spec §17 "duplicate-step suppression": a double- or triple-click on the same spot becomes one step
+    /// (with <c>clickCount</c> 2 or 3) instead of several identical ones.
+    /// </summary>
+    public bool MergeDoubleClicks { get; init; } = true;
+}
+
+public enum ScreenshotFormat
+{
+    Png,
+    Jpeg,
+}
+
+/// <summary>How screenshots are stored and marked. Copied into each session as its screenshot snapshot.</summary>
+public sealed record ScreenshotSettings
+{
+    public const int MinJpegQuality = 10;
+    public const int MaxJpegQuality = 100;
+    public const int MinMarkerSize = 12;
+    public const int MaxMarkerSize = 96;
+
+    public ScreenshotFormat Format { get; init; } = ScreenshotFormat.Png;
+
+    /// <summary>1–100; only used for JPEG.</summary>
+    public int JpegQuality { get; init; } = 85;
+
+    public bool ClickMarkerEnabled { get; init; } = true;
+
+    /// <summary>Marker diameter at 100% scaling (96 DPI); it grows with the clicked window's DPI.</summary>
+    public int ClickMarkerSize { get; init; } = 32;
+
+    /// <summary>A copy with every value inside its allowed range.</summary>
+    public ScreenshotSettings Clamped() => this with
+    {
+        JpegQuality = Math.Clamp(JpegQuality, MinJpegQuality, MaxJpegQuality),
+        ClickMarkerSize = Math.Clamp(ClickMarkerSize, MinMarkerSize, MaxMarkerSize),
+    };
 }
 
 /// <summary>Which reports are written when a recording stops. At least one should be on.</summary>

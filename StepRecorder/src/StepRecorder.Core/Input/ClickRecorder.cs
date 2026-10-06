@@ -1,9 +1,11 @@
+using System.Diagnostics;
 using System.Threading.Channels;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using StepRecorder.Core.Capture;
 using StepRecorder.Core.Recording;
 using StepRecorder.Core.Sessions;
+using StepRecorder.Core.Settings;
 
 namespace StepRecorder.Core.Input;
 
@@ -16,6 +18,9 @@ namespace StepRecorder.Core.Input;
 public sealed class ClickRecorder : IDisposable
 {
     public const int DefaultQueueCapacity = 256;
+
+    /// <summary>Captures slower than this are logged, to find windows that delay later screenshots (ADR 0003).</summary>
+    public static readonly TimeSpan SlowCaptureThreshold = TimeSpan.FromMilliseconds(250);
 
     /// <summary>How far back a tray-menu open looks for the taskbar click that opened it.</summary>
     public static readonly TimeSpan TrayClickWindow = TimeSpan.FromSeconds(3);
@@ -30,6 +35,9 @@ public sealed class ClickRecorder : IDisposable
     private readonly Channel<Work> queue;
     private readonly Task consumer;
     private long droppedClicks;
+
+    // Consumer-thread only: the last click that produced or extended a step, for double-click merging.
+    private (MouseClick Click, long? Window, int StepNumber)? lastRecorded;
 
     public ClickRecorder(
         Recorder recorder,
@@ -197,10 +205,22 @@ public sealed class ClickRecorder : IDisposable
             return;
         }
 
-        recorder.AddStep(click, window, CaptureWindow(window));
+        // The second click of a double-click adds nothing new to document, and its screenshot would show
+        // the result of the first click. Count it on the existing step instead.
+        if (session.RecordingSettingsSnapshot.MergeDoubleClicks
+            && lastRecorded is { } last
+            && RepeatClickDetector.IsRepeat(last.Click, last.Window, click, window?.Handle)
+            && recorder.AddClickToLastStep(last.StepNumber))
+        {
+            lastRecorded = last with { Click = click };
+            return;
+        }
+
+        Step? step = recorder.AddStep(click, window, CaptureWindow(window, session.ScreenshotSettingsSnapshot));
+        lastRecorded = step is null ? null : (click, window?.Handle, step.StepNumber);
     }
 
-    private StepScreenshot CaptureWindow(WindowInfo? window)
+    private StepScreenshot CaptureWindow(WindowInfo? window, ScreenshotSettings settings)
     {
         if (window is null)
         {
@@ -214,7 +234,19 @@ public sealed class ClickRecorder : IDisposable
 
         try
         {
-            CaptureResult result = capture.Capture(window);
+            long started = Stopwatch.GetTimestamp();
+            CaptureResult result = capture.Capture(window, settings);
+            TimeSpan elapsed = Stopwatch.GetElapsedTime(started);
+            if (elapsed > SlowCaptureThreshold)
+            {
+                logger.LogWarning(
+                    "Slow capture: {Milliseconds} ms for {ProcessName} ({Width}x{Height})",
+                    (int)elapsed.TotalMilliseconds,
+                    window.ProcessName,
+                    window.Bounds.Width,
+                    window.Bounds.Height);
+            }
+
             if (result.Image is { } image)
             {
                 return StepScreenshot.Captured(image);

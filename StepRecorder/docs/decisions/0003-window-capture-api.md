@@ -44,8 +44,9 @@ gaps that matter.
 
 - Capture and PNG encoding run in the click consumer, so a slow capture (large or 4K windows) delays
   the *next* click's screenshot. If the manual tests show screenshots that show the state *after* later
-  clicks, split it into two stages in Phase 5: grab pixels right away, then encode and write in a
-  second queue.
+  clicks, split it into two stages: grab pixels right away, then encode and write in a second queue.
+  Phase 5 added "Slow capture" logging (over 250 ms) to decide this. The split itself waits for
+  that data (ADR 0007).
 - The screenshot is taken a few milliseconds after mouse-down, so fast apps may already show the
   pressed or opened state. "Before" screenshots are part of Phase 5/8 (before/after capture).
 

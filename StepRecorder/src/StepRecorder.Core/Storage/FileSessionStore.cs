@@ -2,6 +2,7 @@ using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using StepRecorder.Core.Sessions;
+using StepRecorder.Core.Settings;
 
 namespace StepRecorder.Core.Storage;
 
@@ -42,20 +43,22 @@ public sealed class FileSessionStore(ILogger? logger = null) : ISessionStore
         AtomicFile.WriteAllText(Path.Combine(session.Directory, SessionFileName), json);
     }
 
-    public static string ScreenshotRelativePath(int stepNumber) =>
-        $"{ScreenshotsFolderName}/step-{stepNumber:D3}.png";
+    public static string ScreenshotRelativePath(int stepNumber, ScreenshotFormat format = ScreenshotFormat.Png) =>
+        $"{ScreenshotsFolderName}/step-{stepNumber:D3}{Extension(format)}";
 
-    public string SaveScreenshot(Session session, int stepNumber, byte[] png)
+    public static string Extension(ScreenshotFormat format) => format == ScreenshotFormat.Jpeg ? ".jpg" : ".png";
+
+    public string SaveScreenshot(Session session, int stepNumber, byte[] data, ScreenshotFormat format = ScreenshotFormat.Png)
     {
-        string relative = ScreenshotRelativePath(stepNumber);
-        string path = ResolveInSession(session, relative);
+        string relative = ScreenshotRelativePath(stepNumber, format);
+        string path = ResolveInSession(session.Directory, relative);
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-        File.WriteAllBytes(path, png);
+        File.WriteAllBytes(path, data);
         return relative;
     }
 
     public void DeleteScreenshot(Session session, string relativePath) =>
-        File.Delete(ResolveInSession(session, relativePath));
+        File.Delete(ResolveInSession(session.Directory, relativePath));
 
     public Session Load(string sessionDirectory)
     {
@@ -99,9 +102,9 @@ public sealed class FileSessionStore(ILogger? logger = null) : ISessionStore
     }
 
     /// <summary>Turns a relative path from <c>session.json</c> into a full path that must stay inside the session.</summary>
-    private static string ResolveInSession(Session session, string relativePath)
+    public static string ResolveInSession(string sessionDirectory, string relativePath)
     {
-        string root = Path.GetFullPath(session.Directory);
+        string root = Path.GetFullPath(sessionDirectory);
         string full = Path.GetFullPath(Path.Combine(root, relativePath.Replace('/', Path.DirectorySeparatorChar)));
         if (!full.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
         {

@@ -12,6 +12,9 @@ namespace StepRecorder.Windows;
 /// </summary>
 public sealed class Win32WindowInspector : IWindowInspector
 {
+    private const string UwpFrameClass = "ApplicationFrameWindow";
+    private const string UwpCoreWindowClass = "Windows.UI.Core.CoreWindow";
+
     // File descriptions rarely change while the recorder runs; cache them by executable path.
     private readonly ConcurrentDictionary<string, string> applicationNames = new(StringComparer.OrdinalIgnoreCase);
 
@@ -37,6 +40,23 @@ public sealed class Win32WindowInspector : IWindowInspector
             return new WindowInfo(root.ToInt64(), (int)processId, "", "", "", "", default, null);
         }
 
+        string className = GetClass(root);
+
+        // UWP apps (Calculator, Settings...) live inside a frame window owned by ApplicationFrameHost.exe.
+        // The app's own process owns the CoreWindow child; name the step after that one.
+        if (className == UwpFrameClass)
+        {
+            IntPtr core = FindWindowEx(root, IntPtr.Zero, UwpCoreWindowClass, null);
+            if (core != IntPtr.Zero)
+            {
+                GetWindowThreadProcessId(core, out uint hostedProcessId);
+                if (hostedProcessId != 0)
+                {
+                    processId = hostedProcessId;
+                }
+            }
+        }
+
         string? imagePath = GetProcessImagePath(processId);
         string processName = imagePath is null ? "" : Path.GetFileNameWithoutExtension(imagePath);
 
@@ -59,7 +79,7 @@ public sealed class Win32WindowInspector : IWindowInspector
             ProcessName: processName,
             ApplicationName: imagePath is null ? processName : GetApplicationName(imagePath, processName),
             Title: title,
-            ClassName: GetClass(root),
+            ClassName: className,
             Bounds: WindowGeometry.GetFrameBounds(root),
             Dpi: dpi == 0 ? null : (int)dpi);
     }

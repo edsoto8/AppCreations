@@ -1,4 +1,5 @@
 using StepRecorder.Core.Sessions;
+using StepRecorder.Core.Settings;
 
 namespace StepRecorder.Core.Storage;
 
@@ -14,10 +15,10 @@ public interface ISessionStore
     void Save(Session session);
 
     /// <summary>
-    /// Writes <c>screenshots/step-NNN.png</c>, replacing any file of that name, and returns its path
-    /// relative to the session directory (forward slashes).
+    /// Writes <c>screenshots/step-NNN.png</c> (or <c>.jpg</c>), replacing any file of that name, and returns
+    /// its path relative to the session directory (forward slashes).
     /// </summary>
-    string SaveScreenshot(Session session, int stepNumber, byte[] png);
+    string SaveScreenshot(Session session, int stepNumber, byte[] data, ScreenshotFormat format = ScreenshotFormat.Png);
 
     /// <summary>Deletes a screenshot by its relative path. A missing file is not an error.</summary>
     void DeleteScreenshot(Session session, string relativePath);

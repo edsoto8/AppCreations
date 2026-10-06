@@ -20,12 +20,7 @@ public static class StepDescriber
             return step.GeneratedDescription.Trim();
         }
 
-        string verb = step.MouseButton switch
-        {
-            MouseButton.Right => "Right-click",
-            MouseButton.Middle => "Middle-click",
-            _ => "Click",
-        };
+        string verb = Verb(step);
 
         if (ShellWindows.IsDesktop(step.WindowClassName))
         {
@@ -48,6 +43,27 @@ public static class StepDescriber
         return step.CursorX is { } screenX && step.CursorY is { } screenY
             ? $"{verb} at screen position ({screenX}, {screenY})."
             : $"{verb}.";
+    }
+
+    // "Click", "Double-click", "Right-click", "Double right-click", "Click (5 times)"...
+    private static string Verb(Step step)
+    {
+        string click = step.MouseButton switch
+        {
+            MouseButton.Right => "right-click",
+            MouseButton.Middle => "middle-click",
+            _ => "click",
+        };
+
+        string verb = step.ClickCount switch
+        {
+            null or <= 1 => click,
+            2 => click == "click" ? "double-click" : $"double {click}",
+            3 => click == "click" ? "triple-click" : $"triple {click}",
+            int n => $"{click} ({n} times)",
+        };
+
+        return char.ToUpperInvariant(verb[0]) + verb[1..];
     }
 
     public static string ApplicationName(Step step) =>

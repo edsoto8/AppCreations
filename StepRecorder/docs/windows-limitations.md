@@ -15,7 +15,7 @@ captures the secure desktop (spec §18).
 | UAC prompt, Ctrl+Alt+Del, lock screen | Secure desktop: no clicks are seen. | Expected by design |
 | Window closes in response to the click (e.g. a dialog's OK button) | The lookup normally runs before the app handles the click. If it loses the race, the step keeps only its screen position, with no window details. | Suspected rare |
 | Popup menus and drop-downs | Recorded against the popup window; the title comes from the owning app window. | By design |
-| UWP / packaged apps (Calculator, Settings) | Root window is `ApplicationFrameWindow`, owned by `ApplicationFrameHost.exe`, so the application name may show "Application Frame Host" instead of the app. Fixing this needs the hosted `Windows.UI.Core.CoreWindow` child. | Suspected; candidate fix in Milestone 5 |
+| UWP / packaged apps (Calculator, Settings) | Root window is `ApplicationFrameWindow`, owned by `ApplicationFrameHost.exe`. Since Phase 5 the inspector names the step after the process that owns the hosted `Windows.UI.Core.CoreWindow` child, so it shows "Calculator" rather than "Application Frame Host". If the child isn't found (e.g. a suspended app), the frame host name remains. | Fix built; untested |
 | Touch and pen | Windows turns them into mouse events, which the hook sees as left clicks. | Suspected |
 | Remote Desktop / injected input (automation tools) | Injected clicks are recorded like real ones. | Suspected |
 | Hung application | The window lookup sends no messages to the target, so a hung app can't stall the recorder. | By design |

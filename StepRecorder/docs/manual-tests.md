@@ -97,3 +97,22 @@ Open the session's `screenshots/` folder next to `session.json`.
 | 4.11 | Kill the app mid-recording, restart, Open Last Recording | A report is generated for the interrupted session and labelled "Incomplete" | |
 | 4.12 | Right-click tray → Stop quickly after opening the menu | The report does not end with a taskbar click | |
 | 4.13 | Windows dark mode / light mode browser | Report readable in both; Print preview fits steps on pages without splitting a step | |
+
+## Phase 5 — Click markers, repeat clicks, screenshot settings
+
+| # | Check | Expected | Result |
+|---|---|---|---|
+| 5.1 | Record clicks on a 100% and a 150% (or 200%) monitor; open `report.html` | Rings sit exactly on the click points and look the same size relative to the UI on both monitors | |
+| 5.2 | Open `report.md` in a Markdown viewer | Images come from `screenshots/marked/` and show the same ring as the HTML report | |
+| 5.3 | Compare `screenshots/step-001.png` with `screenshots/marked/step-001.png` | The original has no ring; the marked copy does | |
+| 5.4 | Settings → marker size 64 → record → stop | Bigger rings in both reports | |
+| 5.5 | Settings → turn markers off → Tray → Open Last Recording after deleting `report.html` (to regenerate) | No rings; `screenshots/marked/` removed | |
+| 5.6 | Double-click a file in Explorer; triple-click a paragraph in WordPad/Word | One step each: "Double-click …" / "Triple-click …" with a single screenshot | |
+| 5.7 | Click two different buttons quickly (under half a second apart) | Two separate steps | |
+| 5.8 | Settings → turn off "Double- and triple-clicks become one step" → double-click | Two steps | |
+| 5.9 | Settings → turn off "Record right clicks" → right-click | No step | |
+| 5.10 | Settings → JPEG, quality 60 → record | `step-NNN.jpg` files, clearly smaller than PNG; reports show them | |
+| 5.11 | Settings → JPEG quality 5 → Save | Inline error about the 10–100 range | |
+| 5.12 | Click Calculator and Settings (UWP) | `applicationName` is "Calculator" / "Settings", not "Application Frame Host" | |
+| 5.13 | Maximized 4K window, several quick clicks; check the log | Any "Slow capture: N ms" lines show how long capture takes; note the numbers here | |
+| 5.14 | Settings window with keyboard only | All new controls reachable; Alt+L/G/D/F/Q/K/Z work | |

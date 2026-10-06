@@ -15,6 +15,7 @@ The full product spec is [`../StepRecorder-MultiModel-Spec.md`](../StepRecorder-
 | 2 — Global click recording | **Built; Windows manual checks pending** |
 | 3 — Window screenshots | **Built; Windows manual checks pending** |
 | 4 — HTML + Markdown reports with click markers | **Built; Windows manual checks pending** |
+| Phase 5 — click markers in image copies, double-click merging, screenshot format | **Built; Windows manual checks pending** |
 | 5+ — UI Automation, privacy, editor, smart processing, exports, AI | Not started |
 
 Each left or right click in another application becomes a step in `session.json`, with the window, app
@@ -49,7 +50,7 @@ It never opens a main window. Right-click the icon for the menu:
 | Pause / Resume Recording | Pauses without ending the session |
 | Stop Recording | Finalizes the session and writes its reports; click the notification to open the report |
 | Open Last Recording | Opens the most recent report (writing it first for an interrupted session) |
-| Settings… | Recordings folder, default recording name, report formats (HTML, Markdown or both) |
+| Settings… | Recordings folder and name; which clicks to record and double-click merging; PNG/JPEG and quality; click markers and their size; report formats |
 | Exit | Asks first if a recording is in progress, then stops and saves it |
 
 The icon shows the state: **grey** dot = not recording, **red** dot = recording, **amber** pause symbol = paused.
@@ -77,7 +78,8 @@ Each recording is a self-contained folder that can be moved or zipped:
   assets/           report.css, report.js
   session.json      metadata and steps; saved after every step, with no absolute paths
   screenshots/
-    step-001.png    the clicked window only, named by step number
+    step-001.png    the clicked window only, named by step number (.jpg if JPEG is chosen)
+    marked/         copies with the click marker drawn in (used by report.md); originals stay untouched
 ```
 
 `session.json` holds a `status` field. A session still marked `Recording` or `Paused` after the app has

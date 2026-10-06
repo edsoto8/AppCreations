@@ -1,5 +1,6 @@
 using StepRecorder.Core.Recording;
 using StepRecorder.Core.Sessions;
+using StepRecorder.Core.Settings;
 using StepRecorder.Core.Storage;
 
 namespace StepRecorder.Tests;
@@ -57,8 +58,8 @@ internal sealed class FlakySessionStore(ISessionStore inner) : ISessionStore
         inner.Save(session);
     }
 
-    public string SaveScreenshot(Session session, int stepNumber, byte[] png) =>
-        FailScreenshots ? throw new IOException("Simulated disk full.") : inner.SaveScreenshot(session, stepNumber, png);
+    public string SaveScreenshot(Session session, int stepNumber, byte[] data, ScreenshotFormat format = ScreenshotFormat.Png) =>
+        FailScreenshots ? throw new IOException("Simulated disk full.") : inner.SaveScreenshot(session, stepNumber, data, format);
 
     public void DeleteScreenshot(Session session, string relativePath) => inner.DeleteScreenshot(session, relativePath);
 

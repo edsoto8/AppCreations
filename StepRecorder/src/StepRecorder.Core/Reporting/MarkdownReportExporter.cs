@@ -5,8 +5,8 @@ namespace StepRecorder.Core.Reporting;
 
 /// <summary>
 /// Writes <c>report.md</c>: the same steps as the HTML report, with relative image links. Markdown
-/// can't overlay a click marker, so it gives the click position in the text. Marked screenshot copies
-/// come in Phase 5.
+/// can't overlay a click marker, so it links the copy with the marker drawn in when there is one, and
+/// the original otherwise.
 /// </summary>
 public sealed class MarkdownReportExporter : IReportExporter
 {
@@ -39,7 +39,8 @@ public sealed class MarkdownReportExporter : IReportExporter
             if (step.Screenshot is { } shot)
             {
                 string alt = Escape($"Step {step.Number} screenshot");
-                md.Append("![").Append(alt).Append("](").Append(ReportText.UrlPath(shot.RelativePath)).Append(")\n\n");
+                string path = shot.MarkedRelativePath ?? shot.RelativePath;
+                md.Append("![").Append(alt).Append("](").Append(ReportText.UrlPath(path)).Append(")\n\n");
             }
 
             if (!string.IsNullOrWhiteSpace(step.ScreenshotNote))

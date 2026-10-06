@@ -47,6 +47,11 @@ tests run anywhere.
   branching inside one. All session text must be HTML-encoded/Markdown-escaped, because window titles
   come from other apps. Links stay relative. The HTML click marker is CSS positioned from
   `ClickXRelativeToWindow / ScreenshotWidth` (ADR 0006).
+- **Click markers** come from one `MarkerGeometry` (DPI-scaled, in screenshot pixels), used by both
+  the HTML SVG overlay and `IScreenshotAnnotator` copies in `screenshots/marked/`. Never modify original
+  screenshots (ADR 0007).
+- **Repeat clicks**: the consumer merges a click that repeats the last one into that step's
+  `ClickCount` (`RepeatClickDetector`, `Recorder.AddClickToLastStep`) before capturing.
 - **Persistence**: `FileSessionStore` writes `session.json` atomically (temp file + rename). The session
   folder path is runtime-only (`[JsonIgnore] Session.Directory`). Never put absolute paths in
   `session.json`; screenshot paths are relative with forward slashes.

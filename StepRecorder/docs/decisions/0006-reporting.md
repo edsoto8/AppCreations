@@ -1,6 +1,7 @@
 # 0006 — Report model and exporters
 
-- Status: Accepted (Phase 4 / Milestone 4). Click markers drawn into image copies come in Phase 5.
+- Status: Accepted (Phase 4 / Milestone 4). The marker section is superseded by ADR 0007 (SVG overlay +
+  burned-in copies, DPI-scaled).
 - Date: 2026-10-05
 
 ## Decision

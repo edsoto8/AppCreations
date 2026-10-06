@@ -32,6 +32,8 @@ public sealed class Session
 
     public RecordingSettings RecordingSettingsSnapshot { get; init; } = new();
 
+    public ScreenshotSettings ScreenshotSettingsSnapshot { get; init; } = new();
+
     public List<Step> Steps { get; init; } = [];
 
     /// <summary>

@@ -73,6 +73,9 @@ public sealed class ClickRecorderTests : IDisposable
     private static MouseClick ClickAt(int x, int y, MouseButton button = MouseButton.Left, int secondsIn = 0) =>
         new(button, x, y, TestEnvironment.Start.AddSeconds(secondsIn));
 
+    private static MouseClick ClickAtMs(int x, int y, int millisecondsIn, MouseButton button = MouseButton.Left) =>
+        new(button, x, y, TestEnvironment.Start.AddMilliseconds(millisecondsIn));
+
     [Fact]
     public void Source_RunsOnlyWhileRecording()
     {
@@ -370,8 +373,8 @@ public sealed class ClickRecorderTests : IDisposable
         inspector.Windows[(250, 130)] = Notepad;
         capture.Throw = true;
 
-        source.Click(ClickAt(250, 130));
-        source.Click(ClickAt(250, 130));
+        source.Click(ClickAt(250, 130, secondsIn: 0));
+        source.Click(ClickAt(250, 130, secondsIn: 2));
         await clicks.FlushAsync();
 
         Assert.Equal(2, session.StepCount);
@@ -469,6 +472,113 @@ public sealed class ClickRecorderTests : IDisposable
         Assert.Equal(2, Directory.GetFiles(screenshots).Length);
     }
 
+    [Fact]
+    public async Task DoubleClick_BecomesOneStepWithClickCount()
+    {
+        Session session = Start();
+        inspector.Windows[(250, 130)] = Notepad;
+        inspector.Windows[(252, 131)] = Notepad;
+
+        source.Click(ClickAtMs(250, 130, 0));
+        source.Click(ClickAtMs(252, 131, 180));
+        await clicks.FlushAsync();
+
+        Step step = Assert.Single(session.Steps);
+        Assert.Equal(2, step.ClickCount);
+        Assert.Single(capture.Captured); // the screenshot from the first click is kept
+        Assert.Equal(2, new FileSessionStore().Load(session.Directory).Steps[0].ClickCount);
+    }
+
+    [Fact]
+    public async Task TripleClick_ChainsFromClickToClick()
+    {
+        Session session = Start();
+        inspector.Windows[(250, 130)] = Notepad;
+
+        source.Click(ClickAtMs(250, 130, 0));
+        source.Click(ClickAtMs(250, 130, 400));
+        source.Click(ClickAtMs(250, 130, 800)); // 800 ms after the first, but 400 ms after the second
+        await clicks.FlushAsync();
+
+        Assert.Equal(3, Assert.Single(session.Steps).ClickCount);
+    }
+
+    [Theory]
+    [InlineData(600, 250, 130, MouseButton.Left)]    // too slow
+    [InlineData(100, 260, 130, MouseButton.Left)]    // moved too far
+    [InlineData(100, 250, 130, MouseButton.Right)]   // other button
+    public async Task SeparateClicks_AreNotMerged(int millisecondsLater, int x, int y, MouseButton button)
+    {
+        Session session = Start();
+        inspector.Windows[(250, 130)] = Notepad;
+        inspector.Windows[(260, 130)] = Notepad;
+
+        source.Click(ClickAtMs(250, 130, 0));
+        source.Click(ClickAtMs(x, y, millisecondsLater, button));
+        await clicks.FlushAsync();
+
+        Assert.Equal(2, session.StepCount);
+        Assert.All(session.Steps, s => Assert.Null(s.ClickCount));
+    }
+
+    [Fact]
+    public async Task QuickClicksInDifferentWindows_AreNotMerged()
+    {
+        Session session = Start();
+        inspector.Windows[(250, 130)] = Notepad;
+        inspector.Windows[(251, 130)] = Calculator; // a window edge between the two clicks
+
+        source.Click(ClickAtMs(250, 130, 0));
+        source.Click(ClickAtMs(251, 130, 100));
+        await clicks.FlushAsync();
+
+        Assert.Equal(2, session.StepCount);
+    }
+
+    [Fact]
+    public async Task DoubleClickMerging_CanBeTurnedOff()
+    {
+        Session session = Start(new RecordingSettings { MergeDoubleClicks = false });
+        inspector.Windows[(250, 130)] = Notepad;
+
+        source.Click(ClickAtMs(250, 130, 0));
+        source.Click(ClickAtMs(250, 130, 150));
+        await clicks.FlushAsync();
+
+        Assert.Equal(2, session.StepCount);
+    }
+
+    [Fact]
+    public async Task DoubleClickAfterTrayClickRemoval_StartsANewStep()
+    {
+        Session session = Start();
+        inspector.Windows[(1800, 1060)] = Taskbar;
+
+        source.Click(ClickAtMs(1800, 1060, 0));
+        clicks.DiscardTrayMenuClick();
+        source.Click(ClickAtMs(1800, 1060, 100));
+        await clicks.FlushAsync();
+
+        Step step = Assert.Single(session.Steps);
+        Assert.Null(step.ClickCount);
+    }
+
+    [Fact]
+    public async Task ScreenshotSettings_AreSnapshottedAndUsedForCapture()
+    {
+        var jpeg = new ScreenshotSettings { Format = ScreenshotFormat.Jpeg, JpegQuality = 70 };
+        Session session = recorder.Start(temp.Path, "Test", new RecordingSettings(), jpeg);
+        inspector.Windows[(250, 130)] = Notepad;
+
+        source.Click(ClickAt(250, 130));
+        await clicks.FlushAsync();
+
+        Assert.Equal(jpeg, Assert.Single(capture.SettingsSeen));
+        Assert.Equal("screenshots/step-001.jpg", session.Steps[0].ScreenshotPath);
+        Assert.True(File.Exists(Path.Combine(session.Directory, "screenshots", "step-001.jpg")));
+        Assert.Equal(jpeg, new FileSessionStore().Load(session.Directory).ScreenshotSettingsSnapshot);
+    }
+
     private sealed class FakeClickSource : IMouseClickSource
     {
         private Action<MouseClick>? onClick;
@@ -512,8 +622,11 @@ public sealed class ClickRecorderTests : IDisposable
         /// <summary>Distinct bytes per window, so tests can tell screenshots apart.</summary>
         public static byte[] PngFor(WindowInfo window) => BitConverter.GetBytes(window.Handle);
 
-        public CaptureResult Capture(WindowInfo window)
+        public List<ScreenshotSettings> SettingsSeen { get; } = [];
+
+        public CaptureResult Capture(WindowInfo window, ScreenshotSettings settings)
         {
+            SettingsSeen.Add(settings);
             if (Throw)
             {
                 throw new InvalidOperationException("Simulated capture crash.");
@@ -525,7 +638,7 @@ public sealed class ClickRecorderTests : IDisposable
             }
 
             Captured.Add(window);
-            return CaptureResult.Success(new CapturedImage(PngFor(window), window.Bounds.Width, window.Bounds.Height, "Fake"));
+            return CaptureResult.Success(new CapturedImage(PngFor(window), window.Bounds.Width, window.Bounds.Height, "Fake", settings.Format));
         }
     }
 

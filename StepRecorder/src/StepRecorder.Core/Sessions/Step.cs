@@ -14,6 +14,9 @@ public sealed class Step
 
     public MouseButton? MouseButton { get; init; }
 
+    /// <summary>2 for a double-click, 3 for a triple-click; null means a single click.</summary>
+    public int? ClickCount { get; set; }
+
     /// <summary>Cursor position in physical virtual-desktop pixels.</summary>
     public int? CursorX { get; init; }
 
