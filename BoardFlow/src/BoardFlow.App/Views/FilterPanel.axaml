@@ -1,0 +1,67 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:BoardFlow.App.ViewModels"
+             xmlns:conv="using:BoardFlow.App.Converters"
+             x:Class="BoardFlow.App.Views.FilterPanel"
+             x:DataType="vm:BoardViewModel"
+             Width="300">
+  <StackPanel Spacing="14" Margin="4">
+    <Grid ColumnDefinitions="*,Auto">
+      <TextBlock Classes="h2" Text="Filter cards" VerticalAlignment="Center" />
+      <Button Grid.Column="1" Classes="ghost" Padding="8,2" MinHeight="26" Content="Clear all"
+              Command="{Binding ClearFiltersCommand}" IsEnabled="{Binding IsFilterActive}" />
+    </Grid>
+
+    <StackPanel Spacing="4">
+      <TextBlock Classes="fieldLabel" Text="Due date" />
+      <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding DueOptions}" SelectedItem="{Binding SelectedDue}"
+                AutomationProperties.Name="Due date filter">
+        <ComboBox.ItemTemplate>
+          <DataTemplate DataType="vm:DueFilterOption"><TextBlock Text="{Binding Name}" /></DataTemplate>
+        </ComboBox.ItemTemplate>
+      </ComboBox>
+    </StackPanel>
+
+    <StackPanel Spacing="2">
+      <TextBlock Classes="fieldLabel" Text="Priority" />
+      <ItemsControl ItemsSource="{Binding PriorityOptions}">
+        <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+        <ItemsControl.ItemTemplate>
+          <DataTemplate DataType="vm:FilterOption">
+            <CheckBox IsChecked="{Binding IsSelected}" Content="{Binding Name}" MinWidth="92" />
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </StackPanel>
+
+    <StackPanel Spacing="2">
+      <TextBlock Classes="fieldLabel" Text="Labels" />
+      <TextBlock Classes="muted" Text="No labels in this workspace yet." IsVisible="{Binding !HasLabelOptions}" />
+      <ItemsControl ItemsSource="{Binding LabelOptions}">
+        <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+        <ItemsControl.ItemTemplate>
+          <DataTemplate DataType="vm:FilterOption">
+            <CheckBox IsChecked="{Binding IsSelected}" MinWidth="130">
+              <StackPanel Orientation="Horizontal" Spacing="6">
+                <Ellipse Width="10" Height="10" Fill="{Binding Color, Converter={x:Static conv:HexToBrushConverter.Instance}}" />
+                <TextBlock Text="{Binding Name}" />
+              </StackPanel>
+            </CheckBox>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </StackPanel>
+
+    <StackPanel Spacing="2">
+      <TextBlock Classes="fieldLabel" Text="Columns (show only)" />
+      <ItemsControl ItemsSource="{Binding ColumnOptions}">
+        <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+        <ItemsControl.ItemTemplate>
+          <DataTemplate DataType="vm:FilterOption">
+            <CheckBox IsChecked="{Binding IsSelected}" Content="{Binding Name}" MinWidth="130" />
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </StackPanel>
+  </StackPanel>
+</UserControl>

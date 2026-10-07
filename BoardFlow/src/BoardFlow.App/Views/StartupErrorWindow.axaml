@@ -1,0 +1,16 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="BoardFlow.App.Views.StartupErrorWindow"
+        Title="BoardFlow could not start"
+        Width="560" SizeToContent="Height" CanResize="False"
+        WindowStartupLocation="CenterScreen"
+        Background="{DynamicResource SurfaceBrush}">
+  <StackPanel Margin="28,24" Spacing="14">
+    <TextBlock Classes="h2" Text="BoardFlow could not open its database" />
+    <TextBlock Name="MessageText" TextWrapping="Wrap" Classes="secondary" />
+    <TextBlock TextWrapping="Wrap" Classes="secondary"
+               Text="Your file has not been modified or replaced. Check the log for details, or start BoardFlow with a different data folder (--data-dir &lt;folder&gt;)." />
+    <SelectableTextBlock Name="PathsText" TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource TextMutedBrush}" />
+    <Button Classes="primary" HorizontalAlignment="Right" Content="Close" Name="CloseButton" />
+  </StackPanel>
+</Window>

@@ -1,0 +1,284 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <Styles.Resources>
+    <ResourceDictionary>
+      <ResourceDictionary.MergedDictionaries>
+        <ResourceInclude Source="avares://BoardFlow/Styles/Icons.axaml" />
+      </ResourceDictionary.MergedDictionaries>
+
+      <!-- BoardFlow palette: slate neutrals with a teal accent. -->
+      <Color x:Key="AccentColor">#0E8A7E</Color>
+      <SolidColorBrush x:Key="AccentBrush" Color="#0E8A7E" />
+      <SolidColorBrush x:Key="AccentHoverBrush" Color="#0B776D" />
+      <SolidColorBrush x:Key="AccentPressedBrush" Color="#09645C" />
+      <SolidColorBrush x:Key="AccentSoftBrush" Color="#DDF3F0" />
+      <SolidColorBrush x:Key="DangerBrush" Color="#C93C3C" />
+      <SolidColorBrush x:Key="DangerHoverBrush" Color="#B13232" />
+      <SolidColorBrush x:Key="DangerSoftBrush" Color="#FBE7E7" />
+      <SolidColorBrush x:Key="WarningBrush" Color="#B7791F" />
+      <SolidColorBrush x:Key="WarningSoftBrush" Color="#FDF1DC" />
+
+      <SolidColorBrush x:Key="AppBackgroundBrush" Color="#F3F5F8" />
+      <SolidColorBrush x:Key="SurfaceBrush" Color="#FFFFFF" />
+      <SolidColorBrush x:Key="ColumnBrush" Color="#E7EBF0" />
+      <SolidColorBrush x:Key="BorderBrush" Color="#D8DEE6" />
+      <SolidColorBrush x:Key="SubtleHoverBrush" Color="#DCE2EA" />
+      <SolidColorBrush x:Key="TextPrimaryBrush" Color="#1F2937" />
+      <SolidColorBrush x:Key="TextSecondaryBrush" Color="#5B6675" />
+      <SolidColorBrush x:Key="TextMutedBrush" Color="#8A94A3" />
+
+      <SolidColorBrush x:Key="SidebarBrush" Color="#1E2733" />
+      <SolidColorBrush x:Key="SidebarHoverBrush" Color="#2A3543" />
+      <SolidColorBrush x:Key="SidebarSelectedBrush" Color="#34414F" />
+      <SolidColorBrush x:Key="SidebarTextBrush" Color="#E6EAF0" />
+      <SolidColorBrush x:Key="SidebarMutedBrush" Color="#93A0B0" />
+
+      <SolidColorBrush x:Key="BackdropBrush" Color="#661A202A" />
+      <SolidColorBrush x:Key="PanelBackdropBrush" Color="#331A202A" />
+
+      <x:Double x:Key="ColumnWidth">284</x:Double>
+
+      <!-- Buttons -->
+      <ControlTheme x:Key="BfButton" TargetType="Button">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+        <Setter Property="BorderBrush" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="6" />
+        <Setter Property="Padding" Value="12,6" />
+        <Setter Property="MinHeight" Value="32" />
+        <Setter Property="FontWeight" Value="Medium" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="HorizontalContentAlignment" Value="Center" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="Template">
+          <ControlTemplate>
+            <ContentPresenter Name="PART_ContentPresenter"
+                              Background="{TemplateBinding Background}"
+                              BorderBrush="{TemplateBinding BorderBrush}"
+                              BorderThickness="{TemplateBinding BorderThickness}"
+                              CornerRadius="{TemplateBinding CornerRadius}"
+                              Padding="{TemplateBinding Padding}"
+                              Foreground="{TemplateBinding Foreground}"
+                              Content="{TemplateBinding Content}"
+                              ContentTemplate="{TemplateBinding ContentTemplate}"
+                              HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                              VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}" />
+          </ControlTemplate>
+        </Setter>
+        <Style Selector="^:pointerover">
+          <Setter Property="Background" Value="{DynamicResource SubtleHoverBrush}" />
+        </Style>
+        <Style Selector="^:focus-visible">
+          <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+        </Style>
+        <Style Selector="^:disabled">
+          <Setter Property="Opacity" Value="0.45" />
+        </Style>
+      </ControlTheme>
+
+      <ControlTheme x:Key="PrimaryButton" TargetType="Button" BasedOn="{StaticResource BfButton}">
+        <Setter Property="Background" Value="{DynamicResource AccentBrush}" />
+        <Setter Property="Foreground" Value="White" />
+        <Style Selector="^:pointerover">
+          <Setter Property="Background" Value="{DynamicResource AccentHoverBrush}" />
+        </Style>
+        <Style Selector="^:pressed">
+          <Setter Property="Background" Value="{DynamicResource AccentPressedBrush}" />
+        </Style>
+        <Style Selector="^:focus-visible">
+          <Setter Property="BorderBrush" Value="{DynamicResource TextPrimaryBrush}" />
+        </Style>
+      </ControlTheme>
+
+      <ControlTheme x:Key="DangerButton" TargetType="Button" BasedOn="{StaticResource BfButton}">
+        <Setter Property="Background" Value="{DynamicResource DangerBrush}" />
+        <Setter Property="Foreground" Value="White" />
+        <Style Selector="^:pointerover">
+          <Setter Property="Background" Value="{DynamicResource DangerHoverBrush}" />
+        </Style>
+        <Style Selector="^:focus-visible">
+          <Setter Property="BorderBrush" Value="{DynamicResource TextPrimaryBrush}" />
+        </Style>
+      </ControlTheme>
+
+      <ControlTheme x:Key="SecondaryButton" TargetType="Button" BasedOn="{StaticResource BfButton}">
+        <Setter Property="Background" Value="{DynamicResource SurfaceBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+        <Style Selector="^:pointerover">
+          <Setter Property="Background" Value="{DynamicResource AppBackgroundBrush}" />
+        </Style>
+        <Style Selector="^:focus-visible">
+          <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+        </Style>
+      </ControlTheme>
+
+      <ControlTheme x:Key="DangerTextButton" TargetType="Button" BasedOn="{StaticResource BfButton}">
+        <Setter Property="Foreground" Value="{DynamicResource DangerBrush}" />
+        <Style Selector="^:pointerover">
+          <Setter Property="Background" Value="{DynamicResource DangerSoftBrush}" />
+        </Style>
+      </ControlTheme>
+
+      <ControlTheme x:Key="IconButton" TargetType="Button" BasedOn="{StaticResource BfButton}">
+        <Setter Property="Padding" Value="6" />
+        <Setter Property="MinHeight" Value="28" />
+        <Setter Property="MinWidth" Value="28" />
+        <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+      </ControlTheme>
+
+      <ControlTheme x:Key="SidebarButton" TargetType="Button" BasedOn="{StaticResource BfButton}">
+        <Setter Property="Foreground" Value="{DynamicResource SidebarMutedBrush}" />
+        <Setter Property="HorizontalContentAlignment" Value="Left" />
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+        <Setter Property="Padding" Value="10,6" />
+        <Style Selector="^:pointerover">
+          <Setter Property="Background" Value="{DynamicResource SidebarHoverBrush}" />
+          <Setter Property="Foreground" Value="{DynamicResource SidebarTextBrush}" />
+        </Style>
+      </ControlTheme>
+
+      <!-- A card tile on the board. The whole tile is a button: click or Enter opens it. -->
+      <ControlTheme x:Key="CardButton" TargetType="Button">
+        <Setter Property="Background" Value="{DynamicResource SurfaceBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="8" />
+        <Setter Property="Padding" Value="10,9" />
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="Template">
+          <ControlTemplate>
+            <Border Name="PART_Root"
+                    Background="{TemplateBinding Background}"
+                    BorderBrush="{TemplateBinding BorderBrush}"
+                    BorderThickness="{TemplateBinding BorderThickness}"
+                    CornerRadius="{TemplateBinding CornerRadius}"
+                    BoxShadow="0 1 2 0 #1A1F2937">
+              <ContentPresenter Name="PART_ContentPresenter"
+                                Padding="{TemplateBinding Padding}"
+                                Content="{TemplateBinding Content}"
+                                ContentTemplate="{TemplateBinding ContentTemplate}"
+                                HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}" />
+            </Border>
+          </ControlTemplate>
+        </Setter>
+        <Style Selector="^:pointerover">
+          <Setter Property="BorderBrush" Value="#9FB0C3" />
+        </Style>
+        <Style Selector="^:focus-visible">
+          <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+          <Setter Property="BorderThickness" Value="2" />
+        </Style>
+        <Style Selector="^.dragging">
+          <Setter Property="Opacity" Value="0.35" />
+        </Style>
+      </ControlTheme>
+    </ResourceDictionary>
+  </Styles.Resources>
+
+  <Style Selector="Button.primary"><Setter Property="Theme" Value="{StaticResource PrimaryButton}" /></Style>
+  <Style Selector="Button.danger"><Setter Property="Theme" Value="{StaticResource DangerButton}" /></Style>
+  <Style Selector="Button.secondary"><Setter Property="Theme" Value="{StaticResource SecondaryButton}" /></Style>
+  <Style Selector="Button.ghost"><Setter Property="Theme" Value="{StaticResource BfButton}" /></Style>
+  <Style Selector="Button.dangerText"><Setter Property="Theme" Value="{StaticResource DangerTextButton}" /></Style>
+  <Style Selector="Button.icon"><Setter Property="Theme" Value="{StaticResource IconButton}" /></Style>
+  <Style Selector="Button.sidebar"><Setter Property="Theme" Value="{StaticResource SidebarButton}" /></Style>
+  <Style Selector="Button.card"><Setter Property="Theme" Value="{StaticResource CardButton}" /></Style>
+
+  <Style Selector="PathIcon">
+    <Setter Property="Width" Value="16" />
+    <Setter Property="Height" Value="16" />
+  </Style>
+  <Style Selector="PathIcon.small">
+    <Setter Property="Width" Value="12" />
+    <Setter Property="Height" Value="12" />
+  </Style>
+
+  <!-- Typography -->
+  <Style Selector="TextBlock.h1">
+    <Setter Property="FontSize" Value="20" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+  </Style>
+  <Style Selector="TextBlock.h2">
+    <Setter Property="FontSize" Value="16" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+  </Style>
+  <Style Selector="TextBlock.secondary">
+    <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+  </Style>
+  <Style Selector="TextBlock.muted">
+    <Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}" />
+    <Setter Property="FontSize" Value="12" />
+  </Style>
+  <Style Selector="TextBlock.fieldLabel">
+    <Setter Property="FontSize" Value="12" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+    <Setter Property="Margin" Value="0,0,0,4" />
+  </Style>
+  <Style Selector="TextBlock.sectionLabel">
+    <Setter Property="FontSize" Value="11" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="LetterSpacing" Value="0.6" />
+    <Setter Property="Foreground" Value="{DynamicResource SidebarMutedBrush}" />
+  </Style>
+  <Style Selector="TextBlock.error">
+    <Setter Property="Foreground" Value="{DynamicResource DangerBrush}" />
+    <Setter Property="TextWrapping" Value="Wrap" />
+  </Style>
+
+  <!-- Surfaces -->
+  <Style Selector="Border.column">
+    <Setter Property="Background" Value="{DynamicResource ColumnBrush}" />
+    <Setter Property="CornerRadius" Value="10" />
+    <Setter Property="Width" Value="{StaticResource ColumnWidth}" />
+  </Style>
+  <Style Selector="Border.pill">
+    <Setter Property="CornerRadius" Value="10" />
+    <Setter Property="Padding" Value="7,1" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="Border.labelChip">
+    <Setter Property="CornerRadius" Value="4" />
+    <Setter Property="Padding" Value="6,1" />
+    <Setter Property="Margin" Value="0,0,4,4" />
+  </Style>
+  <Style Selector="Border.labelChip">
+    <Setter Property="TextElement.Foreground" Value="White" />
+    <Setter Property="TextElement.FontSize" Value="11" />
+    <Setter Property="TextElement.FontWeight" Value="SemiBold" />
+  </Style>
+  <Style Selector="Border.dialog">
+    <Setter Property="Background" Value="{DynamicResource SurfaceBrush}" />
+    <Setter Property="CornerRadius" Value="12" />
+    <Setter Property="Padding" Value="24,20" />
+    <Setter Property="BoxShadow" Value="0 12 32 0 #401F2937" />
+  </Style>
+
+  <!-- Due-date badge states -->
+  <!-- TextElement.Foreground is inherited by the badge's text and icon. -->
+  <Style Selector="Border.due">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="TextElement.Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+  </Style>
+  <Style Selector="Border.due.overdue">
+    <Setter Property="Background" Value="{DynamicResource DangerSoftBrush}" />
+    <Setter Property="TextElement.Foreground" Value="{DynamicResource DangerBrush}" />
+  </Style>
+  <Style Selector="Border.due.today">
+    <Setter Property="Background" Value="{DynamicResource WarningSoftBrush}" />
+    <Setter Property="TextElement.Foreground" Value="{DynamicResource WarningBrush}" />
+  </Style>
+
+  <Style Selector="TextBox">
+    <Setter Property="CornerRadius" Value="6" />
+  </Style>
+  <Style Selector="ComboBox">
+    <Setter Property="CornerRadius" Value="6" />
+  </Style>
+</Styles>

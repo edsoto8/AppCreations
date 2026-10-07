@@ -1,0 +1,14 @@
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="BoardFlow.App.App"
+             Name="BoardFlow"
+             RequestedThemeVariant="Light">
+  <Application.Styles>
+    <FluentTheme>
+      <FluentTheme.Palettes>
+        <ColorPaletteResources x:Key="Light" Accent="#0E8A7E" />
+      </FluentTheme.Palettes>
+    </FluentTheme>
+    <StyleInclude Source="avares://BoardFlow/Styles/Theme.axaml" />
+  </Application.Styles>
+</Application>

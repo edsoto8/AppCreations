@@ -1,0 +1,168 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:BoardFlow.App.ViewModels"
+             xmlns:conv="using:BoardFlow.App.Converters"
+             xmlns:infra="using:BoardFlow.App.Infrastructure"
+             x:Class="BoardFlow.App.Views.BoardView"
+             x:DataType="vm:BoardViewModel"
+             Focusable="True">
+  <Panel>
+    <!-- Board without columns -->
+    <StackPanel IsVisible="{Binding !HasColumns}" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="12" MaxWidth="440">
+      <TextBlock Classes="h2" Text="This board has no columns yet" HorizontalAlignment="Center" />
+      <TextBlock Classes="secondary" TextWrapping="Wrap" TextAlignment="Center"
+                 Text="Columns are the stages your cards move through. Start with the usual set or make your own." />
+      <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="8" Margin="0,8,0,0">
+        <Button Classes="primary" Content="Add default columns" Command="{Binding AddDefaultColumnsCommand}" />
+        <Button Classes="secondary" Content="Add a column…" Command="{Binding AddColumnCommand}" />
+      </StackPanel>
+    </StackPanel>
+
+    <ScrollViewer Name="BoardScroller" IsVisible="{Binding HasColumns}"
+                  HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+      <StackPanel Orientation="Horizontal" Spacing="12" Margin="20,16,20,16">
+        <ItemsControl Name="ColumnsHost" ItemsSource="{Binding Columns}">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="12" /></ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate DataType="vm:ColumnViewModel">
+              <Border Classes="column" IsVisible="{Binding IsVisible}" VerticalAlignment="Top" Tag="column">
+                <DockPanel>
+                  <!-- Header: drag it to reorder the column -->
+                  <Border DockPanel.Dock="Top" Name="ColumnHeader" Classes="columnHeader" Background="Transparent"
+                          Padding="12,8,6,6" Cursor="Hand" ToolTip.Tip="Drag to reorder this column">
+                    <Grid ColumnDefinitions="*,Auto,Auto">
+                      <TextBlock Text="{Binding Name}" FontWeight="SemiBold" VerticalAlignment="Center"
+                                 TextTrimming="CharacterEllipsis" Foreground="{DynamicResource TextPrimaryBrush}" />
+                      <Border Grid.Column="1" Classes="pill" Background="{DynamicResource SubtleHoverBrush}" Margin="6,0">
+                        <TextBlock Text="{Binding CountText}" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" />
+                      </Border>
+                      <Button Grid.Column="2" Classes="icon" ToolTip.Tip="Column actions"
+                              AutomationProperties.Name="{Binding Name, StringFormat='Actions for column {0}'}">
+                        <PathIcon Data="{StaticResource IconMore}" />
+                        <Button.Flyout>
+                          <MenuFlyout Placement="BottomEdgeAlignedLeft">
+                            <MenuItem Header="Add card…" Command="{Binding Board.NewCardCommand}" CommandParameter="{Binding}" />
+                            <MenuItem Header="Rename…" Command="{Binding Board.RenameColumnCommand}" CommandParameter="{Binding}" />
+                            <MenuItem Header="Move left" Command="{Binding Board.MoveColumnLeftCommand}" CommandParameter="{Binding}"
+                                      IsEnabled="{Binding !IsFirst}" />
+                            <MenuItem Header="Move right" Command="{Binding Board.MoveColumnRightCommand}" CommandParameter="{Binding}"
+                                      IsEnabled="{Binding !IsLast}" />
+                            <Separator />
+                            <MenuItem Header="Delete column…" Command="{Binding Board.DeleteColumnCommand}" CommandParameter="{Binding}" />
+                          </MenuFlyout>
+                        </Button.Flyout>
+                      </Button>
+                    </Grid>
+                  </Border>
+
+                  <!-- Quick add -->
+                  <Panel DockPanel.Dock="Bottom" Margin="8,2,8,8">
+                    <Button Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                            Foreground="{DynamicResource TextSecondaryBrush}" IsVisible="{Binding !IsQuickAddOpen}"
+                            Command="{Binding OpenQuickAddCommand}"
+                            AutomationProperties.Name="{Binding Name, StringFormat='Add a card to {0}'}">
+                      <StackPanel Orientation="Horizontal" Spacing="6">
+                        <PathIcon Data="{StaticResource IconPlus}" Width="14" Height="14" />
+                        <TextBlock Text="Add a card" />
+                      </StackPanel>
+                    </Button>
+                    <StackPanel IsVisible="{Binding IsQuickAddOpen}" Spacing="6">
+                      <TextBox Name="QuickAddBox" Text="{Binding QuickAddText}" PlaceholderText="Card title"
+                               infra:FocusBehavior.FocusWhenVisible="True"
+                               AutomationProperties.Name="{Binding Name, StringFormat='New card title for {0}'}">
+                        <TextBox.KeyBindings>
+                          <KeyBinding Gesture="Enter" Command="{Binding SubmitQuickAddCommand}" />
+                          <KeyBinding Gesture="Escape" Command="{Binding CancelQuickAddCommand}" />
+                        </TextBox.KeyBindings>
+                      </TextBox>
+                      <StackPanel Orientation="Horizontal" Spacing="6">
+                        <Button Classes="primary" Content="Add card" Command="{Binding SubmitQuickAddCommand}" />
+                        <Button Classes="ghost" Content="Cancel" Command="{Binding CancelQuickAddCommand}" />
+                        <Button Classes="ghost" Content="More fields…" Command="{Binding Board.NewCardCommand}"
+                                CommandParameter="{Binding}" />
+                      </StackPanel>
+                      <TextBlock Classes="muted" Text="Enter to add another · Esc to close" />
+                    </StackPanel>
+                  </Panel>
+
+                  <!-- Cards -->
+                  <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                    <Panel Margin="8,2,8,4">
+                      <Border IsVisible="{Binding IsEmpty}" CornerRadius="8" Padding="10,14" BorderThickness="1"
+                              BorderBrush="{DynamicResource BorderBrush}" Background="#0A1F2937">
+                        <TextBlock Classes="muted" Text="No cards yet. Add one below or drag one here." TextWrapping="Wrap"
+                                   TextAlignment="Center" />
+                      </Border>
+                      <TextBlock Classes="muted" Text="No cards match the filter." Margin="4,6" IsVisible="{Binding IsFilteredEmpty}" />
+                      <ItemsControl Name="CardsList" ItemsSource="{Binding Cards}" MinHeight="12">
+                        <ItemsControl.ItemsPanel>
+                          <ItemsPanelTemplate><StackPanel Spacing="8" /></ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                          <DataTemplate DataType="vm:CardItemViewModel">
+                            <Button Classes="card" AutomationProperties.Name="{Binding AccessibleName}">
+                              <StackPanel Spacing="6">
+                                <ItemsControl ItemsSource="{Binding Labels}" IsVisible="{Binding HasLabels}" Margin="0,0,0,-4">
+                                  <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                                  <ItemsControl.ItemTemplate>
+                                    <DataTemplate DataType="vm:LabelChip">
+                                      <Border Classes="labelChip" Background="{Binding Color, Converter={x:Static conv:HexToBrushConverter.Instance}}">
+                                        <TextBlock Text="{Binding Name}" />
+                                      </Border>
+                                    </DataTemplate>
+                                  </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                <TextBlock Text="{Binding Title}" TextWrapping="Wrap" Foreground="{DynamicResource TextPrimaryBrush}" />
+                                <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding HasFooter}">
+                                  <Border Classes="pill" IsVisible="{Binding HasPriority}" Padding="6,1"
+                                          Background="{Binding Priority, Converter={x:Static conv:PriorityToBrushConverter.Instance}}">
+                                    <TextBlock Text="{Binding PriorityText}" FontSize="11" FontWeight="SemiBold" Foreground="White" />
+                                  </Border>
+                                  <Border Classes="due pill" Padding="5,1" IsVisible="{Binding HasDueDate}"
+                                          Classes.overdue="{Binding IsOverdue}" Classes.today="{Binding IsDueToday}">
+                                    <StackPanel Orientation="Horizontal" Spacing="4">
+                                      <PathIcon Data="{StaticResource IconCalendar}" Classes="small" />
+                                      <TextBlock Text="{Binding DueText}" FontSize="11" />
+                                    </StackPanel>
+                                  </Border>
+                                  <PathIcon Data="{StaticResource IconText}" Classes="small" IsVisible="{Binding HasDescription}"
+                                            Foreground="{DynamicResource TextMutedBrush}" ToolTip.Tip="Has a description" />
+                                </StackPanel>
+                              </StackPanel>
+                            </Button>
+                          </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
+                    </Panel>
+                  </ScrollViewer>
+                </DockPanel>
+              </Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <Button Classes="ghost" VerticalAlignment="Top" Width="{StaticResource ColumnWidth}" Height="44"
+                HorizontalContentAlignment="Left" Background="#0F1F2937" Command="{Binding AddColumnCommand}"
+                AutomationProperties.Name="Add a column">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <PathIcon Data="{StaticResource IconPlus}" Width="14" Height="14" />
+            <TextBlock Text="Add column" />
+          </StackPanel>
+        </Button>
+      </StackPanel>
+    </ScrollViewer>
+
+    <!-- Drag feedback, drawn above the board and never hit-tested -->
+    <Canvas Name="DragLayer" IsHitTestVisible="False">
+      <Border Name="DropIndicator" IsVisible="False" Background="{DynamicResource AccentBrush}" CornerRadius="2" />
+      <Border Name="DragGhost" IsVisible="False" Width="260" Opacity="0.92" CornerRadius="8" Padding="10,9"
+              Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1"
+              BoxShadow="0 8 20 0 #401F2937">
+        <Border.RenderTransform><RotateTransform Angle="2" /></Border.RenderTransform>
+        <TextBlock Name="DragGhostText" TextWrapping="Wrap" MaxHeight="60" />
+      </Border>
+    </Canvas>
+  </Panel>
+</UserControl>
