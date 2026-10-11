@@ -587,16 +587,45 @@ export interface GameOutcome {
   endedTick: number | null;
 }
 
-/** An event that waits for the player's accept/decline (e.g. trader, harvest festival). */
-export interface PendingDecision {
+/**
+ * Trader offer (GAME_DESIGN §10 #1). Flat keys, one per resource and side, present only when non-zero:
+ * `giveWood: 30, getFood: 25` means "30 wood for 25 food". Accept swaps the goods at once.
+ */
+export type TraderPayload = {
+  [K in `${'give' | 'get'}${Capitalize<ResourceType>}`]?: number;
+};
+/** Wanderers (§10 #2) asking to join when there are not enough beds. */
+export type WandererPayload = {
+  /** Group size, 1 or 2. */
+  count: number;
+  /** Free beds at the time of the offer (less than `count`). */
+  freeBeds: number;
+};
+/** Harvest festival (§10 #3). */
+export type FestivalPayload = {
+  /** Food the festival costs when accepted (2 per settler). */
+  foodCost: number;
+};
+
+interface PendingDecisionBase {
   /** Matches `ActiveRandomEvent.id` / log ids (allocated from nextLogId). */
   eventId: number;
-  kind: RandomEventKind;
-  /** Event-specific JSON data (offer amounts, costs, ...). */
-  payload: Record<string, number | string | boolean | null>;
   /** In-game hours until it expires (expiry counts as decline). */
   hoursLeft: number;
+  /** Total length of the decision window in in-game hours (so the UI can scale a countdown). */
+  windowHours: number;
 }
+
+/**
+ * An event that waits for the player's accept/decline. Only three kinds are decisions; each has its
+ * own typed payload. `resolveEvent` with `accept: false`, or expiry, takes the default (decline).
+ */
+export type PendingDecision = PendingDecisionBase &
+  (
+    | { kind: 'traderVisit'; payload: TraderPayload }
+    | { kind: 'wanderer'; payload: WandererPayload }
+    | { kind: 'harvestFestival'; payload: FestivalPayload }
+  );
 
 /** Objectives, unlocks and long-running counters (docs/GAME_DESIGN.md). */
 export interface ProgressState {
@@ -719,6 +748,8 @@ export type SimEvent =
   | { type: 'tileChanged'; x: number; y: number }
   | { type: 'buildingPlaced'; buildingId: EntityId; buildingType: BuildingType }
   | { type: 'buildingCompleted'; buildingId: EntityId; buildingType: BuildingType }
+  /** A completed building was damaged (storm, wildfire) and went back to construction as a repair. */
+  | { type: 'buildingDamaged'; buildingId: EntityId; buildingType: BuildingType; cause: string }
   /** A damaged building finished its repair (not a new completion). */
   | { type: 'buildingRepaired'; buildingId: EntityId; buildingType: BuildingType }
   | { type: 'buildingRemoved'; buildingId: EntityId; buildingType: BuildingType; reason: 'cancelled' | 'demolished' | 'destroyed' }

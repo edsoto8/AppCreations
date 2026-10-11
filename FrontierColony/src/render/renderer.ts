@@ -8,6 +8,7 @@ import { pickTile, tileToScreen } from '../shared/iso';
 import type { OverlayMode, PlacementGhost, Selection } from '../shared/types';
 import { Camera } from './camera';
 import { DepthLayer } from './depthLayer';
+import { Effects } from './effects/effects';
 import { EntityLayer } from './entities/entityLayer';
 import { Overlays } from './entities/overlays';
 import { InputController } from './input';
@@ -31,14 +32,18 @@ export class IsoRenderer implements GameRenderer {
   private readonly depth: DepthLayer;
   private readonly terrain: TerrainRenderer;
   private readonly entities: EntityLayer;
+  private readonly effects: Effects;
   private readonly overlays: Overlays;
   private readonly input: InputController;
 
   private state: Readonly<GameState> | null = null;
   private hover: TilePos | null = null;
+  private selection: Selection | null = null;
   private needsImmediateBuild = true;
   private destroyed = false;
   private lastRevision = -1;
+  /** Clock for character animation: frozen while paused, faster at higher game speeds. */
+  private animTime = 0;
 
   private readonly app: Application;
   private readonly callbacks: RendererCallbacks;
@@ -52,7 +57,13 @@ export class IsoRenderer implements GameRenderer {
     this.depth = new DepthLayer(this.layers.objects);
     this.terrain = new TerrainRenderer(this.layers, tex, this.depth);
     this.entities = new EntityLayer(this.depth, tex, () => this.terrain.model);
-    this.overlays = new Overlays(this.layers);
+    this.effects = new Effects(this.layers, this.depth, tex, this.entities.locator());
+    this.entities.attachEffects(this.effects);
+    this.terrain.onTreeFelled = (x, y, species, seed) => {
+      const p = this.entities.locator().tilePx(x + 0.5, y + 0.5);
+      this.effects.fell.start(p.x, p.y, x + y + 1, species, seed);
+    };
+    this.overlays = new Overlays(this.layers, tex);
     this.input = new InputController(app.canvas, this.camera, {
       onHover: (pos) => this.handleHover(pos),
       onClick: (pos, button) => this.handleClick(pos, button),
@@ -66,6 +77,7 @@ export class IsoRenderer implements GameRenderer {
     this.state = state;
     const w = state.world;
     this.entities.clear();
+    this.effects.clear();
     this.terrain.setWorld(w);
     this.depth.setSize(w.width, w.height);
     this.camera.setMap(w.width, w.height);
@@ -100,17 +112,26 @@ export class IsoRenderer implements GameRenderer {
       for (const e of frame.events) if (e.type === 'tileChanged') changed.push(e);
       if (changed.length > 0) this.terrain.syncTiles(state.world, changed);
     }
+    this.effects.handle(frame.events);
 
     const view = cam.viewRect(0);
     this.terrain.update(view, this.needsImmediateBuild);
     this.needsImmediateBuild = false;
     const time = frame.nowMs / 1000;
     this.terrain.animate(time);
-    this.entities.update(state, frame.alpha, time);
+    const frameDt = Math.min(frame.frameMs, 100) / 1000;
+    this.animTime += frame.speed === 0 ? 0 : frameDt * Math.min(2, Math.sqrt(frame.speed));
+    this.entities.update(state, frame.alpha, time, frameDt, cam.zoom, this.animTime);
+    this.effects.update(frame.speed === 0 ? frameDt * 0.35 : frameDt);
 
     if (cam.moved && this.input.lastPointer) this.handleHover(this.input.lastPointer);
     const model = this.terrain.model;
-    if (model) this.overlays.update(state, model, time, view);
+    if (model) {
+      this.overlays.update(state, model, time, view);
+      const sel = this.selection;
+      const settler = sel?.kind === 'settler' ? state.settlers.find((st) => st.id === sel.id) : undefined;
+      this.overlays.updatePath(model, settler ? settler.path : null, settler ? this.entities.settlerPx(settler.id) : null, time);
+    }
     cam.moved = false;
 
     this.app.render();
@@ -124,6 +145,7 @@ export class IsoRenderer implements GameRenderer {
   }
 
   setSelection(selection: Selection | null): void {
+    this.selection = selection;
     this.overlays.setSelection(selection);
     this.entities.setSelection(selection);
   }

@@ -17,7 +17,7 @@ export function PlacementBar() {
 function PlacementBarInner({ type }: { type: BuildingType }) {
   const controller = useGameController();
   const hover = useUiStore((s) => s.hoverTile);
-  const stock = useUiStore((s) => s.snapshot?.stock ?? null);
+  const stock = useUiStore((s) => s.snapshot?.available ?? null);
   const tick = useUiStore((s) => s.snapshot?.tick ?? 0);
   const setBuildMode = useUiStore((s) => s.setBuildMode);
   const def = BUILDING_DEFS[type];

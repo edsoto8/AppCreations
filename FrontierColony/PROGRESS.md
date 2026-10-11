@@ -10,8 +10,8 @@ been run. A milestone is marked done only after its acceptance criteria were ver
 | M1 Foundation | done | lead: `npm ci`, typecheck, 42/42 unit, build, 1/1 e2e |
 | M2 World Generation | done (renderer polish still in progress) | lead: typecheck, 212/212 unit, build; worldgen determinism + 200-seed start-site tests |
 | M3 Settler Intelligence | done | lead: 212/212 unit incl. A* vs Dijkstra, 2-day autonomy, starvation, mid-path save determinism; screenshot review |
-| M4 Economy & Construction | in progress (UI done; sim hauling/production running) | |
-| M5 Gameplay | pending | |
+| M4 Economy & Construction | done | lead: typecheck, 364/364 unit (incl. economy balance runs), build, e2e 13/15 (2 test-timing issues, routed to QA); screenshot review |
+| M5 Gameplay | done (sim + UI) | lead: same run; 30-day soaks 8/8 normal survive, 6/8 harsh |
 | M6 Visual Polish | pending | |
 | M7 Testing & Optimization | pending | |
 | M8 Final Release | pending | |
@@ -77,3 +77,14 @@ been run. A milestone is marked done only after its acceptance criteria were ver
   fixture. e2e run was 0/15 because of a mid-edit renderer crash (settler textures undefined in the Graphics
   Engineer's uncommitted work), not a committed defect; to be re-run after the graphics wave. Usage: 200k
   tokens, 65 tool calls, 16.8 min.
+- Simulation Engineer finished sim M5: weather Markov chain, 12 random events + storm/wildfire damage via repair
+  flow, typed decision payloads with `windowHours`, population growth, forest regrowth/spread, priorities verified
+  to gate jobs, difficulty multipliers. 30-day soaks: normal 8/8 survive winter and reach victory ~day 20–25;
+  harsh 6/8 survive. Cumulative usage: 702k tokens, 102 tool calls, 40.4 min (M5 round).
+- Graphics Engineer finished renderer M3+M4: settler sprite rigs with walk cycle and per-activity poses/tools/
+  carried goods, baked art for all 8 buildings (3 house variants, 6 farm stages), output piles, chimney smoke,
+  construction (pad, blueprint, rise, scaffolding, material piles), placement ghost, floating +N labels, tree
+  felling, pooled particles; 41 render unit tests. Cumulative usage: 588k tokens, 173 tool calls, 84 min.
+- UI follow-ups: affordability from `getAvailableStock`, reserved stock in tooltips, mirrored constants removed.
+- Lead e2e run on an idle machine: 13/15. Failures are test-side: save/load reads the clock after load resumes the
+  game; the speed test samples a 1 s window while headless SwiftShader renders ~1–3 fps.

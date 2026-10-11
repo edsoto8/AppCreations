@@ -6,6 +6,7 @@ import {
   applyCommand,
   canPlaceBuilding,
   createGame,
+  getAvailableStock,
   getBuildingAt,
   tileIndex,
   type GameState,
@@ -30,13 +31,14 @@ function findGrassSpot(state: GameState, w: number, h: number): { x: number; y: 
 }
 
 describe('applyCommand', () => {
-  it('places a house, charges its cost and occupies the footprint', () => {
+  it('places a house, reserves its cost (nothing is deducted yet) and occupies the footprint', () => {
     const state = createGame(DEFAULT_NEW_GAME_OPTIONS);
     const spot = findGrassSpot(state, 2, 2);
     const woodBefore = state.colony.stock.wood;
     const result = applyCommand(state, { type: 'placeBuilding', buildingType: 'house', ...spot });
     expect(result.ok).toBe(true);
-    expect(state.colony.stock.wood).toBe(woodBefore - (BUILDING_DEFS.house.cost.wood ?? 0));
+    expect(state.colony.stock.wood).toBe(woodBefore);
+    expect(getAvailableStock(state).wood).toBe(woodBefore - (BUILDING_DEFS.house.cost.wood ?? 0));
     const b = getBuildingAt(state, spot.x + 1, spot.y + 1);
     expect(b?.type).toBe('house');
     expect(b?.status).toBe('construction');

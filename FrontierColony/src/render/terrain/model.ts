@@ -96,7 +96,7 @@ export class TerrainModel {
    * Re-read the world; calls `onChange(index, structural)` for every tile whose rendering changed.
    * `structural` is true when terrain/elevation changed (neighbouring tiles' edges depend on it).
    */
-  sync(world: Readonly<WorldState>, onChange: (index: number, structural: boolean) => void): void {
+  sync(world: Readonly<WorldState>, onChange: (index: number, structural: boolean, prevTerrain: number, prevLevel: number) => void): void {
     const n = this.width * this.height;
     let waterChanged = false;
     for (let i = 0; i < n; i++) if (this.updateTile(world, i, onChange)) waterChanged = true;
@@ -105,13 +105,13 @@ export class TerrainModel {
   }
 
   /** Re-read a single tile (driven by `tileChanged` events, e.g. a tree felled). */
-  syncTile(world: Readonly<WorldState>, x: number, y: number, onChange: (index: number, structural: boolean) => void): void {
+  syncTile(world: Readonly<WorldState>, x: number, y: number, onChange: (index: number, structural: boolean, prevTerrain: number, prevLevel: number) => void): void {
     if (!this.inBounds(x, y)) return;
     if (this.updateTile(world, y * this.width + x, onChange)) this.computeShore();
   }
 
   /** Returns true when the tile switched between water and land. */
-  private updateTile(world: Readonly<WorldState>, i: number, onChange: (index: number, structural: boolean) => void): boolean {
+  private updateTile(world: Readonly<WorldState>, i: number, onChange: (index: number, structural: boolean, prevTerrain: number, prevLevel: number) => void): boolean {
     const t = world.terrain[i] ?? Terrain.Grass;
     const water = isWaterTerrain(t);
     const e = water ? 0 : Math.max(0, Math.min(15, world.elevation[i] ?? 0));
@@ -127,6 +127,7 @@ export class TerrainModel {
               : 0
             : 0;
     const prevT = this.terrain[i]!;
+    const prevLevel = this.level[i]!;
     let stump = this.stump[i]!;
     if (this.sig[i] !== -1) {
       if (prevT === Terrain.Forest && t === Terrain.Grass) stump = 1;
@@ -141,7 +142,7 @@ export class TerrainModel {
     this.level[i] = lvl;
     this.stump[i] = stump;
     this.sig[i] = sig;
-    onChange(i, prevSig === -1 || (prevSig & 0xff) !== (sig & 0xff));
+    onChange(i, prevSig === -1 || (prevSig & 0xff) !== (sig & 0xff), prevSig === -1 ? -1 : prevT, prevLevel);
     return waterChanged;
   }
 

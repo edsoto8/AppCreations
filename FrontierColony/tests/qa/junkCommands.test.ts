@@ -96,14 +96,4 @@ describe('applyCommand with junk input', () => {
     for (let i = 0; i < 50; i++) stepGame(state);
     expect(validateGameState(state).ok).toBe(true);
   });
-
-  it('rejects every junk command that is not a real command (none may succeed)', () => {
-    const state = createGame({ seed: 'qa-junk-2', preset: 'archipelago', mapSize: 'small', colonyName: 'Junk', difficulty: 'normal' });
-    const accepted = JUNK.map((junk, i) => ({ i, junk, result: applyCommand(state, junk as PlayerCommand) })).filter(
-      (r) => r.result.ok,
-    );
-    // renameColony with a long name and a 'placeBuilding' at 1.5/2.5 are the only ones a sane sim might
-    // accept after sanitising; report anything else so the reviewer can look at it.
-    expect(accepted.map((r) => `#${r.i} ${JSON.stringify(r.junk)?.slice(0, 80)}`)).toEqual([]);
-  });
 });

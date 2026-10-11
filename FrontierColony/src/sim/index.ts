@@ -24,6 +24,8 @@ import {
 } from './balance';
 import { SAVE_SCHEMA_VERSION, STATS_HISTORY_LENGTH } from './constants';
 import { makeContext } from './needs';
+import { resolveDecision, stepSchedule } from './events';
+import { adjustWeatherForSeason, stepWeather } from './weather';
 import { canPlaceBuilding, costToAmounts, emptyResources, getBuilding, isTerrainWalkable } from './queries';
 import { createRng, deriveRng, hashSeed, shuffle } from './rng';
 import { assignHomes, ejectSettlers, stepSettlers } from './settlerSim';
@@ -54,7 +56,29 @@ export * from './types';
 export * from './constants';
 export * from './queries';
 export { validateGameState, type ValidationResult } from './validate';
-export { BUILDING_DEFS, TERRAIN_DEFS, TRAIT_DEFS, GAME_HOURS_PER_TICK, DAYLIGHT_HOURS, REAL_SECONDS_PER_GAME_DAY } from './balance';
+export {
+  BUILDING_DEFS,
+  TERRAIN_DEFS,
+  TRAIT_DEFS,
+  GAME_HOURS_PER_TICK,
+  DAYLIGHT_HOURS,
+  REAL_SECONDS_PER_GAME_DAY,
+  DAYS_PER_SEASON,
+  DEMOLISH_REFUND,
+  XP_TO_NEXT_LEVEL_PER_LEVEL,
+  TOOLS,
+  TOOL_DURABILITY_HOURS,
+  MOODLETS,
+  OBJECTIVES,
+  VICTORY,
+  OBJECTIVE_TARGETS,
+  FOOD_PER_SETTLER_DAY,
+  WATER_PER_SETTLER_DAY,
+  POPULATION_CAP,
+  DIFFICULTY,
+  type ObjectiveDef,
+  type MoodletDef,
+} from './balance';
 export { hashSeed } from './rng';
 export * from './grid';
 export { evaluateStartSite, type StartSiteReport } from './worldgen';
@@ -217,7 +241,9 @@ export function stepGame(state: GameState): SimEvent[] {
   if (state.outcome.status === 'lost') return events;
 
   const newHour = advanceClock(state, events);
+  stepWeather(state, events, GAME_HOURS_PER_TICK);
   const ctx = makeContext(state, events, GAME_HOURS_PER_TICK, newHour || state.time.tick === 1);
+  stepSchedule(ctx);
   stepSettlers(ctx);
   return events;
 }
@@ -244,6 +270,7 @@ function advanceClock(state: GameState, events: SimEvent[]): boolean {
     if (season !== t.season) {
       t.season = season;
       events.push({ type: 'seasonChanged', season });
+      adjustWeatherForSeason(state, events);
     }
   }
   const newHour = Math.floor(tod) !== prevHour;
@@ -329,7 +356,7 @@ function runCommand(state: GameState, command: PlayerCommand): CommandResult {
     }
     case 'resolveEvent':
       if (!isInt(c.eventId) || typeof c.accept !== 'boolean') return fail('invalidArgument', 'Invalid decision.');
-      return resolveEventStub(state, c.eventId, c.accept);
+      return resolveDecision(state, c.eventId, c.accept);
     case 'acknowledgeVictory': {
       if (state.outcome.status !== 'won') return fail('invalidState', 'The colony has not won yet.');
       // The colony keeps playing as a sandbox: the status returns to 'playing' and victory never re-triggers.
@@ -342,27 +369,16 @@ function runCommand(state: GameState, command: PlayerCommand): CommandResult {
   }
 }
 
-/** M1 stub — replaced in M5: removes the decision without applying its effects. */
-function resolveEventStub(state: GameState, eventId: number, accept: boolean): CommandResult {
-  const index = state.pendingDecisions.findIndex((d) => d.eventId === eventId);
-  if (index < 0) return fail('notFound', 'That decision is no longer open.');
-  const [decision] = state.pendingDecisions.splice(index, 1);
-  pushLog(state, 'info', `${accept ? 'Accepted' : 'Declined'}: ${decision?.kind ?? 'event'}.`);
-  return { ok: true, entityId: null, events: [] };
-}
-
 /**
- * M1 stub — replaced in M4: the cost is taken from the stock and counted as delivered at once
- * (no hauling yet); builders then apply the work.
+ * Place a blueprint (GAME_DESIGN §6.6). Nothing is deducted: the cost is reserved (see
+ * `getAvailableStock`), haulers carry the materials to the site, and builders can only work with
+ * what has been delivered.
  */
 function placeBuilding(state: GameState, type: BuildingType, x: number, y: number): CommandResult {
   const check = canPlaceBuilding(state, type, x, y);
   if (!check.ok) return fail(check.error ?? 'invalidState', check.message ?? 'Cannot build here.');
   const def = BUILDING_DEFS[type];
   const building = addBuilding(state, type, x, y, def.buildHours > 0 ? 'construction' : 'complete');
-  const cost = costToAmounts(def.cost);
-  for (const r of RESOURCE_TYPES) state.colony.stock[r] -= cost[r];
-  if (building.construction) building.construction.delivered = { ...cost };
   ejectSettlers(state, building);
   pushLog(state, 'info', `Construction of a ${def.name} was ordered.`, { buildingId: building.id, tile: { x, y } });
   return { ok: true, entityId: building.id, events: [{ type: 'buildingPlaced', buildingId: building.id, buildingType: type }] };
@@ -387,6 +403,8 @@ function removeBuilding(state: GameState, id: EntityId, reason: 'cancelled' | 'd
   } else {
     for (const r of RESOURCE_TYPES) refund[r] = Math.floor((def.cost[r] ?? 0) * DEMOLISH_REFUND);
   }
+  // Goods waiting in the building's output buffer go back to the stock.
+  for (const r of RESOURCE_TYPES) refund[r] += b.output[r];
 
   state.buildings.splice(state.buildings.indexOf(b), 1);
   setFootprint(state, b, 0);

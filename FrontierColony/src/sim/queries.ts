@@ -3,7 +3,6 @@
  * and tests. They never mutate state and never use randomness.
  */
 import { BUILDING_DEFS, TERRAIN_DEFS } from './balance';
-import { getWalkRegions } from './grid';
 import {
   RESOURCE_TYPES,
   type Building,
@@ -222,35 +221,70 @@ export function canPlaceBuilding(state: GameState, type: BuildingType, x: number
     }
   }
 
-  if (error === null && !hasAccess(state, type, x, y)) {
-    fail('blocked', 'Settlers could not reach this spot.');
-  }
-
   if (error === null && !canAfford(getAvailableStock(state), def.cost)) {
     fail('insufficientResources', `Not enough resources for a ${def.name}.`);
+  }
+
+  // The most expensive check (a flood fill over the map) comes last.
+  if (error === null && !hasAccess(state, type, x, y)) {
+    fail('blocked', 'Settlers could not reach this spot.');
   }
 
   return { ok: error === null, error, message, tiles };
 }
 
 /**
- * True when a footprint at (x, y) has at least one free walkable neighbour tile that lies in the
- * same walkable region as the town center (so settlers can reach it).
+ * True when, with the new footprint in place, settlers can still walk from the town center to a tile
+ * next to every building (the new one included). This stops a placement from walling in the town center
+ * or another building, which would leave settlers unable to eat or work.
  */
 function hasAccess(state: GameState, type: BuildingType, x: number, y: number): boolean {
   const w = state.world;
+  const W = w.width;
+  const H = w.height;
   const town = state.buildings.find((b) => b.type === 'townCenter');
   if (!town) return true;
-  const { labels } = getWalkRegions(w);
-  const region = labels[(town.origin.y - 1) * w.width + town.origin.x - 1] as number;
   const { w: fw, h: fh } = BUILDING_DEFS[type].footprint;
-  for (let ty = y - 1; ty <= y + fh; ty++) {
-    for (let tx = x - 1; tx <= x + fw; tx++) {
-      const inside = tx >= x && tx < x + fw && ty >= y && ty < y + fh;
-      if (inside || !inBounds(w, tx, ty)) continue;
-      const i = ty * w.width + tx;
-      if (w.building[i] === 0 && labels[i] === region && region !== -1) return true;
+  const inNew = (tx: number, ty: number) => tx >= x && tx < x + fw && ty >= y && ty < y + fh;
+  const passable = (tx: number, ty: number) =>
+    tx >= 0 && ty >= 0 && tx < W && ty < H && TERRAIN_DEFS[w.terrain[ty * W + tx] as Terrain].walkable && w.building[ty * W + tx] === 0 && !inNew(tx, ty);
+
+  // Flood fill (4-connected is enough: a legal diagonal step implies a 4-connected route) from the tiles around the town center.
+  const seen = new Uint8Array(W * H);
+  const queue: number[] = [];
+  const ring: number[] = [];
+  for (let ty = town.origin.y - 1; ty <= town.origin.y + town.footprint.h; ty++) {
+    for (let tx = town.origin.x - 1; tx <= town.origin.x + town.footprint.w; tx++) {
+      if (passable(tx, ty)) ring.push(ty * W + tx);
     }
   }
-  return false;
+  if (ring.length === 0) return false;
+  seen[ring[0] as number] = 1;
+  queue.push(ring[0] as number);
+  for (let head = 0; head < queue.length; head++) {
+    const cur = queue[head] as number;
+    const cx = cur % W;
+    const cy = (cur - cx) / W;
+    for (let d = 0; d < 4; d++) {
+      const nx = d === 0 ? cx - 1 : d === 1 ? cx + 1 : cx;
+      const ny = d === 2 ? cy - 1 : d === 3 ? cy + 1 : cy;
+      if (!passable(nx, ny) || seen[ny * W + nx]) continue;
+      seen[ny * W + nx] = 1;
+      queue.push(ny * W + nx);
+    }
+  }
+  const touches = (ox: number, oy: number, bw: number, bh: number): boolean => {
+    for (let ty = oy - 1; ty <= oy + bh; ty++) {
+      for (let tx = ox - 1; tx <= ox + bw; tx++) {
+        if (tx >= ox && tx < ox + bw && ty >= oy && ty < oy + bh) continue;
+        if (tx >= 0 && ty >= 0 && tx < W && ty < H && seen[ty * W + tx]) return true;
+      }
+    }
+    return false;
+  };
+  // The tiles around the town center must stay one connected area (founders and newcomers arrive there).
+  for (const i of ring) if (!seen[i]) return false;
+  if (!touches(x, y, fw, fh)) return false;
+  for (const b of state.buildings) if (!touches(b.origin.x, b.origin.y, b.footprint.w, b.footprint.h)) return false;
+  return true;
 }

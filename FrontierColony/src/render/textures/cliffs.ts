@@ -74,3 +74,74 @@ export function makeCliffStrip(material: CliffMaterial, kind: CliffKind, seed: n
   ctx.putImageData(img, 0, 0);
   return art;
 }
+
+// --- Gentle one-level banks ---------------------------------------------------------------------
+
+export const BANK_H = CLIFF_H + 8;
+
+/**
+ * A one-level step on meadow or beach: a short grassy (or sandy) slope with a soft ambient-occlusion
+ * band spilling onto the lower tile, instead of a hard soil cliff.
+ */
+export function makeBankStrip(material: 'grass' | 'sand', seed: number): Art {
+  const art = createArt(CLIFF_W, BANK_H, 0, 0);
+  const { canvas, ctx } = art;
+  const W = canvas.width;
+  const H = canvas.height;
+  const img = ctx.createImageData(W, H);
+  const data = img.data;
+  const grass = material === 'grass';
+  const top: RGB = grass ? [150, 196, 98] : [240, 226, 182];
+  const mid: RGB = grass ? [112, 164, 80] : [222, 202, 154];
+  const low: RGB = grass ? [92, 138, 70] : [196, 172, 126];
+  const earth: RGB = grass ? [122, 112, 70] : [176, 150, 108];
+  for (let py = 0; py < H; py++) {
+    const ly = (py + 0.5) / TEX_SCALE;
+    for (let px = 0; px < W; px++) {
+      const lx = (px + 0.5) / TEX_SCALE;
+      if (lx > CLIFF_W - 0.2) continue;
+      const v = ly - lx * 0.5;
+      let r = 0;
+      let g = 0;
+      let b = 0;
+      let a = 0;
+      if (v >= -0.4 && v <= ELEVATION_STEP + 0.9) {
+        const k = clamp(v / ELEVATION_STEP, 0, 1);
+        let c = k < 0.45 ? mixRgb(top, mid, k / 0.45) : mixRgb(mid, low, (k - 0.45) / 0.55);
+        const n = fbm(lx * 0.35 + seed, v * 0.6, seed + 5, 3) - 0.5;
+        c = mixRgb(c, earth, clamp(smoothstep(0.7, 1, k) * 0.5 + n * 0.25, 0, 0.6));
+        const shade = 0.94 - k * 0.1 + n * 0.16;
+        r = c[0] * shade;
+        g = c[1] * shade;
+        b = c[2] * shade;
+        a = clamp(Math.min(v + 0.6, ELEVATION_STEP + 0.9 - v + 0.6), 0, 1);
+        // blade flecks along the slope
+        if (grass && valueNoise(lx * 1.7, v * 1.3, seed + 9) > 0.8) {
+          r *= 1.12;
+          g *= 1.14;
+        }
+      }
+      // ambient occlusion below the foot of the step (on the lower tile)
+      const ao = clamp(1 - (v - ELEVATION_STEP) / 7, 0, 1);
+      if (v > ELEVATION_STEP - 1 && ao > 0) {
+        const aa = ao * ao * 0.3;
+        const base = a;
+        const outA = base + aa * (1 - base);
+        if (outA > 0) {
+          r = (r * base + 30 * aa * (1 - base)) / outA;
+          g = (g * base + 40 * aa * (1 - base)) / outA;
+          b = (b * base + 52 * aa * (1 - base)) / outA;
+          a = outA;
+        }
+      }
+      if (a <= 0) continue;
+      const i = (py * W + px) * 4;
+      data[i] = clamp(r, 0, 255);
+      data[i + 1] = clamp(g, 0, 255);
+      data[i + 2] = clamp(b, 0, 255);
+      data[i + 3] = a * 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  return art;
+}

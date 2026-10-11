@@ -21,11 +21,14 @@ import {
   CARRY_PER_HAULING_LEVEL,
   COLLAPSE_ENERGY,
   DRINK,
+  EVENTS,
   GATHER_RATE,
   HEALTH,
   MEAL,
   MOODLETS,
   OUTDOOR_SLEEP_RADIUS_FROM_TOWN_CENTER,
+  SEASON_FARM_MULT,
+  WELL_NEAR_WATER,
   SLEEP_WAKE,
   TOOLS,
   XP_TO_NEXT_LEVEL_PER_LEVEL,
@@ -44,6 +47,8 @@ import {
 } from './needs';
 import { accessGoal, findPath, isPassable, tileGoal, type PathGoal } from './pathfinding';
 import { getWalkRegions, TERRAIN_MOVE_COST } from './grid';
+import { checkObjectives } from './progression';
+import { getAvailableStock, getStorageCapacity } from './queries';
 import { chance, nextFloat, nextInt } from './rng';
 import {
   IDLE_TASK,
@@ -60,6 +65,7 @@ import {
   RESOURCE_TYPES,
   Terrain,
   type ActivityKind,
+  type ResourceType,
   type Building,
   type GameState,
   type JobCategory,
@@ -343,7 +349,7 @@ function taskSig(s: Settler): string {
     case 'socialize':
       return 'socialize';
     case 'haul':
-      return `haul:${t.toBuildingId}`;
+      return `haul:${t.fromBuildingId}:${t.toBuildingId}:${t.resource}`;
     case 'work':
       return `work:${t.buildingId}`;
     case 'depart':
@@ -455,6 +461,57 @@ function startConstruct(state: GameState, s: Settler, site: Building): void {
   beginTask(state, s, { kind: 'construct', buildingId: site.id, phase: 'moving', progress: 0 }, buildingGoal(site));
 }
 
+/** Tiles other settlers are already gathering from (tile reservation). */
+function reservedTiles(state: GameState, self: Settler): Set<number> {
+  const W = state.world.width;
+  const taken = new Set<number>();
+  for (const o of state.settlers) {
+    if (o !== self && o.task.kind === 'gather') taken.add(o.task.targetTile.y * W + o.task.targetTile.x);
+  }
+  return taken;
+}
+
+/** Units of `resource` other haulers have already claimed for a construction site (picked up or not). */
+function plannedToSite(state: GameState, self: Settler, siteId: number, resource: ResourceType): number {
+  let sum = 0;
+  for (const o of state.settlers) {
+    if (o !== self && o.task.kind === 'haul' && o.task.toBuildingId === siteId && o.task.resource === resource) sum += o.task.amount;
+  }
+  return sum;
+}
+
+/** Units of `resource` other haulers are on their way to pick up from a building's output buffer. */
+function claimedFromOutput(state: GameState, self: Settler, buildingId: number, resource: ResourceType): number {
+  let sum = 0;
+  for (const o of state.settlers) {
+    if (o !== self && o.task.kind === 'haul' && o.task.fromBuildingId === buildingId && o.task.resource === resource && o.carrying === null) {
+      sum += o.task.amount;
+    }
+  }
+  return sum;
+}
+
+/**
+ * Where a gatherer drops a load: the nearer of the source building's own output buffer (when the whole
+ * load fits) and the nearest town center / storage (GAME_DESIGN §6.3).
+ */
+function chooseDropOff(state: GameState, s: Settler, source: Building, resource: ResourceType, amount: number): Building | null {
+  const sdef = BUILDING_DEFS[source.type];
+  const store = nearestBuilding(state, s, isEatingPoint);
+  if (sdef.outputCap > 0 && source.output[resource] + Math.max(1, amount) <= sdef.outputCap) {
+    const d = octile(s.pos.x, s.pos.y, source.origin.x + source.footprint.w / 2, source.origin.y + source.footprint.h / 2);
+    if (store === null || d <= store.dist) return source;
+  }
+  return store ? store.b : null;
+}
+
+/** Is there somewhere to put freshly produced goods: the building's buffer or colony stock below capacity? */
+function hasRoomFor(state: GameState, source: Building, resource: ResourceType): boolean {
+  const cap = BUILDING_DEFS[source.type].outputCap;
+  if (cap > 0 && source.output[resource] < cap) return true;
+  return state.colony.stock[resource] < getStorageCapacity(state);
+}
+
 interface GatherTarget {
   x: number;
   y: number;
@@ -474,13 +531,14 @@ function findGatherTarget(state: GameState, s: Settler, b: Building, resource: '
   const myRegion = labels[Math.floor(s.pos.y) * W + Math.floor(s.pos.x)] as number;
   const cx = b.origin.x + b.footprint.w / 2;
   const cy = b.origin.y + b.footprint.h / 2;
+  const taken = reservedTiles(state, s);
   let best: GatherTarget | null = null;
   let bestScore = -Infinity;
   for (let y = Math.max(0, b.origin.y - r); y < Math.min(world.height, b.origin.y + b.footprint.h + r); y++) {
     for (let x = Math.max(0, b.origin.x - r); x < Math.min(W, b.origin.x + b.footprint.w + r); x++) {
       const i = y * W + x;
       const res = world.resource[i] as number;
-      if (res < 1 || world.building[i] !== 0) continue;
+      if (res < 1 || world.building[i] !== 0 || taken.has(i)) continue;
       const t = world.terrain[i] as number;
       let standable = false;
       if (resource === 'wood') {
@@ -520,7 +578,7 @@ function findGatherTarget(state: GameState, s: Settler, b: Building, resource: '
 function startGather(state: GameState, s: Settler, source: Building, resource: 'wood' | 'stone', target: GatherTarget): void {
   const category: JobCategory = resource === 'wood' ? 'woodcutting' : 'mining';
   ensureTool(state, s, category);
-  const drop = nearestBuilding(state, s, isEatingPoint);
+  const drop = chooseDropOff(state, s, source, resource, 0);
   s.workplaceId = source.id;
   beginTask(
     state,
@@ -529,7 +587,7 @@ function startGather(state: GameState, s: Settler, source: Building, resource: '
       kind: 'gather',
       resource,
       targetTile: { x: target.x, y: target.y },
-      dropOffBuildingId: drop ? drop.b.id : null,
+      dropOffBuildingId: drop ? drop.id : null,
       phase: 'moving',
       progress: 0,
     },
@@ -562,27 +620,125 @@ function workScore(state: GameState, s: Settler, category: JobCategory, extra: n
   return score * band.workScoreMult;
 }
 
-/** Work candidates (GAME_DESIGN §5.3). Farming, wells, workshops and hauling plug in here in M4. */
-function workCandidates(state: GameState, s: Settler, out: Candidate[]): void {
+function startWork(state: GameState, s: Settler, b: Building): void {
+  const def = BUILDING_DEFS[b.type];
+  if (def.jobCategory !== null) ensureTool(state, s, def.jobCategory);
+  s.workplaceId = b.id;
+  beginTask(state, s, { kind: 'work', buildingId: b.id, phase: 'moving', progress: 0 }, buildingGoal(b));
+}
+
+function startHaul(state: GameState, s: Settler, from: Building, to: Building, resource: ResourceType, amount: number): void {
+  beginTask(
+    state,
+    s,
+    { kind: 'haul', resource, amount, fromBuildingId: from.id, toBuildingId: to.id, phase: 'moving', progress: 0 },
+    buildingGoal(from),
+  );
+}
+
+/** Tools the colony wants to have in stock (GAME_DESIGN §5.3). */
+function toolTarget(pop: number): number {
+  return Math.max(AI.shortage.tools.min, Math.ceil(pop * AI.shortage.tools.perPop));
+}
+
+/** Production multiplier of the building itself (season, weather, water nearby). 0 = cannot produce now. */
+function buildingMult(ctx: TickContext, b: Building): number {
+  switch (b.type) {
+    case 'farm': {
+      let m = SEASON_FARM_MULT[ctx.season] * ctx.weather.farmGrowth;
+      if (ctx.drought) m *= EVENTS.drought.farmMult;
+      if (ctx.bountiful) m *= EVENTS.bountifulHarvest.farmMult;
+      if (ctx.state.activeEvents.some((e) => e.kind === 'cropBlight' && e.targetId === b.id)) m = 0;
+      return m;
+    }
+    case 'well': {
+      let m = (nearWater(ctx.state, b) ? WELL_NEAR_WATER.mult : 1) * ctx.weather.wellMult;
+      if (ctx.drought) m *= EVENTS.drought.wellMult;
+      if (ctx.coldSnap) m *= EVENTS.coldSnap.wellMult;
+      return m;
+    }
+    default:
+      return 1;
+  }
+}
+
+const nearWaterCache = new WeakMap<GameState, Map<number, boolean>>();
+
+/** Whether deep or shallow water lies within the well bonus radius of the building (terrain never changes to or from water). */
+function nearWater(state: GameState, b: Building): boolean {
+  let cache = nearWaterCache.get(state);
+  if (!cache) {
+    cache = new Map();
+    nearWaterCache.set(state, cache);
+  }
+  const known = cache.get(b.id);
+  if (known !== undefined) return known;
+  const world = state.world;
+  const r = WELL_NEAR_WATER.radius;
+  let found = false;
+  for (let y = Math.max(0, b.origin.y - r); y < Math.min(world.height, b.origin.y + b.footprint.h + r) && !found; y++) {
+    for (let x = Math.max(0, b.origin.x - r); x < Math.min(world.width, b.origin.x + b.footprint.w + r); x++) {
+      if ((world.terrain[y * world.width + x] as number) <= Terrain.ShallowWater) {
+        found = true;
+        break;
+      }
+    }
+  }
+  cache.set(b.id, found);
+  return found;
+}
+
+/** Work candidates (GAME_DESIGN §5.3-§5.4): build, production buildings, gathering and hauling. */
+function workCandidates(ctx: TickContext, s: Settler, out: Candidate[]): void {
+  const state = ctx.state;
   const counts = countWorkers(state);
   const sx = s.pos.x;
   const sy = s.pos.y;
   const homeless = state.settlers.some((o) => o.homeId === null);
+  const capacity = getStorageCapacity(state);
+  const pop = state.settlers.length;
+  const centre = (b: Building) => octile(sx, sy, b.origin.x + b.footprint.w / 2, b.origin.y + b.footprint.h / 2);
 
-  // Build.
+  // Build: only while the delivered materials allow more progress.
   for (const b of state.buildings) {
     if (b.status !== 'construction' || b.construction === null) continue;
     const def = BUILDING_DEFS[b.type];
     if ((counts.get(`${b.id}:construct`) ?? 0) - (s.task.kind === 'construct' && s.task.buildingId === b.id ? 1 : 0) >= def.maxBuilders) continue;
-    if (b.construction.progress >= deliveredFraction(b)) continue;
-    const dist = octile(sx, sy, b.origin.x + b.footprint.w / 2, b.origin.y + b.footprint.h / 2);
+    if (b.construction.progress >= deliveredFraction(b) - 1e-9) continue;
     let bonus: number = AI.buildTaskBonus.any;
     if (b.type === 'house' && homeless) bonus += AI.buildTaskBonus.houseWhileHomeless;
     if (b.type === 'farm' && shortageBonus(state, 'food') > AI.buildTaskBonus.shortageThreshold) bonus += AI.buildTaskBonus.farmOrWellInShortage;
     if (b.type === 'well' && shortageBonus(state, 'water') > AI.buildTaskBonus.shortageThreshold) bonus += AI.buildTaskBonus.farmOrWellInShortage;
-    const score = workScore(state, s, 'building', bonus, dist);
+    const score = workScore(state, s, 'building', bonus, centre(b));
     if (score === null) continue;
     out.push({ sig: `construct:${b.id}`, score, run: () => startConstruct(state, s, b) });
+  }
+
+  // Production buildings with a recipe: farm, well, workshop.
+  for (const b of state.buildings) {
+    const def = BUILDING_DEFS[b.type];
+    if (b.status !== 'complete' || def.production === null || def.jobCategory === null) continue;
+    const recipe = def.production;
+    const taken = (counts.get(`${b.id}:work`) ?? 0) - (s.task.kind === 'work' && s.task.buildingId === b.id ? 1 : 0);
+    if (taken >= def.maxWorkers) continue;
+    if (b.output[recipe.output] >= def.outputCap) continue;
+    if (buildingMult(ctx, b) <= 0) continue;
+    let shortage = 0;
+    if (recipe.output === 'food') shortage = shortageBonus(state, 'food');
+    else if (recipe.output === 'water') shortage = shortageBonus(state, 'water');
+    else if (recipe.output === 'tools') {
+      const target = toolTarget(pop);
+      if (state.colony.stock.tools >= target) continue;
+      if (b.productionProgress <= 0) {
+        const avail = getAvailableStock(state);
+        if (!RESOURCE_TYPES.every((r) => avail[r] >= (recipe.inputs[r] ?? 0))) continue;
+      }
+      shortage = AI.shortage.tools.max * clamp01(1 - state.colony.stock.tools / target);
+    }
+    const full = state.colony.stock[recipe.output] >= capacity ? AI.storageFullPenalty : 0;
+    const score = workScore(state, s, def.jobCategory, shortage - full, centre(b));
+    if (score === null) continue;
+    out.push({ sig: `work:${b.id}`, score, run: () => startWork(state, s, b) });
   }
 
   // Gather wood and mine stone: best source building per resource.
@@ -598,9 +754,9 @@ function workCandidates(state: GameState, s: Settler, out: Candidate[]): void {
       if (slots <= 0) continue;
       const taken = (counts.get(`${b.id}:${src.resource}`) ?? 0) - (s.task.kind === 'gather' && s.workplaceId === b.id && s.task.resource === src.resource ? 1 : 0);
       if (taken >= slots) continue;
-      const dist = octile(sx, sy, b.origin.x + b.footprint.w / 2, b.origin.y + b.footprint.h / 2);
-      const stockFull = state.colony.stock[src.resource] >= STORAGE_ESTIMATE(state) ? AI.storageFullPenalty : 0;
-      const score = workScore(state, s, src.category, shortageBonus(state, src.resource) - stockFull, dist);
+      if (!hasRoomFor(state, b, src.resource)) continue; // storage full: nothing to do with more goods
+      const stockFull = state.colony.stock[src.resource] >= capacity ? AI.storageFullPenalty : 0;
+      const score = workScore(state, s, src.category, shortageBonus(state, src.resource) - stockFull, centre(b));
       if (score === null || (best !== null && score <= best.score)) continue;
       const target = findGatherTarget(state, s, b, src.resource);
       if (target === null) continue;
@@ -615,12 +771,72 @@ function workCandidates(state: GameState, s: Settler, out: Candidate[]): void {
       });
     }
   }
+
+  haulCandidates(ctx, s, out, capacity);
 }
 
-function STORAGE_ESTIMATE(state: GameState): number {
-  let cap = 0;
-  for (const b of state.buildings) if (b.status === 'complete') cap += BUILDING_DEFS[b.type].storage;
-  return cap;
+/** Hauling (GAME_DESIGN §5.4): supply construction sites, and empty full output buffers into the stock. */
+function haulCandidates(ctx: TickContext, s: Settler, out: Candidate[], capacity: number): void {
+  const state = ctx.state;
+  const carry = carryCapacity(s);
+  const stores = (b: Building) => b.status === 'complete' && isEatingPoint(b);
+
+  // Supply a site.
+  for (const site of state.buildings) {
+    const c = site.construction;
+    if (site.status !== 'construction' || c === null || c.kind !== 'new') continue;
+    let bestRes: ResourceType | null = null;
+    let bestNeed = 0;
+    for (const r of RESOURCE_TYPES) {
+      const need = c.required[r] - c.delivered[r] - plannedToSite(state, s, site.id, r);
+      if (need >= 1 && state.colony.stock[r] >= 1 && need > bestNeed) {
+        bestRes = r;
+        bestNeed = need;
+      }
+    }
+    if (bestRes === null) continue;
+    const from = nearestBuilding(state, s, stores);
+    if (!from) continue;
+    const amount = Math.min(carry, Math.floor(bestNeed), Math.floor(state.colony.stock[bestRes]));
+    if (amount < 1) continue;
+    const score = workScore(state, s, 'hauling', AI.haul.supplySiteBonus, octile(s.pos.x, s.pos.y, site.origin.x + site.footprint.w / 2, site.origin.y + site.footprint.h / 2));
+    if (score === null) continue;
+    const resource = bestRes;
+    out.push({
+      sig: `haul:${from.b.id}:${site.id}:${resource}`,
+      score,
+      run: () => startHaul(state, s, from.b, site, resource, amount),
+    });
+  }
+
+  // Empty an output buffer.
+  let best: { b: Building; r: ResourceType; avail: number; bonus: number } | null = null;
+  for (const b of state.buildings) {
+    const def = BUILDING_DEFS[b.type];
+    if (b.status !== 'complete' || def.outputCap <= 0) continue;
+    for (const r of RESOURCE_TYPES) {
+      const avail = b.output[r] - claimedFromOutput(state, s, b.id, r);
+      if (avail < AI.haul.minLoad || state.colony.stock[r] >= capacity) continue;
+      const fill = b.output[r] / def.outputCap;
+      const bonus = AI.haul.fillBonus * fill + (fill >= 1 ? AI.haul.fullBonus : 0);
+      if (best === null || bonus > best.bonus) best = { b, r, avail, bonus };
+    }
+  }
+  if (best !== null) {
+    const chosen = best;
+    const dest = nearestBuilding(state, s, stores);
+    const score = dest
+      ? workScore(state, s, 'hauling', chosen.bonus, octile(s.pos.x, s.pos.y, chosen.b.origin.x + chosen.b.footprint.w / 2, chosen.b.origin.y + chosen.b.footprint.h / 2))
+      : null;
+    if (dest && score !== null) {
+      const amount = Math.min(carry, Math.floor(chosen.avail));
+      out.push({
+        sig: `haul:${chosen.b.id}:${dest.b.id}:${chosen.r}`,
+        score,
+        run: () => startHaul(state, s, chosen.b, dest.b, chosen.r, amount),
+      });
+    }
+  }
 }
 
 /** Fraction of the site's materials delivered (1 when nothing is required): caps the buildable progress. */
@@ -693,14 +909,18 @@ function buildCandidates(ctx: TickContext, s: Settler): Candidate[] {
         sig: 'sleep',
         score:
           AI.sleep.slope * (AI.sleep.maxEnergy - n.energy) +
-          (night ? AI.sleep.nightBonus : 0) -
+          (night ? AI.sleep.nightBonus : 0) +
+          (s.status.sickHoursLeft > 0 ? EVENTS.sickness.sleepScoreBonus : 0) -
           AI.sleep.distPenaltyPerTile * Math.min(octile(s.pos.x, s.pos.y, tx, ty), AI.sleep.distMaxTiles),
         run: () => startSleep(state, s, 'sleep', ctx.phase !== 'night' && !night),
       });
     }
     // 4. socialize
     const town = state.buildings.find((b) => b.type === 'townCenter' && b.status === 'complete');
-    if (town && !hasTrait(s, 'loner') && n.happiness < AI.socialize.maxHappiness && hasSocialPartner(state, s)) {
+    if (town && ctx.festival) {
+      // Harvest festival: everyone gathers at the town center (critical needs still interrupt).
+      out.push({ sig: 'socialize', score: 150, run: () => startSocialize(state, s, town) });
+    } else if (town && !hasTrait(s, 'loner') && n.happiness < AI.socialize.maxHappiness && hasSocialPartner(state, s)) {
       const sociable = hasTrait(s, 'sociable');
       const recentlySocialized = s.moodlets.some((m) => m.id === 'socialized');
       out.push({
@@ -715,7 +935,7 @@ function buildCandidates(ctx: TickContext, s: Settler): Candidate[] {
       });
     }
     // 5/6. work and haul
-    workCandidates(state, s, out);
+    workCandidates(ctx, s, out);
   }
   // 7. wander (always available; the only choice while sulking)
   out.push({
@@ -827,6 +1047,7 @@ function completeConstruction(ctx: TickContext, b: Building): void {
     pushLog(state, 'good', `${def.name} completed.`, { buildingId: b.id, tile: { ...b.origin } });
   }
   assignHomes(state);
+  if (!repair) checkObjectives(state, ctx.events);
 }
 
 function wakeUp(ctx: TickContext, s: Settler): void {
@@ -955,9 +1176,9 @@ function stepTask(ctx: TickContext, s: Settler): void {
     case 'construct':
       return stepConstruct(ctx, s, t);
     case 'haul':
+      return stepHaul(ctx, s, t);
     case 'work':
-      // M4 seams: hauling and production work are not started by the AI yet.
-      return failTask(state, s);
+      return stepWork(ctx, s, t);
     case 'depart': {
       const r = walk(ctx, s);
       if (r === 'blocked') return failTask(state, s);
@@ -1018,6 +1239,117 @@ function stepConstruct(ctx: TickContext, s: Settler, t: Extract<Task, { kind: 'c
   if (c.progress >= 1) completeConstruction(ctx, site);
 }
 
+/** Hauling: pick up (0.1 h), walk, drop (0.1 h). Supplies construction sites or empties output buffers into the stock. */
+function stepHaul(ctx: TickContext, s: Settler, t: Extract<Task, { kind: 'haul' }>): void {
+  const state = ctx.state;
+  const from = t.fromBuildingId === null ? null : findBuilding(state, t.fromBuildingId);
+  const to = findBuilding(state, t.toBuildingId);
+  if (from === null || from.status !== 'complete' || to === null) return failTaskQuiet(state, s);
+  const supply = to.status === 'construction';
+  if (supply && (to.construction === null || to.construction.kind !== 'new')) return failTaskQuiet(state, s);
+  if (!supply && to.status !== 'complete') return failTaskQuiet(state, s);
+
+  if (t.phase === 'moving') {
+    const r = walk(ctx, s);
+    if (r === 'blocked') return failTask(state, s);
+    if (r === 'arrived') {
+      t.phase = 'working';
+      t.progress = 0;
+    }
+    return;
+  }
+  if (t.phase === 'returning') {
+    const r = walk(ctx, s);
+    if (r === 'blocked') return failTask(state, s);
+    if (r === 'arrived') {
+      t.phase = 'working';
+      t.progress = 0;
+    }
+    return;
+  }
+
+  t.progress += ctx.dt;
+  if (s.carrying === null) {
+    // Pick up.
+    if (t.progress < AI.haul.pickupHours) return;
+    const available = supply ? state.colony.stock[t.resource] : from.output[t.resource];
+    const amount = Math.min(t.amount, Math.floor(available));
+    if (amount < 1) return failTaskQuiet(state, s);
+    if (supply) state.colony.stock[t.resource] -= amount;
+    else from.output[t.resource] -= amount;
+    s.carrying = { resource: t.resource, amount };
+    t.amount = amount;
+    t.phase = 'returning';
+    t.progress = 0;
+    if (planMove(state, s, buildingGoal(to)) === 'fail') failTask(state, s);
+    return;
+  }
+  // Drop.
+  if (t.progress < AI.haul.dropHours) return;
+  const load = s.carrying;
+  let delivered = 0;
+  if (supply) {
+    const c = to.construction as NonNullable<Building['construction']>;
+    delivered = Math.max(0, Math.min(load.amount, c.required[load.resource] - c.delivered[load.resource]));
+    c.delivered[load.resource] += delivered;
+  } else {
+    delivered = addStockOf(state, load.resource, load.amount);
+  }
+  const leftover = load.amount - delivered;
+  if (leftover > 0) {
+    // Whatever did not fit goes back to where it came from (or the stock); a little may be lost at the cap.
+    const back = supply ? addStockOf(state, load.resource, leftover) : Math.min(leftover, Math.max(0, BUILDING_DEFS[from.type].outputCap - from.output[load.resource]));
+    if (!supply) from.output[load.resource] += back;
+  }
+  ctx.events.push({ type: 'resourceDelivered', settlerId: s.id, buildingId: to.id, resource: load.resource, amount: delivered });
+  grantXp(s, 'hauling', AI.haul.pickupHours + AI.haul.dropHours);
+  s.carrying = null;
+  s.task = IDLE_TASK();
+}
+
+/** Working at a production building (farm, well, workshop): advance the recipe, fill the output buffer. */
+function stepWork(ctx: TickContext, s: Settler, t: Extract<Task, { kind: 'work' }>): void {
+  const state = ctx.state;
+  const b = findBuilding(state, t.buildingId);
+  const def = b === null ? null : BUILDING_DEFS[b.type];
+  if (b === null || def === null || b.status !== 'complete' || def.production === null || def.jobCategory === null) return failTaskQuiet(state, s);
+  if (t.phase === 'moving') {
+    const r = walk(ctx, s);
+    if (r === 'blocked') return failTask(state, s);
+    if (r === 'arrived') t.phase = 'working';
+    return;
+  }
+  const recipe = def.production;
+  const bmult = buildingMult(ctx, b);
+  if (bmult <= 0 || b.output[recipe.output] >= def.outputCap) return failTaskQuiet(state, s);
+
+  // A cycle takes its inputs from the stock when it starts.
+  if (b.productionProgress <= 0) {
+    const need = recipe.inputs;
+    const avail = getAvailableStock(state);
+    if (!RESOURCE_TYPES.every((r) => avail[r] >= (need[r] ?? 0))) return failTaskQuiet(state, s);
+    for (const r of RESOURCE_TYPES) {
+      const n = need[r] ?? 0;
+      if (n <= 0) continue;
+      state.colony.stock[r] -= n;
+      recordConsumed(state, r, n);
+      ctx.events.push({ type: 'resourceConsumed', resource: r, amount: n, reason: 'crafting' });
+    }
+  }
+  const rate = workSpeedMult(ctx, s, def.jobCategory, recipe.skill) * bmult;
+  b.productionProgress += (rate * ctx.dt) / recipe.cycleHours;
+  grantXp(s, recipe.skill, ctx.dt);
+  wearTool(state, s, ctx.dt);
+  if (b.productionProgress < 1) return;
+  b.productionProgress = 0;
+  const amount = Math.min(recipe.amount, def.outputCap - b.output[recipe.output]);
+  b.output[recipe.output] += amount;
+  recordProduced(state, recipe.output, amount);
+  if (recipe.output === 'tools') state.progress.toolsCrafted += amount;
+  ctx.events.push({ type: 'resourceProduced', buildingId: b.id, resource: recipe.output, amount });
+  if (recipe.output === 'tools') checkObjectives(state, ctx.events);
+}
+
 /** A task ended because its target is gone: no cooldown is needed. */
 function failTaskQuiet(state: GameState, s: Settler): void {
   abortSettlerTask(state, s);
@@ -1055,13 +1387,27 @@ function stepGather(ctx: TickContext, s: Settler, t: Extract<Task, { kind: 'gath
     const r = walk(ctx, s);
     if (r === 'blocked') return failTask(state, s);
     if (r === 'moving') return;
-    // Arrived: deliver the load into the stockpile.
+    // Arrived: deliver the load into a building buffer or the stockpile.
     if (s.carrying) {
-      const stored = addStockOf(state, s.carrying.resource, s.carrying.amount);
-      recordProduced(state, s.carrying.resource, stored);
-      ctx.events.push({ type: 'resourceDelivered', settlerId: s.id, buildingId: drop.id, resource: s.carrying.resource, amount: stored });
+      const load = s.carrying;
+      const dcap = BUILDING_DEFS[drop.type].outputCap;
+      let stored = 0;
+      if (dcap > 0) {
+        stored = Math.min(load.amount, Math.max(0, dcap - drop.output[load.resource]));
+        drop.output[load.resource] += stored;
+      } else {
+        stored = addStockOf(state, load.resource, load.amount);
+      }
+      // What did not fit goes to the source building's buffer, or is lost at the storage cap.
+      const rest = load.amount - stored;
+      if (rest > 0 && source.id !== drop.id) {
+        const room = Math.max(0, BUILDING_DEFS[source.type].outputCap - source.output[load.resource]);
+        source.output[load.resource] += Math.min(rest, room);
+      }
+      ctx.events.push({ type: 'resourceDelivered', settlerId: s.id, buildingId: drop.id, resource: load.resource, amount: stored });
       s.carrying = null;
     }
+    if (!hasRoomFor(state, source, resource)) return failTaskQuiet(state, s); // storage is full
     // Continue the loop with the next tile.
     const next = findGatherTarget(state, s, source, resource);
     if (next === null) return failTaskQuiet(state, s);
@@ -1091,7 +1437,7 @@ function stepGather(ctx: TickContext, s: Settler, t: Extract<Task, { kind: 'gath
   }
   const def = BUILDING_DEFS[source.type];
   const rateMult = def.forage ? def.forage.rateMult : 1;
-  const rate = GATHER_RATE[resource] * workSpeedMult(ctx, s, category, category) * rateMult;
+  const rate = GATHER_RATE[resource] * workSpeedMult(ctx, s, category, category) * rateMult * (ctx.wolves ? EVENTS.wolves.gatherMult : 1);
   t.progress += rate * ctx.dt;
   grantXp(s, category, ctx.dt);
   wearTool(state, s, ctx.dt);
@@ -1103,6 +1449,7 @@ function stepGather(ctx: TickContext, s: Settler, t: Extract<Task, { kind: 'gath
     world.resource[ti] = left - 1;
     if (s.carrying === null) s.carrying = { resource: t.resource, amount: 0 };
     s.carrying.amount += 1;
+    recordProduced(state, t.resource, 1);
     ctx.events.push({ type: 'resourceGathered', settlerId: s.id, resource: t.resource, amount: 1, x: tile.x, y: tile.y });
     if (left - 1 < 1 && t.resource === 'wood' && world.terrain[ti] === Terrain.Forest) {
       world.terrain[ti] = Terrain.Grass; // felled: structural change
@@ -1116,12 +1463,13 @@ function stepGather(ctx: TickContext, s: Settler, t: Extract<Task, { kind: 'gath
 
 function startReturn(ctx: TickContext, s: Settler, t: Extract<Task, { kind: 'gather' }>): void {
   const state = ctx.state;
-  const drop = nearestBuilding(state, s, isEatingPoint);
+  const source = s.workplaceId === null ? null : findBuilding(state, s.workplaceId);
+  const drop = source === null || s.carrying === null ? null : chooseDropOff(state, s, source, s.carrying.resource, s.carrying.amount);
   if (!drop) return failTask(state, s);
-  t.dropOffBuildingId = drop.b.id;
+  t.dropOffBuildingId = drop.id;
   t.phase = 'returning';
   t.progress = 0;
-  const r = planMove(state, s, buildingGoal(drop.b));
+  const r = planMove(state, s, buildingGoal(drop));
   if (r === 'fail') failTask(state, s);
 }
 
@@ -1209,9 +1557,18 @@ function refreshActivity(ctx: TickContext, s: Settler): void {
       }
       return;
     }
-    case 'haul':
-      setActivity(s, 'carrying', s.carrying ? `Hauling ${s.carrying.amount} ${s.carrying.resource}` : `Hauling ${t.resource}`, null, null);
+    case 'haul': {
+      const from = t.fromBuildingId === null ? null : findBuilding(state, t.fromBuildingId);
+      const to = findBuilding(state, t.toBuildingId);
+      if (!s.carrying && moving) {
+        setActivity(s, 'walking', `Walking to ${from ? buildingLabel(from) : 'storage'}`, null, from ? from.origin : null);
+      } else if (to && to.status === 'construction' && s.carrying) {
+        setActivity(s, 'carrying', `Supplying ${buildingLabel(to)}`, null, to.origin);
+      } else {
+        setActivity(s, 'carrying', `Hauling ${s.carrying ? s.carrying.amount : t.amount} ${t.resource}`, null, to ? to.origin : null);
+      }
       return;
+    }
     case 'work': {
       const b = findBuilding(state, t.buildingId);
       const name = b ? buildingLabel(b) : 'workplace';
@@ -1308,7 +1665,8 @@ function isInterruptible(s: Settler): boolean {
     case 'construct':
       return true;
     case 'gather':
-      return t.phase !== 'returning' && s.carrying === null;
+      // A gatherer may be called away mid-load (the load is put into the stock); only the walk home is protected.
+      return t.phase !== 'returning';
     case 'haul':
     case 'work':
       return s.carrying === null;
@@ -1368,7 +1726,8 @@ function stepSettler(ctx: TickContext, s: Settler): boolean {
 
   // 4. Critical interrupts.
   if (s.task.kind !== 'depart') {
-    if (s.needs.energy < COLLAPSE_ENERGY && !isAsleep(s)) {
+    // A meal or drink in progress finishes first (otherwise critical hunger and collapse would swap places every tick).
+    if (s.needs.energy < COLLAPSE_ENERGY && !isAsleep(s) && s.task.kind !== 'eat' && s.task.kind !== 'drink') {
       startCollapse(state, s);
     } else if (!(s.task.kind === 'idle' && s.task.progress > 0)) {
       // (A settler waiting out a failed path is skipped, so an unreachable meal cannot cause a search every tick.)
@@ -1409,11 +1768,14 @@ export function stepSettlers(ctx: TickContext): void {
   }
   for (const id of departQueue) departSettler(ctx, id);
   departQueue.length = 0;
-  if (ctx.newHour) assignHomes(state);
+  if (ctx.newHour) {
+    assignHomes(state);
+    checkObjectives(state, ctx.events, Math.floor(ctx.hour) === 0);
+  }
   if (state.settlers.length === 0 && state.outcome.status !== 'lost') {
     state.outcome = {
       status: 'lost',
-      reason: `The frontier has claimed ${state.colony.name}. It lasted ${state.time.day} days.`,
+      reason: `The frontier has claimed ${state.colony.name}. It lasted ${state.time.day} ${state.time.day === 1 ? 'day' : 'days'}.`,
       endedTick: state.time.tick,
     };
     ctx.events.push({ type: 'gameOver', status: 'lost', reason: state.outcome.reason as string });

@@ -12,18 +12,29 @@ import { pluralize } from '../lib/format';
 /** Placeable building types in catalogue order (the town center is never placeable). */
 export const CATALOGUE: BuildingType[] = BUILDING_TYPES.filter((t) => BUILDING_DEFS[t].placeable);
 
-/** One-line production summary, e.g. "4 food every 4 h" or "1 tools every 3 h (uses 3 wood, 2 stone)". */
+/** Rate per worker-hour as text: "1 per worker-hour" or "1 per 3 worker-hours". */
+function perWorkerHour(amount: number, cycleHours: number): string {
+  const rate = amount / cycleHours;
+  if (rate >= 1) return `${Number.isInteger(rate) ? rate : rate.toFixed(1)} per worker-hour`;
+  const hoursPerUnit = cycleHours / amount;
+  return `1 per ${Number.isInteger(hoursPerUnit) ? hoursPerUnit : hoursPerUnit.toFixed(1)} worker-hours`;
+}
+
+/**
+ * One-line production summary derived from the building definition (never hand-written), e.g.
+ * "Food: 1 per worker-hour" or "Tools: 1 per 3 worker-hours (uses 3 wood, 2 stone)".
+ */
 export function productionText(def: BuildingDef): string | null {
   const p = def.production;
   if (!p) {
-    if (def.jobCategory === 'woodcutting') return 'Fells nearby trees for wood';
-    if (def.jobCategory === 'mining') return 'Quarries nearby hills for stone';
+    if (def.jobCategory === 'woodcutting') return `Fells trees within ${def.workRadius} tiles for wood`;
+    if (def.jobCategory === 'mining') return `Quarries stone within ${def.workRadius} tiles`;
     return null;
   }
   const inputs = Object.entries(p.inputs)
     .filter(([, n]) => (n ?? 0) > 0)
     .map(([r, n]) => `${n} ${RESOURCE_LABEL[r as keyof typeof RESOURCE_LABEL].toLowerCase()}`);
-  return `${p.amount} ${RESOURCE_LABEL[p.output].toLowerCase()} every ${p.cycleHours} h${inputs.length ? ` (uses ${inputs.join(', ')})` : ''}`;
+  return `${RESOURCE_LABEL[p.output]}: ${perWorkerHour(p.amount, p.cycleHours)}${inputs.length ? ` (uses ${inputs.join(', ')})` : ''}`;
 }
 
 function Stat({ icon, children, tip }: { icon: IconName; children: React.ReactNode; tip: string }) {
@@ -40,7 +51,7 @@ function Stat({ icon, children, tip }: { icon: IconName; children: React.ReactNo
 /** Building catalogue: pick a building, then click the map. Shift+1..7 also pick. */
 export function BuildPanel() {
   const { buildMode, stock, unlocked } = useUiStore(
-    useShallow((s) => ({ buildMode: s.buildMode, stock: s.snapshot?.stock ?? null, unlocked: s.snapshot?.progress.unlocked ?? null })),
+    useShallow((s) => ({ buildMode: s.buildMode, stock: s.snapshot?.available ?? null, unlocked: s.snapshot?.progress.unlocked ?? null })),
   );
   const setBuildMode = useUiStore((s) => s.setBuildMode);
 

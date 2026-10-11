@@ -1,5 +1,5 @@
 /** Labels, thresholds and tooltip copy for settler needs, moods, skills and moodlets (docs/GAME_DESIGN.md §4, §15). */
-import type { NeedType, SkillType } from '../../sim';
+import { XP_TO_NEXT_LEVEL_PER_LEVEL, type NeedType, type SkillType } from '../../sim';
 import type { IconName } from '../components/Icon';
 
 export const NEED_ORDER: readonly NeedType[] = ['hunger', 'energy', 'happiness', 'health'];
@@ -128,6 +128,11 @@ const MOODLET_LABELS: Record<string, string> = {
   wolves: 'Wolves nearby',
 };
 
+/** True when the UI has a written label for this moodlet id. */
+export function hasMoodletLabel(id: string): boolean {
+  return id in MOODLET_LABELS;
+}
+
 /** Human label for a moodlet id; unknown ids are prettified from camelCase. */
 export function moodletLabel(id: string): string {
   const known = MOODLET_LABELS[id];
@@ -205,4 +210,9 @@ export function arrangeRoster<T extends RosterRow>(rows: readonly T[], filter: R
   });
   const key = (r: T): number => (sort === 'mood' ? r.needs.happiness : sort === 'needs' ? lowestNeed(r.needs).value : 0);
   return kept.sort((a, b) => (sort === 'name' ? a.name.localeCompare(b.name) : key(a) - key(b) || a.name.localeCompare(b.name)));
+}
+
+/** XP needed to go from `level` to the next one (balance.ts: XP_TO_NEXT_LEVEL_PER_LEVEL * (level + 1)). */
+export function xpToNext(level: number): number {
+  return XP_TO_NEXT_LEVEL_PER_LEVEL * (level + 1);
 }

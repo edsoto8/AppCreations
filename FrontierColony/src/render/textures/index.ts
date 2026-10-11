@@ -5,7 +5,7 @@
 import type { Texture } from 'pixi.js';
 import { AtlasBuilder } from './atlas';
 import type { Art } from './canvas';
-import { makeCliffStrip, type CliffMaterial } from './cliffs';
+import { makeBankStrip, makeCliffStrip, type CliffMaterial } from './cliffs';
 import {
   makeBush,
   makeFlowerPatch,
@@ -17,7 +17,34 @@ import {
   makeStump,
   makeTuft,
 } from './decals';
-import { makeSelectionRing, makeSettlerHair, makeSettlerHead, makeSettlerLegs, makeSettlerTorso, makeSoftShadow } from './entities';
+import { makeSelectionRing, makeSoftShadow } from './entities';
+import { bakeFarm, bakeHouse, bakeLumberCamp, bakeMine, bakeStorage, bakeTownCenter, bakeWell, bakeWorkshop, FARM_STAGES, HOUSE_VARIANTS } from './buildings';
+import { makeChip, makeLeaf, makePuff, makeResourceIcon, makeSoftDot, makeSpark } from './fx';
+import { makeCratePile, makeLogPile, makePlankPile, makeProducePile, makeSitePad, makeStonePile } from './piles';
+import {
+  makeAxe,
+  makeBadge,
+  makeBlanket,
+  makeBucket,
+  makeCrateSmall,
+  makeHammer,
+  makeHand,
+  makeHair,
+  makeHat,
+  makeHead,
+  makeHoe,
+  makeLeg,
+  makeLogBundle,
+  makePick,
+  makeRockCarry,
+  makeSack,
+  makeSleeve,
+  makeSpeech,
+  makeTorso,
+  makeZ,
+  type BadgeKind,
+} from './settlerParts';
+import { RESOURCE_TYPES, type ResourceType } from '../../sim';
 import {
   EDGE_DIRS,
   makeFoamEdge,
@@ -51,6 +78,8 @@ export interface TextureSet {
   wet: EdgeSet;
   foam: EdgeSet;
   cliffs: Record<CliffMaterial, { lip: Texture[]; mid: Texture[] }>;
+  bankGrass: Texture[];
+  bankSand: Texture[];
   tuft: Texture[];
   flowerPatch: Texture[];
   bush: Texture[];
@@ -68,7 +97,35 @@ export interface TextureSet {
   /** mountains[snow][variant][flip ? 1 : 0] */
   mountains: Texture[][][];
   quarried: Texture[];
-  settler: { legs: Texture; torso: Texture; head: Texture; hair: Texture };
+  rig: {
+    leg: Texture;
+    torsoFront: Texture;
+    torsoBack: Texture;
+    sleeve: Texture;
+    hand: Texture;
+    headFront: Texture;
+    headBack: Texture;
+    hairFront: Texture[];
+    hairBack: Texture[];
+    hat: Texture;
+  };
+  tools: { axe: Texture; pick: Texture; hammer: Texture; hoe: Texture; bucket: Texture; bucketFull: Texture };
+  carry: { logs: Texture; rock: Texture; sack: Texture; crate: Texture };
+  badges: Record<BadgeKind, Texture>;
+  fx: { z: Texture; dots: Texture; heart: Texture; note: Texture; blanket: Texture; dot: Texture; puff: Texture; chip: Texture; spark: Texture; leaf: Texture };
+  resIcons: Record<ResourceType, Texture>;
+  buildings: {
+    house: Texture[];
+    townCenter: Texture;
+    storage: Texture;
+    workshop: Texture;
+    farm: Texture[];
+    lumberCamp: Texture;
+    mine: Texture;
+    well: Texture;
+  };
+  piles: { logs: Texture[]; stones: Texture[]; crates: Texture[]; produce: Texture[]; planks: Texture[] };
+  pads: Record<1 | 2 | 3, Texture>;
   selectionRing: Texture;
   softShadow: Texture;
   /** Atlas page canvases, for debugging only. */
@@ -111,6 +168,8 @@ export function buildTextureSet(): TextureSet {
     };
   }
 
+  const bankGrass = list('bank.grass', 3, (i) => makeBankStrip('grass', i + 1));
+  const bankSand = list('bank.sand', 2, (i) => makeBankStrip('sand', i + 1));
   const tuft = list('tuft', 3, (i) => makeTuft(i + 1));
   const flowerPatch = list('flowerPatch', 5, (i) => makeFlowerPatch(i));
   const bush = list('bush', 2, (i) => makeBush(i + 1));
@@ -132,12 +191,65 @@ export function buildTextureSet(): TextureSet {
   );
   const quarried = list('quarried', 2, (i) => makeQuarriedMountain(i + 1));
 
-  const sKeys = {
-    legs: add('settler.legs', makeSettlerLegs()),
-    torso: add('settler.torso', makeSettlerTorso()),
-    head: add('settler.head', makeSettlerHead()),
-    hair: add('settler.hair', makeSettlerHair()),
+  const rigKeys = {
+    leg: add('rig.leg', makeLeg()),
+    torsoFront: add('rig.torsoF', makeTorso(false)),
+    torsoBack: add('rig.torsoB', makeTorso(true)),
+    sleeve: add('rig.sleeve', makeSleeve()),
+    hand: add('rig.hand', makeHand()),
+    headFront: add('rig.headF', makeHead(false)),
+    headBack: add('rig.headB', makeHead(true)),
+    hairFront: [0, 1, 2, 3].map((i) => add(`rig.hairF${i}`, makeHair(i, false))),
+    hairBack: [0, 1, 2, 3].map((i) => add(`rig.hairB${i}`, makeHair(i, true))),
+    hat: add('rig.hat', makeHat()),
   };
+  const toolKeys = {
+    axe: add('tool.axe', makeAxe()),
+    pick: add('tool.pick', makePick()),
+    hammer: add('tool.hammer', makeHammer()),
+    hoe: add('tool.hoe', makeHoe()),
+    bucket: add('tool.bucket', makeBucket(false)),
+    bucketFull: add('tool.bucketFull', makeBucket(true)),
+  };
+  const carryKeys = {
+    logs: add('carry.logs', makeLogBundle()),
+    rock: add('carry.rock', makeRockCarry()),
+    sack: add('carry.sack', makeSack()),
+    crate: add('carry.crate', makeCrateSmall()),
+  };
+  const badgeKinds: BadgeKind[] = ['chop', 'mine', 'build', 'craft', 'farm', 'water', 'eat', 'sleep', 'chat', 'rest'];
+  const badgeKeys = badgeKinds.map((k) => add(`badge.${k}`, makeBadge(k)));
+  const fxKeys = {
+    z: add('fx.z', makeZ()),
+    dots: add('fx.dots', makeSpeech('dots')),
+    heart: add('fx.heart', makeSpeech('heart')),
+    note: add('fx.note', makeSpeech('note')),
+    blanket: add('fx.blanket', makeBlanket()),
+    dot: add('fx.dot', makeSoftDot()),
+    puff: add('fx.puff', makePuff()),
+    chip: add('fx.chip', makeChip()),
+    spark: add('fx.spark', makeSpark()),
+    leaf: add('fx.leaf', makeLeaf()),
+  };
+  const resKeys = RESOURCE_TYPES.map((r) => add(`res.${r}`, makeResourceIcon(r)));
+  const bKeys = {
+    house: list('bld.house', HOUSE_VARIANTS, (i) => bakeHouse(i)),
+    townCenter: add('bld.townCenter', bakeTownCenter()),
+    storage: add('bld.storage', bakeStorage()),
+    workshop: add('bld.workshop', bakeWorkshop()),
+    farm: list('bld.farm', FARM_STAGES, (i) => bakeFarm(i)),
+    lumberCamp: add('bld.lumberCamp', bakeLumberCamp()),
+    mine: add('bld.mine', bakeMine()),
+    well: add('bld.well', bakeWell()),
+  };
+  const pileKeys = {
+    logs: [1, 2, 3, 4].map((l) => add(`pile.logs${l}`, makeLogPile(l))),
+    stones: [1, 2, 3, 4].map((l) => add(`pile.stones${l}`, makeStonePile(l))),
+    crates: [1, 2, 3].map((l) => add(`pile.crates${l}`, makeCratePile(l))),
+    produce: [1, 2, 3].map((l) => add(`pile.produce${l}`, makeProducePile(l))),
+    planks: [1, 2, 3].map((l) => add(`pile.planks${l}`, makePlankPile(l))),
+  };
+  const padKeys = [1, 2, 3].map((n) => add(`pad${n}`, makeSitePad(n, n)));
   const ring = add('ui.ring', makeSelectionRing());
   const softShadow = add('ui.shadow', makeSoftShadow());
 
@@ -170,6 +282,8 @@ export function buildTextureSet(): TextureSet {
     wet: edgeSet(wetKeys),
     foam: edgeSet(foamKeys),
     cliffs,
+    bankGrass: ts(bankGrass),
+    bankSand: ts(bankSand),
     tuft: ts(tuft),
     flowerPatch: ts(flowerPatch),
     bush: ts(bush),
@@ -184,7 +298,35 @@ export function buildTextureSet(): TextureSet {
     rubble: ts(rubble),
     mountains: mountainKeys.map((perSnow) => perSnow.map(ts)),
     quarried: ts(quarried),
-    settler: { legs: t(sKeys.legs), torso: t(sKeys.torso), head: t(sKeys.head), hair: t(sKeys.hair) },
+    rig: {
+      leg: t(rigKeys.leg),
+      torsoFront: t(rigKeys.torsoFront),
+      torsoBack: t(rigKeys.torsoBack),
+      sleeve: t(rigKeys.sleeve),
+      hand: t(rigKeys.hand),
+      headFront: t(rigKeys.headFront),
+      headBack: t(rigKeys.headBack),
+      hairFront: ts(rigKeys.hairFront),
+      hairBack: ts(rigKeys.hairBack),
+      hat: t(rigKeys.hat),
+    },
+    tools: { axe: t(toolKeys.axe), pick: t(toolKeys.pick), hammer: t(toolKeys.hammer), hoe: t(toolKeys.hoe), bucket: t(toolKeys.bucket), bucketFull: t(toolKeys.bucketFull) },
+    carry: { logs: t(carryKeys.logs), rock: t(carryKeys.rock), sack: t(carryKeys.sack), crate: t(carryKeys.crate) },
+    badges: Object.fromEntries(badgeKinds.map((k, i) => [k, t(badgeKeys[i]!)])) as Record<BadgeKind, Texture>,
+    fx: { z: t(fxKeys.z), dots: t(fxKeys.dots), heart: t(fxKeys.heart), note: t(fxKeys.note), blanket: t(fxKeys.blanket), dot: t(fxKeys.dot), puff: t(fxKeys.puff), chip: t(fxKeys.chip), spark: t(fxKeys.spark), leaf: t(fxKeys.leaf) },
+    resIcons: Object.fromEntries(RESOURCE_TYPES.map((r, i) => [r, t(resKeys[i]!)])) as Record<ResourceType, Texture>,
+    buildings: {
+      house: ts(bKeys.house),
+      townCenter: t(bKeys.townCenter),
+      storage: t(bKeys.storage),
+      workshop: t(bKeys.workshop),
+      farm: ts(bKeys.farm),
+      lumberCamp: t(bKeys.lumberCamp),
+      mine: t(bKeys.mine),
+      well: t(bKeys.well),
+    },
+    piles: { logs: ts(pileKeys.logs), stones: ts(pileKeys.stones), crates: ts(pileKeys.crates), produce: ts(pileKeys.produce), planks: ts(pileKeys.planks) },
+    pads: { 1: t(padKeys[0]!), 2: t(padKeys[1]!), 3: t(padKeys[2]!) },
     selectionRing: t(ring),
     softShadow: t(softShadow),
     pages,

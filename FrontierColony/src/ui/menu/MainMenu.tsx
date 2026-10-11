@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useGameController } from '../../game';
 import type { SaveSlotInfo } from '../../game/save';
-import { useUiStore } from '../../store';
+import { uiStore, useUiStore } from '../../store';
 import { Icon } from '../components/Icon';
 import { Panel } from '../components/Panel';
 import { formatClock, formatRelativeTime, pluralize } from '../lib/format';
@@ -28,10 +28,16 @@ export function MainMenu() {
   const gameStarted = useUiStore((s) => s.gameStarted);
   const resumeName = useUiStore((s) => s.snapshot?.colonyName ?? null);
   const resumeDay = useUiStore((s) => s.snapshot?.day ?? null);
-  const [view, setView] = useState<View>('home');
+  // After game over the menu opens straight on New Game or Load; the request is consumed here.
+  const [view, setView] = useState<View>(() => uiStore.getState().menuView);
   const [slots, setSlots] = useState<SaveSlotInfo[]>(() => controller.listSaves());
   const newest = useMemo(() => newestSave(slots), [slots]);
   const anySave = slots.some((s) => s.exists);
+  const effectiveView: View = view === 'load' && !anySave ? 'home' : view;
+
+  useEffect(() => {
+    if (uiStore.getState().menuView !== 'home') uiStore.setState({ menuView: 'home' });
+  }, []);
 
   useEffect(() => {
     if (view === 'home') setSlots(controller.listSaves());
@@ -55,7 +61,7 @@ export function MainMenu() {
   return (
     <div className="main-menu" data-testid="main-menu">
       <div className="main-menu__vignette" aria-hidden="true" />
-      <div className={`main-menu__content ${view === 'newGame' ? 'is-wide' : ''}`}>
+      <div className={`main-menu__content ${effectiveView === 'newGame' ? 'is-wide' : ''}`}>
         <header className="title-block">
           <div className="title-block__emblem" aria-hidden="true">
             <Icon name="compass" size={34} />
@@ -67,7 +73,7 @@ export function MainMenu() {
           <p className="tagline">Found a settlement. Feed it. Survive the winter.</p>
         </header>
 
-        {view === 'home' && (
+        {effectiveView === 'home' && (
           <nav className="menu-card glass" aria-label="Main menu">
             {gameStarted && (
               <button type="button" className="menu-btn menu-btn--primary" onClick={() => flow.resume()} data-testid="menu-resume" data-autofocus>
@@ -106,7 +112,7 @@ export function MainMenu() {
           </nav>
         )}
 
-        {view === 'newGame' && (
+        {effectiveView === 'newGame' && (
           <div className="menu-card menu-card--wide glass">
             <h2 className="menu-card__title">Found a new colony</h2>
             <NewGameForm onBack={() => setView('home')} />
@@ -114,7 +120,7 @@ export function MainMenu() {
         )}
       </div>
 
-      {view === 'load' && (
+      {effectiveView === 'load' && (
         <Panel title="Load game" icon="folder" placement="center" width={560} onClose={() => setView('home')} testId="panel-load">
           <SaveLoadView mode="load" />
         </Panel>

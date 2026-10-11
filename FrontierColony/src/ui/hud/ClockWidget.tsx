@@ -5,12 +5,15 @@ import { Tooltip } from '../components/Tooltip';
 import {
   DAYS_PER_SEASON,
   PHASE_LABEL,
+  SEASON_EFFECT,
   SEASON_LABEL,
+  intensityLabel,
   WEATHER_EFFECT,
   WEATHER_LABEL,
   dayPhase,
   formatClock,
   seasonInfo,
+  SEASON_ORDER,
   skyPosition,
 } from '../lib/format';
 
@@ -53,6 +56,7 @@ export function ClockWidget() {
         // Minute resolution is plenty for display and keeps re-renders at the clock's actual pace.
         minute: Math.floor(snap.timeOfDay * 60),
         weather: snap.weather.current,
+        intensity: Math.round(snap.weather.intensity * 10) / 10,
         season: snap.season,
       };
     }),
@@ -62,6 +66,31 @@ export function ClockWidget() {
   const phase = dayPhase(timeOfDay);
   const info = seasonInfo(data.day);
   const phaseIcon: IconName = phase === 'dawn' ? 'sunrise' : phase === 'dusk' ? 'sunset' : phase === 'night' ? 'moon' : 'sun';
+
+  const untilNext = info.daysUntilNextSeason === 0 ? 'tomorrow' : `in ${info.daysUntilNextSeason} day${info.daysUntilNextSeason === 1 ? '' : 's'}`;
+  const nextSeason = SEASON_LABEL[SEASON_ORDER[(SEASON_ORDER.indexOf(info.season) + 1) % SEASON_ORDER.length]!];
+  const seasonTip = (
+    <>
+      <p>{SEASON_EFFECT[info.season]}</p>
+      <dl className="tt-stats">
+        <dt>{nextSeason}</dt>
+        <dd>{untilNext}</dd>
+        <dt>Year</dt>
+        <dd>{info.year}</dd>
+      </dl>
+    </>
+  );
+  const weatherTip = (
+    <>
+      <p>{WEATHER_EFFECT[data.weather]}</p>
+      {data.weather !== 'clear' && data.weather !== 'cloudy' && (
+        <dl className="tt-stats">
+          <dt>Strength</dt>
+          <dd>{intensityLabel(data.intensity)}</dd>
+        </dl>
+      )}
+    </>
+  );
 
   const clockTip = (
     <>
@@ -73,10 +102,8 @@ export function ClockWidget() {
         <dd>
           {SEASON_LABEL[info.season]}, day {info.dayInSeason} of {DAYS_PER_SEASON}
         </dd>
-        <dt>Year</dt>
-        <dd>{info.year}</dd>
         <dt>Next season</dt>
-        <dd>{info.daysUntilNextSeason === 0 ? 'tomorrow' : `in ${info.daysUntilNextSeason} day${info.daysUntilNextSeason === 1 ? '' : 's'}`}</dd>
+        <dd>{untilNext}</dd>
       </dl>
     </>
   );
@@ -89,9 +116,11 @@ export function ClockWidget() {
           <div className="clock__text">
             <div className="clock__day" data-testid="clock">
               Day {data.day}
-              <span className="clock__season">
-                <Icon name={info.season} size={13} /> {SEASON_LABEL[info.season]}
-              </span>
+              <Tooltip title={`${SEASON_LABEL[info.season]}, day ${info.dayInSeason} of ${DAYS_PER_SEASON}`} content={seasonTip} side="bottom">
+                <span className="clock__season" tabIndex={0} data-testid="season-badge">
+                  <Icon name={info.season} size={13} /> {SEASON_LABEL[info.season]}
+                </span>
+              </Tooltip>
             </div>
             <div className="clock__time">
               <Icon name={phaseIcon} size={12} />
@@ -101,7 +130,7 @@ export function ClockWidget() {
           </div>
         </div>
       </Tooltip>
-      <Tooltip title={WEATHER_LABEL[data.weather]} content={WEATHER_EFFECT[data.weather]} side="bottom">
+      <Tooltip title={WEATHER_LABEL[data.weather]} content={weatherTip} side="bottom">
         <div className="weather" tabIndex={0} role="group" aria-label={`Weather: ${WEATHER_LABEL[data.weather]}`} data-testid="weather">
           <Icon name={data.weather} size={24} />
           <span className="weather__label">{WEATHER_LABEL[data.weather]}</span>

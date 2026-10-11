@@ -34,10 +34,12 @@ export const createRenderer: CreateRenderer = async (host, callbacks) => {
   app.ticker.stop();
   app.canvas.setAttribute('data-testid', 'game-canvas');
   host.appendChild(app.canvas);
+  const t0 = performance.now();
   const tex = buildTextureSet();
+  const texMs = performance.now() - t0;
   const renderer = new IsoRenderer(app, callbacks, tex);
   if (typeof location !== 'undefined' && new URLSearchParams(location.search).has('renderDebug')) {
-    (window as unknown as { __frontierRender?: unknown }).__frontierRender = { renderer, stats: renderer.stats, pages: tex.pages };
+    (window as unknown as { __frontierRender?: unknown }).__frontierRender = { renderer, stats: renderer.stats, pages: tex.pages, texMs };
   }
   return renderer;
 };

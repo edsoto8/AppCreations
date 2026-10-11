@@ -1,8 +1,8 @@
 /** Pure display helpers (no React, no DOM) so they can be unit tested in node. */
-import type { Season, WeatherKind } from '../../sim';
+import { DAYS_PER_SEASON, type Season, type WeatherKind } from '../../sim';
 
-/** Days per season (docs/GAME_DESIGN.md §2). Mirrors DAYS_PER_SEASON in sim/balance.ts. */
-export const DAYS_PER_SEASON = 5;
+export { DAYS_PER_SEASON };
+
 export const SEASON_ORDER: readonly Season[] = ['spring', 'summer', 'autumn', 'winter'];
 /** Food and water eaten/drunk per settler per day (GAME_DESIGN §4.1). */
 export const NEED_PER_SETTLER_PER_DAY = 2;
@@ -20,6 +20,19 @@ export const WEATHER_LABEL: Record<WeatherKind, string> = {
   storm: 'Storm',
   snow: 'Snow',
 };
+
+/** What each season does (GAME_DESIGN §2). */
+export const SEASON_EFFECT: Record<Season, string> = {
+  spring: 'Mild weather. Crops grow at normal speed.',
+  summer: 'Crops grow 25% faster. Drought is possible.',
+  autumn: 'Crops grow at normal speed. Stockpile food for winter.',
+  winter: 'Fields lie fallow, trees stop regrowing and settlers tire 10% faster. Snow and cold snaps are likely.',
+};
+
+/** "Light", "Moderate" or "Heavy" for a 0..1 weather intensity. */
+export function intensityLabel(intensity: number): string {
+  return intensity < 0.55 ? 'Light' : intensity < 0.8 ? 'Moderate' : 'Heavy';
+}
 
 /** Short gameplay effect of each weather (GAME_DESIGN §9). */
 export const WEATHER_EFFECT: Record<WeatherKind, string> = {

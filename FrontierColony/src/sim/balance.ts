@@ -20,6 +20,7 @@ import {
   type MapSize,
   type Priorities,
   type ResourceAmounts,
+  type ResourceType,
   type Season,
   type SkillType,
   type TerrainDef,
@@ -688,3 +689,90 @@ export const OBJECTIVES: readonly ObjectiveDef[] = [
 export const VICTORY = { population: 20, minAvgHappiness: 50 } as const;
 /** Objective thresholds. */
 export const OBJECTIVE_TARGETS = { foundationsBuildings: 3, toolsCrafted: 5, growingPopulation: 10, larderFoodPerSettler: 10, winterDay: 21 } as const;
+
+// --- Weather (GAME_DESIGN §9) ------------------------------------------------------------------------
+
+export const WEATHER_DURATION_HOURS: Record<WeatherKind, readonly [number, number]> = {
+  clear: [6, 18],
+  cloudy: [4, 12],
+  rain: [3, 9],
+  storm: [2, 5],
+  snow: [4, 12],
+};
+export const WEATHER_INTENSITY_RANGE = [0.4, 1.0] as const;
+/** Column order of the transition rows. */
+export const WEATHER_ORDER: readonly WeatherKind[] = ['clear', 'cloudy', 'rain', 'storm', 'snow'];
+/** Rows: the current weather; columns follow `WEATHER_ORDER`. */
+export const WEATHER_TRANSITIONS: Record<'warm' | 'winter', Record<WeatherKind, readonly number[]>> = {
+  warm: {
+    clear: [0.45, 0.4, 0.12, 0.03, 0],
+    cloudy: [0.4, 0.2, 0.3, 0.1, 0],
+    rain: [0.2, 0.45, 0.2, 0.15, 0],
+    storm: [0.1, 0.4, 0.5, 0, 0],
+    snow: [0, 1.0, 0, 0, 0],
+  },
+  winter: {
+    clear: [0.4, 0.35, 0, 0.05, 0.2],
+    cloudy: [0.25, 0.25, 0, 0.1, 0.4],
+    rain: [0, 0, 0, 0, 1.0],
+    storm: [0.1, 0.4, 0, 0, 0.5],
+    snow: [0.15, 0.4, 0, 0.15, 0.3],
+  },
+};
+export const RAIN_BARREL_WATER_PER_HOUR = 0.5;
+
+// --- Schedule, growth and nature (GAME_DESIGN §2, §6.5, §8) -------------------------------------------
+
+export const SCHEDULE = { regrowthHour: 0, growthCheckHour: 8, eventRollHour: 8, wildfireRollHour: 14 } as const;
+export const GROWTH = {
+  minFreeBeds: 1,
+  minFoodDays: 2,
+  minWaterDays: 2,
+  minAvgHappiness: 50,
+  noDeathWithinHours: 24,
+  baseChance: 0.5,
+  perExtraBed: 0.1,
+  maxExtraBeds: 3,
+  pairChance: 0.3,
+  pairMinFreeBeds: 2,
+} as const;
+/** Days per year (4 seasons). */
+export const DAYS_PER_YEAR = DAYS_PER_SEASON * 4;
+
+// --- Random events (GAME_DESIGN §10) ------------------------------------------------------------------
+
+export interface TraderOffer {
+  give: Partial<Record<ResourceType, number>>;
+  get: Partial<Record<ResourceType, number>>;
+}
+export const TRADER_OFFERS: readonly TraderOffer[] = [
+  { give: { wood: 30 }, get: { food: 25 } },
+  { give: { food: 25 }, get: { stone: 20 } },
+  { give: { wood: 30, stone: 10 }, get: { tools: 4 } },
+  { give: { food: 30 }, get: { wood: 35 } },
+  { give: { wood: 20 }, get: { water: 25 } },
+];
+export const SUPPLY_CACHE_REWARDS: readonly Partial<Record<ResourceType, number>>[] = [{ wood: 30 }, { stone: 20 }, { food: 25 }, { tools: 3 }];
+
+export const EVENTS = {
+  traderVisit: { positive: true, p: 0.1, minDay: 3, windowHours: 12 },
+  wanderer: { positive: true, p: 0.07, minDay: 2, maxPop: 28, pairChance: 0.4, windowHours: 12 },
+  harvestFestival: { positive: true, p: 0.35, minFoodPerPop: 6, foodCostPerPop: 2, socializeHours: 4, windowHours: 6, festivalHours: 48 },
+  bountifulHarvest: { positive: true, p: 0.06, durationHours: 48, farmMult: 1.5 },
+  richVein: { positive: true, p: 0.05, stonePerTile: 40 },
+  supplyCache: { positive: true, p: 0.05, minDay: 2 },
+  wolves: { positive: false, p: 0.06, minDay: 4, durationHours: 24, attackDamage: 35, attackMinDistance: 10, gatherMult: 0.8 },
+  sickness: { positive: false, p: 0.05, minDay: 5, extraPIfExposed: 0.05, infectFraction: 0.25, durationHours: 36, toughDurationHours: 18, sleepScoreBonus: 20 },
+  cropBlight: { positive: false, p: 0.04, durationHours: 48 },
+  drought: { positive: false, p: 0.08, durationHours: 72, farmMult: 0.6, wellMult: 0.7 },
+  wildfire: { positive: false, p: 0.2, minDistanceFromTownCenter: 8, radius: 3 },
+  stormDamage: { positive: false, pPerStormHour: 0.03 },
+  toolsBreak: { positive: false, p: 0.04, minTools: 4, lossFraction: 0.25 },
+  coldSnap: { positive: false, p: 0.2, durationHours: 48, energyDecayMult: 1.3, wellMult: 0.5 },
+} as const;
+export const DAMAGE_REPAIR_PROGRESS = 0.7;
+export const DAMAGE_IMMUNE: readonly BuildingType[] = ['townCenter', 'storage'];
+
+/** Food and water one settler eats and drinks per in-game day (24 h x 4 hunger/h / 48 per meal). */
+export const FOOD_PER_SETTLER_DAY = (24 * HUNGER_DECAY) / MEAL.hungerRestore;
+export const WATER_PER_SETTLER_DAY = FOOD_PER_SETTLER_DAY;

@@ -3,13 +3,15 @@
  * Everything here is drawn with a handful of Graphics objects that are only redrawn when their input
  * changes; pulsing is done through alpha so it costs nothing per frame.
  */
-import { Container, Graphics } from 'pixi.js';
+import { Container, Graphics, Sprite } from 'pixi.js';
 import { BUILDING_DEFS, TERRAIN_DEFS, Terrain, type GameState, type TilePos } from '../../sim';
 import { tileToScreen } from '../../shared/iso';
 import type { OverlayMode, PlacementGhost, Selection } from '../../shared/types';
 import type { Layers } from '../layers';
 import type { TerrainModel } from '../terrain/model';
-import { drawBuilding } from './buildingArt';
+import type { TextureSet } from '../textures';
+import { setTex } from '../util/sprite';
+import { buildingTexture } from './buildingTextures';
 
 /** Diamond for a w×h block of tiles whose top vertex is at (0,0). */
 function diamondPoints(w: number, h: number, inset = 0): number[] {
@@ -35,7 +37,8 @@ export class Overlays {
   private readonly hover = new Graphics();
   private readonly selection = new Graphics();
   private readonly ghostTiles = new Graphics();
-  private readonly ghostBuilding = new Graphics();
+  private readonly ghostBuilding = new Sprite();
+  private readonly path = new Graphics();
   private readonly mapOverlay = new Graphics();
   private readonly root = new Container();
 
@@ -47,11 +50,14 @@ export class Overlays {
   private selectionKey = '';
   private ghostKey = '';
 
-  constructor(layers: Layers) {
+  private readonly tex: TextureSet;
+
+  constructor(layers: Layers, tex: TextureSet) {
+    this.tex = tex;
     this.hover.visible = false;
     this.selection.visible = false;
     this.ghostBuilding.alpha = 0.7;
-    this.root.addChild(this.mapOverlay, this.hover, this.selection, this.ghostTiles, this.ghostBuilding);
+    this.root.addChild(this.mapOverlay, this.hover, this.selection, this.path, this.ghostTiles, this.ghostBuilding);
     layers.overlays.addChild(this.root);
     this.drawHover();
   }
@@ -151,6 +157,7 @@ export class Overlays {
       this.ghostTiles.visible = true;
       this.ghostBuilding.visible = true;
       this.ghostTiles.alpha = 0.75 + 0.25 * Math.sin(timeSec * 5);
+      this.ghostBuilding.alpha = 0.62 + 0.1 * Math.sin(timeSec * 5);
     }
 
     // map overlays (redrawn when the mode, the world or the covered region changes)
@@ -167,6 +174,41 @@ export class Overlays {
     if (bucket !== this.overlayKey) {
       this.overlayKey = bucket;
       this.drawMapOverlay(state, model, { x0: view.x0 - m, y0: view.y0 - m, x1: view.x1 + m, y1: view.y1 + m });
+    }
+  }
+
+  /** Dotted route preview for the selected settler: from its feet through the remaining waypoints. */
+  updatePath(model: TerrainModel, path: readonly TilePos[] | null, start: { x: number; y: number } | null, timeSec: number): void {
+    const g = this.path;
+    g.clear();
+    if (!path || path.length === 0 || !start) return;
+    let px = start.x;
+    let py = start.y;
+    const spacing = 10;
+    let carry = (timeSec * 16) % spacing;
+    const n = Math.min(path.length, 80);
+    for (let i = 0; i < n; i++) {
+      const t = path[i]!;
+      if (!model.inBounds(t.x, t.y)) break;
+      const q = tileToScreen(t.x + 0.5, t.y + 0.5, model.elevAt(t.x, t.y));
+      const dx = q.x - px;
+      const dy = q.y - py;
+      const len = Math.hypot(dx, dy);
+      let d = carry;
+      while (d < len) {
+        const f = d / len;
+        g.circle(px + dx * f, py + dy * f, 1.7).fill({ color: 0xffe08a, alpha: 0.9 });
+        d += spacing;
+      }
+      carry = d - len;
+      px = q.x;
+      py = q.y;
+    }
+    const last = path[Math.min(path.length, n) - 1]!;
+    if (model.inBounds(last.x, last.y)) {
+      const p = tileToScreen(last.x, last.y, model.elevAt(last.x, last.y));
+      const pts = diamondPoints(1, 1, 3).map((v, i) => v + (i % 2 === 0 ? p.x : p.y));
+      g.poly(pts).stroke({ width: 1.6, color: 0xffe08a, alpha: 0.5 + 0.4 * Math.sin(timeSec * 5), join: 'round' });
     }
   }
 
@@ -211,9 +253,8 @@ export class Overlays {
     const e = this.footprintElevation(model, gh.origin.x, gh.origin.y, w, h);
     const c = tileToScreen(gh.origin.x + w / 2, gh.origin.y + h / 2, e);
     this.ghostBuilding.position.set(c.x, c.y);
-    this.ghostBuilding.clear();
-    drawBuilding(this.ghostBuilding, gh.buildingType, w, h, false, 1);
-    this.ghostBuilding.tint = gh.ok ? 0xe8fff0 : 0xffb0b0;
+    setTex(this.ghostBuilding, buildingTexture(this.tex, gh.buildingType, 0, 3));
+    this.ghostBuilding.tint = gh.ok ? 0xd8ffe0 : 0xffa8a8;
   }
 
   private drawMapOverlay(state: Readonly<GameState>, model: TerrainModel, view: { x0: number; y0: number; x1: number; y1: number }): void {

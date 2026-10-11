@@ -9,9 +9,9 @@ import {
   needLevel,
   needWarning,
   trendOf,
+  xpToNext,
   type RosterRow,
 } from '../../src/ui/lib/settlerInfo';
-import { xpToNext } from '../../src/ui/lib/balanceMirror';
 
 const needs = (o: Partial<Record<'hunger' | 'energy' | 'happiness' | 'health', number>> = {}) => ({ hunger: 80, energy: 80, happiness: 60, health: 100, ...o });
 const row = (id: number, name: string, n = needs(), kind = 'walking', sick = false): RosterRow => ({ id, name, needs: n, activity: { kind }, sick });

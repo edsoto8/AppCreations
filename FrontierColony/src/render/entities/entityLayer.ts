@@ -1,60 +1,76 @@
 /**
- * Settlers and buildings. Both live in the depth-sorted `objects` layer next to trees and raised
- * terrain; their zIndex comes from `isoDepth`. M3 / M4 replace the simple art with animated sprites,
- * the structure (views keyed by entity id, updated from GameState each frame) stays.
+ * Settlers and buildings. Both live in the depth-sorted objects layer next to trees and raised
+ * terrain (see depthLayer.ts); views are keyed by entity id and updated from GameState every frame.
  */
-import { Container, Graphics, Sprite } from 'pixi.js';
-import { BUILDING_DEFS, type Building, type GameState, type Settler } from '../../sim';
-import { isoDepth, tileToScreen } from '../../shared/iso';
+import type { Container } from 'pixi.js';
+import { BUILDING_DEFS, getStorageCapacity, type GameState, type Settler } from '../../sim';
+import { tileToScreen } from '../../shared/iso';
 import type { Selection } from '../../shared/types';
+import { buildingDepth, settlerDepth } from '../depthKeys';
 import type { DepthLayer } from '../depthLayer';
+import type { Effects, Locator } from '../effects/effects';
 import type { TerrainModel } from '../terrain/model';
 import type { TextureSet } from '../textures';
 import { clamp } from '../util/noise';
-import { buildingHeight, drawBuilding } from './buildingArt';
-import { P } from './isoDraw';
-
-const SKIN = [0xf6d5b8, 0xeac09a, 0xd9a577, 0xc58c5e, 0xa9714a, 0x8a5636, 0x6c4129, 0xf2cdbd];
-const HAIR = [0x2b1d16, 0x4a3022, 0x70492d, 0xa8742f, 0xd6b25e, 0xb5502f, 0x8c8c90, 0xe8e0d0];
-const SHIRT = [0xd9604f, 0x4f86c6, 0x6aa84f, 0xe0b040, 0x9b6bc4, 0xe8e2d2, 0x3f9d95, 0xd9814f];
-
-interface SettlerView {
-  id: number;
-  root: Container;
-  body: Container;
-  ring: Sprite;
-  phase: number;
-  x: number;
-  y: number;
-  seen: boolean;
-}
-
-interface BuildingView {
-  id: number;
-  root: Container;
-  g: Graphics;
-  key: string;
-  seen: boolean;
-}
+import { BuildingView } from './buildingView';
+import { buildingHeight } from './buildingTextures';
+import { P, pointInConvex } from './isoMath';
+import { SettlerView, type SettlerEffectsHook } from './settlerView';
 
 export interface SettlerHit {
   id: number;
   dist: number;
 }
 
+const INDOOR_LABEL = /^(Sleeping|Resting) in /i;
+
 export class EntityLayer {
   private readonly settlers = new Map<number, SettlerView>();
   private readonly buildings = new Map<number, BuildingView>();
   private selection: Selection | null = null;
+  private effects: Effects | null = null;
+  private zoom = 1;
 
   private readonly depth: DepthLayer;
   private readonly tex: TextureSet;
   private readonly model: () => TerrainModel | null;
+  readonly hook: SettlerEffectsHook;
 
   constructor(depth: DepthLayer, tex: TextureSet, model: () => TerrainModel | null) {
     this.depth = depth;
     this.tex = tex;
     this.model = model;
+    this.hook = {
+      strike: (kind, x, y) => {
+        const fx = this.effects;
+        if (!fx) return;
+        switch (kind) {
+          case 'chopping':
+            fx.particles.woodChips(x, y - 2, 4);
+            break;
+          case 'mining':
+            fx.particles.stoneChips(x, y - 2, 5);
+            break;
+          case 'building':
+            fx.particles.sparks(x, y - 4, 3, 0xffe29a);
+            fx.particles.dust(x, y + 2, 0xd9cbb0, 1, 0.4);
+            break;
+          case 'crafting':
+            fx.particles.sparks(x, y - 4, 4, 0xffa95a);
+            break;
+          case 'farming':
+            fx.particles.dust(x, y + 2, 0x9a7650, 2, 0.45);
+            break;
+          default:
+            break;
+        }
+      },
+      zzz: (x, y) => this.effects?.particles.zzz(x, y),
+    };
+  }
+
+  attachEffects(fx: Effects): void {
+    this.effects = fx;
   }
 
   setSelection(sel: Selection | null): void {
@@ -62,14 +78,29 @@ export class EntityLayer {
   }
 
   clear(): void {
-    for (const v of this.settlers.values()) v.root.destroy({ children: true });
-    for (const v of this.buildings.values()) v.root.destroy({ children: true });
+    for (const v of this.settlers.values()) v.destroy();
+    for (const v of this.buildings.values()) v.destroy();
     this.settlers.clear();
     this.buildings.clear();
   }
 
   destroy(): void {
     this.clear();
+  }
+
+  locator(): Locator {
+    return {
+      tilePx: (x, y) => tileToScreen(x, y, this.sampleElevation(x, y)),
+      building: (id) => {
+        const v = this.buildings.get(id);
+        if (!v) return null;
+        return { x: v.root.position.x, y: v.root.position.y, height: v.height, w: v.w, h: v.h };
+      },
+      settler: (id) => {
+        const v = this.settlers.get(id);
+        return v ? { x: v.root.position.x, y: v.root.position.y } : null;
+      },
+    };
   }
 
   /** Smoothed ground height (in levels) at a continuous world position. */
@@ -89,122 +120,113 @@ export class EntityLayer {
     return (e00 * (1 - tx) + e10 * tx) * (1 - ty) + (e01 * (1 - tx) + e11 * tx) * ty;
   }
 
-  update(state: Readonly<GameState>, alpha: number, timeSec: number): void {
-    this.updateBuildings(state);
-    this.updateSettlers(state, alpha, timeSec);
+  /** World pixel of a settler's feet (null when unknown). */
+  settlerPx(id: number): { x: number; y: number } | null {
+    const v = this.settlers.get(id);
+    return v ? { x: v.root.position.x, y: v.root.position.y } : null;
+  }
+
+  update(state: Readonly<GameState>, alpha: number, timeSec: number, dt: number, zoom: number, animTime: number): void {
+    this.zoom = zoom;
+    this.updateBuildings(state, timeSec, dt);
+    this.updateSettlers(state, alpha, timeSec, animTime);
   }
 
   // --- buildings -------------------------------------------------------------------------------
 
-  private updateBuildings(state: Readonly<GameState>): void {
+  private updateBuildings(state: Readonly<GameState>, timeSec: number, dt: number): void {
     const m = this.model();
-    if (!m) return;
+    const fx = this.effects;
+    if (!m || !fx) return;
     for (const v of this.buildings.values()) v.seen = false;
+    // overall stock fill (for the storage crates)
+    const cap = Math.max(1, getStorageCapacity(state));
+    const st = state.colony.stock;
+    const fill = clamp(Math.max(st.wood, st.stone, st.food, st.tools) / cap, 0, 1);
     for (const b of state.buildings) {
       let v = this.buildings.get(b.id);
       if (!v) {
-        const root = new Container();
-        const g = new Graphics();
-        root.addChild(g);
-        this.depth.place(root);
-        v = { id: b.id, root, g, key: '', seen: true };
+        v = new BuildingView(b, this.tex);
         this.buildings.set(b.id, v);
+        this.depth.place(v.root);
       }
       v.seen = true;
       const w = b.footprint.w;
       const h = b.footprint.h;
-      let e = 0;
-      for (let y = b.origin.y; y < b.origin.y + h; y++) for (let x = b.origin.x; x < b.origin.x + w; x++) e = Math.max(e, m.elevAt(x, y));
-      const c = tileToScreen(b.origin.x + w / 2, b.origin.y + h / 2, e);
-      v.root.position.set(c.x, c.y);
-      this.depth.setDepth(v.root, isoDepth(b.origin.x + w / 2, b.origin.y + h / 2) + 0.5);
-      const progress = b.construction ? b.construction.progress : 1;
-      const ripe = b.type === 'farm' ? clamp(b.productionProgress, 0, 1) : 1;
-      const key = `${b.status}:${Math.round(progress * 24)}:${Math.round(ripe * 4)}:${e}`;
-      if (key !== v.key) {
-        v.key = key;
-        v.g.clear();
-        this.drawFoundation(v.g, m, b, e);
-        drawBuilding(v.g, b.type, w, h, b.status === 'construction', progress, ripe);
+      let hi = 0;
+      let lo = 99;
+      for (let y = b.origin.y; y < b.origin.y + h; y++) {
+        for (let x = b.origin.x; x < b.origin.x + w; x++) {
+          const e = m.elevAt(x, y);
+          if (e > hi) hi = e;
+          if (e < lo) lo = e;
+        }
       }
+      const c = tileToScreen(b.origin.x + w / 2, b.origin.y + h / 2, hi);
+      v.root.position.set(c.x, c.y);
+      v.setDrop((hi - lo) * 12);
+      this.depth.setDepth(v.root, buildingDepth(b.origin.x, b.origin.y, w, h));
+      v.update(b, state, timeSec, dt, fx, fill);
     }
     for (const [id, v] of this.buildings) {
       if (!v.seen) {
-        v.root.destroy({ children: true });
+        v.destroy();
         this.buildings.delete(id);
       }
     }
   }
 
-  /** When a building stands on uneven ground, draw a stone plinth down to the lowest tile. */
-  private drawFoundation(g: Graphics, m: TerrainModel, b: Building, top: number): void {
-    let low = top;
-    for (let y = b.origin.y; y < b.origin.y + b.footprint.h; y++) for (let x = b.origin.x; x < b.origin.x + b.footprint.w; x++) low = Math.min(low, m.elevAt(x, y));
-    if (low >= top) return;
-    const drop = (top - low) * 12;
-    const hu = b.footprint.w / 2;
-    const hv = b.footprint.h / 2;
-    const l = P(-hu, hv, 0);
-    const bt = P(hu, hv, 0);
-    const r = P(hu, -hv, 0);
-    g.poly([l.x, l.y, bt.x, bt.y, bt.x, bt.y + drop, l.x, l.y + drop]).fill(0x866c52).stroke({ width: 1, color: 0x4a443c, alpha: 0.5 });
-    g.poly([bt.x, bt.y, r.x, r.y, r.x, r.y + drop, bt.x, bt.y + drop]).fill(0x6a5340).stroke({ width: 1, color: 0x4a443c, alpha: 0.5 });
+  private buildingNear(state: Readonly<GameState>, x: number, y: number): BuildingView | null {
+    for (const b of state.buildings) {
+      if (b.status !== 'complete') continue;
+      if (x >= b.origin.x - 1.6 && x <= b.origin.x + b.footprint.w + 1.6 && y >= b.origin.y - 1.6 && y <= b.origin.y + b.footprint.h + 1.6) {
+        return this.buildings.get(b.id) ?? null;
+      }
+    }
+    return null;
   }
 
   // --- settlers --------------------------------------------------------------------------------
 
-  private makeSettler(s: Settler): SettlerView {
-    const root = new Container();
-    const shadow = new Sprite(this.tex.softShadow);
-    shadow.scale.set(0.62);
-    const body = new Container();
-    const legs = new Sprite(this.tex.settler.legs);
-    legs.y = 0;
-    const torso = new Sprite(this.tex.settler.torso);
-    torso.tint = SHIRT[s.appearance.shirt % SHIRT.length] ?? 0xffffff;
-    torso.y = -5.5;
-    const head = new Sprite(this.tex.settler.head);
-    head.tint = SKIN[s.appearance.skin % SKIN.length] ?? 0xf0c8a8;
-    head.y = -12.5;
-    const hair = new Sprite(this.tex.settler.hair);
-    hair.tint = HAIR[s.appearance.hair % HAIR.length] ?? 0x4a3022;
-    hair.y = -12.5;
-    body.addChild(legs, torso, head, hair);
-    const ring = new Sprite(this.tex.selectionRing);
-    ring.visible = false;
-    root.addChild(ring, shadow, body);
-    this.depth.place(root);
-    return { id: s.id, root, body, ring, phase: (s.id * 1.7) % 6.28, x: s.pos.x, y: s.pos.y, seen: true };
-  }
-
-  private updateSettlers(state: Readonly<GameState>, alpha: number, timeSec: number): void {
+  private updateSettlers(state: Readonly<GameState>, alpha: number, timeSec: number, animTime: number): void {
+    const fx = this.effects;
+    if (!fx) return;
     for (const v of this.settlers.values()) v.seen = false;
     const selId = this.selection?.kind === 'settler' ? this.selection.id : -1;
     for (const s of state.settlers) {
       let v = this.settlers.get(s.id);
       if (!v) {
-        v = this.makeSettler(s);
+        v = new SettlerView(s, this.tex);
         this.settlers.set(s.id, v);
+        this.depth.place(v.root);
       }
       v.seen = true;
       const x = s.prevPos.x + (s.pos.x - s.prevPos.x) * alpha;
       const y = s.prevPos.y + (s.pos.y - s.prevPos.y) * alpha;
-      v.x = x;
-      v.y = y;
+      const moved = Math.hypot(x - v.x, y - v.y);
       const e = this.sampleElevation(x, y);
       const p = tileToScreen(x, y, e);
-      const moving = Math.hypot(s.pos.x - s.prevPos.x, s.pos.y - s.prevPos.y) > 1e-4;
-      const bob = moving ? Math.abs(Math.sin(timeSec * 11 + v.phase)) * 1.8 : Math.sin(timeSec * 1.6 + v.phase) * 0.35;
-      v.body.y = -bob;
       v.root.position.set(p.x, p.y);
-      // never sink behind the tile top we are standing on
-      this.depth.setDepth(v.root, Math.max(isoDepth(x, y), Math.floor(x) + Math.floor(y) + 0.6) + 0.02);
-      v.ring.visible = s.id === selId;
-      if (v.ring.visible) v.ring.scale.set(0.92 + 0.06 * Math.sin(timeSec * 4));
+      this.depth.setDepth(v.root, settlerDepth(x, y));
+
+      const kind = s.activity.kind;
+      let indoors = false;
+      if ((kind === 'sleeping' || kind === 'resting') && INDOOR_LABEL.test(s.activity.label)) {
+        const b = this.buildingNear(state, x, y);
+        if (b) {
+          indoors = true;
+          if (kind === 'sleeping' && timeSec > v.nextZ) {
+            v.nextZ = timeSec + 2.2;
+            fx.particles.zzz(b.root.position.x + 6, b.root.position.y - b.height * 0.7);
+          }
+        }
+      }
+      v.update(s, x, y, moved > 1 ? 0 : moved, animTime, this.zoom, indoors, this.hook, p.x, p.y, timeSec);
+      v.setSelected(s.id === selId, timeSec);
     }
     for (const [id, v] of this.settlers) {
       if (!v.seen) {
-        v.root.destroy({ children: true });
+        v.destroy();
         this.settlers.delete(id);
       }
     }
@@ -216,6 +238,7 @@ export class EntityLayer {
   hitSettler(wx: number, wy: number): SettlerHit | null {
     let best: SettlerHit | null = null;
     for (const v of this.settlers.values()) {
+      if (v.hidden) continue;
       const px = v.root.position.x;
       const py = v.root.position.y;
       const dx = wx - px;
@@ -230,8 +253,6 @@ export class EntityLayer {
 
   /** Front-most building whose silhouette contains the world-pixel point, or null. */
   hitBuilding(state: Readonly<GameState>, wx: number, wy: number): number | null {
-    const m = this.model();
-    if (!m) return null;
     let best: { id: number; depth: number } | null = null;
     for (const b of state.buildings) {
       const v = this.buildings.get(b.id);
@@ -239,7 +260,7 @@ export class EntityLayer {
       const def = BUILDING_DEFS[b.type];
       const hu = def.footprint.w / 2;
       const hv = def.footprint.h / 2;
-      const H = b.status === 'construction' ? 34 : buildingHeight(b.type);
+      const H = b.status === 'construction' ? 40 : buildingHeight(b.type);
       const lx = wx - v.root.position.x;
       const ly = wy - v.root.position.y;
       const poly = [P(-hu, hv, 0), P(hu, hv, 0), P(hu, -hv, 0), P(hu, -hv, H), P(-hu, -hv, H), P(-hu, hv, H)];
@@ -252,17 +273,4 @@ export class EntityLayer {
   }
 }
 
-function pointInConvex(poly: { x: number; y: number }[], x: number, y: number): boolean {
-  let sign = 0;
-  for (let i = 0; i < poly.length; i++) {
-    const a = poly[i]!;
-    const b = poly[(i + 1) % poly.length]!;
-    const cross = (b.x - a.x) * (y - a.y) - (b.y - a.y) * (x - a.x);
-    if (cross !== 0) {
-      const s = cross > 0 ? 1 : -1;
-      if (sign === 0) sign = s;
-      else if (s !== sign) return false;
-    }
-  }
-  return true;
-}
+export type { Container, Settler };

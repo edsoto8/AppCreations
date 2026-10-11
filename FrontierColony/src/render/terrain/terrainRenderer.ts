@@ -3,7 +3,7 @@
  * tiles changed (detected by diffing against `world.revision`), culls the rest and animates the water.
  */
 import type { WorldState } from '../../sim';
-import { MAX_ELEVATION } from '../../sim';
+import { MAX_ELEVATION, Terrain } from '../../sim';
 import { ELEVATION_STEP } from '../../shared/iso';
 import type { DepthLayer } from '../depthLayer';
 import type { Layers } from '../layers';
@@ -87,18 +87,36 @@ export class TerrainRenderer {
     const model = this.model;
     if (!model || model.revision === world.revision) return;
     const w = model.width;
-    model.sync(world, (i, structural) => {
+    model.sync(world, (i, structural, prevT, prevL) => {
       const x = i % w;
       const y = (i - x) / w;
       this.markDirty(x, y, structural);
+      this.noteFelled(model, x, y, i, prevT, prevL);
     });
+  }
+
+  /** Called when a forest tile loses trees (chopped) so the renderer can play a falling-tree animation. */
+  onTreeFelled: ((x: number, y: number, species: number, seed: number) => void) | null = null;
+
+  private noteFelled(model: TerrainModel, x: number, y: number, i: number, prevT: number, prevL: number): void {
+    if (!this.onTreeFelled || prevT !== Terrain.Forest || prevL <= 0) return;
+    const t = model.terrain[i]!;
+    const l = model.level[i]!;
+    if ((t === Terrain.Forest && l < prevL) || t === Terrain.Grass) this.onTreeFelled(x, y, model.species(x, y), x * 31 + y * 17);
   }
 
   /** Patch single tiles from `tileChanged` sim events (resource-only changes don't bump the revision). */
   syncTiles(world: Readonly<WorldState>, tiles: readonly { x: number; y: number }[]): void {
     const model = this.model;
     if (!model) return;
-    for (const t of tiles) model.syncTile(world, t.x, t.y, (i, structural) => this.markDirty(i % model.width, Math.floor(i / model.width), structural));
+    for (const t of tiles) {
+      model.syncTile(world, t.x, t.y, (i, structural, prevT, prevL) => {
+        const x = i % model.width;
+        const y = Math.floor(i / model.width);
+        this.markDirty(x, y, structural);
+        this.noteFelled(model, x, y, i, prevT, prevL);
+      });
+    }
   }
 
   private markDirty(x: number, y: number, structural: boolean): void {

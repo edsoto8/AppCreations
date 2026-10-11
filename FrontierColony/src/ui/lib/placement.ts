@@ -1,6 +1,7 @@
 /** Placement hint text for build mode. Pure so it can be tested without a game. */
 import {
   BUILDING_DEFS,
+  OBJECTIVES,
   TERRAIN_DEFS,
   canPlaceBuilding,
   type BuildingType,
@@ -58,14 +59,9 @@ export function placementRule(type: BuildingType): string {
   return text.charAt(0).toUpperCase() + text.slice(1) + '.';
 }
 
-/** Objective titles that unlock buildings (docs/GAME_DESIGN.md §11). */
-export const OBJECTIVE_UNLOCK_TEXT: Record<string, string> = {
-  foundations: 'Complete the objective "Lay the Foundations": finish 3 player-built buildings.',
-  timber: 'Complete the objective "Stone and Timber": finish a lumber camp and a mine.',
-};
-
 export function unlockText(type: BuildingType): string | null {
   const id = BUILDING_DEFS[type].unlockedBy;
   if (id === null) return null;
-  return OBJECTIVE_UNLOCK_TEXT[id] ?? `Unlocked by the objective "${id}".`;
+  const objective = OBJECTIVES.find((o) => o.id === id);
+  return objective ? `Complete the objective "${objective.title}": ${objective.description.replace(/\s*Unlocks[^.]*\./, '').trim()}` : `Unlocked by the objective "${id}".`;
 }

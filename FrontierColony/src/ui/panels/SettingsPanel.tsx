@@ -5,7 +5,7 @@ const SHORTCUTS: { keys: string[]; action: string }[] = [
   { keys: ['Space'], action: 'Pause or resume' },
   { keys: ['1', '2', '3'], action: 'Speed 1x, 2x, 4x' },
   { keys: ['Esc'], action: 'Close panel, cancel placement, or open the game menu' },
-  ...(['build', 'settlers', 'priorities', 'events', 'saveLoad', 'settings'] as PanelId[]).map((id) => ({
+  ...(['build', 'settlers', 'priorities', 'events', 'stats', 'saveLoad', 'settings'] as PanelId[]).map((id) => ({
     keys: [hotkeyFor(id) ?? ''],
     action: `${PANEL_DEFS[id].title} panel`,
   })),

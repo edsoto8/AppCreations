@@ -1,7 +1,6 @@
 /** Building status wording and demolish refunds (docs/GAME_DESIGN.md §15). Pure, so it is unit tested. */
-import { BUILDING_DEFS, RESOURCE_TYPES, type ResourceAmounts, type Season } from '../../sim';
+import { BUILDING_DEFS, DEMOLISH_REFUND, RESOURCE_TYPES, type ResourceAmounts, type Season } from '../../sim';
 import type { BuildingDetail } from '../../store';
-import { DEMOLISH_REFUND } from './balanceMirror';
 
 export interface BuildingStatusLine {
   text: string;

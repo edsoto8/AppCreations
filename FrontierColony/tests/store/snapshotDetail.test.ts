@@ -133,3 +133,25 @@ describe('computeNetRates', () => {
     expect(computeNetRates(state).wood).toBe(0);
   });
 });
+
+describe('reserved and available stock', () => {
+  it('reports what construction sites still need and subtracts it from the spendable stock', () => {
+    const state = newState();
+    const town = state.buildings.find((b) => b.type === 'townCenter')!;
+    let placed = false;
+    for (let r = 3; r < 12 && !placed; r++) {
+      for (let dx = -r; dx <= r && !placed; dx++) {
+        const x = town.origin.x + dx;
+        const y = town.origin.y + r;
+        if (canPlaceBuilding(state, 'house', x, y).ok) placed = applyCommand(state, { type: 'placeBuilding', buildingType: 'house', x, y }).ok;
+      }
+    }
+    expect(placed).toBe(true);
+    const snap = buildHudSnapshot(state);
+    for (const r of ['wood', 'stone', 'food', 'water', 'tools'] as const) {
+      expect(snap.available[r]).toBeCloseTo(snap.stock[r] - snap.reserved[r], 6);
+    }
+    expect(snap.reserved.wood + snap.reserved.stone).toBeGreaterThanOrEqual(0);
+    expect(snap.available.wood).toBeLessThanOrEqual(snap.stock.wood);
+  });
+});

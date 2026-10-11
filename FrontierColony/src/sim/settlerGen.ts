@@ -5,6 +5,7 @@
 import {
   FOUNDER_SPECIALTIES,
   FOUNDER_TRAIT_LIMITS,
+  MOODLETS,
   NEWCOMER_SPECIALTY_BONUS,
   NEWCOMER_START_NEEDS,
   SETTLER_START_NEEDS,
@@ -14,6 +15,7 @@ import {
   TRAIT_COUNT_WEIGHTS,
   TRAIT_EXCLUSIVE_PAIRS,
 } from './balance';
+import { addTimedMoodlet } from './stateOps';
 import { APPEARANCE_VARIANTS, NEED_MAX, SKILL_MAX } from './constants';
 import { SETTLER_FIRST_NAMES, SETTLER_LAST_NAMES } from './names';
 import { chance, nextInt, pick, shuffle } from './rng';
@@ -187,4 +189,26 @@ export function createFounders(state: GameState, rng: RngState, spawnTiles: read
     founders.push(settler);
   }
   return founders;
+}
+
+/**
+ * Add a newcomer at `pos`: rolls a settler with the newcomer needs and specialty bonus, records the name,
+ * counts the arrival and gives everyone the `newcomer` mood bonus. The caller logs and emits the event.
+ */
+export function addNewcomer(state: GameState, pos: Vec2): Settler {
+  const names = createNameRegistry(state.colony.usedNames);
+  const settler = createSettler(state, state.rng, pos, {
+    difficulty: state.meta.difficulty,
+    names,
+    specialty: null,
+    bannedTraits: new Set(),
+    newcomerDays: state.time.day - 1,
+  });
+  state.settlers.push(settler);
+  state.colony.usedNames.push(settler.name);
+  state.stats.arrivals++;
+  state.stats.peakPopulation = Math.max(state.stats.peakPopulation, state.settlers.length);
+  const mood = MOODLETS.newcomer as { value: number; hours: number; maxStacks: number };
+  for (const s of state.settlers) addTimedMoodlet(s, 'newcomer', mood.value, mood.hours, mood.maxStacks);
+  return settler;
 }

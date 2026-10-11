@@ -58,6 +58,9 @@ export type IconName =
   | 'crosshair'
   | 'hammer'
   | 'clock'
+  | 'cart'
+  | 'trophy'
+  | 'chart'
   | 'moodInspired'
   | 'moodContent'
   | 'moodUnhappy'
@@ -409,6 +412,26 @@ const GLYPHS: Record<IconName, ReactNode> = {
       <circle cx="15" cy="10" r="1.1" fill="#2a1d10" stroke="none" />
       <path d="M8 17c1.6-2.4 6.4-2.4 8 0" stroke="#2a1d10" />
       <path d="M7.2 7.6l3 1M16.8 7.6l-3 1" stroke="#2a1d10" />
+    </g>
+  ),
+  cart: (
+    <g {...stroke} strokeWidth={1.9}>
+      <path d="M3 5h3l2.2 10.4h9.4L20 8.4H7" />
+      <circle cx="9.6" cy="19" r="1.6" fill="currentColor" />
+      <circle cx="16.4" cy="19" r="1.6" fill="currentColor" />
+    </g>
+  ),
+  trophy: (
+    <g strokeLinecap="round" strokeLinejoin="round">
+      <path d="M7.4 4h9.2v5.2a4.6 4.6 0 0 1-9.2 0Z" fill="#f4c64e" stroke="#a8841a" strokeWidth="1.3" />
+      <path d="M7.4 6H4.4c0 3 1.4 4.6 3.4 4.8M16.6 6h3c0 3-1.4 4.6-3.4 4.8" fill="none" stroke="#a8841a" strokeWidth="1.5" />
+      <path d="M12 13.8V17M8.4 20.4h7.2M9.6 17h4.8l.6 3.4H9Z" fill="#d9a53a" stroke="#a8841a" strokeWidth="1.3" />
+    </g>
+  ),
+  chart: (
+    <g {...stroke} strokeWidth={1.9}>
+      <path d="M4 4v16h16" />
+      <path d="m7.6 15 3.4-4.6 3 2.8 4.4-6" />
     </g>
   ),
   lock: (

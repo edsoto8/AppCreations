@@ -488,6 +488,7 @@ function validate(value: unknown): import('./types').GameState {
     int(o.eventId, `pendingDecisions[${i}].eventId`, 1);
     oneOf(o.kind, EVENT_KINDS, `pendingDecisions[${i}].kind`);
     num(o.hoursLeft, `pendingDecisions[${i}].hoursLeft`, 0);
+    num(o.windowHours, `pendingDecisions[${i}].windowHours`, 0);
     const payload = obj(o.payload, `pendingDecisions[${i}].payload`);
     for (const k of Object.keys(payload)) {
       const p = payload[k];

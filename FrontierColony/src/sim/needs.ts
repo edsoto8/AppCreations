@@ -51,6 +51,12 @@ export interface TickContext {
   phase: DayPhase;
   coldSnap: boolean;
   wolves: boolean;
+  /** A drought is active (farms and wells slower, no rain). */
+  drought: boolean;
+  /** A bountiful harvest is active (farms faster). */
+  bountiful: boolean;
+  /** The harvest festival is on: everyone gathers at the town center. */
+  festival: boolean;
 }
 
 export function dayPhase(hour: number): DayPhase {
@@ -64,9 +70,15 @@ export function makeContext(state: GameState, events: SimEvent[], dt: number, ne
   const weatherKind = state.weather.current;
   let coldSnap = false;
   let wolves = false;
+  let drought = false;
+  let bountiful = false;
+  let festival = false;
   for (const e of state.activeEvents) {
     if (e.kind === 'coldSnap') coldSnap = true;
     else if (e.kind === 'wolves') wolves = true;
+    else if (e.kind === 'drought') drought = true;
+    else if (e.kind === 'bountifulHarvest') bountiful = true;
+    else if (e.kind === 'harvestFestival') festival = true;
   }
   return {
     state,
@@ -82,6 +94,9 @@ export function makeContext(state: GameState, events: SimEvent[], dt: number, ne
     phase: dayPhase(state.time.timeOfDay),
     coldSnap,
     wolves,
+    drought,
+    bountiful,
+    festival,
   };
 }
 

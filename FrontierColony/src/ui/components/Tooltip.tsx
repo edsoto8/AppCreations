@@ -109,7 +109,12 @@ export function Tooltip({ content, title, side = 'bottom', delay = 380, children
       if (!enabled) return;
       clearTimer();
       if (wait <= 0) setOpen(true);
-      else timer.current = window.setTimeout(() => setOpen(true), wait);
+      else {
+        timer.current = window.setTimeout(() => {
+          timer.current = null;
+          setOpen(true);
+        }, wait);
+      }
     },
     [enabled, clearTimer],
   );
@@ -147,8 +152,14 @@ export function Tooltip({ content, title, side = 'bottom', delay = 380, children
       ref={anchorRef}
       className={className ? `tt-anchor ${className}` : 'tt-anchor'}
       aria-describedby={open ? id : undefined}
-      onPointerEnter={(e) => {
-        if (e.pointerType !== 'touch') show(delay);
+      onPointerOver={(e) => {
+        // A tooltip nested inside this one owns the pointer while it is over the inner anchor.
+        const own = e.target instanceof Element && e.target.closest('.tt-anchor') === anchorRef.current;
+        if (!own) {
+          hide();
+          return;
+        }
+        if (e.pointerType !== 'touch' && !open && timer.current === null) show(delay);
       }}
       onPointerLeave={hide}
       onPointerDown={hide}

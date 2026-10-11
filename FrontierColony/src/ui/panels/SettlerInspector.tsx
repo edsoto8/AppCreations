@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { SKILL_MAX, SKILL_TYPES, TRAIT_DEFS } from '../../sim';
+import { SKILL_MAX, SKILL_TYPES, TOOL_DURABILITY_HOURS, TRAIT_DEFS } from '../../sim';
 import { useUiStore, type SettlerDetail } from '../../store';
 import { useGameController } from '../../game';
 import { Avatar } from '../components/Avatar';
@@ -7,7 +7,6 @@ import { Icon } from '../components/Icon';
 import { NeedBar } from '../components/NeedBar';
 import { Panel } from '../components/Panel';
 import { Tooltip } from '../components/Tooltip';
-import { TOOL_DURABILITY_HOURS, xpToNext } from '../lib/balanceMirror';
 import { RESOURCE_LABEL } from '../lib/tooltipText';
 import {
   MOOD_EFFECT,
@@ -20,6 +19,7 @@ import {
   formatSigned,
   moodBand,
   moodletLabel,
+  xpToNext,
 } from '../lib/settlerInfo';
 import { pluralize } from '../lib/format';
 import { useSelectedSettler } from '../lib/useSelectedDetail';

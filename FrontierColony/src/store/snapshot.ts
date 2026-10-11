@@ -9,6 +9,8 @@ import {
   RESOURCE_TYPES,
   emptyResources,
   getHousingCapacity,
+  getAvailableStock,
+  getOutstandingMaterials,
   getStorageCapacity,
   type Activity,
   type Appearance,
@@ -116,6 +118,10 @@ export interface HudSnapshot {
   stock: ResourceAmounts;
   /** Per-resource capacity. */
   storageCapacity: number;
+  /** Materials construction sites have reserved but not yet received. */
+  reserved: ResourceAmounts;
+  /** Stock minus `reserved`: what can still be spent on new orders (use this for affordability). */
+  available: ResourceAmounts;
   /** Net change per in-game day. */
   rates: ResourceAmounts;
   population: number;
@@ -267,6 +273,8 @@ export function buildHudSnapshot(state: Readonly<GameState>, selection: Selectio
     weather: { current: s.weather.current, intensity: s.weather.intensity },
     stock: { ...s.colony.stock },
     storageCapacity: getStorageCapacity(s),
+    reserved: getOutstandingMaterials(s),
+    available: getAvailableStock(s),
     rates: computeNetRates(s),
     population: s.settlers.length,
     housingCapacity: getHousingCapacity(s),

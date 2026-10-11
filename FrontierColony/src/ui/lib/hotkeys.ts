@@ -30,6 +30,7 @@ export const PANEL_HOTKEYS: Record<string, PanelId> = {
   t: 'settlers',
   p: 'priorities',
   j: 'events',
+  g: 'stats',
   f: 'saveLoad',
   o: 'settings',
 };

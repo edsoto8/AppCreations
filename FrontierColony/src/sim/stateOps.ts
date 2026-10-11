@@ -140,16 +140,22 @@ export function removeSettler(state: GameState, id: EntityId): Settler | null {
   return settler;
 }
 
+/** Abort every task that uses the building (as workplace, source, destination, drop-off or bed). Homes are kept. */
+export function releaseBuildingUsers(state: GameState, id: EntityId): void {
+  for (const s of state.settlers) {
+    if (s.workplaceId === id || taskReferencesBuilding(s.task, id)) abortSettlerTask(state, s);
+  }
+}
+
 /**
  * Remove a building and clear every reference to it: residents become homeless, workers lose
- * their workplace, and any task that points at it is aborted. Does not touch the stock.
+ * their workplace, any task that points at it is aborted, and events that target it end.
+ * Does not touch the stock.
  */
 export function clearBuildingReferences(state: GameState, id: EntityId): void {
-  for (const s of state.settlers) {
-    if (s.homeId === id) s.homeId = null;
-    const referenced = s.workplaceId === id || taskReferencesBuilding(s.task, id);
-    if (referenced) abortSettlerTask(state, s);
-  }
+  for (const s of state.settlers) if (s.homeId === id) s.homeId = null;
+  releaseBuildingUsers(state, id);
+  state.activeEvents = state.activeEvents.filter((e) => e.targetId !== id);
 }
 
 /** Mood events are queued as moodlets; this keeps the cap on stacking ones. */

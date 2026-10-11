@@ -135,3 +135,30 @@ describe('toasts', () => {
     expect(store.getState().toasts).toHaveLength(MAX_TOASTS);
   });
 });
+
+describe('main menu view and unread events', () => {
+  it('opens the main menu on the requested view', () => {
+    const store = createUiStore();
+    store.getState().showMainMenu('newGame');
+    expect(store.getState()).toMatchObject({ screen: 'mainMenu', menuView: 'newGame', paused: true });
+    store.getState().showMainMenu();
+    expect(store.getState().menuView).toBe('home');
+  });
+
+  it('tracks the newest seen log id, only moving forward unless forced', () => {
+    const store = createUiStore();
+    expect(store.getState().eventsSeenId).toBeNull();
+    store.getState().markEventsSeen(5);
+    store.getState().markEventsSeen(3);
+    expect(store.getState().eventsSeenId).toBe(5);
+    store.getState().markEventsSeen(2, true);
+    expect(store.getState().eventsSeenId).toBe(2);
+  });
+
+  it('forgets what was seen when a new game or load starts', () => {
+    const store = createUiStore();
+    store.getState().markEventsSeen(40);
+    store.getState().enterGame();
+    expect(store.getState().eventsSeenId).toBeNull();
+  });
+});

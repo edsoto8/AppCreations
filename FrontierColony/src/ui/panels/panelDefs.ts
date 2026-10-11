@@ -52,9 +52,9 @@ export const PANEL_DEFS: Record<PanelId, PanelDef> = {
     short: 'Priorities',
     icon: 'priorities',
     placement: 'right',
-    width: 380,
+    width: 430,
     blurb: 'Tell the colony which jobs matter most.',
-    comingIn: 'M5',
+    comingIn: null,
     inToolbar: true,
   },
   events: {
@@ -65,19 +65,19 @@ export const PANEL_DEFS: Record<PanelId, PanelDef> = {
     placement: 'right',
     width: 400,
     blurb: 'A running history of arrivals, weather, accidents and discoveries.',
-    comingIn: 'M5',
+    comingIn: null,
     inToolbar: true,
   },
   stats: {
     id: 'stats',
     title: 'Statistics',
     short: 'Stats',
-    icon: 'compass',
+    icon: 'chart',
     placement: 'right',
     width: 400,
     blurb: 'Charts of stock and population over time.',
-    comingIn: 'M5',
-    inToolbar: false,
+    comingIn: null,
+    inToolbar: true,
   },
   saveLoad: {
     id: 'saveLoad',
@@ -103,7 +103,7 @@ export const PANEL_DEFS: Record<PanelId, PanelDef> = {
   },
 };
 
-export const TOOLBAR_PANELS: PanelDef[] = (['build', 'settlers', 'priorities', 'events', 'saveLoad', 'settings'] as const).map(
+export const TOOLBAR_PANELS: PanelDef[] = (['build', 'settlers', 'priorities', 'events', 'stats', 'saveLoad', 'settings'] as const).map(
   (id) => PANEL_DEFS[id],
 );
 

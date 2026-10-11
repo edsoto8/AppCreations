@@ -10,7 +10,11 @@ import { useGameFlow } from './lib/useGameFlow';
 import { useHotkeys } from './lib/useHotkeys';
 import { GameMenu } from './menu/GameMenu';
 import { MainMenu } from './menu/MainMenu';
+import { DecisionHost } from './hud/DecisionHost';
 import { HoverCard } from './hud/HoverCard';
+import { ObjectivesTracker } from './hud/ObjectivesTracker';
+import { WarningsStrip } from './hud/WarningsStrip';
+import { GameOverOverlay } from './menu/GameOverOverlay';
 import { PlacementBar } from './hud/PlacementBar';
 import { BuildingInspector } from './panels/BuildingInspector';
 import { SettlerInspector } from './panels/SettlerInspector';
@@ -31,16 +35,20 @@ function GameUi() {
         <TopBar />
         <div className="hud-middle">
           <div className="hud-top-center">
+            <WarningsStrip />
             <PlacementBar />
             <PauseIndicator />
           </div>
           <PauseFrame />
           <PanelHost />
           <InspectorHost />
+          <ObjectivesTracker />
+          <DecisionHost />
         </div>
         <Toolbar />
       </div>
       <HoverCard />
+      <GameOverOverlay />
       <GameMenu />
     </>
   );

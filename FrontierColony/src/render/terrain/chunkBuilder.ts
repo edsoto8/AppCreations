@@ -242,6 +242,20 @@ export function buildChunk(chunk: Chunk, model: TerrainModel, tex: TextureSet, d
         const set = tex.cliffs[water ? 'soil' : mat];
         const shade = f.right ? 0xb9b4b2 : 0xffffff;
         const waterSide = water ? (f.right ? 0x4a7aa0 : 0x6a9cbf) : shade;
+        if (levels === 1 && !oob && !water && (t === Terrain.Grass || t === Terrain.Forest || t === Terrain.Sand)) {
+          const arr = t === Terrain.Sand ? tex.bankSand : tex.bankGrass;
+          const s = new Sprite(arr[(h + (f.right ? 3 : 0)) % arr.length]!);
+          s.position.set(top.x, top.y);
+          if (f.right) {
+            s.scale.x = -1;
+            s.tint = 0xd2d2d2;
+          }
+          if (raised) {
+            s.zIndex = d + 0.49;
+            sorted.push(s);
+          } else groundUnder.push(s);
+          continue;
+        }
         for (let k = 0; k < levels; k++) {
           const lip = k === 0 && t !== Terrain.Mountain && !water;
           const arr = lip ? set.lip : set.mid;

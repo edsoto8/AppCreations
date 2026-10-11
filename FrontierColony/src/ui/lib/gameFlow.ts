@@ -6,7 +6,7 @@ import type { StoreApi } from 'zustand/vanilla';
 import type { NewGameOptions } from '../../sim';
 import type { GameControllerApi } from '../../game/types';
 import type { LoadResult, SaveSlotId } from '../../game/save';
-import type { UiStore } from '../../store';
+import type { MenuView, UiStore } from '../../store';
 
 export type FlowController = Pick<GameControllerApi, 'newGame' | 'loadGame' | 'saveGame' | 'getState' | 'setSpeed' | 'listSaves' | 'deleteSave'>;
 
@@ -17,7 +17,7 @@ export interface GameFlow {
   /** Return from the main menu to the game that is still running behind it. */
   resume(): void;
   /** Autosave, then show the main menu (the game stays resumable). */
-  toMainMenu(): void;
+  toMainMenu(view?: MenuView): void;
 }
 
 export function createGameFlow(controller: FlowController, store: StoreApi<UiStore>): GameFlow {
@@ -35,10 +35,10 @@ export function createGameFlow(controller: FlowController, store: StoreApi<UiSto
     resume() {
       store.getState().resumeGame();
     },
-    toMainMenu() {
+    toMainMenu(view = 'home') {
       const ui = store.getState();
       if (ui.gameStarted && controller.getState().outcome.status !== 'lost') controller.saveGame('autosave');
-      ui.showMainMenu();
+      ui.showMainMenu(view);
     },
   };
 }

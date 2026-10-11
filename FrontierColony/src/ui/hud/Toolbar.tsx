@@ -1,5 +1,7 @@
 import { useShallow } from 'zustand/react/shallow';
-import { useUiStore } from '../../store';
+import { useEffect } from 'react';
+import { uiStore, useUiStore } from '../../store';
+import { unreadCount } from '../lib/logView';
 import { Icon } from '../components/Icon';
 import { Tooltip } from '../components/Tooltip';
 import { TOOLBAR_PANELS, hotkeyFor } from '../panels/panelDefs';
@@ -7,6 +9,13 @@ import { TOOLBAR_PANELS, hotkeyFor } from '../panels/panelDefs';
 /** Bottom dock with one button per panel, plus the game menu. */
 export function Toolbar() {
   const { openPanel, buildMode } = useUiStore(useShallow((s) => ({ openPanel: s.openPanel, buildMode: s.buildMode })));
+  const unread = useUiStore((s) => (s.snapshot ? unreadCount(s.snapshot.recentLog, s.eventsSeenId) : 0));
+  const needsBaseline = useUiStore((s) => s.eventsSeenId === null && s.snapshot !== null);
+  const newestId = useUiStore((s) => (s.snapshot && s.snapshot.recentLog.length > 0 ? s.snapshot.recentLog[s.snapshot.recentLog.length - 1]!.id : 0));
+  // After a new game or load, everything already in the log counts as seen.
+  useEffect(() => {
+    if (needsBaseline) uiStore.getState().markEventsSeen(newestId, true);
+  }, [needsBaseline, newestId]);
   const togglePanel = useUiStore((s) => s.togglePanel);
   const openGameMenu = useUiStore((s) => s.openGameMenu);
 
@@ -41,6 +50,11 @@ export function Toolbar() {
               <Icon name={def.icon} size={22} />
               <span className="tool-btn__label">{def.short}</span>
               {key && <span className="tool-btn__key">{key}</span>}
+              {def.id === 'events' && unread > 0 && !active && (
+                <span className="tool-btn__badge" data-testid="events-unread" aria-label={`${unread} unread events`}>
+                  {unread > 9 ? '9+' : unread}
+                </span>
+              )}
             </button>
           </Tooltip>
         );

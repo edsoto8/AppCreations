@@ -172,7 +172,7 @@ describe('validateGameState', () => {
       ['construction without status', (s) => void (s.buildings[0]!.construction = { kind: 'new', progress: 0, workDone: 0, required: s.colony.stock, delivered: s.colony.stock })],
       ['too many residents', (s) => void s.settlers.forEach((x) => void (x.homeId = s.buildings[0]!.id))],
       ['active event with a missing target', (s) => void s.activeEvents.push({ id: 1, kind: 'cropBlight', startedTick: 0, hoursRemaining: 5, magnitude: 0.5, targetId: 31337, tile: null })],
-      ['pending decision with a weird payload', (s) => void s.pendingDecisions.push({ eventId: 1, kind: 'traderVisit', payload: { a: {} as never }, hoursLeft: 2 })],
+      ['pending decision with a weird payload', (s) => void s.pendingDecisions.push({ eventId: 1, kind: 'traderVisit', payload: { a: {} } as never, hoursLeft: 2, windowHours: 12 } as never)],
     ];
     for (const [name, mutate] of cases) {
       const state = clone();

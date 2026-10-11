@@ -27,6 +27,7 @@ interface ChipData {
   rate: number;
   population: number;
   toolsInUse: number;
+  reserved: number;
 }
 
 /** One resource: icon, amount / capacity, per-day net rate and a fill bar. Re-renders only when the shown values change. */
@@ -43,6 +44,7 @@ export const ResourceChip = memo(function ResourceChip({ resource }: { resource:
         rate: quantizeRate(snap.rates[resource]),
         population: snap.population,
         toolsInUse,
+        reserved: Math.ceil(snap.reserved?.[resource] ?? 0),
       };
     }),
   );
@@ -63,6 +65,12 @@ export const ResourceChip = memo(function ResourceChip({ resource }: { resource:
         <dd>
           {data.amount} / {data.cap}
         </dd>
+        {data.reserved > 0 && (
+          <>
+            <dt>Reserved</dt>
+            <dd>{data.reserved} for construction</dd>
+          </>
+        )}
         <dt>Net per day</dt>
         <dd className={`rate rate--${rate.trend}`}>{rate.text}</dd>
         {days !== null && (
