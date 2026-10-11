@@ -104,3 +104,7 @@ been run. A milestone is marked done only after its acceptance criteria were ver
   the Game Designer's `docs/balance/M6-tuning.md`.
 - Lead: `SAVE_SCHEMA_VERSION` 1 → 2 with a v1→v2 migration in `src/game/save.ts` (+ test). Checkpoint 78c1e81:
   typecheck clean, 426 unit tests pass + 3 expected-fail (QA pace-bound soaks pending the retune), build ok.
+- QA round 2: strict invariants + resource ledger (8 tests), pace-bound soak (5 pass, 3 `it.fails` pending
+  retune), CRIT-1/MAJ-1 regressions (4 pass), e2e specs for M5 features and cancel/demolish, sturdier speed and
+  save/load specs. QA twice ended its turn before running the full e2e suite (it backgrounds long runs); the
+  lead will run the e2e suite after the M6 wave instead. Rain collection lacks a `resourceProduced` event (minor).
