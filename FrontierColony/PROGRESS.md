@@ -72,3 +72,8 @@ been run. A milestone is marked done only after its acceptance criteria were ver
   Balance (normal, sensible script): all builds 0.2–0.6 days; 16/16 preset×seed runs kept 5 settlers alive 16
   days; neglect (no farm) first death day 9.8 vs design day 9–10. 0.113 ms/tick for 30 settlers.
   Usage this round: 117k tokens, 38 tool calls, 17.3 min. Continued into sim M5.
+- QA Engineer (haiku, `claude-haiku-5-5`) added 15 Vitest regression tests (`tests/qa/`: 12-way soak with NaN
+  walker, save/load equivalence, junk commands; all pass) and 14 Playwright specs in `e2e/` with a console-error
+  fixture. e2e run was 0/15 because of a mid-edit renderer crash (settler textures undefined in the Graphics
+  Engineer's uncommitted work), not a committed defect; to be re-run after the graphics wave. Usage: 200k
+  tokens, 65 tool calls, 16.8 min.
