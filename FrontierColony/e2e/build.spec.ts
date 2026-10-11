@@ -1,5 +1,5 @@
 import { expect, test } from './fixtures';
-import { gotoQuickstart, readGame, tileScreenPoint } from './helpers';
+import { gotoQuickstart, openBuildingInspectorByClick, readGame, tileScreenPoint } from './helpers';
 
 test('build panel: pick a house, click a valid tile, get a construction site, open its inspector', async ({ page }) => {
   await gotoQuickstart(page, { seed: 'qa-build' });
@@ -57,10 +57,8 @@ test('build panel: pick a house, click a valid tile, get a construction site, op
   await expect(page.getByTestId('placement-bar')).toBeHidden();
 
   // The site can be inspected by clicking it on the map.
-  const hit = tileScreenPoint(canvasBox, game, site.origin.x, site.origin.y);
-  await page.mouse.click(hit.x, hit.y);
-  await expect(page.getByTestId('building-inspector')).toBeVisible();
-  await expect(page.getByTestId('inspector-name')).toHaveText('House');
+  // Click the footprint tiles until the House inspector opens (a neighbour's sprite can take the click).
+  await openBuildingInspectorByClick(page, site.id, 'House');
   await expect(page.getByTestId('building-status')).toBeVisible();
 });
 
