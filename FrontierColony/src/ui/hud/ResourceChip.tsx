@@ -5,6 +5,7 @@ import { useUiStore } from '../../store';
 import { Icon } from '../components/Icon';
 import { Tooltip } from '../components/Tooltip';
 import {
+  consumptionPerDay,
   daysOfSupply,
   formatAmount,
   formatDays,
@@ -14,6 +15,7 @@ import {
   type StockLevel,
 } from '../lib/format';
 import { RESOURCE_LABEL, RESOURCE_TOOLTIP } from '../lib/tooltipText';
+import { useRolledNumber } from '../lib/useRolledNumber';
 
 /** Drop the leading "Wood: " (the tooltip title already says it) and capitalise what is left. */
 function describe(text: string): string {
@@ -48,14 +50,15 @@ export const ResourceChip = memo(function ResourceChip({ resource }: { resource:
       };
     }),
   );
+  const rolled = useRolledNumber(data?.amount ?? 0);
   if (!data) return null;
 
   const rate = formatRate(data.rate);
   const consumable = resource === 'food' || resource === 'water';
-  const level: StockLevel = consumable ? stockLevel(data.amount, data.population) : 'ok';
+  const level: StockLevel = consumable ? stockLevel(data.amount, data.population, consumptionPerDay(resource as 'food' | 'water')) : 'ok';
   const full = data.cap > 0 && data.amount >= data.cap * 0.95;
   const fill = data.cap > 0 ? Math.min(1, data.amount / data.cap) : 0;
-  const days = consumable ? daysOfSupply(data.amount, data.population) : null;
+  const days = consumable ? daysOfSupply(data.amount, data.population, consumptionPerDay(resource as 'food' | 'water')) : null;
 
   const tooltip = (
     <>
@@ -104,7 +107,7 @@ export const ResourceChip = memo(function ResourceChip({ resource }: { resource:
         <Icon name={resource} className="chip__icon" />
         <div className="chip__text">
           <div className="chip__main">
-            <span className="chip__amount">{formatAmount(data.amount)}</span>
+            <span className="chip__amount">{formatAmount(rolled)}</span>
             <span className="chip__cap">/{data.cap}</span>
           </div>
           <div className={`chip__rate rate rate--${rate.trend}`}>

@@ -8,6 +8,7 @@ import {
   DAY_PHASES,
   DIFFICULTY,
   ENERGY_DECAY,
+  EVENTS,
   HAPPINESS,
   HEALTH,
   HUNGER_DECAY,
@@ -24,6 +25,7 @@ import {
   SLEEP_RESTORE,
   CARRYING_WALK_MULT,
   TOOLS,
+  TRAIT_EFFECTS,
   WEATHER_EFFECTS,
   type DifficultyDef,
   type MoodBandDef,
@@ -139,9 +141,9 @@ export function lightMult(ctx: TickContext, s: Settler): number {
 export function workSpeedMult(ctx: TickContext, s: Settler, category: JobCategory, skill: SkillType): number {
   let m = skillMult(s.skills[skill]);
   if (s.toolDurability !== null && TOOLS.usedBy.includes(category)) m *= TOOLS.productivityMult;
-  if (hasTrait(s, 'hardworking')) m *= 1.15;
-  else if (hasTrait(s, 'lazy')) m *= 0.85;
-  if (hasTrait(s, 'clumsy') && (skill === 'construction' || skill === 'crafting')) m *= 0.85;
+  if (hasTrait(s, 'hardworking')) m *= TRAIT_EFFECTS.hardworking.workSpeed;
+  else if (hasTrait(s, 'lazy')) m *= TRAIT_EFFECTS.lazy.workSpeed;
+  if (hasTrait(s, 'clumsy') && (skill === 'construction' || skill === 'crafting')) m *= TRAIT_EFFECTS.clumsy.constructionSpeed;
   m *= moodBand(s.needs.happiness).workMult;
   if (s.status.sickHoursLeft > 0) m *= HEALTH.sickWorkMult;
   else if (s.needs.health < HEALTH.hurtBelow) m *= HEALTH.hurtWorkMult;
@@ -152,8 +154,8 @@ export function workSpeedMult(ctx: TickContext, s: Settler, category: JobCategor
 /** Tiles walked per tick on terrain with move cost 1 (all modifiers except terrain). */
 export function walkSpeedPerTick(ctx: TickContext, s: Settler): number {
   let v = SETTLER_WALK_SPEED * TICK_SECONDS;
-  if (hasTrait(s, 'nimble')) v *= 1.2;
-  else if (hasTrait(s, 'clumsy')) v *= 0.9;
+  if (hasTrait(s, 'nimble')) v *= TRAIT_EFFECTS.nimble.walkSpeed;
+  else if (hasTrait(s, 'clumsy')) v *= TRAIT_EFFECTS.clumsy.walkSpeed;
   if (s.carrying) v *= CARRYING_WALK_MULT;
   if (ctx.phase === 'night') v *= NIGHT_WALK_MULT;
   return v * ctx.weather.walk;
@@ -170,8 +172,8 @@ export function isSleepTask(kind: Settler['task']['kind']): boolean {
 
 function damageMult(ctx: TickContext, s: Settler): number {
   let m = ctx.diff.healthDamageMult;
-  if (hasTrait(s, 'tough')) m *= 0.7;
-  else if (hasTrait(s, 'frail')) m *= 1.3;
+  if (hasTrait(s, 'tough')) m *= TRAIT_EFFECTS.tough.healthDamage;
+  else if (hasTrait(s, 'frail')) m *= TRAIT_EFFECTS.frail.healthDamage;
   return m;
 }
 
@@ -184,9 +186,9 @@ function addDamage(ctx: TickContext, s: Settler, cause: string, perHour: number)
 /** Sum of the moodlet values plus the trait baseline: the happiness the settler drifts toward. */
 export function happinessTarget(s: Settler): number {
   let t: number = HAPPINESS.baseTarget;
-  if (hasTrait(s, 'cheerful')) t += 8;
-  else if (hasTrait(s, 'gloomy')) t -= 8;
-  if (hasTrait(s, 'loner')) t += 4;
+  if (hasTrait(s, 'cheerful')) t += TRAIT_EFFECTS.cheerful.happinessBaseline;
+  else if (hasTrait(s, 'gloomy')) t += TRAIT_EFFECTS.gloomy.happinessBaseline;
+  if (hasTrait(s, 'loner')) t += TRAIT_EFFECTS.loner.happinessBaseline;
   for (let i = 0; i < s.moodlets.length; i++) t += (s.moodlets[i] as Settler['moodlets'][number]).value;
   return t < 0 ? 0 : t > 100 ? 100 : t;
 }
@@ -201,8 +203,8 @@ export function updateNeeds(ctx: TickContext, s: Settler, asleep: boolean, inBed
 
   // Hunger: always, including asleep.
   let hungerRate = HUNGER_DECAY * ctx.diff.needDecayMult;
-  if (hasTrait(s, 'glutton')) hungerRate *= 1.25;
-  else if (hasTrait(s, 'frugal')) hungerRate *= 0.85;
+  if (hasTrait(s, 'glutton')) hungerRate *= TRAIT_EFFECTS.glutton.hungerDecay;
+  else if (hasTrait(s, 'frugal')) hungerRate *= TRAIT_EFFECTS.frugal.hungerDecay;
   n.hunger -= hungerRate * dt;
   if (n.hunger < 0) n.hunger = 0;
 
@@ -213,9 +215,9 @@ export function updateNeeds(ctx: TickContext, s: Settler, asleep: boolean, inBed
   } else {
     let rate = isWorkTask(s.task.kind) ? ENERGY_DECAY.working : ENERGY_DECAY.awakeOther;
     rate *= SEASON_ENERGY_DECAY_MULT[ctx.season] * ctx.weather.energyDecay * ctx.diff.needDecayMult;
-    if (ctx.coldSnap) rate *= 1.3;
-    if (hasTrait(s, 'hardworking')) rate *= 1.1;
-    else if (hasTrait(s, 'lazy')) rate *= 0.9;
+    if (ctx.coldSnap) rate *= EVENTS.coldSnap.energyDecayMult;
+    if (hasTrait(s, 'hardworking')) rate *= TRAIT_EFFECTS.hardworking.energyDecay;
+    else if (hasTrait(s, 'lazy')) rate *= TRAIT_EFFECTS.lazy.energyDecay;
     n.energy -= rate * dt;
     if (n.energy < 0) n.energy = 0;
   }
@@ -236,7 +238,7 @@ export function updateNeeds(ctx: TickContext, s: Settler, asleep: boolean, inBed
     status.sickHoursLeft <= 0
   ) {
     let regen = asleep && inBed ? HEALTH.regenInBed : HEALTH.regen;
-    if (hasTrait(s, 'frail')) regen *= 0.75;
+    if (hasTrait(s, 'frail')) regen *= TRAIT_EFFECTS.frail.healthRegen;
     n.health += regen * dt;
   }
   if (n.health > NEED_MAX) n.health = NEED_MAX;

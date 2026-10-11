@@ -170,27 +170,32 @@ describe('job priorities', () => {
 });
 
 describe('decision text', () => {
-  it('reads trader offers in either payload shape', () => {
-    expect(readSide({ giveResource: 'wood', giveAmount: 30 }, 'give')).toEqual([{ resource: 'wood', amount: 30 }]);
+  const base = { eventId: 1, hoursLeft: 9, windowHours: 12 } as const;
+
+  it('reads the goods of a typed trader payload', () => {
+    expect(readSide({ giveWood: 30, getFood: 25 }, 'give')).toEqual([{ resource: 'wood', amount: 30 }]);
     expect(readSide({ giveWood: 30, giveStone: 10, getTools: 4 }, 'give')).toEqual([
       { resource: 'wood', amount: 30 },
       { resource: 'stone', amount: 10 },
     ]);
-    expect(readSide({ get_food: 25 }, 'get')).toEqual([{ resource: 'food', amount: 25 }]);
-    expect(readSide({ unrelated: 1 }, 'give')).toBeNull();
+    expect(readSide({ giveWood: 30, getFood: 25 }, 'get')).toEqual([{ resource: 'food', amount: 25 }]);
+    expect(readSide({}, 'give')).toEqual([]);
   });
 
-  it('describes decisions and falls back gracefully for unknown payloads', () => {
-    const t = describeDecision('traderVisit', { giveWood: 30, getFood: 25 }, null);
-    expect(t).toMatchObject({ title: 'Traveling Trader', acceptLabel: 'Trade' });
-    expect(t.body).toBe('A traveling trader pulls up at the town center: 30 wood for 25 food?');
-    expect(t.acceptNote).toBe('Swap 30 wood for 25 food right away.');
-    expect(describeDecision('traderVisit', {}, 'Custom message').body).toBe('Custom message');
-    expect(describeDecision('traderVisit', { weird: true }, null).body).toBe('A traveling trader offers a swap of goods.');
-    expect(describeDecision('wanderer', { count: 2 }, null).body).toMatch(/^2 wanderers ask to join/);
-    expect(describeDecision('wanderer', { count: 1 }, null).body).toMatch(/^A wanderer ask/);
-    expect(describeDecision('harvestFestival', { foodCost: 12 }, null).acceptNote).toMatch(/Costs 12 food/);
-    expect(describeDecision('somethingNew', {}, null)).toMatchObject({ title: 'Something New', acceptLabel: 'Accept' });
+  it('describes each decision kind from its payload', () => {
+    const trade = describeDecision({ ...base, kind: 'traderVisit', payload: { giveWood: 30, getFood: 25 } }, null);
+    expect(trade).toMatchObject({ title: 'Traveling Trader', acceptLabel: 'Trade' });
+    expect(trade.body).toBe('A traveling trader pulls up at the town center: 30 wood for 25 food?');
+    expect(trade.acceptNote).toBe('Swap 30 wood for 25 food right away.');
+    expect(describeDecision({ ...base, kind: 'traderVisit', payload: { giveWood: 30, getFood: 25 } }, 'Custom message').body).toBe('Custom message');
+
+    const two = describeDecision({ ...base, kind: 'wanderer', payload: { count: 2, freeBeds: 1 } }, null);
+    expect(two.body).toBe('2 wanderers ask to join. There is 1 free bed, not enough for everyone. Anyone without a bed sleeps outdoors.');
+    expect(describeDecision({ ...base, kind: 'wanderer', payload: { count: 1, freeBeds: 0 } }, null).body).toMatch(/^A wanderer asks to join\. There are no free beds/);
+
+    const fest = describeDecision({ ...base, kind: 'harvestFestival', payload: { foodCost: 12 } }, null);
+    expect(fest.acceptNote).toMatch(/Costs 12 food/);
+    expect(fest.body).toContain('costs 12 food');
   });
 
   it('formats countdowns', () => {

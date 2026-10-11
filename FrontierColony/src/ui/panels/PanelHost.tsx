@@ -1,4 +1,5 @@
-import { useUiStore } from '../../store';
+import { useEffect, useState } from 'react';
+import { useUiStore, type PanelId } from '../../store';
 import { Panel } from '../components/Panel';
 import { BuildPanel } from './BuildPanel';
 import { EventsPanel } from './EventsPanel';
@@ -7,14 +8,38 @@ import { StatsPanel } from './StatsPanel';
 import { SettlersPanel } from './SettlersPanel';
 import { PlaceholderPanel } from './PlaceholderPanel';
 import { SaveLoadView } from './SaveLoadView';
+import { HowToPlay } from './HowToPlay';
 import { SettingsPanel } from './SettingsPanel';
 import { PANEL_DEFS } from './panelDefs';
 
 /** Renders whichever panel the store says is open. Replace a placeholder here when its milestone lands. */
+/** Keeps the last panel mounted for `ms` after it closes, so it can animate out. */
+function useClosing(open: PanelId | null, ms = 150): { shown: PanelId | null; closing: boolean } {
+  const [shown, setShown] = useState<PanelId | null>(open);
+  const [closing, setClosing] = useState(false);
+  useEffect(() => {
+    if (open) {
+      setShown(open);
+      setClosing(false);
+      return;
+    }
+    if (!shown) return;
+    setClosing(true);
+    const t = window.setTimeout(() => {
+      setShown(null);
+      setClosing(false);
+    }, ms);
+    return () => window.clearTimeout(t);
+    // `shown` is only read to know whether there is anything to close.
+  }, [open, ms]);
+  return { shown: open ?? shown, closing: open === null && closing };
+}
+
 export function PanelHost() {
-  const openPanel = useUiStore((s) => s.openPanel);
+  const current = useUiStore((s) => s.openPanel);
   const setOpenPanel = useUiStore((s) => s.setOpenPanel);
   const gameMenuOpen = useUiStore((s) => s.gameMenuOpen);
+  const { shown: openPanel, closing } = useClosing(current);
   if (!openPanel || gameMenuOpen) return null;
   const def = PANEL_DEFS[openPanel];
   const close = () => setOpenPanel(null);
@@ -42,13 +67,16 @@ export function PanelHost() {
     case 'stats':
       body = <StatsPanel />;
       break;
+    case 'help':
+      body = <HowToPlay />;
+      break;
     default:
       // Every panel now has a real body; PlaceholderPanel stays available for future panels.
       body = <PlaceholderPanel icon={def.icon} heading={def.title} blurb={def.blurb} comingIn={def.comingIn ?? 'a later milestone'} />;
   }
 
   return (
-    <Panel key={openPanel} title={def.title} icon={def.icon} placement={def.placement} width={def.width} onClose={close} testId={`panel-${openPanel}`}>
+    <Panel key={openPanel} title={def.title} icon={def.icon} placement={def.placement} width={def.width} onClose={close} closing={closing} testId={`panel-${openPanel}`}>
       {body}
     </Panel>
   );

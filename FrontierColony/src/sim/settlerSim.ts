@@ -31,6 +31,7 @@ import {
   WELL_NEAR_WATER,
   SLEEP_WAKE,
   TOOLS,
+  TRAIT_EFFECTS,
   XP_TO_NEXT_LEVEL_PER_LEVEL,
 } from './balance';
 import { NEED_MAX, SKILL_MAX } from './constants';
@@ -60,11 +61,13 @@ import {
   recordConsumed,
   recordProduced,
   removeSettler,
+  reportLoss,
 } from './stateOps';
 import {
   RESOURCE_TYPES,
   Terrain,
   type ActivityKind,
+  type ResourceAmounts,
   type ResourceType,
   type Building,
   type GameState,
@@ -100,11 +103,12 @@ export function buildingLabel(b: Building): string {
   return b.type === 'house' ? `${name} #${b.id}` : name;
 }
 
-function setActivity(s: Settler, kind: ActivityKind, label: string, progress: number | null, target: TilePos | null): void {
+function setActivity(s: Settler, kind: ActivityKind, label: string, progress: number | null, target: TilePos | null, indoors: number | null = null): void {
   const a = s.activity;
   a.kind = kind;
   a.label = label;
   a.progress = progress;
+  a.indoorsBuildingId = indoors;
   if (target === null) a.targetTile = null;
   else if (a.targetTile === null || a.targetTile.x !== target.x || a.targetTile.y !== target.y) {
     a.targetTile = { x: target.x, y: target.y };
@@ -169,17 +173,34 @@ function bedOf(state: GameState, s: Settler): Building | null {
   return b !== null && b.status === 'complete' && BUILDING_DEFS[b.type].housing > 0 ? b : null;
 }
 
+/** Walk region of the tiles around the town center (the first free tile of its ring), or -1. */
+function townRegion(state: GameState, town: Building): number {
+  const world = state.world;
+  const { labels } = getWalkRegions(world);
+  for (let y = town.origin.y - 1; y <= town.origin.y + town.footprint.h; y++) {
+    for (let x = town.origin.x - 1; x <= town.origin.x + town.footprint.w; x++) {
+      const inside = x >= town.origin.x && x < town.origin.x + town.footprint.w && y >= town.origin.y && y < town.origin.y + town.footprint.h;
+      if (!inside && x >= 0 && y >= 0 && x < world.width && y < world.height && isPassable(world, y * world.width + x)) {
+        return labels[y * world.width + x] as number;
+      }
+    }
+  }
+  return -1;
+}
+
 /** A free walkable tile within a few tiles of the town center, one per settler id (the campfire bedroll). */
-function campfireSpot(state: GameState, s: Settler): TilePos | null {
+export function campfireSpot(state: GameState, s: Settler): TilePos | null {
   const town = state.buildings.find((b) => b.type === 'townCenter');
   if (!town) return null;
   const world = state.world;
   const r = OUTDOOR_SLEEP_RADIUS_FROM_TOWN_CENTER;
+  const { labels } = getWalkRegions(world);
+  const home = townRegion(state, town);
   const spots: TilePos[] = [];
   for (let y = town.origin.y - r; y < town.origin.y + town.footprint.h + r; y++) {
     for (let x = town.origin.x - r; x < town.origin.x + town.footprint.w + r; x++) {
       if (x < 0 || y < 0 || x >= world.width || y >= world.height) continue;
-      if (isPassable(world, y * world.width + x)) spots.push({ x, y });
+      if (isPassable(world, y * world.width + x) && labels[y * world.width + x] === home) spots.push({ x, y });
     }
   }
   return spots.length === 0 ? null : (spots[s.id % spots.length] as TilePos);
@@ -361,7 +382,7 @@ function priorityOf(state: GameState, category: JobCategory): number {
   return state.colony.priorities[category];
 }
 
-function shortageBonus(state: GameState, kind: 'food' | 'water' | 'wood' | 'stone'): number {
+export function shortageBonus(state: GameState, kind: 'food' | 'water' | 'wood' | 'stone', avail?: ResourceAmounts): number {
   const stock = state.colony.stock;
   const pop = Math.max(1, state.settlers.length);
   const sh = AI.shortage;
@@ -373,9 +394,10 @@ function shortageBonus(state: GameState, kind: 'food' | 'water' | 'wood' | 'ston
     case 'water':
       return sh.water.max * clamp01(1 - stock.water / (pop * 2) / sh.water.targetDays);
     case 'wood':
-      return sh.wood.max * clamp01(1 - stock.wood / sh.wood.target);
+      // Wood and stone count what is not already promised to construction sites (GAME_DESIGN §5.3).
+      return sh.wood.max * clamp01(1 - (avail ?? getAvailableStock(state)).wood / sh.wood.target);
     case 'stone':
-      return sh.stone.max * clamp01(1 - stock.stone / sh.stone.target);
+      return sh.stone.max * clamp01(1 - (avail ?? getAvailableStock(state)).stone / sh.stone.target);
   }
 }
 
@@ -403,6 +425,23 @@ const isDrinkingPoint = (b: Building): boolean => BUILDING_DEFS[b.type].drinking
 
 function buildingGoal(b: Building): PathGoal {
   return accessGoal(b.origin.x, b.origin.y, b.footprint.w, b.footprint.h);
+}
+
+/**
+ * Where a hungry settler can get a meal: the nearest eating point while the stockpile has food, otherwise
+ * the nearest building whose output buffer holds food (a farm: an emergency meal; GAME_DESIGN §5.5).
+ */
+function foodSource(state: GameState, s: Settler): { b: Building; dist: number } | null {
+  if (state.colony.stock.food >= 1) {
+    const store = nearestBuilding(state, s, isEatingPoint);
+    if (store) return store;
+  }
+  return nearestBuilding(state, s, (b) => b.output.food >= 1);
+}
+
+/** Can resting still heal this settler? Health only regenerates when fed and not parched. */
+function canRegenerate(state: GameState, s: Settler): boolean {
+  return s.needs.hunger >= HEALTH.regenMinHunger && !(s.status.dehydrated && state.colony.stock.water < 1);
 }
 
 // --- start functions -------------------------------------------------------------------------
@@ -505,11 +544,24 @@ function chooseDropOff(state: GameState, s: Settler, source: Building, resource:
   return store ? store.b : null;
 }
 
-/** Is there somewhere to put freshly produced goods: the building's buffer or colony stock below capacity? */
-function hasRoomFor(state: GameState, source: Building, resource: ResourceType): boolean {
+/** Units of `resource` other gatherers are carrying towards the stock. */
+function carriedByOthers(state: GameState, self: Settler, resource: ResourceType): number {
+  let sum = 0;
+  for (const o of state.settlers) if (o !== self && o.task.kind === 'gather' && o.carrying && o.carrying.resource === resource) sum += o.carrying.amount;
+  return sum;
+}
+
+/**
+ * Is there room for one more unit on top of what the settler already carries: in the source building's
+ * buffer or in the stockpile (counting loads other gatherers are bringing)? Gathering stops when not,
+ * so goods are never harvested just to be thrown away.
+ */
+function hasRoomFor(state: GameState, s: Settler, source: Building, resource: ResourceType): boolean {
+  const carried = s.carrying && s.carrying.resource === resource ? s.carrying.amount : 0;
+  const others = carriedByOthers(state, s, resource); // loads other gatherers are about to put down
   const cap = BUILDING_DEFS[source.type].outputCap;
-  if (cap > 0 && source.output[resource] < cap) return true;
-  return state.colony.stock[resource] < getStorageCapacity(state);
+  if (cap > 0 && cap - source.output[resource] - others >= carried + 1) return true;
+  return getStorageCapacity(state) - state.colony.stock[resource] - others >= carried + 1;
 }
 
 interface GatherTarget {
@@ -641,6 +693,23 @@ function toolTarget(pop: number): number {
   return Math.max(AI.shortage.tools.min, Math.ceil(pop * AI.shortage.tools.perPop));
 }
 
+/** Total tools the colony has: the stockpile plus finished tools waiting in workshop buffers. */
+function toolsOnHand(state: GameState): number {
+  let n = state.colony.stock.tools;
+  for (const b of state.buildings) n += b.output.tools;
+  return n;
+}
+
+/**
+ * Smallest buffer worth a hauling trip. During a food or water shortage anything is worth carrying
+ * to the larder, and tools are always carried one by one (they are made one at a time).
+ */
+function minLoadFor(state: GameState, resource: ResourceType): number {
+  if (resource === 'tools') return 1;
+  if ((resource === 'food' || resource === 'water') && shortageBonus(state, resource) > 0) return 1;
+  return AI.haul.minLoad;
+}
+
 /** Production multiplier of the building itself (season, weather, water nearby). 0 = cannot produce now. */
 function buildingMult(ctx: TickContext, b: Building): number {
   switch (b.type) {
@@ -696,6 +765,7 @@ function workCandidates(ctx: TickContext, s: Settler, out: Candidate[]): void {
   const sy = s.pos.y;
   const homeless = state.settlers.some((o) => o.homeId === null);
   const capacity = getStorageCapacity(state);
+  const available = getAvailableStock(state);
   const pop = state.settlers.length;
   const centre = (b: Building) => octile(sx, sy, b.origin.x + b.footprint.w / 2, b.origin.y + b.footprint.h / 2);
 
@@ -723,17 +793,19 @@ function workCandidates(ctx: TickContext, s: Settler, out: Candidate[]): void {
     if (taken >= def.maxWorkers) continue;
     if (b.output[recipe.output] >= def.outputCap) continue;
     if (buildingMult(ctx, b) <= 0) continue;
+    // Famine: food or water already waiting in the buffer must reach the larder before more is made.
+    if ((recipe.output === 'food' || recipe.output === 'water') && state.colony.stock[recipe.output] < pop && b.output[recipe.output] >= 1) continue;
     let shortage = 0;
     if (recipe.output === 'food') shortage = shortageBonus(state, 'food');
     else if (recipe.output === 'water') shortage = shortageBonus(state, 'water');
     else if (recipe.output === 'tools') {
       const target = toolTarget(pop);
-      if (state.colony.stock.tools >= target) continue;
+      if (toolsOnHand(state) >= target) continue;
       if (b.productionProgress <= 0) {
         const avail = getAvailableStock(state);
         if (!RESOURCE_TYPES.every((r) => avail[r] >= (recipe.inputs[r] ?? 0))) continue;
       }
-      shortage = AI.shortage.tools.max * clamp01(1 - state.colony.stock.tools / target);
+      shortage = AI.shortage.tools.max * clamp01(1 - toolsOnHand(state) / target);
     }
     const full = state.colony.stock[recipe.output] >= capacity ? AI.storageFullPenalty : 0;
     const score = workScore(state, s, def.jobCategory, shortage - full, centre(b));
@@ -754,9 +826,9 @@ function workCandidates(ctx: TickContext, s: Settler, out: Candidate[]): void {
       if (slots <= 0) continue;
       const taken = (counts.get(`${b.id}:${src.resource}`) ?? 0) - (s.task.kind === 'gather' && s.workplaceId === b.id && s.task.resource === src.resource ? 1 : 0);
       if (taken >= slots) continue;
-      if (!hasRoomFor(state, b, src.resource)) continue; // storage full: nothing to do with more goods
+      if (!hasRoomFor(state, s, b, src.resource)) continue; // storage full: nothing to do with more goods
       const stockFull = state.colony.stock[src.resource] >= capacity ? AI.storageFullPenalty : 0;
-      const score = workScore(state, s, src.category, shortageBonus(state, src.resource) - stockFull, centre(b));
+      const score = workScore(state, s, src.category, shortageBonus(state, src.resource, available) - stockFull, centre(b));
       if (score === null || (best !== null && score <= best.score)) continue;
       const target = findGatherTarget(state, s, b, src.resource);
       if (target === null) continue;
@@ -816,9 +888,11 @@ function haulCandidates(ctx: TickContext, s: Settler, out: Candidate[], capacity
     if (b.status !== 'complete' || def.outputCap <= 0) continue;
     for (const r of RESOURCE_TYPES) {
       const avail = b.output[r] - claimedFromOutput(state, s, b.id, r);
-      if (avail < AI.haul.minLoad || state.colony.stock[r] >= capacity) continue;
+      if (avail < minLoadFor(state, r) || state.colony.stock[r] >= capacity) continue;
       const fill = b.output[r] / def.outputCap;
-      const bonus = AI.haul.fillBonus * fill + (fill >= 1 ? AI.haul.fullBonus : 0);
+      // Food and water short in the larder: moving them there is as urgent as making them (§5.3 shortage bonus).
+      const urgency = r === 'food' || r === 'water' ? shortageBonus(state, r) : 0;
+      const bonus = AI.haul.fillBonus * fill + (fill >= 1 ? AI.haul.fullBonus : 0) + urgency;
       if (best === null || bonus > best.bonus) best = { b, r, avail, bonus };
     }
   }
@@ -872,8 +946,8 @@ function buildCandidates(ctx: TickContext, s: Settler): Candidate[] {
 
   if (!sulking) {
     // 1. eat
-    if (stock.food >= 1 && n.hunger < AI.eat.maxHunger) {
-      const point = nearestBuilding(state, s, isEatingPoint);
+    if (n.hunger < AI.eat.maxHunger) {
+      const point = foodSource(state, s);
       if (point) {
         const b = point.b;
         out.push({
@@ -980,10 +1054,11 @@ function criticalResponse(ctx: TickContext, s: Settler): 'eat' | 'drink' | 'rest
   const n = s.needs;
   const stock = ctx.state.colony.stock;
   if (n.hunger < AI.critical.hungerBelow) {
-    if (stock.food >= 1) return 'eat';
+    if (stock.food >= 1 || ctx.state.buildings.some((b) => b.status === 'complete' && b.output.food >= 1)) return 'eat';
     if (stock.water >= 1 && s.status.drinkCooldownHours <= 0) return 'drink';
   }
-  if (n.health < AI.critical.healthRestBelow) return 'rest';
+  // Resting only helps while health can regenerate (fed, not parched); otherwise the settler goes looking for food.
+  if (n.health < AI.critical.healthRestBelow && canRegenerate(ctx.state, s)) return 'rest';
   return null;
 }
 
@@ -992,7 +1067,7 @@ function applyCritical(ctx: TickContext, s: Settler, response: 'eat' | 'drink' |
   abortSettlerTask(state, s);
   switch (response) {
     case 'eat': {
-      const p = nearestBuilding(state, s, isEatingPoint);
+      const p = foodSource(state, s);
       if (p) startEat(state, s, p.b);
       else failTask(state, s);
       return;
@@ -1095,7 +1170,10 @@ function stepTask(ctx: TickContext, s: Settler): void {
     case 'eat':
     case 'drink': {
       const b = findBuilding(state, t.buildingId);
-      const ok = b !== null && b.status === 'complete' && (t.kind === 'eat' ? isEatingPoint(b) : isDrinkingPoint(b));
+      const ok =
+        b !== null &&
+        b.status === 'complete' &&
+        (t.kind === 'eat' ? isEatingPoint(b) || b.output.food >= 1 : isDrinkingPoint(b));
       if (!ok) return failTask(state, s);
       if (t.phase === 'moving') {
         const r = walk(ctx, s);
@@ -1108,8 +1186,12 @@ function stepTask(ctx: TickContext, s: Settler): void {
       if (t.progress < duration) return;
       const stock = state.colony.stock;
       if (t.kind === 'eat') {
-        if (stock.food >= 1) {
-          stock.food -= MEAL.food;
+        // The meal comes from the stockpile at an eating point, or straight from the buffer of a farm.
+        const fromStock = stock.food >= 1 && isEatingPoint(b as Building);
+        const fromBuffer = !fromStock && (b as Building).output.food >= 1;
+        if (fromStock || fromBuffer || stock.food >= 1) {
+          if (fromBuffer) (b as Building).output.food -= MEAL.food;
+          else stock.food -= MEAL.food;
           recordConsumed(state, 'food', MEAL.food);
           ctx.events.push({ type: 'resourceConsumed', resource: 'food', amount: MEAL.food, reason: 'meal' });
           s.needs.hunger = Math.min(NEED_MAX, s.needs.hunger + MEAL.hungerRestore);
@@ -1149,7 +1231,8 @@ function stepTask(ctx: TickContext, s: Settler): void {
         return;
       }
       if (t.kind === 'rest') {
-        if (s.needs.health >= HEALTH.restUntil) wakeUp(ctx, s);
+        // Rest until recovered, or give up when it cannot heal (hungry or parched): go and find food instead.
+        if (s.needs.health >= HEALTH.restUntil || !canRegenerate(state, s)) wakeUp(ctx, s);
         return;
       }
       const wakeAt = t.progress === 1 ? SLEEP_WAKE.nap : SLEEP_WAKE.full;
@@ -1211,7 +1294,7 @@ function grantSocialized(ctx: TickContext, s: Settler): void {
   }
   if (!partner) return;
   const base = MOODLETS.socialized as { value: number; hours: number };
-  const value = hasTrait(s, 'sociable') ? 12 : base.value;
+  const value = hasTrait(s, 'sociable') ? TRAIT_EFFECTS.sociable.socializedMoodlet : base.value;
   s.moodlets = s.moodlets.filter((m) => m.id !== 'socialized');
   s.moodlets.push({ id: 'socialized', value, hoursLeft: base.hours });
   s.status.lastSocializedTick = ctx.tick;
@@ -1300,6 +1383,7 @@ function stepHaul(ctx: TickContext, s: Settler, t: Extract<Task, { kind: 'haul' 
     // Whatever did not fit goes back to where it came from (or the stock); a little may be lost at the cap.
     const back = supply ? addStockOf(state, load.resource, leftover) : Math.min(leftover, Math.max(0, BUILDING_DEFS[from.type].outputCap - from.output[load.resource]));
     if (!supply) from.output[load.resource] += back;
+    reportLoss(state, load.resource, leftover - back, 'storage full');
   }
   ctx.events.push({ type: 'resourceDelivered', settlerId: s.id, buildingId: to.id, resource: load.resource, amount: delivered });
   grantXp(s, 'hauling', AI.haul.pickupHours + AI.haul.dropHours);
@@ -1322,6 +1406,9 @@ function stepWork(ctx: TickContext, s: Settler, t: Extract<Task, { kind: 'work' 
   const recipe = def.production;
   const bmult = buildingMult(ctx, b);
   if (bmult <= 0 || b.output[recipe.output] >= def.outputCap) return failTaskQuiet(state, s);
+  if ((recipe.output === 'food' || recipe.output === 'water') && state.colony.stock[recipe.output] < state.settlers.length && b.output[recipe.output] >= 1) {
+    return failTaskQuiet(state, s); // famine: the waiting goods go to the larder first
+  }
 
   // A cycle takes its inputs from the stock when it starts.
   if (b.productionProgress <= 0) {
@@ -1398,16 +1485,19 @@ function stepGather(ctx: TickContext, s: Settler, t: Extract<Task, { kind: 'gath
       } else {
         stored = addStockOf(state, load.resource, load.amount);
       }
-      // What did not fit goes to the source building's buffer, or is lost at the storage cap.
-      const rest = load.amount - stored;
+      // What did not fit goes to the source building's buffer; only a remainder with no room anywhere is lost.
+      let rest = load.amount - stored;
       if (rest > 0 && source.id !== drop.id) {
         const room = Math.max(0, BUILDING_DEFS[source.type].outputCap - source.output[load.resource]);
-        source.output[load.resource] += Math.min(rest, room);
+        const moved = Math.min(rest, room);
+        source.output[load.resource] += moved;
+        rest -= moved;
       }
+      if (rest > 0) reportLoss(state, load.resource, rest, 'nowhere to put the load');
       ctx.events.push({ type: 'resourceDelivered', settlerId: s.id, buildingId: drop.id, resource: load.resource, amount: stored });
       s.carrying = null;
     }
-    if (!hasRoomFor(state, source, resource)) return failTaskQuiet(state, s); // storage is full
+    if (!hasRoomFor(state, s, source, resource)) return failTaskQuiet(state, s); // storage is full
     // Continue the loop with the next tile.
     const next = findGatherTarget(state, s, source, resource);
     if (next === null) return failTaskQuiet(state, s);
@@ -1446,6 +1536,10 @@ function stepGather(ctx: TickContext, s: Settler, t: Extract<Task, { kind: 'gath
     t.progress -= 1;
     const left = world.resource[ti] as number;
     if (left < 1) break;
+    if (!hasRoomFor(state, s, source, resource)) {
+      t.progress = 0;
+      break; // no room for more: take what is in hand home
+    }
     world.resource[ti] = left - 1;
     if (s.carrying === null) s.carrying = { resource: t.resource, amount: 0 };
     s.carrying.amount += 1;
@@ -1458,7 +1552,8 @@ function stepGather(ctx: TickContext, s: Settler, t: Extract<Task, { kind: 'gath
     ctx.events.push({ type: 'tileChanged', x: tile.x, y: tile.y });
     if (s.carrying.amount >= cap) break;
   }
-  if (s.carrying !== null && s.carrying.amount >= cap) startReturn(ctx, s, t);
+  if (s.carrying !== null && (s.carrying.amount >= cap || !hasRoomFor(state, s, source, resource))) startReturn(ctx, s, t);
+  else if (s.carrying === null && !hasRoomFor(state, s, source, resource)) failTaskQuiet(state, s);
 }
 
 function startReturn(ctx: TickContext, s: Settler, t: Extract<Task, { kind: 'gather' }>): void {
@@ -1525,9 +1620,9 @@ function refreshActivity(ctx: TickContext, s: Settler): void {
       if (moving) {
         setActivity(s, 'walking', place ? `Walking to ${place}` : 'Walking to the campfire', null, b ? b.origin : null);
       } else if (t.kind === 'rest') {
-        setActivity(s, 'resting', s.status.sickHoursLeft > 0 ? 'Resting (sick)' : 'Resting (hurt)', clamp01(s.needs.health / HEALTH.restUntil), null);
+        setActivity(s, 'resting', s.status.sickHoursLeft > 0 ? 'Resting (sick)' : 'Resting (hurt)', clamp01(s.needs.health / HEALTH.restUntil), null, b ? b.id : null);
       } else {
-        setActivity(s, 'sleeping', place ? `Sleeping in ${place}` : 'Sleeping by the campfire', clamp01(s.needs.energy / NEED_MAX), null);
+        setActivity(s, 'sleeping', place ? `Sleeping in ${place}` : 'Sleeping by the campfire', clamp01(s.needs.energy / NEED_MAX), null, b ? b.id : null);
       }
       return;
     }
@@ -1639,7 +1734,7 @@ function killSettler(ctx: TickContext, s: Settler): void {
   state.colony.graveyard.push({ id, name, diedDay: state.time.day, cause });
   ctx.events.push({ type: 'settlerDied', settlerId: id, name, cause, x, y });
   pushLog(state, 'danger', `${name} died of ${cause}.`, { tile: { x: Math.floor(x), y: Math.floor(y) } });
-  for (const o of state.settlers) addTimedMoodlet(o, 'colonistDied', (MOODLETS.colonistDied as { value: number }).value, 72, 3);
+  for (const o of state.settlers) addTimedMoodlet(o, 'colonistDied', (MOODLETS.colonistDied as { value: number }).value, (MOODLETS.colonistDied as { hours: number }).hours, 3);
   assignHomes(state);
 }
 
@@ -1651,7 +1746,7 @@ function departSettler(ctx: TickContext, id: number): void {
   removeSettler(state, id);
   ctx.events.push({ type: 'settlerLeft', settlerId: id, name, reason: 'gave up on the frontier' });
   pushLog(state, 'warning', `${name} has given up on the frontier and left.`);
-  for (const o of state.settlers) addTimedMoodlet(o, 'colonistLeft', (MOODLETS.colonistLeft as { value: number }).value, 48, 2);
+  for (const o of state.settlers) addTimedMoodlet(o, 'colonistLeft', (MOODLETS.colonistLeft as { value: number }).value, (MOODLETS.colonistLeft as { hours: number }).hours, 2);
   assignHomes(state);
 }
 
@@ -1711,7 +1806,7 @@ function stepSettler(ctx: TickContext, s: Settler): boolean {
   }
 
   // 3. Desertion.
-  if (s.status.breakingHours >= ctx.diff.desertionHours && s.task.kind !== 'depart') {
+  if (s.status.breakingHours >= ctx.diff.desertionHours && s.task.kind !== 'depart' && !(s.task.kind === 'idle' && s.task.progress > 0)) {
     const edge = findEdgeTile(state, s);
     abortSettlerTask(state, s);
     if (edge === null) {

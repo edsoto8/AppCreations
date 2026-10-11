@@ -8,10 +8,13 @@ import { TopBar } from './hud/TopBar';
 import { parseQuickstart } from './lib/quickstart';
 import { useGameFlow } from './lib/useGameFlow';
 import { useHotkeys } from './lib/useHotkeys';
+import { usePrefsSync, useUiScale } from './lib/usePrefsSync';
 import { GameMenu } from './menu/GameMenu';
 import { MainMenu } from './menu/MainMenu';
 import { DecisionHost } from './hud/DecisionHost';
 import { HoverCard } from './hud/HoverCard';
+import { Minimap } from './hud/Minimap';
+import { TourHost } from './hud/TourHost';
 import { ObjectivesTracker } from './hud/ObjectivesTracker';
 import { WarningsStrip } from './hud/WarningsStrip';
 import { GameOverOverlay } from './menu/GameOverOverlay';
@@ -42,22 +45,26 @@ function GameUi() {
           <PauseFrame />
           <PanelHost />
           <InspectorHost />
-          <ObjectivesTracker />
+          <div className="left-dock">
+            <ObjectivesTracker />
+            <Minimap />
+          </div>
           <DecisionHost />
         </div>
         <Toolbar />
       </div>
-      <HoverCard />
       <GameOverOverlay />
       <GameMenu />
     </>
   );
 }
 
-/** App shell: the canvas fills the viewport; React UI is overlaid on top. */
+/** App shell: the canvas fills the viewport; React UI is overlaid on top, scaled by the UI size preference. */
 export function App() {
   const screen = useUiStore((s) => s.screen);
+  const scale = useUiScale();
   useHotkeys();
+  usePrefsSync();
   const flow = useGameFlow();
   useEffect(() => {
     // `?quickstart` skips the menu (dev and e2e).
@@ -65,13 +72,17 @@ export function App() {
     if (options) flow.startNewGame(options);
   }, [flow]);
   return (
-    <div className="app">
+    <div className="app" data-testid="app">
       <GameCanvas />
-      {screen === 'mainMenu' ? <MainMenu /> : <GameUi />}
-      {/* Above menus and dialogs, so save/load feedback is never hidden behind a scrim. */}
-      <div className={`ui-layer toast-layer ${screen === 'playing' ? 'toast-layer--game' : ''}`}>
-        <ToastHost />
+      <div className="ui-scale" style={{ ['--s' as string]: scale }}>
+        {screen === 'mainMenu' ? <MainMenu /> : <GameUi />}
+        {/* Above menus and dialogs, so save/load feedback is never hidden behind a scrim. */}
+        <div className={`ui-layer toast-layer ${screen === 'playing' ? 'toast-layer--game' : ''}`}>
+          <ToastHost />
+        </div>
       </div>
+      {screen === 'playing' && <HoverCard />}
+      <TourHost />
     </div>
   );
 }

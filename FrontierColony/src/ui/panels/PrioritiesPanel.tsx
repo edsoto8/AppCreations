@@ -6,7 +6,7 @@ import { useUiStore } from '../../store';
 import { Icon } from '../components/Icon';
 import { Tooltip } from '../components/Tooltip';
 import { pluralize } from '../lib/format';
-import { DEFAULT_PRIORITY, JOB_INFO, PRIORITY_LABEL, PRIORITY_LEVELS, PRIORITY_TOOLTIP, countByJob, stepLevel } from '../lib/jobs';
+import { DEFAULT_PRIORITY, JOB_INFO, PRIORITY_HINT, PRIORITY_LABEL, PRIORITY_LEVELS, PRIORITY_TOOLTIP, countByJob, stepLevel } from '../lib/jobs';
 
 function LevelControl({ category, level, onSet }: { category: JobCategory; level: PriorityLevel; onSet: (l: PriorityLevel) => void }) {
   const refs = useRef<Record<number, HTMLButtonElement | null>>({});
@@ -33,8 +33,8 @@ function LevelControl({ category, level, onSet }: { category: JobCategory; level
       }}
     >
       {PRIORITY_LEVELS.map((l) => (
+        <Tooltip key={l} title={`${JOB_INFO[category].label}: ${PRIORITY_LABEL[l]}`} content={PRIORITY_HINT[l]} side="top">
         <button
-          key={l}
           ref={(el) => {
             refs.current[l] = el;
           }}
@@ -44,11 +44,11 @@ function LevelControl({ category, level, onSet }: { category: JobCategory; level
           tabIndex={level === l ? 0 : -1}
           className={`level level--${l} ${level === l ? 'is-active' : ''}`}
           onClick={() => onSet(l)}
-          title={PRIORITY_LABEL[l]}
           data-testid={`priority-${category}-${l}`}
         >
           {l}
         </button>
+        </Tooltip>
       ))}
     </div>
   );

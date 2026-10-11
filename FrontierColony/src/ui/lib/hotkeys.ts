@@ -33,6 +33,7 @@ export const PANEL_HOTKEYS: Record<string, PanelId> = {
   g: 'stats',
   f: 'saveLoad',
   o: 'settings',
+  h: 'help',
 };
 
 export const SPEED_HOTKEYS: Record<string, GameSpeed> = { '1': 1, '2': 2, '3': 4 };

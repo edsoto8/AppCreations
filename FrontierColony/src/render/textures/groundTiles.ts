@@ -258,7 +258,43 @@ export function makeSandTile(seed: number, o: { rippled?: boolean; pebbles?: boo
 
 // --- Hills / rock -------------------------------------------------------------------------------
 
+/** Grassy, dry-grass rolling hill ground with the odd bare rock patch. */
 export function makeHillsGround(seed: number): Art {
+  const art = createArt(TILE_FRAME_W, TILE_FRAME_H);
+  const rng = mulberry32(seed * 3571 + 21);
+  const rockiness = 0.1 + (seed % 4) * 0.07;
+  const dryRamp: Ramp = { dark: [118, 144, 78], mid: [150, 166, 90], light: [182, 188, 108] };
+  paintTilePixels(art, (p, out) => {
+    const n = fbm(p.lx * 0.055, p.ly * 0.1, seed + 500, 3);
+    const m = fbm(p.lx * 0.1 + 9, p.ly * 0.18, seed + 640, 3);
+    const fade = 1 - smoothstep(0.55, 1.0, p.d) * 0.7;
+    rampColor(dryRamp, Math.min(1, Math.max(0, (n - 0.5) * 1.8 * fade + 0.5)), out);
+    const rock = smoothstep(0.62 - rockiness, 0.72 - rockiness, m) * fade;
+    if (rock > 0) {
+      const g = valueNoise(p.lx * 0.9, p.ly * 1.4, seed + 77);
+      const rc: RGB = [128 + g * 40, 120 + g * 36, 104 + g * 30];
+      out[0] = out[0] * (1 - rock) + rc[0] * rock;
+      out[1] = out[1] * (1 - rock) + rc[1] * rock;
+      out[2] = out[2] * (1 - rock) + rc[2] * rock;
+    }
+  });
+  const { ctx } = art;
+  ctx.save();
+  clipTileDiamond(ctx);
+  for (let i = 0; i < 9; i++) {
+    const [x, y] = randInDiamond(rng, 0.9);
+    ctx.fillStyle = css(rng() < 0.5 ? [96, 86, 72] : [196, 186, 164], 0.5);
+    ctx.beginPath();
+    ctx.ellipse(x, y, 0.8 + rng() * 1.2, 0.5 + rng() * 0.6, rng() * 3, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+  scatterBlades(art, rng, 46, [96, 120, 60], [190, 200, 120], 3);
+  addGrain(art, 6, seed + 17);
+  return art;
+}
+
+export function makeHillsGroundOld(seed: number): Art {
   const art = createArt(TILE_FRAME_W, TILE_FRAME_H);
   const rng = mulberry32(seed * 3571 + 21);
   paintBase(art, { seed: seed + 500, ramp: HILL_GROUND, freq: 0.08, contrast: 1.7, grain: 0.14 });
@@ -438,3 +474,32 @@ export function makeFoamEdge(dir: EdgeDir, seed: number): Art {
 }
 
 export { TILE_FRAME_H, TILE_FRAME_W, TILE_HH, TILE_HW };
+
+/** Lay a blanket of snow over an existing ground tile texture (patchy, with the ground showing through). */
+export function applySnow(art: Art, seed: number, cover = 0.9): Art {
+  const { canvas, ctx } = art;
+  const W = canvas.width;
+  const H = canvas.height;
+  const img = ctx.getImageData(0, 0, W, H);
+  const d = img.data;
+  for (let py = 0; py < H; py++) {
+    for (let px = 0; px < W; px++) {
+      const i = (py * W + px) * 4;
+      if (d[i + 3] === 0) continue;
+      const lx = (px + 0.5) / 2;
+      const ly = (py + 0.5) / 2;
+      const n = fbm(lx * 0.09, ly * 0.16, seed, 3) * 0.7 + valueNoise(lx * 0.7, ly * 1.1, seed + 3) * 0.3;
+      const a = smoothstep(1 - cover - 0.1, 1 - cover + 0.12, n) * 0.96;
+      if (a <= 0) continue;
+      const shade = 0.93 + (valueNoise(lx * 0.4, ly * 0.7, seed + 8) - 0.5) * 0.14;
+      const r = 244 * shade;
+      const g = 248 * shade;
+      const b = 255 * shade;
+      d[i] = d[i]! * (1 - a) + r * a;
+      d[i + 1] = d[i + 1]! * (1 - a) + g * a;
+      d[i + 2] = d[i + 2]! * (1 - a) + b * a;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  return art;
+}

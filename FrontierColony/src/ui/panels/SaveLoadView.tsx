@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useGameController } from '../../game';
 import type { SaveSlotId, SaveSlotInfo } from '../../game/save';
 import { uiStore, useUiStore } from '../../store';
+import { EmptyState } from '../components/EmptyState';
 import { Icon } from '../components/Icon';
 import { formatClock, formatDateTime, formatRelativeTime, pluralize } from '../lib/format';
 import { PRESET_INFO } from '../lib/newGameOptions';
@@ -76,7 +77,11 @@ export function SaveLoadView({ mode, onLoaded }: SaveLoadViewProps) {
   return (
     <div className="saveload" data-testid="saveload">
       {mode === 'both' && !gameRunning && <p className="saveload__note">There is no running game to save.</p>}
-      {mode === 'load' && !anySave && <p className="saveload__note">No saved games yet. Start a new colony first.</p>}
+      {mode === 'load' && !anySave && (
+        <EmptyState icon="folder" hint="Start a new colony, and it is saved automatically.">
+          No saved games yet.
+        </EmptyState>
+      )}
       <ul className="slot-list">
         {slots.map((info) => {
           const isPending = pending?.slot === info.slot;

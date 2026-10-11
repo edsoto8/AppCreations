@@ -3,7 +3,7 @@
  * container; anything raised, plus every tall object, goes into the shared depth-sorted layer so
  * settlers and buildings can walk in front of / behind it correctly.
  */
-import { Container, Sprite, type Texture } from 'pixi.js';
+import { Container, Sprite, type RenderTexture, type Texture } from 'pixi.js';
 import { Terrain } from '../../sim';
 import { ELEVATION_STEP, tileToScreen } from '../../shared/iso';
 import type { TextureSet } from '../textures';
@@ -13,6 +13,7 @@ import { clamp, fbm, hash01, hash32, smoothstep } from '../util/noise';
 import { mixRgb, toHex, type RGB } from '../util/color';
 import { WATER_DEEP, WATER_MID, WATER_SHALLOW, WATER_SHORE } from '../textures/palette';
 import type { DepthLayer } from '../depthLayer';
+import type { SeasonLook } from '../atmosphere/seasons';
 import { CHUNK_SIZE, isWaterTerrain, type TerrainModel } from './model';
 
 export interface ShimmerFx {
@@ -36,13 +37,20 @@ export interface Chunk {
   cx: number;
   cy: number;
   index: number;
+  /** Flat-tile sprites. In baked mode this is a detached scratch container, in live mode it is on the stage. */
   ground: Container;
+  /** Baked image of `ground` (one quad instead of ~1000 overlapping tile quads). */
+  bake: Sprite | null;
+  rt: RenderTexture | null;
+  mode: 'none' | 'baked' | 'live';
   fx: Container;
   sorted: Sprite[];
   shimmers: ShimmerFx[];
   foams: FoamFx[];
   built: boolean;
   dirty: boolean;
+  /** Season look the chunk was built with. */
+  lookKey: string;
   shown: boolean;
   lastShownFrame: number;
   /** World-pixel bounds (generous), valid after the chunk is built. */
@@ -60,12 +68,16 @@ export function createChunk(cx: number, cy: number, index: number): Chunk {
     cy,
     index,
     ground,
+    bake: null,
+    rt: null,
+    mode: 'none',
     fx,
     sorted: [],
     shimmers: [],
     foams: [],
     built: false,
     dirty: true,
+    lookKey: '',
     shown: false,
     lastShownFrame: 0,
     x0: 0,
@@ -86,6 +98,35 @@ export function clearChunk(chunk: Chunk): void {
   chunk.shimmers.length = 0;
   chunk.foams.length = 0;
   chunk.built = false;
+}
+
+/** Free the baked image of a chunk too. */
+export function destroyBake(chunk: Chunk): void {
+  chunk.bake?.destroy();
+  chunk.rt?.destroy(true);
+  chunk.bake = null;
+  chunk.rt = null;
+  chunk.mode = 'none';
+}
+
+export interface GroundRect {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+/** World-pixel rectangle covering every flat-tile sprite of a chunk (integer aligned). */
+export function groundRect(chunk: Chunk, mapW: number, mapH: number): GroundRect {
+  const x0 = chunk.cx * CHUNK_SIZE;
+  const y0 = chunk.cy * CHUNK_SIZE;
+  const x1 = Math.min(mapW, x0 + CHUNK_SIZE);
+  const y1 = Math.min(mapH, y0 + CHUNK_SIZE);
+  const left = Math.floor((x0 - y1) * 32 - 36);
+  const right = Math.ceil((x1 - y0) * 32 + 36);
+  const top = Math.floor((x0 + y0) * 16 - 30);
+  const bottom = Math.ceil((x1 + y1) * 16 + 60);
+  return { x: left, y: top, w: right - left, h: bottom - top };
 }
 
 const EDGE_NEIGHBOUR: Record<EdgeDir, [number, number]> = { ne: [0, -1], se: [1, 0], sw: [0, 1], nw: [-1, 0] };
@@ -114,7 +155,7 @@ function tint(r: number, g: number, b: number): number {
 }
 
 /** Subtle large-scale brightness/hue variation so the land never looks like a flat repeat. */
-export function landTint(x: number, y: number, e: number, terrain: number): number {
+export function landTint(x: number, y: number, e: number, terrain: number, look: SeasonLook): number {
   const n = fbm(x * 0.085 + 11, y * 0.085 + 5, 5, 3);
   const m = fbm(x * 0.21 + 3, y * 0.21 + 9, 8, 2);
   const lift = Math.min(e, 4) * 0.032;
@@ -131,6 +172,19 @@ export function landTint(x: number, y: number, e: number, terrain: number): numb
   } else if (terrain === Terrain.Sand) {
     b *= 0.985;
   }
+  if (terrain !== Terrain.Sand && terrain !== Terrain.Mountain) {
+    r *= look.grass[0];
+    g *= look.grass[1];
+    b *= look.grass[2];
+    if (look.dry > 0) {
+      // drought: yellowed, patchy
+      const patch = 0.6 + 0.4 * fbm(x * 0.12 + 7, y * 0.12 + 3, 55, 2);
+      const k = look.dry * patch;
+      r *= 1 + k * 0.1;
+      g *= 1 - k * 0.1;
+      b *= 1 - k * 0.42;
+    }
+  }
   return tint(Math.min(1, r), Math.min(1, g), Math.min(1, b));
 }
 
@@ -141,7 +195,9 @@ const WATER_STOPS: { at: number; c: RGB }[] = [
   { at: 1, c: WATER_DEEP },
 ];
 
-export function waterTint(x: number, y: number, terrain: number, shore: number): number {
+const ICE: RGB = [206, 232, 244];
+
+export function waterTint(x: number, y: number, terrain: number, shore: number, ice = 0): number {
   let f = clamp((shore - 0.6) / 9, 0, 1);
   if (terrain === Terrain.DeepWater) f = Math.max(f, 0.5);
   else f = Math.min(f, 0.45);
@@ -157,6 +213,7 @@ export function waterTint(x: number, y: number, terrain: number, shore: number):
     }
     c = b.c;
   }
+  if (ice > 0 && terrain === Terrain.ShallowWater) c = mixRgb(c, ICE, ice * 0.7 * (1 - smoothstep(0, 5, shore)));
   return toHex(c);
 }
 
@@ -176,7 +233,7 @@ function cliffMaterial(terrain: number): CliffMaterial {
 }
 
 /** Build all sprites for a chunk (the chunk must have been cleared). */
-export function buildChunk(chunk: Chunk, model: TerrainModel, tex: TextureSet, depth: DepthLayer): void {
+export function buildChunk(chunk: Chunk, model: TerrainModel, tex: TextureSet, depth: DepthLayer, look: SeasonLook): void {
   const ctx: Ctx = { model, tex, chunk, maxElev: 0, hasMountain: false, hasForest: false };
   const x0 = chunk.cx * CHUNK_SIZE;
   const y0 = chunk.cy * CHUNK_SIZE;
@@ -274,36 +331,40 @@ export function buildChunk(chunk: Chunk, model: TerrainModel, tex: TextureSet, d
       // ---- tile top ---------------------------------------------------------------------------
       let topTex: Texture;
       let topTint: number;
+      const sea = tex.seasonal;
+      const snowy = sea !== null && look.snow > 0 && !water && hash01(x, y, 401) < look.snow;
       switch (t) {
         case Terrain.DeepWater:
         case Terrain.ShallowWater:
           topTex = pick(tex.water, h >>> 3);
-          topTint = waterTint(x, y, t, model.shoreSmooth[i]!);
+          topTint = waterTint(x, y, t, model.shoreSmooth[i]!, look.ice);
           break;
         case Terrain.Sand:
-          topTex = (h & 7) === 0 ? pick(tex.sandPebbles, h >>> 4) : pick(tex.sandPlain, h >>> 4);
-          topTint = landTint(x, y, e, t);
+          topTex = snowy ? pick(sea!.sandFrost, h >>> 4) : (h & 7) === 0 ? pick(tex.sandPebbles, h >>> 4) : pick(tex.sandPlain, h >>> 4);
+          topTint = landTint(x, y, e, t, look);
           break;
         case Terrain.Forest:
-          topTex = pick(tex.forestFloor, h >>> 4);
-          topTint = landTint(x, y, e, t);
+          topTex = snowy ? pick(sea!.forestSnow, h >>> 4) : pick(tex.forestFloor, h >>> 4);
+          topTint = landTint(x, y, e, t, look);
           ctx.hasForest = true;
           break;
         case Terrain.Hills:
-          topTex = pick(tex.hills, h >>> 4);
-          topTint = landTint(x, y, e, t);
+          topTex = snowy ? pick(sea!.hillsSnow, h >>> 4) : pick(tex.hills, h >>> 4);
+          topTint = landTint(x, y, e, t, look);
           break;
         case Terrain.Mountain:
-          topTex = pick(tex.rockGround, h >>> 4);
-          topTint = landTint(x, y, e, t);
+          topTex = snowy ? pick(sea!.rockSnow, h >>> 4) : pick(tex.rockGround, h >>> 4);
+          topTint = landTint(x, y, e, t, look);
           ctx.hasMountain = true;
           break;
         default: {
           const r = (h >>> 5) & 15;
-          topTex = r < 9 ? pick(tex.grassPlain, h >>> 9) : r < 13 ? pick(tex.grassTuft, h >>> 9) : pick(tex.grassFlower, h >>> 9);
-          topTint = landTint(x, y, e, t);
+          const flowerFrom = 13 - Math.round(look.spring * 3);
+          topTex = snowy ? pick(sea!.grassSnow, h >>> 9) : r < 9 ? pick(tex.grassPlain, h >>> 9) : r < flowerFrom ? pick(tex.grassTuft, h >>> 9) : pick(tex.grassFlower, h >>> 9);
+          topTint = landTint(x, y, e, t, look);
         }
       }
+      if (snowy) topTint = tint(0.94 + hash01(x, y, 403) * 0.06, 0.96 + hash01(x, y, 404) * 0.04, 1);
       add(topTex, c.x, c.y, raised, d + 0.5, 'top', topTint, ((h >>> 12) & 1) === 1);
 
       // ---- overlays: fringes, wet banks, foam ------------------------------------------------
@@ -332,19 +393,20 @@ export function buildChunk(chunk: Chunk, model: TerrainModel, tex: TextureSet, d
         if (model.elev[ni] !== e) continue;
         const rn = RANK[nt] ?? 0;
         const rt = RANK[t] ?? 0;
-        if (rn > rt) add(tex.fringe[FRINGE_MATERIAL[nt]!][dir], c.x, c.y, raised, d + 0.51, 'over');
+        if (rn > rt && !snowy) add(tex.fringe[FRINGE_MATERIAL[nt]!][dir], c.x, c.y, raised, d + 0.51, 'over');
       }
 
       // ---- decals & objects -------------------------------------------------------------------
       const hd = hash01(x, y, 29);
       const ox = (hash01(x, y, 31) - 0.5) * 30;
       const oy = (hash01(x, y, 37) - 0.5) * 12;
+      const wintry = look.snow > 0.45;
       switch (t) {
         case Terrain.Grass: {
           if (model.stump[i]) addObject(tex.stump, c.x + ox * 0.3, c.y + oy * 0.4, d + 0.99);
           else if (hd < 0.045) addObject(pick(tex.bush, h >>> 7), c.x + ox, c.y + oy, d + 1 + oy * 0.001);
-          else if (hd < 0.11) add(pick(tex.flowerPatch, h >>> 9), c.x + ox, c.y + oy, raised, d + 0.53, 'over');
-          else if (hd < 0.2) add(pick(tex.tuft, h >>> 9), c.x + ox, c.y + oy, raised, d + 0.53, 'over');
+          else if (hd < 0.11 + look.spring * 0.07 && !wintry) add(pick(tex.flowerPatch, h >>> 9), c.x + ox, c.y + oy, raised, d + 0.53, 'over');
+          else if (hd < 0.2 + look.spring * 0.07 && !snowy) add(pick(tex.tuft, h >>> 9), c.x + ox, c.y + oy, raised, d + 0.53, 'over');
           break;
         }
         case Terrain.Sand: {
@@ -355,8 +417,20 @@ export function buildChunk(chunk: Chunk, model: TerrainModel, tex: TextureSet, d
         case Terrain.Forest: {
           if (lvl > 0) {
             const sp = model.species(x, y);
-            const arr = sp === 0 ? tex.trees.oak : sp === 1 ? tex.trees.pine : tex.trees.birch;
-            addObject(arr[lvl - 1]![(h >>> 6) % arr[0]!.length]!, c.x, c.y, d + 1, ((h >>> 13) & 1) === 1);
+            const v = (h >>> 6) % 3;
+            const th = hash01(x, y, 402);
+            let texture: Texture;
+            if (sp === 1) {
+              texture = sea !== null && look.snow > th * 0.8 ? sea.pineSnow[lvl - 1]![v]! : tex.trees.pine[lvl - 1]![(h >>> 6) % tex.trees.pine[0]!.length]!;
+            } else if (sea !== null && look.bare > th) {
+              texture = (sp === 0 ? sea.treesBare.oak : sea.treesBare.birch)[lvl - 1]![v]!;
+            } else if (sea !== null && look.autumn > th) {
+              texture = (sp === 0 ? sea.treesAutumn.oak : sea.treesAutumn.birch)[lvl - 1]![v]!;
+            } else {
+              const arr = sp === 0 ? tex.trees.oak : tex.trees.birch;
+              texture = arr[lvl - 1]![(h >>> 6) % arr[0]!.length]!;
+            }
+            addObject(texture, c.x, c.y, d + 1, ((h >>> 13) & 1) === 1);
           } else {
             addObject(tex.stump, c.x - 6, c.y + 1, d + 0.99);
             addObject(tex.stump, c.x + 8, c.y - 2, d + 0.99);
@@ -364,15 +438,30 @@ export function buildChunk(chunk: Chunk, model: TerrainModel, tex: TextureSet, d
           break;
         }
         case Terrain.Hills: {
-          if (lvl > 0) addObject(tex.rocks[lvl - 1]![(h >>> 6) % tex.rocks[0]!.length]!, c.x, c.y, d + 1, ((h >>> 13) & 1) === 1);
-          else addObject(pick(tex.rubble, h >>> 6), c.x, c.y, d + 1);
+          if (lvl > 0) {
+            // outcrops are sparse and varied; richer tiles are likelier to carry a bigger one
+            const chance = [0.3, 0.42, 0.55, 0.68][lvl - 1]!;
+            if (hash01(x, y, 411) < chance) {
+              const kind = (h >>> 5) % tex.outcrops.length;
+              const tier = clamp(lvl - 1 + (((h >>> 9) & 3) === 0 ? -1 : 0), 0, 3);
+              const arr = tex.outcrops[kind]![tier]!;
+              addObject(arr[(h >>> 11) % arr.length]!, c.x + (hash01(x, y, 412) - 0.5) * 22, c.y + (hash01(x, y, 413) - 0.5) * 8, d + 1, ((h >>> 13) & 1) === 1);
+            } else if (hd < 0.35 && !wintry) {
+              addObject(pick(tex.bush, h >>> 7), c.x + ox, c.y + oy, d + 1 + oy * 0.001);
+            } else if (hd < 0.6 && !snowy) {
+              add(pick(tex.tuft, h >>> 9), c.x + ox, c.y + oy, raised, d + 0.53, 'over');
+            }
+          } else addObject(pick(tex.rubble, h >>> 6), c.x, c.y, d + 1);
           break;
         }
         case Terrain.Mountain: {
           if (lvl > 0) {
-            const snow = e >= 6 ? 2 : e >= 5 ? 1 : 0;
+            const base = e >= 6 ? 2 : e >= 5 ? 1 : 0;
+            const snow = Math.min(2, base + (sea !== null && look.snow > hash01(x, y, 405) ? 1 : 0));
             const v = (h >>> 6) % tex.mountains[snow]!.length;
-            addObject(tex.mountains[snow]![v]![(h >>> 14) & 1]!, c.x, c.y + 4, d + 1);
+            const sp = addObject(tex.mountains[snow]![v]![(h >>> 14) & 1]!, c.x, c.y + 4, d + 1);
+            const sc = 0.86 + hash01(x, y, 421) * 0.3;
+            sp.scale.set(sc);
           } else addObject(pick(tex.quarried, h >>> 6), c.x, c.y + 4, d + 1);
           break;
         }
@@ -425,5 +514,6 @@ export function buildChunk(chunk: Chunk, model: TerrainModel, tex: TextureSet, d
   chunk.y1 = (x1 + y1) * 16 + 40;
   chunk.built = true;
   chunk.dirty = false;
+  chunk.lookKey = look.key + (tex.seasonal ? '+' : '-');
   if (chunk.shown) for (const s of sorted) depth.place(s);
 }

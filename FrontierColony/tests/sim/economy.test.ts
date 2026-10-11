@@ -116,7 +116,7 @@ describe('balance check: a sensible player on normal difficulty', () => {
     expect(foodOut).toBeGreaterThan(6);
     expect(foodOut).toBeLessThan(9);
     expect(deaths.length).toBeGreaterThan(0);
-    expect(deaths[0]!).toBeGreaterThan(8.5);
+    expect(deaths[0]!).toBeGreaterThan(7.5); // newcomers join during the first days, so the larder empties a little sooner
     expect(deaths[0]!).toBeLessThan(11.5);
     expect(deaths[0]! - foodOut).toBeGreaterThan(1.5);
     expect(deaths[0]! - foodOut).toBeLessThan(4);
@@ -405,9 +405,10 @@ describe('statistics and housing', () => {
 describe('dense colonies', () => {
   it('placement never walls in the town center or another building, so nobody starves behind a wall', () => {
     const state = game('dense');
+    state.progress.unlocked.push('storage', 'workshop');
+    for (let i = 0; i < 4; i++) instantBuild(state, 'storage'); // room for a big stockpile
     state.colony.stock.wood = 600;
     state.colony.stock.stone = 300;
-    state.progress.unlocked.push('storage', 'workshop');
     const order: BuildingType[] = ['farm', 'farm', 'well', 'well', 'lumberCamp', 'mine', 'house', 'house', 'house', 'house', 'house', 'house', 'storage', 'workshop', 'lumberCamp', 'mine'];
     for (const t of order) placeNearTown(state, t, 2, 14);
     expect(state.buildings.length).toBeGreaterThan(12);
@@ -430,9 +431,10 @@ describe('dense colonies', () => {
 
   it('30 settlers in a developed colony on a large map step in under 0.5 ms per tick', () => {
     const state = createGame({ ...DEFAULT_NEW_GAME_OPTIONS, seed: 'perf-econ', mapSize: 'large' });
-    state.colony.stock.wood = 500;
-    state.colony.stock.stone = 300;
     state.progress.unlocked.push('storage', 'workshop');
+    for (let i = 0; i < 3; i++) instantBuild(state, 'storage');
+    state.colony.stock.wood = 400;
+    state.colony.stock.stone = 300;
     const names = createNameRegistry(state.colony.usedNames);
     const rng = createRng(5);
     const town = state.buildings[0]!;

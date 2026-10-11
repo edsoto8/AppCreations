@@ -41,6 +41,8 @@ export interface EmitOptions {
   tint?: number;
   rotation?: number;
   fadeIn?: number;
+  /** Additive blending (fire, sparks). */
+  add?: boolean;
 }
 
 export class Particles {
@@ -98,6 +100,7 @@ export class Particles {
     const s = p.sprite;
     s.texture = texture;
     s.tint = o.tint ?? 0xffffff;
+    s.blendMode = o.add ? 'add' : 'normal';
     s.rotation = o.rotation ?? 0;
     s.position.set(x, y);
     s.scale.set(p.size0);
@@ -258,6 +261,34 @@ export class Particles {
       });
     }
     this.dust(x, y + 6, 0xe8dcc4, 6, 0.9);
+  }
+
+  flame(x: number, y: number, size = 1): void {
+    this.emit(this.tex.fx.flame, x + (Math.random() - 0.5) * 10, y, {
+      vx: (Math.random() - 0.5) * 8,
+      vy: -22 - Math.random() * 16,
+      life: 0.55 + Math.random() * 0.4,
+      size0: 1.0 * size,
+      size1: 0.25 * size,
+      alpha0: 0.95,
+      alpha1: 0,
+      add: true,
+    });
+  }
+
+  darkSmoke(x: number, y: number): void {
+    this.emit(this.tex.fx.puff, x + (Math.random() - 0.5) * 8, y, {
+      vx: 6 + Math.random() * 8,
+      vy: -16 - Math.random() * 10,
+      drag: 0.1,
+      life: 3 + Math.random() * 1.5,
+      size0: 0.4,
+      size1: 1.5,
+      alpha0: 0.55,
+      alpha1: 0,
+      tint: 0x4a4644,
+      fadeIn: 0.1,
+    });
   }
 
   zzz(x: number, y: number): void {

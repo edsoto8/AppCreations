@@ -20,6 +20,12 @@ export const JOB_INFO: Record<JobCategory, JobInfo> = {
 
 export const PRIORITY_LEVELS: readonly PriorityLevel[] = [0, 1, 2, 3];
 export const PRIORITY_LABEL: Record<PriorityLevel, string> = { 0: 'Off', 1: 'Low', 2: 'Normal', 3: 'High' };
+export const PRIORITY_HINT: Record<PriorityLevel, string> = {
+  0: 'Off: settlers never take this job.',
+  1: 'Low: only when nothing more important needs doing.',
+  2: 'Normal: the default balance.',
+  3: 'High: settlers do this first.',
+};
 export const PRIORITY_TOOLTIP =
   'Priority 0 = never, 1 = low, 2 = normal, 3 = high. Settlers still eat and sleep when they need to.';
 export const DEFAULT_PRIORITY: PriorityLevel = 2;

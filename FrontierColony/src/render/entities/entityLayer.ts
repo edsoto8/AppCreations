@@ -22,14 +22,14 @@ export interface SettlerHit {
   dist: number;
 }
 
-const INDOOR_LABEL = /^(Sleeping|Resting) in /i;
-
 export class EntityLayer {
   private readonly settlers = new Map<number, SettlerView>();
   private readonly buildings = new Map<number, BuildingView>();
   private selection: Selection | null = null;
   private effects: Effects | null = null;
   private zoom = 1;
+  private snow = 0;
+  private light = 0;
 
   private readonly depth: DepthLayer;
   private readonly tex: TextureSet;
@@ -67,6 +67,10 @@ export class EntityLayer {
       },
       zzz: (x, y) => this.effects?.particles.zzz(x, y),
     };
+  }
+
+  buildingViews(): IterableIterator<BuildingView> {
+    return this.buildings.values();
   }
 
   attachEffects(fx: Effects): void {
@@ -126,8 +130,10 @@ export class EntityLayer {
     return v ? { x: v.root.position.x, y: v.root.position.y } : null;
   }
 
-  update(state: Readonly<GameState>, alpha: number, timeSec: number, dt: number, zoom: number, animTime: number): void {
+  update(state: Readonly<GameState>, alpha: number, timeSec: number, dt: number, zoom: number, animTime: number, snow = 0, light = 0): void {
     this.zoom = zoom;
+    this.snow = snow;
+    this.light = light;
     this.updateBuildings(state, timeSec, dt);
     this.updateSettlers(state, alpha, timeSec, animTime);
   }
@@ -166,7 +172,7 @@ export class EntityLayer {
       v.root.position.set(c.x, c.y);
       v.setDrop((hi - lo) * 12);
       this.depth.setDepth(v.root, buildingDepth(b.origin.x, b.origin.y, w, h));
-      v.update(b, state, timeSec, dt, fx, fill);
+      v.update(b, state, timeSec, dt, fx, fill, this.snow, this.light);
     }
     for (const [id, v] of this.buildings) {
       if (!v.seen) {
@@ -174,16 +180,6 @@ export class EntityLayer {
         this.buildings.delete(id);
       }
     }
-  }
-
-  private buildingNear(state: Readonly<GameState>, x: number, y: number): BuildingView | null {
-    for (const b of state.buildings) {
-      if (b.status !== 'complete') continue;
-      if (x >= b.origin.x - 1.6 && x <= b.origin.x + b.footprint.w + 1.6 && y >= b.origin.y - 1.6 && y <= b.origin.y + b.footprint.h + 1.6) {
-        return this.buildings.get(b.id) ?? null;
-      }
-    }
-    return null;
   }
 
   // --- settlers --------------------------------------------------------------------------------
@@ -211,8 +207,9 @@ export class EntityLayer {
 
       const kind = s.activity.kind;
       let indoors = false;
-      if ((kind === 'sleeping' || kind === 'resting') && INDOOR_LABEL.test(s.activity.label)) {
-        const b = this.buildingNear(state, x, y);
+      const homeId = s.activity.indoorsBuildingId;
+      if (homeId !== null) {
+        const b = this.buildings.get(homeId);
         if (b) {
           indoors = true;
           if (kind === 'sleeping' && timeSec > v.nextZ) {

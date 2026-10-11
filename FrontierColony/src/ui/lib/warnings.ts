@@ -1,7 +1,7 @@
 /** Persistent colony warnings (docs/GAME_DESIGN.md §12), derived from the HUD snapshot. Pure. */
 import type { ActivityKind, BuildingType, BuildingStatus, LogSeverity, ResourceAmounts, Season } from '../../sim';
 import type { PanelId } from '../../store';
-import { NEED_PER_SETTLER_PER_DAY, formatDays, seasonInfo, pluralize } from './format';
+import { consumptionPerDay, formatDays, seasonInfo, pluralize } from './format';
 import { RESOURCE_LABEL } from './tooltipText';
 
 export type WarningAction =
@@ -33,10 +33,10 @@ const SEVERITY_ORDER: Record<LogSeverity, number> = { danger: 0, warning: 1, inf
 export function computeWarnings(s: WarningInput): Warning[] {
   const out: Warning[] = [];
   const pop = s.population;
-  const daily = pop * NEED_PER_SETTLER_PER_DAY;
 
   for (const r of ['food', 'water'] as const) {
     const label = RESOURCE_LABEL[r];
+    const daily = pop * consumptionPerDay(r);
     if (s.stock[r] < 1) {
       out.push({
         id: `${r}Out`,

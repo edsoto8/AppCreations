@@ -1,22 +1,26 @@
 import { expect, test } from './fixtures';
-import { advance, gotoQuickstart, readGame, readTick } from './helpers';
+import { GAME_HOURS_PER_TICK, advance, gotoQuickstart, readGame, readTick, waitFrames } from './helpers';
+
 
 test('save to slot1, advance time, load slot1: day and tick are restored', async ({ page }) => {
   await gotoQuickstart(page, { seed: 'qa-saveload' });
   await advance(page, 400);
+  // Pause before saving so the saved tick is the one we advanced to.
+  await page.getByTestId('pause').click();
+  await expect(page.getByTestId('pause')).toHaveAttribute('aria-pressed', 'true');
+  await waitFrames(page, 3);
   const saved = await readGame(page);
 
   await page.getByTestId('tool-saveLoad').click();
   await expect(page.getByTestId('saveload')).toBeVisible();
   await page.getByTestId('save-slot1').click();
   await expect(page.getByTestId('toast').filter({ hasText: 'Game saved.' })).toBeVisible();
-  const stored = await page.evaluate(() => localStorage.getItem('frontierColony.v1.save.slot1'));
-  expect(stored).not.toBeNull();
+  const envelope = await page.evaluate(() => JSON.parse(localStorage.getItem('frontierColony.v1.save.slot1') ?? 'null'));
+  expect(envelope?.state?.time?.tick).toBe(saved.tick);
   await expect(page.getByTestId('slot-slot1')).toContainText('New Hope');
 
   await advance(page, 1200);
-  const later = await readGame(page);
-  expect(later.tick).toBeGreaterThan(saved.tick);
+  expect((await readGame(page)).tick).toBe(saved.tick + 1200);
 
   await page.getByTestId('load-slot1').click();
   // Loading over a running game asks first.
@@ -24,12 +28,28 @@ test('save to slot1, advance time, load slot1: day and tick are restored', async
   await page.getByTestId('confirm-yes').click();
   await expect(page.getByTestId('toast').filter({ hasText: 'Game loaded.' })).toBeVisible();
 
+  // Pause state after a load: the controller resumes a playing game (replaceState -> setPaused(false)).
+  await expect(page.getByTestId('pause')).toHaveAttribute('aria-pressed', 'false');
+  await expect(page.getByTestId('pause-indicator')).toBeHidden();
+
+  // Ticks run from the moment of the load until our pause lands, so the restored tick is bounded
+  // below by the saved tick and above by the few ticks that elapse before the pause click.
+  await page.getByTestId('pause').click();
+  await expect(page.getByTestId('pause')).toHaveAttribute('aria-pressed', 'true');
+  await waitFrames(page, 3);
   const restored = await readGame(page);
-  expect(restored.tick).toBe(saved.tick);
+  expect(restored.tick).toBeGreaterThanOrEqual(saved.tick);
+  expect(restored.tick - saved.tick).toBeLessThan(300);
   expect(restored.day).toBe(saved.day);
-  expect(restored.timeOfDay).toBeCloseTo(saved.timeOfDay, 9);
-  expect(restored.settlers.map((s) => s.id)).toEqual(saved.settlers.map((s) => s.id));
-  expect(await readTick(page)).toBe(saved.tick);
+  // Time of day is derived from the tick, so the restored clock must agree with the tick elapsed since the save.
+  expect(restored.timeOfDay - saved.timeOfDay).toBeCloseTo((restored.tick - saved.tick) * GAME_HOURS_PER_TICK, 6);
+  expect(restored.settlers.map((s) => s.id).sort()).toEqual(saved.settlers.map((s) => s.id).sort());
+  expect(restored.colonyName).toBe(saved.colonyName);
+
+  // And it really is frozen now.
+  const frozen = restored.tick;
+  await waitFrames(page, 5);
+  expect(await readTick(page)).toBe(frozen);
 });
 
 test('a corrupt slot1 save shows an error toast instead of crashing', async ({ page }) => {

@@ -869,6 +869,7 @@
 
 /* ---------- Map hover card ---------- */
 .hover-card {
+  transform-origin: 0 0;
   position: fixed;
   left: 0;
   top: 0;

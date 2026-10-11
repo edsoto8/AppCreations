@@ -117,7 +117,7 @@ export const MOUNTAIN_W = 112;
 export const MOUNTAIN_H = 118;
 export const MOUNTAIN_AX = 56;
 export const MOUNTAIN_AY = 92;
-export const MOUNTAIN_VARIANTS = 4;
+export const MOUNTAIN_VARIANTS = 6;
 export const SNOW_LEVELS = 3; // 0 none, 1 cap, 2 deep snow
 
 interface PeakSpec {
@@ -326,6 +326,92 @@ export function makeQuarriedMountain(variant: number): Art {
   ];
   for (const [sx, sy, w, h] of slots.sort((a, b) => a[1] - b[1])) {
     boulder(art.ctx, MOUNTAIN_AX + sx, MOUNTAIN_AY + sy, w, h, rng, mixRgb(ROCK.mid, [120, 116, 112], 0.4));
+  }
+  return art;
+}
+
+// --- Hill outcrops ------------------------------------------------------------------------------
+
+export const OUTCROP_KINDS = 4;
+export const OUTCROP_TIERS = 4;
+export const OUTCROP_VARIANTS = 2;
+export const OUTCROP_W = 76;
+export const OUTCROP_H = 60;
+export const OUTCROP_AX = 38;
+export const OUTCROP_AY = 44;
+
+/**
+ * Rock outcrops of varied character: kind 0 a single boulder, 1 a trio, 2 a flat slab with pebbles,
+ * 3 a jagged standing rock. `tier` (0..3) scales them with the stone left in the tile.
+ */
+export function makeOutcrop(kind: number, tier: number, variant: number): Art {
+  const art = createArt(OUTCROP_W, OUTCROP_H, OUTCROP_AX, OUTCROP_AY);
+  const { ctx } = art;
+  const rng = mulberry32(kind * 1013 + tier * 67 + variant * 7 + 11);
+  const sz = [0.55, 0.8, 1.05, 1.32][tier]!;
+  const warm = rng() < 0.5;
+  const tone = (): RGB => mixRgb(ROCK.mid, warm ? [158, 140, 120] : [128, 132, 140], 0.25 + rng() * 0.45);
+  const ax = OUTCROP_AX;
+  const ay = OUTCROP_AY;
+  switch (kind) {
+    case 0:
+      boulder(ctx, ax, ay, 9 * sz, 10.5 * sz, rng, tone());
+      if (tier >= 2) boulder(ctx, ax + 11 * sz, ay + 3, 3.4 * sz, 3.4 * sz, rng, tone());
+      break;
+    case 1: {
+      const spots: [number, number, number, number][] = [
+        [-8 * sz, 2, 5.6 * sz, 6.4 * sz],
+        [8 * sz, 3.5, 4.6 * sz, 5 * sz],
+        [0, -3, 6.4 * sz, 8 * sz],
+      ];
+      for (const [x, y, w, h] of spots.sort((a, b) => a[1] - b[1])) boulder(ctx, ax + x, ay + y, w, h, rng, tone());
+      break;
+    }
+    case 2: {
+      boulder(ctx, ax, ay + 2, 15 * sz, 5.6 * sz, rng, tone());
+      boulder(ctx, ax - 12 * sz, ay + 5, 3 * sz, 2.8 * sz, rng, tone());
+      boulder(ctx, ax + 13 * sz, ay + 4, 2.6 * sz, 2.4 * sz, rng, tone());
+      if (tier >= 1) boulder(ctx, ax + 3 * sz, ay - 1, 6 * sz, 5.6 * sz, rng, tone());
+      break;
+    }
+    default: {
+      // jagged standing rock
+      const h = (16 + 14 * sz) * 1;
+      const w = 6 + 4 * sz;
+      softBlob(ctx, ax + 3, ay + 1, w * 1.7, w * 0.7, css(SHADOW, 1), 0.4);
+      const pts: [number, number][] = [
+        [ax - w, ay],
+        [ax - w * 0.9, ay - h * 0.45],
+        [ax - w * 0.35, ay - h * 0.78],
+        [ax - w * 0.05, ay - h],
+        [ax + w * 0.4, ay - h * 0.7],
+        [ax + w * 0.95, ay - h * 0.38],
+        [ax + w, ay],
+      ];
+      const dark = mixRgb(ROCK.dark, [20, 20, 30], 0.5);
+      ctx.fillStyle = css(dark, 1);
+      poly(ctx, pts.map(([x, y]) => [x + (x < ax ? -0.8 : 0.8), y - 0.4] as [number, number]));
+      ctx.fill();
+      ctx.save();
+      poly(ctx, pts);
+      ctx.clip();
+      const t = tone();
+      const lit = ctx.createLinearGradient(ax - w, ay - h, ax + w, ay);
+      lit.addColorStop(0, css(mixRgb(t, ROCK.light, 0.7), 1));
+      lit.addColorStop(0.5, css(t, 1));
+      lit.addColorStop(1, css(mixRgb(t, ROCK.dark, 0.7), 1));
+      ctx.fillStyle = lit;
+      ctx.fillRect(ax - w - 2, ay - h - 2, w * 2 + 4, h + 4);
+      ctx.strokeStyle = css(ROCK.dark, 0.45);
+      ctx.lineWidth = 0.8;
+      ctx.beginPath();
+      ctx.moveTo(ax - w * 0.05, ay - h);
+      ctx.lineTo(ax + w * 0.1, ay - h * 0.4);
+      ctx.lineTo(ax - w * 0.2, ay);
+      ctx.stroke();
+      ctx.restore();
+      if (tier >= 1) boulder(ctx, ax + w + 3, ay + 1, 3.6, 3.6, rng, tone());
+    }
   }
   return art;
 }

@@ -17,6 +17,8 @@ export class Kit {
   readonly ctx: CanvasRenderingContext2D;
   readonly ax: number;
   readonly ay: number;
+  /** Winter variant: roofs and tops get a blanket of snow. */
+  snow = false;
 
   /** w × h footprint in tiles; maxH = tallest point in px above the ground. */
   constructor(w: number, h: number, maxH: number, pad = 12) {
@@ -360,5 +362,31 @@ export function facets(color: RGB, seed = 1, n = 30): (c: CanvasRenderingContext
       c.lineTo(cx - r * 0.1, cy - r * 0.6);
       c.stroke();
     }
+  };
+}
+
+/** Snow blanket over a roof slope (local y runs down the slope from the ridge). */
+export function snowBlanket(cover = 0.84): (c: CanvasRenderingContext2D, w: number, h: number) => void {
+  return (c, w, h) => {
+    const bottom = h * cover;
+    c.beginPath();
+    c.moveTo(-2, -2);
+    c.lineTo(w + 2, -2);
+    c.lineTo(w + 2, bottom);
+    const n = Math.max(3, Math.round(w / 7));
+    for (let i = n; i >= 0; i--) {
+      const x = (i / n) * w;
+      c.quadraticCurveTo(x + w / n / 2, bottom + 3.2, x, bottom - (i % 2) * 1.6);
+    }
+    c.closePath();
+    const g = c.createLinearGradient(0, 0, 0, bottom + 3);
+    g.addColorStop(0, css([252, 253, 255], 1));
+    g.addColorStop(0.7, css([232, 240, 252], 1));
+    g.addColorStop(1, css([188, 206, 232], 1));
+    c.fillStyle = g;
+    c.fill();
+    c.strokeStyle = css([150, 172, 208], 0.5);
+    c.lineWidth = 0.8;
+    c.stroke();
   };
 }

@@ -118,4 +118,20 @@ describe('save / load', () => {
     storage.data.delete(saveMetaKey('slot2'));
     expect(listSaveSlots(storage).find((s) => s.slot === 'slot2')!.summary?.colonyName).toBe(state.colony.name);
   });
+
+  it('migrates a v1 save (no Activity.indoorsBuildingId) to the current schema', () => {
+    const state = createGame(DEFAULT_NEW_GAME_OPTIONS);
+    for (let i = 0; i < 50; i++) stepGame(state);
+    const env = JSON.parse(serializeGame(state, new Date('2026-01-01T00:00:00Z'))) as {
+      schemaVersion: number;
+      state: { meta: { schemaVersion: number }; settlers: { activity: Record<string, unknown> }[] };
+    };
+    env.schemaVersion = 1;
+    env.state.meta.schemaVersion = 1;
+    for (const s of env.state.settlers) delete s.activity.indoorsBuildingId;
+    const loaded = deserializeGame(JSON.stringify(env));
+    if (!loaded.ok) throw new Error(loaded.error);
+    expect(loaded.state.meta.schemaVersion).toBe(2);
+    for (const s of loaded.state.settlers) expect(s.activity.indoorsBuildingId).toBeNull();
+  });
 });

@@ -1,3 +1,4 @@
+import { POPULATION_CAP } from '../../sim';
 import { useShallow } from 'zustand/react/shallow';
 import { useUiStore } from '../../store';
 import { Icon } from '../components/Icon';
@@ -19,6 +20,8 @@ export function PopulationChip() {
         <dd>{data.pop}</dd>
         <dt>Beds</dt>
         <dd>{data.beds}</dd>
+        <dt>Colony limit</dt>
+        <dd>{POPULATION_CAP}</dd>
       </dl>
       {homeless > 0 && (
         <p className="tt-alert tt-alert--warning">

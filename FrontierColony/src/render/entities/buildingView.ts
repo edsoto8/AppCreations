@@ -4,38 +4,14 @@
  * staked pad, a faint blueprint, the building rising from the ground, scaffolding and delivered
  * material piles.
  */
-import { Container, Graphics, Rectangle, Sprite, Texture } from 'pixi.js';
+import { Container, Graphics, Sprite, type Texture } from 'pixi.js';
 import type { Building, GameState, ResourceType } from '../../sim';
 import type { TextureSet } from '../textures';
 import { buildingHeight, buildingTexture, farmStage, pileLevel } from './buildingTextures';
 import { P } from './isoMath';
+import { fixturesFor } from '../atmosphere/lightPoints';
 import type { Particles } from '../effects/particles';
 import { setTex } from '../util/sprite';
-
-const CROP_CACHE = new WeakMap<Texture, Map<number, Texture>>();
-
-/** Bottom part of a building texture (for the rise-from-the-ground animation). */
-function cropped(base: Texture, stage: number, stages: number): Texture {
-  let m = CROP_CACHE.get(base);
-  if (!m) {
-    m = new Map();
-    CROP_CACHE.set(base, m);
-  }
-  let t = m.get(stage);
-  if (t) return t;
-  const f = base.frame;
-  const anchorY = (base.defaultAnchor?.y ?? 0.5) * f.height;
-  const k = stage / stages;
-  // the cut line sweeps from the front corner of the footprint up to the top of the sprite
-  const frontY = Math.min(f.height - 2, anchorY + (f.width - 24) / 4);
-  const cut = Math.max(0, Math.round(frontY * (1 - k)));
-  const rect = new Rectangle(f.x, f.y + cut, f.width, f.height - cut);
-  t = new Texture({ source: base.source, frame: rect, defaultAnchor: { x: base.defaultAnchor?.x ?? 0.5, y: (anchorY - cut) / (f.height - cut) } });
-  m.set(stage, t);
-  return t;
-}
-
-const STAGES = 18;
 
 export interface BuildingFx {
   particles: Particles;
@@ -43,12 +19,16 @@ export interface BuildingFx {
 
 export class BuildingView {
   readonly id: number;
+  readonly type: Building['type'];
   readonly root = new Container();
   private readonly pad: Sprite;
   private readonly blueprint: Sprite;
   private readonly base: Sprite;
   private readonly scaffold = new Graphics();
   private readonly skirt = new Graphics();
+  private readonly snowSprite = new Sprite();
+  private snowTexKey = '';
+  private readonly fixtures: { base: Sprite; flame: Sprite; u: number; v: number; kind: 'campfire' | 'torch'; phase: number }[] = [];
   private drop = -1;
   readonly w: number;
   readonly h: number;
@@ -64,6 +44,7 @@ export class BuildingView {
 
   constructor(b: Building, tex: TextureSet) {
     this.id = b.id;
+    this.type = b.type;
     this.tex = tex;
     this.w = b.footprint.w;
     this.h = b.footprint.h;
@@ -79,7 +60,19 @@ export class BuildingView {
       s.visible = false;
       this.piles.push(s);
     }
-    this.root.addChild(this.skirt, this.pad, this.blueprint, this.base, this.scaffold, ...this.piles);
+    this.snowSprite.visible = false;
+    this.root.addChild(this.skirt, this.pad, this.blueprint, this.base, this.snowSprite, this.scaffold, ...this.piles);
+    for (const f of fixturesFor(b.type)) {
+      const base = new Sprite(f.kind === 'campfire' ? tex.fx.campfire : tex.fx.torch);
+      const p = P(f.u, f.v, 0);
+      base.position.set(p.x, p.y);
+      const flame = new Sprite(tex.fx.flame);
+      flame.position.set(p.x, p.y - (f.kind === 'campfire' ? 9 : 31));
+      flame.scale.set(f.kind === 'campfire' ? 1.2 : 0.7);
+      flame.blendMode = 'add';
+      this.root.addChild(base, flame);
+      this.fixtures.push({ base, flame, u: f.u, v: f.v, kind: f.kind, phase: Math.random() * 6.28 });
+    }
     this.height = buildingHeight(b.type);
   }
 
@@ -104,7 +97,7 @@ export class BuildingView {
   }
 
   /** Brightness flash + scale pop when a site becomes a finished building. */
-  update(b: Building, state: Readonly<GameState>, timeSec: number, dt: number, fx: BuildingFx, stockFill: number): void {
+  update(b: Building, state: Readonly<GameState>, timeSec: number, dt: number, fx: BuildingFx, stockFill: number, snow: number, light: number): void {
     const c = b.construction;
     const building = b.status === 'construction' && c !== null;
     const repair = building && c.kind === 'repair';
@@ -138,6 +131,31 @@ export class BuildingView {
     } else if (this.base.scale.x !== 1) {
       this.base.scale.set(1);
       this.base.tint = 0xffffff;
+    }
+
+    // winter: crossfade the snow-roofed variant over the base art
+    const sea = this.tex.seasonal;
+    if (sea && !building && snow > 0.02 && b.type !== 'farm') {
+      const snowTex = snowTexture(sea.buildingsSnow, b.type, b.id);
+      if (snowTex) {
+        const key = `${b.type}:${b.id % 3}`;
+        if (key !== this.snowTexKey) {
+          this.snowTexKey = key;
+          setTex(this.snowSprite, snowTex);
+        }
+        this.snowSprite.visible = true;
+        this.snowSprite.alpha = Math.min(1, snow * 1.15);
+      }
+    } else this.snowSprite.visible = false;
+
+    // fixtures: flames flicker, brighter after dark
+    for (const f of this.fixtures) {
+      const flick = 0.85 + 0.15 * Math.sin(timeSec * 11 + f.phase) + 0.08 * Math.sin(timeSec * 23 + f.phase * 2);
+      const base = f.kind === 'campfire' ? 0.35 : 0.3;
+      f.flame.alpha = (base + (1 - base) * light) * Math.min(1, flick);
+      const sc = (f.kind === 'campfire' ? 1.0 : 0.62) * (0.7 + 0.5 * light) * flick;
+      f.flame.scale.set(sc * (1 + 0.06 * Math.sin(timeSec * 17 + f.phase)), sc * flick);
+      f.flame.rotation = Math.sin(timeSec * 5 + f.phase) * 0.08;
     }
 
     // chimney smoke
@@ -185,14 +203,23 @@ export class BuildingView {
     const H = buildingHeight(b.type);
 
     if (building && !repair) {
-      // staked pad + blueprint + rising building + scaffolding + delivered materials
+      // staked pad, a timber-coloured shell that gives way to the finished building, scaffolding,
+      // and the materials delivered so far
+      const p = progress;
+      const ss = (e0: number, e1: number, x: number): number => {
+        const t = Math.min(1, Math.max(0, (x - e0) / (e1 - e0)));
+        return t * t * (3 - 2 * t);
+      };
       this.pad.visible = true;
-      this.blueprint.visible = true;
+      this.blueprint.visible = b.type !== 'farm' && p > 0.02;
       setTex(this.blueprint, full);
-      const st = Math.round(progress * STAGES);
-      this.base.visible = st > 1;
-      if (st > 1) setTex(this.base, cropped(full, Math.min(STAGES, st), STAGES));
-      if (b.type !== 'farm') this.drawScaffold(hu, hv, progress, H);
+      this.blueprint.tint = 0xc9a56c;
+      this.blueprint.alpha = 0.82 * ss(0.02, 0.2, p) * (1 - ss(0.4, 0.92, p));
+      this.base.visible = p > 0.3 || b.type === 'farm';
+      setTex(this.base, full);
+      this.base.tint = 0xffffff;
+      this.base.alpha = b.type === 'farm' ? 0.25 + 0.75 * p : ss(0.3, 0.98, p);
+      if (b.type !== 'farm') this.drawScaffold(hu, hv, 0.55 + 0.45 * p, H);
       this.placePile(0, tex.piles.planks, pileLevel(o.delW, [1, 12, 24]), -hu * 0.5, hv + 0.28);
       this.placePile(1, tex.piles.stones, pileLevel(o.delS, [1, 6, 14]), hu + 0.3, hv * 0.2);
       this.placePile(2, tex.piles.crates, pileLevel(o.delT, [1, 2, 4]), -hu - 0.1, hv * 0.55);
@@ -201,6 +228,7 @@ export class BuildingView {
 
     this.pad.visible = false;
     this.blueprint.visible = false;
+    this.base.alpha = 1;
     this.base.visible = true;
     setTex(this.base, full);
     if (repair) this.drawScaffold(hu, hv, 0.35 + 0.65 * (1 - Math.abs(progress - 0.5) * 2), H, true);
@@ -269,6 +297,27 @@ export class BuildingView {
       const d1 = P(x1, y1, top * 0.8);
       g.moveTo(d0.x, d0.y).lineTo(d1.x, d1.y).stroke({ width: 1.1, color: 0xd2ac72, alpha: 0.8 });
     }
+  }
+}
+
+function snowTexture(set: NonNullable<TextureSet['seasonal']>['buildingsSnow'], type: Building['type'], id: number): Texture | null {
+  switch (type) {
+    case 'house':
+      return set.house[id % set.house.length]!;
+    case 'townCenter':
+      return set.townCenter;
+    case 'storage':
+      return set.storage;
+    case 'workshop':
+      return set.workshop;
+    case 'lumberCamp':
+      return set.lumberCamp;
+    case 'mine':
+      return set.mine;
+    case 'well':
+      return set.well;
+    default:
+      return null;
   }
 }
 

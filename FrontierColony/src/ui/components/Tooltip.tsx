@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
+import { useUiStore } from '../../store';
+import { useUiScale } from '../lib/usePrefsSync';
 
 export type TooltipSide = 'top' | 'bottom' | 'left' | 'right';
 
@@ -91,7 +93,9 @@ export function Tooltip({ content, title, side = 'bottom', delay = 380, children
   const tipRef = useRef<HTMLDivElement>(null);
   const timer = useRef<number | null>(null);
   const id = useId();
-  const enabled = Boolean(content) || Boolean(title);
+  const showTips = useUiStore((s) => s.prefs.showTips);
+  const scale = useUiScale();
+  const enabled = showTips && (Boolean(content) || Boolean(title));
 
   const clearTimer = useCallback(() => {
     if (timer.current !== null) {
@@ -178,7 +182,7 @@ export function Tooltip({ content, title, side = 'bottom', delay = 380, children
             id={id}
             role="tooltip"
             className={`tooltip tooltip--${pos?.side ?? side}`}
-            style={pos ? { left: pos.left, top: pos.top } : { left: 0, top: 0, visibility: 'hidden' }}
+            style={{ ...(pos ? { left: pos.left, top: pos.top } : { left: 0, top: 0, visibility: 'hidden' as const }), transform: scale === 1 ? undefined : `scale(${scale})`, transformOrigin: '0 0' }}
           >
             {title && <div className="tooltip__title">{title}</div>}
             {content && <div className="tooltip__body">{content}</div>}

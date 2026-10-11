@@ -19,7 +19,7 @@ function ToastItem({ toast }: { toast: Toast }) {
     return () => {
       if (timer.current !== null) window.clearTimeout(timer.current);
     };
-  }, [toast.id]);
+  }, [toast.id, toast.updatedAt]);
 
   return (
     <div
@@ -33,6 +33,11 @@ function ToastItem({ toast }: { toast: Toast }) {
     >
       <Icon name={ICON[toast.severity]} size={18} className="toast__icon" />
       <span className="toast__msg">{toast.message}</span>
+      {toast.count > 1 && (
+        <span className="toast__count" aria-label={`${toast.count} times`}>
+          &times;{toast.count}
+        </span>
+      )}
       <button type="button" className="toast__close" onClick={() => dismiss(toast.id)} aria-label="Dismiss notification">
         <Icon name="close" size={12} />
       </button>

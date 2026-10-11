@@ -39,7 +39,7 @@ export function assertInvariants(state: GameState): void {
   for (const key of Object.keys(state.colony.stock) as (keyof typeof state.colony.stock)[]) {
     const v = state.colony.stock[key];
     if (!Number.isFinite(v) || v < 0) fail(`stock.${key} = ${v}`);
-    if (v > cap + 1e-6 && v > 1000) fail(`stock.${key} = ${v} is far above capacity ${cap}`);
+    if (v > cap + 1e-6) fail(`stock.${key} = ${v} is above the storage capacity ${cap}`);
   }
 
   const names = new Set<string>();
@@ -53,6 +53,11 @@ export function assertInvariants(state: GameState): void {
       fail(`${s.name}: label "${s.activity.label}" does not match kind ${s.activity.kind}`);
     }
     if (s.carrying && s.carrying.amount <= 0) fail(`${s.name} carries ${s.carrying.amount}`);
+    const indoors = s.activity.indoorsBuildingId;
+    const asleep = (s.task.kind === 'sleep' || s.task.kind === 'rest') && s.task.phase === 'working' && s.task.buildingId !== null;
+    if ((indoors !== null) !== asleep || (indoors !== null && s.task.kind !== 'idle' && 'buildingId' in s.task && s.task.buildingId !== indoors)) {
+      fail(`${s.name}: indoorsBuildingId ${indoors} does not match the task ${s.task.kind}/${s.task.phase}`);
+    }
     if (names.has(s.name)) fail(`duplicate settler name ${s.name}`);
     names.add(s.name);
     if (s.task.kind === 'idle' && s.path.length > 0) fail(`${s.name} is idle but has a path`);

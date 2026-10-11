@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef } from 'react';
 import { useGameController } from '../../game';
 import { useUiStore } from '../../store';
 import { describeTile } from '../lib/tileInfo';
+import { useUiScale } from '../lib/usePrefsSync';
 
 /**
  * Small floating card near the cursor describing the hovered tile (terrain, resource left, building,
@@ -13,6 +14,7 @@ export function HoverCard() {
   const buildMode = useUiStore((s) => s.buildMode);
   const snapshot = useUiStore((s) => s.snapshot);
   const controller = useGameController();
+  const scale = useUiScale();
   const ref = useRef<HTMLDivElement>(null);
   const pointer = useRef({ x: 0, y: 0, overCanvas: false });
 
@@ -22,11 +24,11 @@ export function HoverCard() {
       if (!el) return;
       const { x, y, overCanvas } = pointer.current;
       el.style.visibility = overCanvas ? 'visible' : 'hidden';
-      const w = el.offsetWidth;
-      const h = el.offsetHeight;
+      const w = el.offsetWidth * scale;
+      const h = el.offsetHeight * scale;
       const left = x + 18 + w > window.innerWidth - 8 ? x - 18 - w : x + 18;
       const top = Math.max(8, Math.min(y + 14, window.innerHeight - h - 8));
-      el.style.transform = `translate(${Math.max(8, left)}px, ${top}px)`;
+      el.style.transform = `translate(${Math.max(8, left)}px, ${top}px) scale(${scale})`;
     };
     const onMove = (e: PointerEvent) => {
       pointer.current = { x: e.clientX, y: e.clientY, overCanvas: e.target instanceof HTMLCanvasElement };

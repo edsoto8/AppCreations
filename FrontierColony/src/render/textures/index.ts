@@ -3,6 +3,7 @@
  * Variant arrays are indexed by a per-tile hash so the same tile always shows the same art.
  */
 import type { Texture } from 'pixi.js';
+import type { SeasonalSet } from './seasonal';
 import { AtlasBuilder } from './atlas';
 import type { Art } from './canvas';
 import { makeBankStrip, makeCliffStrip, type CliffMaterial } from './cliffs';
@@ -19,7 +20,7 @@ import {
 } from './decals';
 import { makeSelectionRing, makeSoftShadow } from './entities';
 import { bakeFarm, bakeHouse, bakeLumberCamp, bakeMine, bakeStorage, bakeTownCenter, bakeWell, bakeWorkshop, FARM_STAGES, HOUSE_VARIANTS } from './buildings';
-import { makeChip, makeLeaf, makePuff, makeResourceIcon, makeSoftDot, makeSpark } from './fx';
+import { makeAsh, makeCampfire, makeChip, makeCloud, makeFlame, makeGlow, makeLeaf, makePuff, makeResourceIcon, makeRing, makeSickBadge, makeSoftDot, makeSpark, makeStreak, makeTorchPost } from './fx';
 import { makeCratePile, makeLogPile, makePlankPile, makeProducePile, makeSitePad, makeStonePile } from './piles';
 import {
   makeAxe,
@@ -59,7 +60,7 @@ import {
   type EdgeDir,
   type FringeMaterial,
 } from './groundTiles';
-import { makeMountain, makeQuarriedMountain, makeRockCluster, makeRubble, MOUNTAIN_VARIANTS, ROCK_LEVELS, ROCK_VARIANTS, SNOW_LEVELS } from './rocks';
+import { makeMountain, makeOutcrop, makeQuarriedMountain, makeRubble, MOUNTAIN_VARIANTS, OUTCROP_KINDS, OUTCROP_TIERS, OUTCROP_VARIANTS, SNOW_LEVELS } from './rocks';
 import { makeTreeCluster, TREE_LEVELS, TREE_SPECIES, TREE_VARIANTS, type TreeSpecies } from './trees';
 
 export type EdgeSet = Record<EdgeDir, Texture>;
@@ -91,8 +92,8 @@ export interface TextureSet {
   sparkle: Texture;
   /** trees[species][level - 1][variant] */
   trees: Record<TreeSpecies, Texture[][]>;
-  /** rocks[level - 1][variant] */
-  rocks: Texture[][];
+  /** outcrops[kind][tier][variant] */
+  outcrops: Texture[][][];
   rubble: Texture[];
   /** mountains[snow][variant][flip ? 1 : 0] */
   mountains: Texture[][][];
@@ -112,7 +113,7 @@ export interface TextureSet {
   tools: { axe: Texture; pick: Texture; hammer: Texture; hoe: Texture; bucket: Texture; bucketFull: Texture };
   carry: { logs: Texture; rock: Texture; sack: Texture; crate: Texture };
   badges: Record<BadgeKind, Texture>;
-  fx: { z: Texture; dots: Texture; heart: Texture; note: Texture; blanket: Texture; dot: Texture; puff: Texture; chip: Texture; spark: Texture; leaf: Texture };
+  fx: { z: Texture; dots: Texture; heart: Texture; note: Texture; blanket: Texture; dot: Texture; puff: Texture; chip: Texture; spark: Texture; leaf: Texture; streak: Texture; ring: Texture; cloud: Texture; flame: Texture; glow: Texture; campfire: Texture; torch: Texture; sick: Texture; ash: Texture[] };
   resIcons: Record<ResourceType, Texture>;
   buildings: {
     house: Texture[];
@@ -128,6 +129,8 @@ export interface TextureSet {
   pads: Record<1 | 2 | 3, Texture>;
   selectionRing: Texture;
   softShadow: Texture;
+  /** Winter / autumn textures, baked in the background (null until ready). */
+  seasonal: SeasonalSet | null;
   /** Atlas page canvases, for debugging only. */
   pages: HTMLCanvasElement[];
   destroy(): void;
@@ -149,7 +152,7 @@ export function buildTextureSet(): TextureSet {
   const forestFloor = list('forestFloor', 4, (i) => makeForestFloor(i + 1));
   const sandPlain = list('sandPlain', 4, (i) => makeSandTile(i + 1));
   const sandPebbles = list('sandPebbles', 2, (i) => makeSandTile(i + 30, { pebbles: true }));
-  const hills = list('hills', 5, (i) => makeHillsGround(i + 1));
+  const hills = list('hills', 6, (i) => makeHillsGround(i + 1));
   const rockGround = list('rockGround', 4, (i) => makeRockGround(i + 1));
   const water = list('water', 4, (i) => makeWaterTile(i + 1));
 
@@ -184,7 +187,7 @@ export function buildTextureSet(): TextureSet {
   for (const sp of TREE_SPECIES) {
     treeKeys[sp] = Array.from({ length: TREE_LEVELS }, (_, l) => list(`tree.${sp}.${l + 1}.`, TREE_VARIANTS, (v) => makeTreeCluster(sp, l + 1, v)));
   }
-  const rockKeys = Array.from({ length: ROCK_LEVELS }, (_, l) => list(`rock.${l + 1}.`, ROCK_VARIANTS, (v) => makeRockCluster(l + 1, v)));
+  const outcropKeys = Array.from({ length: OUTCROP_KINDS }, (_, k) => Array.from({ length: OUTCROP_TIERS }, (_, t) => list(`outcrop.${k}.${t}.`, OUTCROP_VARIANTS, (v) => makeOutcrop(k, t, v))));
   const rubble = list('rubble', 3, (i) => makeRubble(i + 1));
   const mountainKeys = Array.from({ length: SNOW_LEVELS }, (_, s) =>
     Array.from({ length: MOUNTAIN_VARIANTS }, (_, v) => [add(`mtn.${s}.${v}.0`, makeMountain(v, s, false)), add(`mtn.${s}.${v}.1`, makeMountain(v, s, true))]),
@@ -230,7 +233,16 @@ export function buildTextureSet(): TextureSet {
     chip: add('fx.chip', makeChip()),
     spark: add('fx.spark', makeSpark()),
     leaf: add('fx.leaf', makeLeaf()),
+    streak: add('fx.streak', makeStreak()),
+    ring: add('fx.ring', makeRing()),
+    cloud: add('fx.cloud', makeCloud()),
+    flame: add('fx.flame', makeFlame()),
+    glow: add('fx.glow', makeGlow()),
+    campfire: add('fx.campfire', makeCampfire()),
+    torch: add('fx.torch', makeTorchPost()),
+    sick: add('fx.sick', makeSickBadge()),
   };
+  const ashKeys = list('fx.ash', 3, (i) => makeAsh(i + 1));
   const resKeys = RESOURCE_TYPES.map((r) => add(`res.${r}`, makeResourceIcon(r)));
   const bKeys = {
     house: list('bld.house', HOUSE_VARIANTS, (i) => bakeHouse(i)),
@@ -294,7 +306,7 @@ export function buildTextureSet(): TextureSet {
     stump: t(stump),
     sparkle: t(sparkle),
     trees,
-    rocks: rockKeys.map(ts),
+    outcrops: outcropKeys.map((perKind) => perKind.map(ts)),
     rubble: ts(rubble),
     mountains: mountainKeys.map((perSnow) => perSnow.map(ts)),
     quarried: ts(quarried),
@@ -313,7 +325,7 @@ export function buildTextureSet(): TextureSet {
     tools: { axe: t(toolKeys.axe), pick: t(toolKeys.pick), hammer: t(toolKeys.hammer), hoe: t(toolKeys.hoe), bucket: t(toolKeys.bucket), bucketFull: t(toolKeys.bucketFull) },
     carry: { logs: t(carryKeys.logs), rock: t(carryKeys.rock), sack: t(carryKeys.sack), crate: t(carryKeys.crate) },
     badges: Object.fromEntries(badgeKinds.map((k, i) => [k, t(badgeKeys[i]!)])) as Record<BadgeKind, Texture>,
-    fx: { z: t(fxKeys.z), dots: t(fxKeys.dots), heart: t(fxKeys.heart), note: t(fxKeys.note), blanket: t(fxKeys.blanket), dot: t(fxKeys.dot), puff: t(fxKeys.puff), chip: t(fxKeys.chip), spark: t(fxKeys.spark), leaf: t(fxKeys.leaf) },
+    fx: { z: t(fxKeys.z), dots: t(fxKeys.dots), heart: t(fxKeys.heart), note: t(fxKeys.note), blanket: t(fxKeys.blanket), dot: t(fxKeys.dot), puff: t(fxKeys.puff), chip: t(fxKeys.chip), spark: t(fxKeys.spark), leaf: t(fxKeys.leaf), streak: t(fxKeys.streak), ring: t(fxKeys.ring), cloud: t(fxKeys.cloud), flame: t(fxKeys.flame), glow: t(fxKeys.glow), campfire: t(fxKeys.campfire), torch: t(fxKeys.torch), sick: t(fxKeys.sick), ash: ts(ashKeys) },
     resIcons: Object.fromEntries(RESOURCE_TYPES.map((r, i) => [r, t(resKeys[i]!)])) as Record<ResourceType, Texture>,
     buildings: {
       house: ts(bKeys.house),
@@ -329,8 +341,10 @@ export function buildTextureSet(): TextureSet {
     pads: { 1: t(padKeys[0]!), 2: t(padKeys[1]!), 3: t(padKeys[2]!) },
     selectionRing: t(ring),
     softShadow: t(softShadow),
+    seasonal: null,
     pages,
     destroy() {
+      this.seasonal?.destroy();
       for (const tex of textures.values()) tex.destroy(false);
       for (const s of sources) s.destroy();
     },

@@ -3,6 +3,8 @@ import { useShallow } from 'zustand/react/shallow';
 import { useGameController } from '../../game';
 import { uiStore, useUiStore } from '../../store';
 import { Icon, type IconName } from '../components/Icon';
+import { Tooltip } from '../components/Tooltip';
+import { PANEL_DEFS } from '../panels/panelDefs';
 import { computeWarnings, newDangerIds, type Warning } from '../lib/warnings';
 
 const ICON: Record<Warning['severity'], IconName> = { info: 'info', good: 'good', warning: 'warning', danger: 'danger' };
@@ -86,10 +88,12 @@ export function WarningsStrip() {
     <ul className="warnings" aria-label="Warnings" data-testid="warnings">
       {shown.map((w) => (
         <li key={w.id}>
+          <Tooltip content={w.action.kind === 'panel' ? `Click to open ${PANEL_DEFS[w.action.panel].title}` : w.action.kind === 'settler' ? 'Click to find this settler' : null} side="bottom">
           <button type="button" className={`warning-chip warning-chip--${w.severity}`} onClick={() => act(w)} disabled={w.action.kind === 'none'} data-testid={`warning-${w.id}`}>
             <Icon name={ICON[w.severity]} size={14} />
             <span>{w.text}</span>
           </button>
+          </Tooltip>
         </li>
       ))}
       {hidden > 0 && (

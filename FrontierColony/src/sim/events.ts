@@ -26,7 +26,7 @@ import { getWalkRegions } from './grid';
 import { chance, nextFloat, pick, pickWeightedIndex, shuffle } from './rng';
 import { addNewcomer } from './settlerGen';
 import { assignHomes } from './settlerSim';
-import { addStockOf, pushLog, recordConsumed, releaseBuildingUsers } from './stateOps';
+import { addStockOrLose, pushLog, recordConsumed, releaseBuildingUsers } from './stateOps';
 import type { TickContext } from './needs';
 import {
   RESOURCE_TYPES,
@@ -115,7 +115,20 @@ function arrivalTile(state: GameState): { x: number; y: number } {
   const H = world.height;
   const town = townCentre(state);
   const { labels } = getWalkRegions(world);
-  const home = town ? (labels[(town.origin.y - 1) * W + town.origin.x - 1] as number) : -1;
+  // The region of the free tiles around the town center (not its corner, which could be unwalkable).
+  let home = -1;
+  if (town) {
+    for (let y = town.origin.y - 1; y <= town.origin.y + town.footprint.h && home < 0; y++) {
+      for (let x = town.origin.x - 1; x <= town.origin.x + town.footprint.w; x++) {
+        const inside = x >= town.origin.x && x < town.origin.x + town.footprint.w && y >= town.origin.y && y < town.origin.y + town.footprint.h;
+        const i = y * W + x;
+        if (!inside && x >= 0 && y >= 0 && x < W && y < H && world.building[i] === 0 && labels[i] !== -1) {
+          home = labels[i] as number;
+          break;
+        }
+      }
+    }
+  }
   const edge: number[] = [];
   const consider = (x: number, y: number) => {
     const i = y * W + x;
@@ -230,15 +243,13 @@ export function resolveDecision(state: GameState, eventId: number, accept: boole
       if (!RESOURCE_TYPES.every((r) => avail[r] >= (offer.give[r] ?? 0))) {
         return { ok: false, error: 'insufficientResources', message: 'You no longer have the goods for this trade.' };
       }
-      let lost = 0;
       for (const r of RESOURCE_TYPES) {
         const give = offer.give[r] ?? 0;
         if (give > 0) state.colony.stock[r] -= give;
         const get = offer.get[r] ?? 0;
-        if (get > 0) lost += get - addStockOf(state, r, get);
+        if (get > 0) addStockOrLose(state, r, get, 'a trade');
       }
       pushLog(state, 'good', `Traded ${amountsText(offer.give)} for ${amountsText(offer.get)}.`);
-      if (lost > 0) pushLog(state, 'warning', 'Some of the goods were lost: the storage is full.');
       return done();
     }
     case 'wanderer': {
@@ -411,8 +422,8 @@ export function fireEvent(ctx: TickContext, kind: DailyKind): void {
       for (const r of RESOURCE_TYPES) {
         const amount = reward[r] ?? 0;
         if (amount <= 0) continue;
-        const stored = addStockOf(state, r, amount);
-        text = `Settlers found an abandoned wagon: +${amount} ${r}.${stored < amount ? ' Some of it was lost: the storage is full.' : ''}`;
+        addStockOrLose(state, r, amount, 'the wagon');
+        text = `Settlers found an abandoned wagon: +${amount} ${r}.`;
       }
       announce(state, events, kind, text, 'good');
       return;

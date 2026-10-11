@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type { LogEntry, LogSeverity } from '../../sim';
 import { useGameController } from '../../game';
 import { uiStore, useUiStore } from '../../store';
+import { EmptyState } from '../components/EmptyState';
 import { Icon, type IconName } from '../components/Icon';
 import { formatClock } from '../lib/format';
 import { eventTitle, EVENT_INFO } from '../lib/eventInfo';
@@ -79,7 +80,9 @@ export function EventsPanel() {
         ))}
       </div>
       {rows.length === 0 ? (
-        <p className="muted chronicle__empty">{log && log.length > 0 ? 'Nothing matches this filter.' : 'Nothing has happened yet. Give it time.'}</p>
+        <EmptyState icon="events" hint={log && log.length > 0 ? 'Try the All filter.' : 'Arrivals, weather and accidents will be recorded here.'}>
+          {log && log.length > 0 ? 'Nothing matches this filter.' : 'Nothing has happened yet.'}
+        </EmptyState>
       ) : (
         <ol className="log" data-testid="log-list">
           {rows.map((e) => (

@@ -6,6 +6,9 @@ import { Application } from 'pixi.js';
 import { MAX_ELEVATION, Terrain, getBuildingAt, inBounds, tileIndex, type GameState, type TilePos } from '../sim';
 import { pickTile, tileToScreen } from '../shared/iso';
 import type { OverlayMode, PlacementGhost, Selection } from '../shared/types';
+import { Atmosphere } from './atmosphere/atmosphere';
+import { seasonLook } from './atmosphere/seasons';
+import { SeasonalBaker } from './textures/seasonal';
 import { Camera } from './camera';
 import { DepthLayer } from './depthLayer';
 import { Effects } from './effects/effects';
@@ -33,6 +36,8 @@ export class IsoRenderer implements GameRenderer {
   private readonly terrain: TerrainRenderer;
   private readonly entities: EntityLayer;
   private readonly effects: Effects;
+  private readonly atmosphere: Atmosphere;
+  private readonly baker = new SeasonalBaker();
   private readonly overlays: Overlays;
   private readonly input: InputController;
 
@@ -44,6 +49,8 @@ export class IsoRenderer implements GameRenderer {
   private lastRevision = -1;
   /** Clock for character animation: frozen while paused, faster at higher game speeds. */
   private animTime = 0;
+  private frameIndex = 0;
+  private dbgHide = '';
 
   private readonly app: Application;
   private readonly callbacks: RendererCallbacks;
@@ -55,7 +62,7 @@ export class IsoRenderer implements GameRenderer {
     app.stage.eventMode = 'none';
     app.stage.addChild(this.layers.world);
     this.depth = new DepthLayer(this.layers.objects);
-    this.terrain = new TerrainRenderer(this.layers, tex, this.depth);
+    this.terrain = new TerrainRenderer(this.layers, tex, this.depth, app.renderer);
     this.entities = new EntityLayer(this.depth, tex, () => this.terrain.model);
     this.effects = new Effects(this.layers, this.depth, tex, this.entities.locator());
     this.entities.attachEffects(this.effects);
@@ -64,6 +71,7 @@ export class IsoRenderer implements GameRenderer {
       this.effects.fell.start(p.x, p.y, x + y + 1, species, seed);
     };
     this.overlays = new Overlays(this.layers, tex);
+    this.atmosphere = new Atmosphere(app.stage, tex);
     this.input = new InputController(app.canvas, this.camera, {
       onHover: (pos) => this.handleHover(pos),
       onClick: (pos, button) => this.handleClick(pos, button),
@@ -115,13 +123,20 @@ export class IsoRenderer implements GameRenderer {
     this.effects.handle(frame.events);
 
     const view = cam.viewRect(0);
-    this.terrain.update(view, this.needsImmediateBuild);
+    this.terrain.update(view, this.needsImmediateBuild, cam.zoom);
     this.needsImmediateBuild = false;
     const time = frame.nowMs / 1000;
     this.terrain.animate(time);
     const frameDt = Math.min(frame.frameMs, 100) / 1000;
     this.animTime += frame.speed === 0 ? 0 : frameDt * Math.min(2, Math.sqrt(frame.speed));
-    this.entities.update(state, frame.alpha, time, frameDt, cam.zoom, this.animTime);
+    const look = seasonLook(state.time, this.atmosphere.drought, state.weather.current, state.weather.intensity);
+    this.terrain.setLook(look);
+    this.entities.update(state, frame.alpha, time, frameDt, cam.zoom, this.animTime, look.snow, this.atmosphere.light);
+    this.atmosphere.update({ state, dt: frameDt, world: this.layers.world, screenW: this.app.screen.width, screenH: this.app.screen.height, view, entities: this.entities });
+    if (!this.baker.done && this.frameIndex++ > 20) {
+      const set = this.baker.step(Math.min(40, Math.max(4, frame.frameMs * 0.35)));
+      if (set) this.tex.seasonal = set;
+    }
     this.effects.update(frame.speed === 0 ? frameDt * 0.35 : frameDt);
 
     if (cam.moved && this.input.lastPointer) this.handleHover(this.input.lastPointer);
@@ -134,6 +149,21 @@ export class IsoRenderer implements GameRenderer {
     }
     cam.moved = false;
 
+    if (!this.dbgHide) this.dbgHide = new URLSearchParams(location.search).get('hide') ?? '-';
+    if (this.dbgHide !== '-') {
+      const L = this.layers;
+      const h = this.dbgHide;
+      L.ground.visible = !h.includes('g');
+      L.waterFx.visible = !h.includes('w');
+      L.objects.visible = !h.includes('o');
+      L.effects.visible = !h.includes('e');
+      L.overlays.visible = !h.includes('v');
+      L.labels.visible = !h.includes('l');
+    }
+    if (this.dbgHide !== '-' && this.dbgHide.includes('x')) {
+      this.stats.frames++;
+      return;
+    }
     this.app.render();
     const dt = performance.now() - t0;
     this.stats.cpuMs = this.stats.frames === 0 ? dt : this.stats.cpuMs * 0.95 + dt * 0.05;

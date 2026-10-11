@@ -90,6 +90,17 @@ export const PANEL_DEFS: Record<PanelId, PanelDef> = {
     comingIn: null,
     inToolbar: true,
   },
+  help: {
+    id: 'help',
+    title: 'How to Play',
+    short: 'Help',
+    icon: 'info',
+    placement: 'center',
+    width: 640,
+    blurb: 'Controls, the core loop, survival tips, and how to win or lose.',
+    comingIn: null,
+    inToolbar: false,
+  },
   settings: {
     id: 'settings',
     title: 'Settings',
@@ -97,8 +108,8 @@ export const PANEL_DEFS: Record<PanelId, PanelDef> = {
     icon: 'settings',
     placement: 'center',
     width: 520,
-    blurb: 'Controls and options.',
-    comingIn: 'M6',
+    blurb: 'Interface size, autosave, tooltips and the tutorial.',
+    comingIn: null,
     inToolbar: true,
   },
 };

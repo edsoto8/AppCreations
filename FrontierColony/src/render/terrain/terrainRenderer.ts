@@ -2,13 +2,15 @@
  * Owns the chunk grid: builds chunks lazily as they come into view, rebuilds only the chunks whose
  * tiles changed (detected by diffing against `world.revision`), culls the rest and animates the water.
  */
+import { RenderTexture, Sprite, type Renderer } from 'pixi.js';
 import type { WorldState } from '../../sim';
 import { MAX_ELEVATION, Terrain } from '../../sim';
 import { ELEVATION_STEP } from '../../shared/iso';
+import { NEUTRAL_LOOK, type SeasonLook } from '../atmosphere/seasons';
 import type { DepthLayer } from '../depthLayer';
 import type { Layers } from '../layers';
 import type { TextureSet } from '../textures';
-import { buildChunk, clearChunk, createChunk, type Chunk } from './chunkBuilder';
+import { buildChunk, clearChunk, createChunk, destroyBake, groundRect, type Chunk } from './chunkBuilder';
 import { CHUNK_SIZE, TerrainModel } from './model';
 
 export interface ViewRect {
@@ -18,7 +20,7 @@ export interface ViewRect {
   y1: number;
 }
 
-const MAX_BUILT_CHUNKS = 64;
+const MAX_BUILT_CHUNKS = 48;
 /** Chunks (re)built per frame beyond the ones needed this very frame. */
 const PREFETCH_BUDGET = 2;
 
@@ -31,11 +33,18 @@ export class TerrainRenderer {
   private readonly layers: Layers;
   private readonly tex: TextureSet;
   private readonly depth: DepthLayer;
+  private readonly renderer: Renderer;
+  /** Ground chunks are baked into one texture each while zoomed out; live sprites when zoomed in. */
+  private liveGround = false;
+  private bakeRes = 1;
+  private look: SeasonLook = NEUTRAL_LOOK;
 
-  constructor(layers: Layers, tex: TextureSet, depth: DepthLayer) {
+  constructor(layers: Layers, tex: TextureSet, depth: DepthLayer, renderer: Renderer) {
     this.layers = layers;
     this.tex = tex;
     this.depth = depth;
+    this.renderer = renderer;
+    this.bakeRes = Math.min(1.5, renderer.resolution);
   }
 
   /** Rebuild everything for a new or loaded world. */
@@ -49,7 +58,6 @@ export class TerrainRenderer {
         const chunk = createChunk(cx, cy, cy * this.cols + cx);
         chunk.ground.visible = false;
         chunk.fx.visible = false;
-        this.layers.ground.addChild(chunk.ground);
         this.layers.waterFx.addChild(chunk.fx);
         this.approximateBounds(chunk, world.width, world.height);
         this.chunks.push(chunk);
@@ -60,6 +68,7 @@ export class TerrainRenderer {
   private clear(): void {
     for (const c of this.chunks) {
       clearChunk(c);
+      destroyBake(c);
       c.ground.destroy();
       c.fx.destroy();
     }
@@ -93,6 +102,11 @@ export class TerrainRenderer {
       this.markDirty(x, y, structural);
       this.noteFelled(model, x, y, i, prevT, prevL);
     });
+  }
+
+  /** Set the seasonal palette; chunks re-skin gradually (one per frame) as it changes. */
+  setLook(look: SeasonLook): void {
+    this.look = look;
   }
 
   /** Called when a forest tile loses trees (chopped) so the renderer can play a falling-tree animation. */
@@ -141,16 +155,52 @@ export class TerrainRenderer {
   private rebuild(c: Chunk): void {
     if (!this.model) return;
     clearChunk(c);
-    buildChunk(c, this.model, this.tex, this.depth);
+    buildChunk(c, this.model, this.tex, this.depth, this.look);
+    if (this.liveGround) this.goLive(c);
+    else this.bake(c);
+  }
+
+  /** Render the chunk's flat tiles into its texture, then drop the individual sprites. */
+  private bake(c: Chunk): void {
+    const model = this.model!;
+    const r = groundRect(c, model.width, model.height);
+    if (!c.rt || c.rt.width !== r.w || c.rt.height !== r.h) {
+      c.bake?.destroy();
+      c.rt?.destroy(true);
+      c.rt = RenderTexture.create({ width: r.w, height: r.h, resolution: this.bakeRes, autoGenerateMipmaps: true, scaleMode: 'linear' });
+      c.bake = new Sprite(c.rt);
+      c.bake.position.set(r.x, r.y);
+      c.bake.visible = false;
+      this.layers.ground.addChild(c.bake);
+    }
+    if (c.ground.parent) c.ground.parent.removeChild(c.ground);
+    c.ground.position.set(-r.x, -r.y);
+    c.ground.visible = true;
+    this.renderer.render({ container: c.ground, target: c.rt, clear: true });
+    for (const ch of c.ground.removeChildren()) ch.destroy();
+    c.mode = 'baked';
+    c.bake!.visible = c.shown;
+  }
+
+  /** Keep the chunk's ground as live sprites (crisp when zoomed in). */
+  private goLive(c: Chunk): void {
+    c.ground.position.set(0, 0);
+    this.layers.ground.addChild(c.ground);
+    c.ground.visible = c.shown;
+    if (c.bake) c.bake.visible = false;
+    c.mode = 'live';
   }
 
   /**
    * Cull and (re)build. `view` is the visible world rectangle; chunks within a margin of it are kept
    * built so panning never shows a hole. `immediate` builds everything needed right now.
    */
-  update(view: ViewRect, immediate = false): void {
+  update(view: ViewRect, immediate = false, zoom = 1): void {
     if (!this.model) return;
     this.frame++;
+    const wantLive = this.liveGround ? zoom > 1.25 : zoom > 1.45;
+    const modeChanged = wantLive !== this.liveGround;
+    this.liveGround = wantLive;
     const margin = 260;
     const nearX0 = view.x0 - margin;
     const nearY0 = view.y0 - margin;
@@ -170,12 +220,19 @@ export class TerrainRenderer {
         this.hide(c);
       }
     }
+    const stale = (c: Chunk): boolean => !c.built || c.dirty || (modeChanged && c.mode !== 'none') || (c.mode === 'live') !== wantLive;
+    const lookKey = this.look.key + (this.tex.seasonal ? '+' : '-');
+    let lookBudget = immediate ? Infinity : 1;
     for (const c of needNow) {
-      if (!c.built || c.dirty) this.rebuild(c);
+      if (stale(c)) this.rebuild(c);
+      else if (c.lookKey !== lookKey && lookBudget > 0) {
+        lookBudget--;
+        this.rebuild(c);
+      }
       this.show(c);
     }
     for (const c of prefetch) {
-      if ((!c.built || c.dirty) && budget > 0) {
+      if (stale(c) && budget > 0) {
         this.rebuild(c);
         budget--;
       }
@@ -189,7 +246,8 @@ export class TerrainRenderer {
     c.lastShownFrame = this.frame;
     if (c.shown) return;
     c.shown = true;
-    c.ground.visible = true;
+    if (c.mode === 'live') c.ground.visible = true;
+    else if (c.bake) c.bake.visible = true;
     c.fx.visible = true;
     for (const s of c.sorted) this.depth.place(s);
   }
@@ -198,6 +256,7 @@ export class TerrainRenderer {
     if (!c.shown) return;
     c.shown = false;
     c.ground.visible = false;
+    if (c.bake) c.bake.visible = false;
     c.fx.visible = false;
     for (const s of c.sorted) this.depth.remove(s);
   }
@@ -210,6 +269,7 @@ export class TerrainRenderer {
     for (const c of candidates) {
       if (built <= MAX_BUILT_CHUNKS) break;
       clearChunk(c);
+      destroyBake(c);
       c.dirty = true;
       built--;
     }

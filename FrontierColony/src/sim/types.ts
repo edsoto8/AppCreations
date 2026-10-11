@@ -289,6 +289,11 @@ export interface Activity {
   progress: number | null;
   /** Tile being worked on (for facing / particles), or null. */
   targetTile: TilePos | null;
+  /**
+   * The building the settler is inside right now (asleep or resting in a bed), or null. The renderer
+   * hides or draws settlers indoors from this, not from the label. Updated every tick.
+   */
+  indoorsBuildingId: EntityId | null;
 }
 
 /** Where a task is in its lifecycle. */
@@ -566,6 +571,7 @@ export interface ColonyStats {
   consumedThisHour: ResourceAmounts;
   totalProduced: ResourceAmounts;
   totalConsumed: ResourceAmounts;
+  /** Deprecated: the design has no births, so this stays 0. */
   births: number;
   arrivals: number;
   deaths: number;
@@ -747,12 +753,15 @@ export type SimEvent =
   | { type: 'constructionWork'; settlerId: EntityId; buildingId: EntityId }
   | { type: 'tileChanged'; x: number; y: number }
   | { type: 'buildingPlaced'; buildingId: EntityId; buildingType: BuildingType }
+  /** Goods were destroyed because the storage was full (a cancelled task, a refund, a trade or a cache). */
+  | { type: 'goodsLost'; resource: ResourceType; amount: number; reason: string }
   | { type: 'buildingCompleted'; buildingId: EntityId; buildingType: BuildingType }
   /** A completed building was damaged (storm, wildfire) and went back to construction as a repair. */
   | { type: 'buildingDamaged'; buildingId: EntityId; buildingType: BuildingType; cause: string }
   /** A damaged building finished its repair (not a new completion). */
   | { type: 'buildingRepaired'; buildingId: EntityId; buildingType: BuildingType }
   | { type: 'buildingRemoved'; buildingId: EntityId; buildingType: BuildingType; reason: 'cancelled' | 'demolished' | 'destroyed' }
+  /** Deprecated: the design has no births, so this is never emitted. */
   | { type: 'settlerBorn'; settlerId: EntityId }
   | { type: 'settlerArrived'; settlerId: EntityId }
   | { type: 'settlerDied'; settlerId: EntityId; name: string; cause: string; x: number; y: number }

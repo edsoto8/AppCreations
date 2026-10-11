@@ -4,6 +4,7 @@ import { Icon } from '../components/Icon';
 import { Tooltip } from '../components/Tooltip';
 import {
   DIFFICULTY_INFO,
+  difficultyDetails,
   MAX_COLONY_NAME,
   MAX_SEED_LENGTH,
   PRESET_INFO,
@@ -115,7 +116,9 @@ export function NewGameForm({ onBack }: { onBack: () => void }) {
             testIdPrefix="difficulty"
             options={DIFFICULTIES.map((d) => ({ value: d, label: DIFFICULTY_INFO[d].name }))}
           />
-          <p className="field__hint">{DIFFICULTY_INFO[draft.difficulty].blurb}</p>
+          <p className="field__hint">
+            {DIFFICULTY_INFO[draft.difficulty].blurb} <span className="field__fine">{difficultyDetails(draft.difficulty)}</span>
+          </p>
         </div>
 
         <div className="new-game__col">

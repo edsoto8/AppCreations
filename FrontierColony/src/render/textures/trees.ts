@@ -51,6 +51,12 @@ interface CanopyOpts {
 }
 
 const OAK: CanopyOpts = { dark: TREE.oakDark, mid: TREE.oakMid, light: TREE.oakLight, hi: TREE.oakHi };
+const OAK_AUTUMN: CanopyOpts[] = [
+  { dark: [128, 52, 30], mid: [206, 104, 42], light: [238, 152, 58], hi: [255, 208, 104] },
+  { dark: [116, 44, 34], mid: [186, 76, 40], light: [222, 118, 52], hi: [250, 178, 88] },
+  { dark: [138, 84, 30], mid: [214, 150, 48], light: [240, 190, 68], hi: [255, 226, 124] },
+];
+const BIRCH_AUTUMN: CanopyOpts = { dark: [152, 112, 30], mid: [220, 172, 52], light: [244, 212, 84], hi: [255, 240, 146] };
 const BIRCH: CanopyOpts = { dark: [70, 118, 60], mid: [112, 162, 70], light: [160, 202, 88], hi: [214, 232, 120] };
 
 function drawRound(ctx: CanvasRenderingContext2D, x: number, y: number, s: number, rng: () => number, pal: CanopyOpts, birch: boolean): void {
@@ -129,7 +135,7 @@ function drawRound(ctx: CanvasRenderingContext2D, x: number, y: number, s: numbe
   ctx.restore();
 }
 
-function drawPine(ctx: CanvasRenderingContext2D, x: number, y: number, s: number, rng: () => number): void {
+function drawPine(ctx: CanvasRenderingContext2D, x: number, y: number, s: number, rng: () => number, snow = false): void {
   groundShadow(ctx, x, y, 12 * s, 0.4);
   trunk(ctx, x, y, 3 * s, 8 * s, TREE.trunk, TREE.trunkDark);
   const tiers = 4;
@@ -180,6 +186,24 @@ function drawPine(ctx: CanvasRenderingContext2D, x: number, y: number, s: number
     sh.addColorStop(1, css(TREE.pineDark, 0.55));
     ctx.fillStyle = sh;
     ctx.fillRect(x - w - 1, yb - 5 * s, 2 * w + 2, 6 * s);
+    if (snow) {
+      // snow heaped on the upper part of each tier, ragged lower edge
+      ctx.beginPath();
+      ctx.moveTo(x, yt - 1);
+      const cut = yt + h * 0.62;
+      const zz = 6;
+      for (let i = 0; i <= zz; i++) {
+        const u = i / zz;
+        const px = x + w * 1.2 - u * 2 * w * 1.2;
+        ctx.lineTo(px, cut + (i % 2 === 0 ? 0 : -2.4 * s) - Math.abs(u - 0.5) * h * 0.55);
+      }
+      ctx.closePath();
+      const sg = ctx.createLinearGradient(x - w, yt, x + w, yb);
+      sg.addColorStop(0, css(SNOW_LIGHT, 1));
+      sg.addColorStop(1, css(SNOW_SHADE, 1));
+      ctx.fillStyle = sg;
+      ctx.fill();
+    }
     // needle strokes
     ctx.lineWidth = 0.8;
     for (let i = 0; i < 10; i++) {
@@ -193,6 +217,62 @@ function drawPine(ctx: CanvasRenderingContext2D, x: number, y: number, s: number
       ctx.stroke();
     }
     ctx.restore();
+  }
+}
+
+
+const SNOW_LIGHT: RGB = [250, 252, 255];
+const SNOW_SHADE: RGB = [176, 198, 226];
+
+/** Leafless deciduous tree with snow lying on its branches. */
+function drawBare(ctx: CanvasRenderingContext2D, x: number, y: number, s: number, rng: () => number, birch: boolean): void {
+  groundShadow(ctx, x, y, 11 * s, 0.34);
+  const th = (birch ? 16 : 13) * s;
+  if (birch) {
+    trunk(ctx, x, y, 2.6 * s, th, [238, 234, 224], [150, 144, 134]);
+    ctx.fillStyle = css([60, 56, 54], 0.8);
+    for (let i = 0; i < 4; i++) ctx.fillRect(x - 1 * s, y - th * (0.2 + i * 0.2), 1.6 * s, 0.9 * s);
+  } else {
+    trunk(ctx, x, y, 3.4 * s, th, TREE.trunk, TREE.trunkDark);
+  }
+  const col = birch ? css([196, 190, 180], 1) : css(TREE.trunkDark, 1);
+  const lit = birch ? css([240, 236, 228], 1) : css(TREE.trunk, 1);
+  const branch = (bx: number, by: number, ang: number, len: number, depth: number, w: number): void => {
+    const ex = bx + Math.sin(ang) * len;
+    const ey = by - Math.cos(ang) * len;
+    ctx.strokeStyle = col;
+    ctx.lineWidth = w + 0.9;
+    ctx.beginPath();
+    ctx.moveTo(bx, by);
+    ctx.lineTo(ex, ey);
+    ctx.stroke();
+    ctx.strokeStyle = lit;
+    ctx.lineWidth = w;
+    ctx.stroke();
+    // snow resting on top of the branch
+    ctx.strokeStyle = css(SNOW_LIGHT, 0.95);
+    ctx.lineWidth = Math.max(0.8, w * 0.7);
+    ctx.beginPath();
+    ctx.moveTo(bx + 0.2, by - 0.9);
+    ctx.lineTo(ex + 0.2, ey - 0.9);
+    ctx.stroke();
+    if (depth <= 0) return;
+    const forks = depth > 1 ? 2 : 2 + (rng() < 0.5 ? 1 : 0);
+    for (let i = 0; i < forks; i++) {
+      const da = (i / (forks - 1) - 0.5) * 1.15 + (rng() - 0.5) * 0.3;
+      branch(ex, ey, ang * 0.5 + da, len * (0.66 + rng() * 0.1), depth - 1, Math.max(0.7, w * 0.66));
+    }
+  };
+  const top = y - th;
+  branch(x, top + 2, -0.1, 13 * s, 3, 2.2 * s);
+  branch(x, top + 6 * s, -0.95, 10 * s, 2, 1.6 * s);
+  branch(x, top + 6 * s, 0.95, 10 * s, 2, 1.6 * s);
+  // snow cap on the trunk fork and a few clumps
+  ctx.fillStyle = css(SNOW_LIGHT, 0.95);
+  for (let i = 0; i < 5; i++) {
+    ctx.beginPath();
+    ctx.ellipse(x + (rng() - 0.5) * 14 * s, top - 4 * s - rng() * 12 * s, (1.2 + rng()) * s, 0.8 * s, 0, 0, Math.PI * 2);
+    ctx.fill();
   }
 }
 
@@ -222,10 +302,12 @@ const SLOTS: Record<number, [number, number][]> = {
   ],
 };
 
-export function makeTreeCluster(species: TreeSpecies, level: number, variant: number): Art {
+export type TreeSeason = 'summer' | 'autumn' | 'winter';
+
+export function makeTreeCluster(species: TreeSpecies, level: number, variant: number, season: TreeSeason = 'summer'): Art {
   const art = createArt(CLUSTER_W, CLUSTER_H, CLUSTER_AX, CLUSTER_AY);
   const { ctx } = art;
-  const rng = mulberry32((variant + 1) * 7919 + level * 131 + (species === 'oak' ? 1 : species === 'pine' ? 2 : 3) * 17);
+  const rng = mulberry32((variant + 1) * 7919 + level * 131 + (species === 'oak' ? 1 : species === 'pine' ? 2 : 3) * 17 + (season === 'summer' ? 0 : season === 'autumn' ? 101 : 211));
   const slots = [...SLOTS[level]!].map(([sx, sy]) => [sx + (rng() - 0.5) * 4, sy + (rng() - 0.5) * 2.4] as [number, number]);
   slots.sort((a, b) => a[1] - b[1]);
   const baseScale = level === 1 ? 0.78 : level === 2 ? 0.92 : 1;
@@ -236,7 +318,9 @@ export function makeTreeCluster(species: TreeSpecies, level: number, variant: nu
     // mixed stands: a tile of 'oak' may carry the odd pine, and vice versa
     let sp: TreeSpecies = species;
     if (level >= 3 && rng() < 0.22) sp = species === 'pine' ? 'oak' : 'pine';
-    if (sp === 'pine') drawPine(ctx, x, y, s * 0.96, rng);
+    if (sp === 'pine') drawPine(ctx, x, y, s * 0.96, rng, season === 'winter');
+    else if (season === 'winter') drawBare(ctx, x, y, s, rng, sp === 'birch');
+    else if (season === 'autumn') drawRound(ctx, x, y, s, rng, sp === 'birch' ? BIRCH_AUTUMN : OAK_AUTUMN[Math.floor(rng() * OAK_AUTUMN.length)]!, sp === 'birch');
     else drawRound(ctx, x, y, s, rng, sp === 'birch' ? BIRCH : OAK, sp === 'birch');
   }
   return art;

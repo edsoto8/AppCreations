@@ -2,6 +2,7 @@ import { memo, useMemo, useState } from 'react';
 import { useGameController } from '../../game';
 import { useUiStore, type SettlerSummary } from '../../store';
 import { Avatar } from '../components/Avatar';
+import { EmptyState } from '../components/EmptyState';
 import { Icon } from '../components/Icon';
 import { Tooltip } from '../components/Tooltip';
 import {
@@ -121,7 +122,9 @@ export function SettlersPanel() {
         </label>
       </div>
       {rows.length === 0 ? (
-        <p className="muted roster__empty">{settlers && settlers.length > 0 ? 'Nobody matches this filter.' : 'No settlers yet.'}</p>
+        <EmptyState icon="settlers" hint={settlers && settlers.length > 0 ? 'Try the All filter.' : 'Settlers will appear here.'}>
+          {settlers && settlers.length > 0 ? 'Nobody matches this filter.' : 'No settlers yet.'}
+        </EmptyState>
       ) : (
         <ul className="roster__list">
           {rows.map((s) => (

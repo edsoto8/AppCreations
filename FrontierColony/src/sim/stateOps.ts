@@ -51,6 +51,38 @@ export function addStockOf(state: GameState, resource: ResourceType, amount: num
   return stored;
 }
 
+// Goods that could not be stored are queued here during a tick and announced (event + log) when the tick ends.
+const lossQueue = new WeakMap<GameState, { resource: ResourceType; amount: number; reason: string }[]>();
+
+/** Record goods destroyed because the storage was full. Announced by `drainLosses`. */
+export function reportLoss(state: GameState, resource: ResourceType, amount: number, reason: string): void {
+  if (amount <= 0) return;
+  let list = lossQueue.get(state);
+  if (!list) {
+    list = [];
+    lossQueue.set(state, list);
+  }
+  list.push({ resource, amount, reason });
+}
+
+/** Emit a `goodsLost` event and one log line per loss recorded since the last call. */
+export function drainLosses(state: GameState, events: SimEvent[]): void {
+  const list = lossQueue.get(state);
+  if (!list || list.length === 0) return;
+  for (const l of list) {
+    events.push({ type: 'goodsLost', resource: l.resource, amount: l.amount, reason: l.reason });
+    pushLog(state, 'warning', `Storage full: ${Math.round(l.amount * 10) / 10} ${l.resource} lost (${l.reason}).`);
+  }
+  list.length = 0;
+}
+
+/** Add to the stock; whatever does not fit is lost and announced. Returns the amount stored. */
+export function addStockOrLose(state: GameState, resource: ResourceType, amount: number, reason: string): number {
+  const stored = addStockOf(state, resource, amount);
+  reportLoss(state, resource, amount - stored, reason);
+  return stored;
+}
+
 /** Add to the colony stock, clamped to storage capacity. Returns the amounts actually stored. */
 export function addStock(state: GameState, amounts: Record<ResourceType, number>): Record<ResourceType, number> {
   const stored = { wood: 0, stone: 0, food: 0, water: 0, tools: 0 };
@@ -112,7 +144,17 @@ export function taskReferencesBuilding(task: Task, id: EntityId): boolean {
  */
 export function abortSettlerTask(state: GameState, s: Settler): void {
   if (s.carrying) {
-    addStockOf(state, s.carrying.resource, s.carrying.amount);
+    // Back into the stockpile; if that is full, into the workplace's own buffer; only then is it lost.
+    const load = s.carrying;
+    let rest = load.amount - addStockOf(state, load.resource, load.amount);
+    const work = rest > 0 && s.workplaceId !== null ? findBuilding(state, s.workplaceId) : null;
+    if (work !== null && rest > 0) {
+      const room = Math.max(0, BUILDING_DEFS[work.type].outputCap - work.output[load.resource]);
+      const moved = Math.min(rest, room);
+      work.output[load.resource] += moved;
+      rest -= moved;
+    }
+    reportLoss(state, load.resource, rest, 'a task was cancelled');
     s.carrying = null;
   }
   s.workplaceId = null;
@@ -129,11 +171,13 @@ export function removeSettler(state: GameState, id: EntityId): Settler | null {
   if (index < 0) return null;
   const settler = state.settlers[index] as Settler;
   if (settler.toolDurability !== null) {
-    addStockOf(state, 'tools', 1);
+    addStockOrLose(state, 'tools', 1, 'a tool was returned');
     settler.toolDurability = null;
   }
   abortSettlerTask(state, settler);
   state.settlers.splice(index, 1);
+  // Events that targeted this settler (the wolves' victim) keep running without a target.
+  for (const e of state.activeEvents) if (e.targetId === id) e.targetId = null;
   for (const other of state.settlers) {
     if (other.task.kind === 'socialize' && other.task.withSettlerId === id) other.task.withSettlerId = null;
   }

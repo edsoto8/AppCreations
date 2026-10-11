@@ -1,4 +1,3 @@
-import { useEffect, useRef } from 'react';
 import { useGameController } from '../../game';
 import { useUiStore } from '../../store';
 import { Icon } from '../components/Icon';
@@ -13,21 +12,11 @@ export function DecisionHost() {
   const log = useUiStore((s) => s.snapshot?.recentLog);
   const speed = useUiStore((s) => s.speed);
   const controller = useGameController();
-  // The window length is not in the contract, so remember the largest `hoursLeft` seen per decision.
-  const maxHours = useRef(new Map<number, number>());
-
-  useEffect(() => {
-    const live = new Set((decisions ?? []).map((d) => d.eventId));
-    for (const d of decisions ?? []) maxHours.current.set(d.eventId, Math.max(maxHours.current.get(d.eventId) ?? 0, d.hoursLeft));
-    for (const id of [...maxHours.current.keys()]) if (!live.has(id)) maxHours.current.delete(id);
-  }, [decisions]);
-
   if (!decisions || decisions.length === 0) return null;
   const current = decisions[0]!;
   const message = log?.find((l) => l.id === current.eventId)?.message ?? null;
-  const view = describeDecision(current.kind, current.payload, message);
-  const total = Math.max(maxHours.current.get(current.eventId) ?? current.hoursLeft, current.hoursLeft, 0.001);
-  const fraction = Math.max(0, Math.min(1, current.hoursLeft / total));
+  const view = describeDecision(current, message);
+  const fraction = Math.max(0, Math.min(1, current.hoursLeft / Math.max(0.001, current.windowHours)));
   const seconds = realSecondsLeft(current.hoursLeft) / speed;
   const resolve = (accept: boolean) => {
     controller.dispatch({ type: 'resolveEvent', eventId: current.eventId, accept });

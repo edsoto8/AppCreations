@@ -1,11 +1,9 @@
 /** Pure display helpers (no React, no DOM) so they can be unit tested in node. */
-import { DAYS_PER_SEASON, type Season, type WeatherKind } from '../../sim';
+import { DAYS_PER_SEASON, FOOD_PER_SETTLER_DAY, SEASONS, WATER_PER_SETTLER_DAY, type Season, type WeatherKind } from '../../sim';
 
 export { DAYS_PER_SEASON };
 
-export const SEASON_ORDER: readonly Season[] = ['spring', 'summer', 'autumn', 'winter'];
-/** Food and water eaten/drunk per settler per day (GAME_DESIGN §4.1). */
-export const NEED_PER_SETTLER_PER_DAY = 2;
+export const SEASON_ORDER: readonly Season[] = SEASONS;
 
 export type DayPhase = 'dawn' | 'day' | 'dusk' | 'night';
 
@@ -120,17 +118,20 @@ export function quantizeRate(rate: number): number {
 }
 
 /** Days the stock lasts for `population` settlers at the base consumption, or null when nobody consumes. */
-export function daysOfSupply(stock: number, population: number): number | null {
+export function daysOfSupply(stock: number, population: number, perSettlerPerDay: number = FOOD_PER_SETTLER_DAY): number | null {
   if (population <= 0) return null;
-  return stock / (population * NEED_PER_SETTLER_PER_DAY);
+  return stock / (population * perSettlerPerDay);
 }
+
+/** What one settler uses of a consumable per in-game day (food and water differ only if the sim says so). */
+export const consumptionPerDay = (resource: 'food' | 'water'): number => (resource === 'water' ? WATER_PER_SETTLER_DAY : FOOD_PER_SETTLER_DAY);
 
 export type StockLevel = 'ok' | 'low' | 'out';
 
 /** Food and water warn below one day of supply (GAME_DESIGN §12). */
-export function stockLevel(stock: number, population: number): StockLevel {
+export function stockLevel(stock: number, population: number, perSettlerPerDay: number = FOOD_PER_SETTLER_DAY): StockLevel {
   if (stock < 1) return 'out';
-  const days = daysOfSupply(stock, population);
+  const days = daysOfSupply(stock, population, perSettlerPerDay);
   return days !== null && days < 1 ? 'low' : 'ok';
 }
 

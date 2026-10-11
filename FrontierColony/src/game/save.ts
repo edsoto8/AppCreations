@@ -121,8 +121,29 @@ function migrateEnvelope(env: Record<string, unknown>): { ok: true; env: Record<
   if (typeof version !== 'number') return { ok: false, error: 'Save has no schema version.' };
   if (version > SAVE_SCHEMA_VERSION) return { ok: false, error: 'Save was made by a newer version of the game.' };
   if (version < 1) return { ok: false, error: `Unsupported save version ${version}.` };
-  // No migrations yet (current version is 1).
-  return { ok: true, env };
+  let current = env;
+  if (version < 2) current = v1ToV2(current);
+  return { ok: true, env: current };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/** v2 added `Activity.indoorsBuildingId` (null until the next tick recomputes it). */
+function v1ToV2(env: Record<string, unknown>): Record<string, unknown> {
+  const state = env.state;
+  if (isRecord(state)) {
+    if (Array.isArray(state.settlers)) {
+      for (const settler of state.settlers) {
+        if (isRecord(settler) && isRecord(settler.activity) && !Object.hasOwn(settler.activity, 'indoorsBuildingId')) {
+          settler.activity.indoorsBuildingId = null;
+        }
+      }
+    }
+    if (isRecord(state.meta)) state.meta.schemaVersion = 2;
+  }
+  return { ...env, schemaVersion: 2 };
 }
 
 export function deserializeGame(json: string): LoadResult {

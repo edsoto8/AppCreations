@@ -26,11 +26,11 @@ import { SAVE_SCHEMA_VERSION, STATS_HISTORY_LENGTH } from './constants';
 import { makeContext } from './needs';
 import { resolveDecision, stepSchedule } from './events';
 import { adjustWeatherForSeason, stepWeather } from './weather';
-import { canPlaceBuilding, costToAmounts, emptyResources, getBuilding, isTerrainWalkable } from './queries';
+import { canPlaceBuilding, costToAmounts, emptyResources, getBuilding, getStorageCapacity, isTerrainWalkable } from './queries';
 import { createRng, deriveRng, hashSeed, shuffle } from './rng';
 import { assignHomes, ejectSettlers, stepSettlers } from './settlerSim';
 import { createFounders } from './settlerGen';
-import { addStock, clearBuildingReferences, pushLog, setFootprint } from './stateOps';
+import { addStockOrLose, clearBuildingReferences, drainLosses, pushLog, setFootprint } from './stateOps';
 import {
   BUILDING_TYPES,
   DIFFICULTIES,
@@ -245,6 +245,7 @@ export function stepGame(state: GameState): SimEvent[] {
   const ctx = makeContext(state, events, GAME_HOURS_PER_TICK, newHour || state.time.tick === 1);
   stepSchedule(ctx);
   stepSettlers(ctx);
+  drainLosses(state, events);
   return events;
 }
 
@@ -310,7 +311,9 @@ export function applyCommand(state: GameState, command: PlayerCommand): CommandR
   if (state.outcome.status === 'lost') return fail('gameOver', 'The colony has fallen.');
   if (typeof command !== 'object' || command === null) return fail('invalidArgument', 'Malformed command.');
   try {
-    return runCommand(state, command);
+    const result = runCommand(state, command);
+    if (result.ok) drainLosses(state, result.events);
+    return result;
   } catch {
     return fail('invalidArgument', 'The command could not be applied.');
   }
@@ -397,6 +400,15 @@ function removeBuilding(state: GameState, id: EntityId, reason: 'cancelled' | 'd
     return fail('invalidState', 'Cancel the construction site instead.');
   }
 
+  // Taking storage away must not leave more in the stockpile than it can hold: refuse instead of destroying goods.
+  if (b.status === 'complete' && def.storage > 0) {
+    const newCap = getStorageCapacity(state) - def.storage;
+    const over = RESOURCE_TYPES.find((r) => state.colony.stock[r] > newCap);
+    if (over) {
+      return fail('invalidState', `Demolishing the ${def.name} would overflow the stockpile (${Math.floor(state.colony.stock[over])} ${over} but room for ${newCap}). Use some up first.`);
+    }
+  }
+
   const refund: ResourceAmounts = emptyResources();
   if (b.construction && b.construction.kind === 'new') {
     for (const r of RESOURCE_TYPES) refund[r] = b.construction.delivered[r];
@@ -409,7 +421,7 @@ function removeBuilding(state: GameState, id: EntityId, reason: 'cancelled' | 'd
   state.buildings.splice(state.buildings.indexOf(b), 1);
   setFootprint(state, b, 0);
   clearBuildingReferences(state, id);
-  addStock(state, refund);
+  for (const r of RESOURCE_TYPES) addStockOrLose(state, r, refund[r], reason === 'cancelled' ? 'a cancelled order' : 'a refund');
   assignHomes(state);
   pushLog(state, 'info', `${def.name} ${reason === 'cancelled' ? 'construction cancelled' : 'demolished'}.`, {
     tile: { ...b.origin },

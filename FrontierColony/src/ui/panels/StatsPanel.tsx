@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { RESOURCE_TYPES } from '../../sim';
 import { useGameController } from '../../game';
 import { useUiStore } from '../../store';
+import { EmptyState } from '../components/EmptyState';
 import { Icon, type IconName } from '../components/Icon';
 import { RESOURCE_LABEL } from '../lib/tooltipText';
 import { seriesFor, sparklinePoints, spanLabel, type HistorySample, type SeriesKey } from '../lib/statsSeries';
@@ -62,7 +63,9 @@ export function StatsPanel() {
     <div className="stats" data-testid="stats-panel">
       <p className="muted">{spanLabel(history.length)}. One sample per in-game hour.</p>
       {history.length < 2 ? (
-        <p className="muted stats__empty">Charts appear after the first couple of hours.</p>
+        <EmptyState icon="chart" hint="One sample is taken every in-game hour.">
+          Charts appear after the first couple of hours.
+        </EmptyState>
       ) : (
         <ul className="spark-list">
           {KEYS.map((k) => (

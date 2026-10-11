@@ -1,5 +1,5 @@
 /** Labels and descriptions for the New Game form. Gameplay numbers come from GAME_DESIGN §14 and Appendix A. */
-import { MAP_DIMENSIONS, type Difficulty, type MapPreset, type MapSize, type NewGameOptions } from '../../sim';
+import { DIFFICULTY, MAP_DIMENSIONS, type Difficulty, type MapPreset, type MapSize, type NewGameOptions } from '../../sim';
 
 export const MAX_COLONY_NAME = 24;
 export const MAX_SEED_LENGTH = 40;
@@ -53,4 +53,11 @@ export function draftToOptions(draft: NewGameDraft, fallbackSeed: () => string):
   const colonyName = draft.colonyName.trim().slice(0, MAX_COLONY_NAME) || 'New Hope';
   const seed = draft.seed.trim().slice(0, MAX_SEED_LENGTH) || fallbackSeed();
   return { colonyName, seed, preset: draft.preset, mapSize: draft.mapSize, difficulty: draft.difficulty };
+}
+
+/** Numbers behind a difficulty, straight from the sim's table (e.g. "Bad events x0.6, no bad events before day 5"). */
+export function difficultyDetails(d: Difficulty): string {
+  const def = DIFFICULTY[d];
+  const mult = (n: number) => `x${n}`;
+  return `Bad events ${mult(def.negEventMult)}, good events ${mult(def.posEventMult)}, growth ${mult(def.growthMult)}. No bad events before day ${def.graceDays}.`;
 }

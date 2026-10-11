@@ -135,7 +135,7 @@ export function createSettler(state: GameState, rng: RngState, pos: Vec2, option
     facing: 'se',
     path: [],
     task: { kind: 'idle', phase: 'working', progress: 0 },
-    activity: { kind: 'idle', label: 'Idle', progress: null, targetTile: null },
+    activity: { kind: 'idle', label: 'Idle', progress: null, targetTile: null, indoorsBuildingId: null },
     carrying: null,
     homeId: null,
     workplaceId: null,

@@ -14,12 +14,13 @@ import { createStore, type StoreApi } from 'zustand/vanilla';
 import { useStore } from 'zustand';
 import type { BuildingType, LogSeverity, TilePos } from '../sim';
 import type { GameSpeed, OverlayMode, Selection } from '../shared/types';
+import { DEFAULT_PREFS, type Prefs } from './prefs';
 import type { HudSnapshot } from './snapshot';
 
 export type Screen = 'mainMenu' | 'playing';
 /** Which view the main menu opens on (set by `showMainMenu`, e.g. after game over). */
 export type MenuView = 'home' | 'newGame' | 'load';
-export type PanelId = 'build' | 'settlers' | 'priorities' | 'events' | 'stats' | 'saveLoad' | 'settings';
+export type PanelId = 'build' | 'settlers' | 'priorities' | 'events' | 'stats' | 'saveLoad' | 'settings' | 'help';
 
 export interface Toast {
   id: number;
@@ -27,6 +28,10 @@ export interface Toast {
   severity: LogSeverity;
   /** performance.now() when created; the UI auto-dismisses after its own timeout. */
   createdAt: number;
+  /** How many identical or merged messages this toast stands for. */
+  count: number;
+  /** performance.now() of the latest merge; the UI restarts the dismiss timer when it changes. */
+  updatedAt: number;
 }
 
 export interface UiState {
@@ -45,6 +50,10 @@ export interface UiState {
   menuView: MenuView;
   /** Id of the newest event-log entry the player has seen (drives the unread badge); null until first measured. */
   eventsSeenId: number | null;
+  /** Persisted player preferences. */
+  prefs: Prefs;
+  /** Index of the tutorial step being shown, or null when the tour is not running. */
+  tourStep: number | null;
   speed: GameSpeed;
   paused: boolean;
   selection: Selection | null;
@@ -92,6 +101,12 @@ export interface UiActions {
   togglePanel(panel: PanelId): void;
   setSnapshot(snapshot: HudSnapshot | null): void;
   pushToast(message: string, severity?: LogSeverity): void;
+  setPrefs(patch: Partial<Prefs>): void;
+  /** Start (or restart) the tutorial tour at step 0. */
+  startTour(): void;
+  setTourStep(step: number): void;
+  /** Close the tour. Finishing or skipping both mark it as done so it is not offered again. */
+  endTour(): void;
   dismissToast(id: number): void;
 }
 
@@ -107,6 +122,8 @@ export const initialUiState: UiState = {
   pausedBeforeMenu: false,
   menuView: 'home',
   eventsSeenId: null,
+  prefs: DEFAULT_PREFS,
+  tourStep: null,
   speed: 1,
   paused: false,
   selection: null,
@@ -117,6 +134,32 @@ export const initialUiState: UiState = {
   snapshot: null,
   toasts: [],
 };
+
+const GAIN = /^([+\u2212-])(\d+(?:\.\d+)?) (.+)$/;
+
+/**
+ * Add a toast, merging it into one already on screen when it says the same thing: an identical
+ * message bumps a counter ("x3"), and "+5 wood" style gains/losses of the same thing add up ("+12 wood").
+ * The merged toast moves to the end and restarts its timer. Pure, so it is unit tested.
+ */
+export function mergeToast(toasts: Toast[], message: string, severity: LogSeverity, id: number, now: number): Toast[] {
+  const gain = GAIN.exec(message);
+  const same = toasts.find((t) => {
+    if (t.severity !== severity) return false;
+    if (t.message === message) return true;
+    const other = GAIN.exec(t.message);
+    return gain !== null && other !== null && other[1] === gain[1] && other[3] === gain[3];
+  });
+  if (!same) return [...toasts, { id, message, severity, createdAt: now, count: 1, updatedAt: now }].slice(-MAX_TOASTS);
+  const rest = toasts.filter((t) => t !== same);
+  const a = GAIN.exec(same.message);
+  if (gain && a) {
+    const total = Number(a[2]) + Number(gain[2]);
+    const text = `${gain[1]}${Number.isInteger(total) ? total : total.toFixed(1)} ${gain[3]}`;
+    return [...rest, { ...same, message: text, count: same.count + 1, updatedAt: now }];
+  }
+  return [...rest, { ...same, count: same.count + 1, updatedAt: now }];
+}
 
 /** Create an independent store (tests create their own; the app uses `uiStore`). */
 export function createUiStore(initial: Partial<UiState> = {}): StoreApi<UiStore> {
@@ -183,14 +226,11 @@ export function createUiStore(initial: Partial<UiState> = {}): StoreApi<UiStore>
     togglePanel: (panel) => set((s) => ({ openPanel: s.openPanel === panel ? null : panel })),
     setSnapshot: (snapshot) => set({ snapshot }),
     pushToast: (message, severity = 'info') =>
-      set((s) => ({
-        // An identical toast already on screen is replaced (moved to the end with a fresh timer), so
-        // a repeated failure does not stack up copies.
-        toasts: [
-          ...s.toasts.filter((t) => t.message !== message || t.severity !== severity),
-          { id: nextToastId++, message, severity, createdAt: performance.now() },
-        ].slice(-MAX_TOASTS),
-      })),
+      set((s) => ({ toasts: mergeToast(s.toasts, message, severity, nextToastId++, performance.now()) })),
+    setPrefs: (patch) => set((s) => ({ prefs: { ...s.prefs, ...patch } })),
+    startTour: () => set({ tourStep: 0 }),
+    setTourStep: (tourStep) => set({ tourStep }),
+    endTour: () => set((s) => ({ tourStep: null, prefs: { ...s.prefs, tutorialDone: true } })),
     dismissToast: (id) => set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })),
   }));
 }

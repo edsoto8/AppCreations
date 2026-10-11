@@ -10,7 +10,7 @@ export const TICKS_PER_SECOND = 10;
 export const TICK_SECONDS = 1 / TICKS_PER_SECOND;
 
 /** Bump on any breaking change to `GameState`; add a migration in src/game/save.ts. */
-export const SAVE_SCHEMA_VERSION = 1;
+export const SAVE_SCHEMA_VERSION = 2;
 
 /** Map edge length in tiles per size preset (maps are square). */
 export const MAP_DIMENSIONS: Record<MapSize, number> = {

@@ -1,15 +1,21 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useGameController } from '../../game';
 import type { SaveSlotInfo } from '../../game/save';
+import pkg from '../../../package.json';
 import { uiStore, useUiStore } from '../../store';
 import { Icon } from '../components/Icon';
 import { Panel } from '../components/Panel';
 import { formatClock, formatRelativeTime, pluralize } from '../lib/format';
 import { useGameFlow } from '../lib/useGameFlow';
+import { HowToPlay } from '../panels/HowToPlay';
 import { SaveLoadView } from '../panels/SaveLoadView';
+import { SettingsPanel } from '../panels/SettingsPanel';
 import { NewGameForm } from './NewGameForm';
 
-type View = 'home' | 'newGame' | 'load';
+/** Version string from package.json. */
+export const APP_VERSION: string = pkg.version;
+
+type View = 'home' | 'newGame' | 'load' | 'help' | 'settings';
 
 /** The newest readable save across all slots (normally the autosave). */
 export function newestSave(slots: SaveSlotInfo[]): SaveSlotInfo | null {
@@ -29,7 +35,7 @@ export function MainMenu() {
   const resumeName = useUiStore((s) => s.snapshot?.colonyName ?? null);
   const resumeDay = useUiStore((s) => s.snapshot?.day ?? null);
   // After game over the menu opens straight on New Game or Load; the request is consumed here.
-  const [view, setView] = useState<View>(() => uiStore.getState().menuView);
+  const [view, setView] = useState<View>(() => uiStore.getState().menuView as View);
   const [slots, setSlots] = useState<SaveSlotInfo[]>(() => controller.listSaves());
   const newest = useMemo(() => newestSave(slots), [slots]);
   const anySave = slots.some((s) => s.exists);
@@ -61,6 +67,11 @@ export function MainMenu() {
   return (
     <div className="main-menu" data-testid="main-menu">
       <div className="main-menu__vignette" aria-hidden="true" />
+      <div className="main-menu__motes" aria-hidden="true">
+        {Array.from({ length: 16 }, (_, i) => (
+          <span key={i} style={{ ["--i" as string]: i }} />
+        ))}
+      </div>
       <div className={`main-menu__content ${effectiveView === 'newGame' ? 'is-wide' : ''}`}>
         <header className="title-block">
           <div className="title-block__emblem" aria-hidden="true">
@@ -109,6 +120,14 @@ export function MainMenu() {
                 <span className="menu-btn__sub">Autosave and three manual slots</span>
               </button>
             )}
+            <div className="menu-row">
+              <button type="button" className="menu-btn menu-btn--small" onClick={() => setView('help')} data-testid="menu-help">
+                <span className="menu-btn__title">How to play</span>
+              </button>
+              <button type="button" className="menu-btn menu-btn--small" onClick={() => setView('settings')} data-testid="menu-settings">
+                <span className="menu-btn__title">Settings</span>
+              </button>
+            </div>
           </nav>
         )}
 
@@ -126,7 +145,24 @@ export function MainMenu() {
         </Panel>
       )}
 
-      <footer className="main-menu__footer">Frontier Colony · early build</footer>
+      {effectiveView === 'help' && (
+        <Panel title="How to Play" icon="info" placement="center" width={640} onClose={() => setView('home')} testId="panel-help">
+          <HowToPlay />
+        </Panel>
+      )}
+      {effectiveView === 'settings' && (
+        <Panel title="Settings" icon="settings" placement="center" width={520} onClose={() => setView('home')} testId="panel-settings">
+          <SettingsPanel onOpenHelp={() => setView('help')} />
+        </Panel>
+      )}
+
+      <footer className="main-menu__footer">
+        <span>Frontier Colony</span>
+        <span aria-hidden="true">·</span>
+        <span data-testid="version">v{APP_VERSION}</span>
+        <span aria-hidden="true">·</span>
+        <span>Early build</span>
+      </footer>
     </div>
   );
 }

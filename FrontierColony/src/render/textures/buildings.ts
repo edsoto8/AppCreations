@@ -5,7 +5,7 @@
 import { css, shadeRgb, type RGB } from '../util/color';
 import { mulberry32 } from '../util/noise';
 import type { Art } from './canvas';
-import { Kit, ao, compose, door, facets, planks, shingles, solid, stones, sweep, windowPane, type Pt } from './isoKit';
+import { Kit, ao, compose, door, facets, planks, shingles, snowBlanket, solid, stones, sweep, windowPane, type Pt } from './isoKit';
 
 const PLASTER: RGB[] = [
   [238, 224, 192],
@@ -51,8 +51,9 @@ function gableU(k: Roofed['k'], u0: number, u1: number, v0: number, v1: number, 
   const ra = k.P(u1 + over, vm, h + rise);
   const rb = k.P(u0 - over, v1 + over, h - 2);
   k.surface(ro, { x: ra.x - ro.x, y: ra.y - ro.y }, { x: rb.x - ro.x, y: rb.y - ro.y }, compose(solid(roof, 1.04, 0.1), shingles(rowH, 7, shadeRgb(roof, 1), 7), ao(0.2, 0.18)));
+  if (k.snow) k.surface(ro, { x: ra.x - ro.x, y: ra.y - ro.y }, { x: rb.x - ro.x, y: rb.y - ro.y }, snowBlanket(), 0);
   // lit ridge cap
-  c.strokeStyle = css(shadeRgb(roof, 1.35), 0.9);
+  c.strokeStyle = css(k.snow ? [240, 246, 255] : shadeRgb(roof, 1.35), 0.9);
   c.lineWidth = 1.6;
   c.beginPath();
   c.moveTo(ro.x, ro.y);
@@ -83,7 +84,8 @@ function gableV(k: Kit, u0: number, u1: number, v0: number, v1: number, h: numbe
   const ra = k.P(um, v0 - over, h + rise);
   const rb = k.P(u1 + over, v1 + over, h - 2);
   k.surface(ro, { x: ra.x - ro.x, y: ra.y - ro.y }, { x: rb.x - ro.x, y: rb.y - ro.y }, compose(solid(shadeRgb(roof, 0.8), 1, 0.1), shingles(rowH, 7, shadeRgb(roof, 0.8), 11), ao(0.2, 0.2)));
-  c.strokeStyle = css(shadeRgb(roof, 1.2), 0.85);
+  if (k.snow) k.surface(ro, { x: ra.x - ro.x, y: ra.y - ro.y }, { x: rb.x - ro.x, y: rb.y - ro.y }, compose(snowBlanket(), (cc, w, h) => { cc.fillStyle = 'rgba(40,60,110,0.16)'; cc.fillRect(0, 0, w, h); }), 0);
+  c.strokeStyle = css(k.snow ? [240, 246, 255] : shadeRgb(roof, 1.2), 0.85);
   c.lineWidth = 1.4;
   c.beginPath();
   c.moveTo(ro.x, ro.y);
@@ -110,6 +112,13 @@ function hip(k: Kit, u0: number, u1: number, v0: number, v1: number, h: number, 
     solid(roof, s, 0.1)(c, w, hh);
     shingles(4.2, 6.5, shadeRgb(roof, s), 5)(c, w, hh);
     ao(0.1, 0.16)(c, w, hh);
+    if (k.snow) {
+      snowBlanket(0.9)(c, w, hh);
+      if (s < 0.9) {
+        c.fillStyle = 'rgba(40,60,110,0.16)';
+        c.fillRect(0, 0, w, hh);
+      }
+    }
     c.restore();
     k.poly([p0, p1, apex]);
     c.strokeStyle = css([30, 22, 26], 0.5);
@@ -141,8 +150,9 @@ function timberFrame(c: CanvasRenderingContext2D, w: number, h: number, cols: nu
 
 // --- Buildings ------------------------------------------------------------------------------------
 
-export function bakeHouse(variant: number): Art {
+export function bakeHouse(variant: number, snow = false): Art {
   const k = new Kit(2, 2, 66);
+  k.snow = snow;
   const plaster = PLASTER[variant % PLASTER.length]!;
   const roof = ROOF[variant % ROOF.length]!;
   const c = k.ctx;
@@ -182,8 +192,9 @@ export function bakeHouse(variant: number): Art {
   return k.art;
 }
 
-export function bakeTownCenter(): Art {
+export function bakeTownCenter(snow = false): Art {
   const k = new Kit(3, 3, 112);
+  k.snow = snow;
   const c = k.ctx;
   const plaster: RGB = [232, 216, 180];
   const roof: RGB = [158, 70, 56];
@@ -236,8 +247,9 @@ export function bakeTownCenter(): Art {
   return k.art;
 }
 
-export function bakeStorage(): Art {
+export function bakeStorage(snow = false): Art {
   const k = new Kit(2, 2, 70);
+  k.snow = snow;
   const c = k.ctx;
   const wood: RGB = [152, 98, 70];
   const roof: RGB = [92, 100, 108];
@@ -288,8 +300,9 @@ export function bakeStorage(): Art {
   return k.art;
 }
 
-export function bakeWorkshop(): Art {
+export function bakeWorkshop(snow = false): Art {
   const k = new Kit(2, 2, 78);
+  k.snow = snow;
   const c = k.ctx;
   const roof: RGB = [110, 78, 60];
   k.groundShadow(-0.85, 0.85, -0.85, 0.85, 0.9);
@@ -523,8 +536,9 @@ function plant(c: CanvasRenderingContext2D, p: { x: number; y: number }, stage: 
 
 // --- Lumber camp ------------------------------------------------------------------------------------
 
-export function bakeLumberCamp(): Art {
+export function bakeLumberCamp(snow = false): Art {
   const k = new Kit(2, 2, 54);
+  k.snow = snow;
   const c = k.ctx;
   const rng = mulberry32(91);
   // trampled earth with sawdust
@@ -570,6 +584,7 @@ export function bakeLumberCamp(): Art {
     cc.fillStyle = css([0, 0, 0], 0.08);
     for (let x = 6; x < w; x += 9) cc.fillRect(x, 0, 0.8, h);
   }, ao(0.05, 0.2)));
+  if (snow) k.surface(ro, { x: ra.x - ro.x, y: ra.y - ro.y }, { x: rb.x - ro.x, y: rb.y - ro.y }, snowBlanket(0.8), 0);
   c.strokeStyle = css([120, 86, 56], 1);
   c.lineWidth = 1.6;
   c.beginPath();
@@ -638,8 +653,9 @@ export function bakeLumberCamp(): Art {
 
 // --- Mine -----------------------------------------------------------------------------------------
 
-export function bakeMine(): Art {
+export function bakeMine(snow = false): Art {
   const k = new Kit(2, 2, 76);
+  k.snow = snow;
   const c = k.ctx;
   const rng = mulberry32(131);
   k.top(-0.98, 0.98, -0.98, 0.98, 0, compose(solid([132, 118, 100], 1, 0.02), (cc, w, h) => {
@@ -697,6 +713,17 @@ export function bakeMine(): Art {
       cc.fill();
     }
   }));
+  if (snow) {
+    k.top(-0.92, 0.92, -0.92, 0.5, 44, (cc, w, h) => {
+      const g = cc.createLinearGradient(0, 0, 0, h);
+      g.addColorStop(0, 'rgba(252,254,255,0.96)');
+      g.addColorStop(1, 'rgba(214,226,244,0.92)');
+      cc.fillStyle = g;
+      cc.beginPath();
+      cc.roundRect(3, 3, w - 6, h - 5, 10);
+      cc.fill();
+    }, 0);
+  }
   // rocks breaking the silhouette
   for (const [u, v, r] of [
     [-0.7, -0.6, 12],
@@ -767,8 +794,9 @@ export function bakeMine(): Art {
 
 // --- Well ---------------------------------------------------------------------------------------
 
-export function bakeWell(): Art {
+export function bakeWell(snow = false): Art {
   const k = new Kit(1, 1, 64, 10);
+  k.snow = snow;
   const c = k.ctx;
   const cx = k.P(0, 0, 0);
   const rx = 0.36 * 45.25;

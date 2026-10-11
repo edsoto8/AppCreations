@@ -144,6 +144,8 @@ describe('survival', () => {
     const state = game('thirst');
     state.colony.stock.food = 150;
     state.colony.stock.water = 0;
+    state.weather.current = 'clear'; // no rain barrels
+    state.weather.hoursRemaining = 1e9;
     run(state, TICKS_PER_DAY * 8, 200);
     expect(state.settlers).toHaveLength(0);
     expect(state.outcome.status).toBe('lost');

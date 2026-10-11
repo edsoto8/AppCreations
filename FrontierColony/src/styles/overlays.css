@@ -164,14 +164,27 @@
 .hud-top-center {
   position: absolute;
   top: 2px;
-  left: 50%;
-  transform: translateX(-50%);
+  left: 0;
+  right: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 8px;
   pointer-events: none !important;
-  max-width: calc(100% - 24px);
+  padding: 0 4px;
+}
+
+/* Keep the centre column clear of docked panels and the inspector. */
+.hud-middle:has(.panel--right) .hud-top-center {
+  right: calc(var(--right-dock-w, 440px) + var(--gutter));
+}
+
+.hud-middle:has(.panel--left) .hud-top-center {
+  left: calc(var(--left-dock-w, 380px) + var(--gutter));
+}
+
+.hud-middle:has(.panel--inspector):has(.panel--right:not(.panel--inspector)) .hud-top-center {
+  right: calc(var(--right-dock-w, 440px) + var(--inspector-w) + 2 * var(--gutter));
 }
 
 .hud-top-center > * {

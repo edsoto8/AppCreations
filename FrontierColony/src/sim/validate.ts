@@ -269,6 +269,7 @@ function validateSettler(v: unknown, what: string, dims: Dims, ids: Ids): void {
   str(a.label, `${what}.activity.label`, 200);
   nullOr(a.progress, (x) => num(x, `${what}.activity.progress`, 0, 1));
   nullOr(a.targetTile, (x) => tile(x, `${what}.activity.targetTile`, dims));
+  nullOr(a.indoorsBuildingId, (x) => buildingRef(x, `${what}.activity.indoorsBuildingId`, ids));
   nullOr(s.carrying, (c) => {
     const o = obj(c, `${what}.carrying`);
     oneOf(o.resource, RESOURCE_TYPES, `${what}.carrying.resource`);

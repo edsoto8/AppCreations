@@ -46,6 +46,7 @@ export function Toolbar() {
               aria-pressed={active}
               onClick={() => togglePanel(def.id)}
               data-testid={`tool-${def.id}`}
+              data-tour={`tool-${def.id}`}
             >
               <Icon name={def.icon} size={22} />
               <span className="tool-btn__label">{def.short}</span>

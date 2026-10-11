@@ -1,5 +1,5 @@
 /** Objectives from docs/GAME_DESIGN.md §11, with progress derived from the HUD snapshot. Pure. */
-import { BUILDING_DEFS, BUILDING_TYPES, OBJECTIVES, VICTORY, type BuildingStatus, type BuildingType } from '../../sim';
+import { BUILDING_DEFS, BUILDING_TYPES, OBJECTIVES, OBJECTIVE_TARGETS, VICTORY, type BuildingStatus, type BuildingType } from '../../sim';
 
 export interface ObjectiveInput {
   day: number;
@@ -34,8 +34,6 @@ export const OBJECTIVE_LIST: readonly ObjectiveDef[] = OBJECTIVES.map((o) => ({
   ...(o.id === 'thriving' ? { victory: true } : {}),
 }));
 
-/** Progress thresholds (balance.ts OBJECTIVE_TARGETS; only VICTORY is exported so far). */
-const TARGET = { foundations: 3, toolsCrafted: 5, growing: 10, larderPerSettler: 10, winterDay: 21 } as const;
 
 export interface ObjectiveProgress {
   current: number;
@@ -60,19 +58,19 @@ export function objectiveProgress(id: string, s: ObjectiveInput): ObjectiveProgr
     case 'water':
       return make(completeCount(s.buildings, 'well'), 1);
     case 'foundations':
-      return make(s.buildings.filter((b) => b.type !== 'townCenter' && b.status === 'complete').length, TARGET.foundations);
+      return make(s.buildings.filter((b) => b.type !== 'townCenter' && b.status === 'complete').length, OBJECTIVE_TARGETS.foundationsBuildings);
     case 'timber':
       return make((completeCount(s.buildings, 'lumberCamp') > 0 ? 1 : 0) + (completeCount(s.buildings, 'mine') > 0 ? 1 : 0), 2);
     case 'toolmaker':
-      return make(s.progress.toolsCrafted, TARGET.toolsCrafted);
+      return make(s.progress.toolsCrafted, OBJECTIVE_TARGETS.toolsCrafted);
     case 'growing':
-      return make(s.population, TARGET.growing, `${s.population}/${TARGET.growing}`);
+      return make(s.population, OBJECTIVE_TARGETS.growingPopulation, `${s.population}/${OBJECTIVE_TARGETS.growingPopulation}`);
     case 'larder': {
-      const target = Math.max(1, s.population * TARGET.larderPerSettler);
+      const target = Math.max(1, s.population * OBJECTIVE_TARGETS.larderFoodPerSettler);
       return make(s.stock.food, target, `${Math.floor(s.stock.food)}/${target} food`);
     }
     case 'winter':
-      return make(s.day, TARGET.winterDay, `Day ${s.day}/${TARGET.winterDay}`);
+      return make(s.day, OBJECTIVE_TARGETS.winterDay, `Day ${s.day}/${OBJECTIVE_TARGETS.winterDay}`);
     case 'thriving': {
       const avg = s.settlers.length ? s.settlers.reduce((a, x) => a + x.needs.happiness, 0) / s.settlers.length : 0;
       return make(s.population, VICTORY.population, `${s.population}/${VICTORY.population} settlers · mood ${Math.round(avg)}/${VICTORY.minAvgHappiness}`);

@@ -9,6 +9,8 @@ export interface PanelProps {
   /** Replaces the icon and plain title in the title bar (e.g. an avatar and a name). */
   titleNode?: ReactNode;
   className?: string;
+  /** Plays the close animation (the owner unmounts the panel a moment later). */
+  closing?: boolean;
   placement?: PanelPlacement;
   /** Preferred width in px (clamped to the viewport). */
   width?: number;
@@ -65,7 +67,7 @@ export function useDialogFocus(ref: React.RefObject<HTMLElement | null>, focusFi
  * Reusable window: title bar with icon and close button, scrollable body. `left`/`right` panels dock to
  * a side of the playfield and do not block the map; `center` panels are modal dialogs over a scrim.
  */
-export function Panel({ title, icon, titleNode, className, placement = 'right', width = 360, onClose, actions, children, testId }: PanelProps) {
+export function Panel({ title, icon, titleNode, className, closing, placement = 'right', width = 360, onClose, actions, children, testId }: PanelProps) {
   const titleId = useId();
   const ref = useRef<HTMLElement>(null);
   const modal = placement === 'center';
@@ -75,7 +77,7 @@ export function Panel({ title, icon, titleNode, className, placement = 'right', 
   const body = (
     <section
       ref={ref}
-      className={`panel panel--${placement}${className ? ` ${className}` : ''}`}
+      className={`panel panel--${placement}${className ? ` ${className}` : ''}${closing ? ' is-closing' : ''}`}
       style={{ ['--panel-w' as string]: `${width}px` }}
       role={modal ? 'dialog' : 'complementary'}
       aria-modal={modal ? true : undefined}
@@ -113,7 +115,7 @@ export function Panel({ title, icon, titleNode, className, placement = 'right', 
   if (!modal) return body;
   return (
     <div
-      className="modal-scrim"
+      className={`modal-scrim${closing ? ' is-closing' : ''}`}
       onPointerDown={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
