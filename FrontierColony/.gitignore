@@ -1,0 +1,6 @@
+# Frontier Colony build and test output (node_modules is covered by the root .gitignore)
+dist/
+test-results/
+playwright-report/
+blob-report/
+*.local
