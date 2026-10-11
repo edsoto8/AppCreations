@@ -57,6 +57,8 @@ export class SettlerView {
   private readonly blanket: Sprite;
   private readonly badge: Sprite;
   private readonly bubble: Sprite;
+  private readonly sickBadge: Sprite;
+  private sick = false;
   private readonly tex: TextureSet;
   private readonly look: SettlerLook;
   private readonly pose: Pose = newPose();
@@ -121,12 +123,15 @@ export class SettlerView {
     this.badge = new Sprite(tex.badges.chop);
     this.badge.visible = false;
     this.badge.position.set(0, -38);
+    this.sickBadge = new Sprite(tex.fx.sick);
+    this.sickBadge.visible = false;
+    this.sickBadge.position.set(-9, -36);
     this.bubble = new Sprite(tex.fx.dots);
     this.bubble.visible = false;
     this.bubble.position.set(8, -33);
     this.body.addChild(this.legBack, this.armBack.root, this.legFront, this.torso, this.carry, this.head, this.hair, this.hat, this.armFront.root);
     this.body.scale.set(BODY_SCALE);
-    this.root.addChild(this.ring, this.shadow, this.body, this.blanket, this.badge, this.bubble);
+    this.root.addChild(this.ring, this.shadow, this.body, this.blanket, this.badge, this.bubble, this.sickBadge);
     this.x = s.pos.x;
     this.y = s.pos.y;
   }
@@ -193,6 +198,13 @@ export class SettlerView {
     }
 
     this.updateBadges(kind, zoom, t);
+    const sick = s.status.sickHoursLeft > 0;
+    if (sick !== this.sick) {
+      this.sick = sick;
+      this.body.tint = sick ? 0xc4f0b4 : 0xffffff;
+    }
+    this.sickBadge.visible = sick && zoom >= 0.7;
+    if (sick) this.sickBadge.y = -36 + Math.sin(t * 2.4) * 1.2;
   }
 
   private applyPose(p: Pose, flip: 1 | -1, back: boolean, s: Settler): void {

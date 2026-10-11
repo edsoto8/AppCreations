@@ -86,15 +86,21 @@ export class Kit {
     this.surface(o, { x: a.x - o.x, y: a.y - o.y }, { x: b.x - o.x, y: b.y - o.y }, draw, outline);
   }
 
-  /** Soft contact shadow below the footprint. */
+  /** Soft contact shadow below the footprint (blurred, so it never reads as a hard-edged box). */
   groundShadow(u0: number, u1: number, v0: number, v1: number, alpha = 0.3): void {
     const c = this.ctx;
-    for (let i = 0; i < 4; i++) {
-      const g = 0.35 - i * 0.1;
-      this.poly([this.P(u0 - g, v0 - g, 0), this.P(u1 + g + 0.15, v0 - g, 0), this.P(u1 + g + 0.15, v1 + g + 0.15, 0), this.P(u0 - g, v1 + g + 0.15, 0)]);
-      c.fillStyle = css([24, 30, 52], alpha * 0.2);
-      c.fill();
-    }
+    c.save();
+    // draw the shape far off-canvas and let its blurred shadow land on the art
+    const off = 4000;
+    c.shadowColor = css([24, 30, 52], Math.min(1, alpha * 0.55));
+    c.shadowBlur = 9 * 2;
+    c.shadowOffsetX = off * 2;
+    c.shadowOffsetY = 0;
+    const pts = [this.P(u0 - 0.1, v0 - 0.1, 0), this.P(u1 + 0.22, v0 - 0.1, 0), this.P(u1 + 0.22, v1 + 0.22, 0), this.P(u0 - 0.1, v1 + 0.22, 0)].map((p) => ({ x: p.x - off, y: p.y }));
+    this.poly(pts);
+    c.fillStyle = '#000';
+    c.fill();
+    c.restore();
   }
 
   /** Axis-aligned prism with per-face painters. */

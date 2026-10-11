@@ -17,8 +17,8 @@ export interface GameControllerApi {
   loadGame(slot: SaveSlotId): LoadResult;
   listSaves(): SaveSlotInfo[];
   deleteSave(slot: SaveSlotId): void;
-  /** Move the camera to a world point in tile units. */
-  centerOn(tile: TilePos | { x: number; y: number }): void;
+  /** Move the camera to a world point in tile units (eased unless `animate` is false, e.g. while dragging the minimap). */
+  centerOn(tile: TilePos | { x: number; y: number }, opts?: { animate?: boolean }): void;
   zoomBy(factor: number): void;
   /**
    * Camera centre (iso screen pixels, as in `shared/iso.ts`) and zoom, or null before the renderer

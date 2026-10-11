@@ -49,7 +49,8 @@ export class IsoRenderer implements GameRenderer {
   private lastRevision = -1;
   /** Clock for character animation: frozen while paused, faster at higher game speeds. */
   private animTime = 0;
-  private frameIndex = 0;
+  private suppressFell = false;
+  private bakeTimer = 0;
   private dbgHide = '';
 
   private readonly app: Application;
@@ -67,11 +68,20 @@ export class IsoRenderer implements GameRenderer {
     this.effects = new Effects(this.layers, this.depth, tex, this.entities.locator());
     this.entities.attachEffects(this.effects);
     this.terrain.onTreeFelled = (x, y, species, seed) => {
+      if (this.suppressFell) return;
       const p = this.entities.locator().tilePx(x + 0.5, y + 0.5);
       this.effects.fell.start(p.x, p.y, x + y + 1, species, seed);
     };
     this.overlays = new Overlays(this.layers, tex);
     this.atmosphere = new Atmosphere(app.stage, tex);
+    // seasonal art is drawn in the background a few milliseconds at a time (never in the render loop)
+    const bakeSome = (): void => {
+      if (this.destroyed || this.baker.done) return;
+      const set = this.baker.step(10);
+      if (set) this.tex.seasonal = set;
+      else this.bakeTimer = window.setTimeout(bakeSome, 40);
+    };
+    this.bakeTimer = window.setTimeout(bakeSome, 1500);
     this.input = new InputController(app.canvas, this.camera, {
       onHover: (pos) => this.handleHover(pos),
       onClick: (pos, button) => this.handleClick(pos, button),
@@ -111,6 +121,13 @@ export class IsoRenderer implements GameRenderer {
 
     // Structural changes bump world.revision (full diff); resource-only changes (trees felled, rock
     // quarried) arrive as tileChanged events and patch just those tiles.
+    // A wildfire turns forest into grass in one go: show flames and scorched ground instead of tumbling trees.
+    let burned: { x: number; y: number }[] | null = null;
+    if (frame.events.some((e) => e.type === 'randomEvent' && e.kind === 'wildfire')) {
+      burned = [];
+      for (const e of frame.events) if (e.type === 'tileChanged') burned.push(e);
+    }
+    this.suppressFell = burned !== null;
     if (state.world.revision !== this.lastRevision) {
       this.terrain.sync(state.world);
       this.lastRevision = state.world.revision;
@@ -120,10 +137,12 @@ export class IsoRenderer implements GameRenderer {
       for (const e of frame.events) if (e.type === 'tileChanged') changed.push(e);
       if (changed.length > 0) this.terrain.syncTiles(state.world, changed);
     }
+    this.suppressFell = false;
+    if (burned && burned.length > 0) this.effects.startFire(burned);
     this.effects.handle(frame.events);
 
     const view = cam.viewRect(0);
-    this.terrain.update(view, this.needsImmediateBuild, cam.zoom);
+    this.terrain.update(view, this.needsImmediateBuild, cam.zoom, frame.frameMs);
     this.needsImmediateBuild = false;
     const time = frame.nowMs / 1000;
     this.terrain.animate(time);
@@ -132,11 +151,8 @@ export class IsoRenderer implements GameRenderer {
     const look = seasonLook(state.time, this.atmosphere.drought, state.weather.current, state.weather.intensity);
     this.terrain.setLook(look);
     this.entities.update(state, frame.alpha, time, frameDt, cam.zoom, this.animTime, look.snow, this.atmosphere.light);
-    this.atmosphere.update({ state, dt: frameDt, world: this.layers.world, screenW: this.app.screen.width, screenH: this.app.screen.height, view, entities: this.entities });
-    if (!this.baker.done && this.frameIndex++ > 20) {
-      const set = this.baker.step(Math.min(40, Math.max(4, frame.frameMs * 0.35)));
-      if (set) this.tex.seasonal = set;
-    }
+    this.atmosphere.update({ state, dt: frameDt, world: this.layers.world, screenW: this.app.screen.width, screenH: this.app.screen.height, view, entities: this.entities, fires: this.effects.activeFires() });
+
     this.effects.update(frame.speed === 0 ? frameDt * 0.35 : frameDt);
 
     if (cam.moved && this.input.lastPointer) this.handleHover(this.input.lastPointer);
@@ -203,6 +219,7 @@ export class IsoRenderer implements GameRenderer {
   destroy(): void {
     if (this.destroyed) return;
     this.destroyed = true;
+    window.clearTimeout(this.bakeTimer);
     this.input.destroy();
     this.entities.destroy();
     this.overlays.destroy();

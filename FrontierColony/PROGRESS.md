@@ -113,3 +113,8 @@ been run. A milestone is marked done only after its acceptance criteria were ver
   gated on "Survive the Winter". Its 32-game headless model: normal victory p10/median/p90 = day 22/26/30, 0 lost;
   harsh median day 42, 3/32 lost. Usage this round: ~113k tokens, 35 tool calls, 28 min. Simulation Engineer
   applying the tuning.
+- UI/UX Engineer finished UI M6: typed decision payloads, minimap (canvas, click/drag pan, viewport rect), 7-step
+  coach-mark tour that advances on player action, How to Play panel, real Settings (UI scale, tooltips, autosave,
+  replay tutorial), toast grouping, number roll-up, responsive pass at 1920/1280/1024 widths, a11y labels.
+  Caught and fixed a React #185 selector loop. Cumulative usage: 665k tokens, 99 tool calls this round, 58.5 min.
+  Lead applied its requests: autosave honours the pref; `centerOn(tile, { animate })`.

@@ -201,7 +201,7 @@ export function waterTint(x: number, y: number, terrain: number, shore: number, 
   let f = clamp((shore - 0.6) / 9, 0, 1);
   if (terrain === Terrain.DeepWater) f = Math.max(f, 0.5);
   else f = Math.min(f, 0.45);
-  f += (fbm(x * 0.1 + 2, y * 0.1 + 8, 77, 3) - 0.5) * 0.08;
+  f += (fbm(x * 0.1 + 2, y * 0.1 + 8, 77, 3) - 0.5) * 0.08 + (hash01(x, y, 77) - 0.5) * 0.035;
   f = clamp(f, 0, 1);
   let c: RGB = WATER_STOPS[0]!.c;
   for (let i = 1; i < WATER_STOPS.length; i++) {
@@ -364,7 +364,7 @@ export function buildChunk(chunk: Chunk, model: TerrainModel, tex: TextureSet, d
           topTint = landTint(x, y, e, t, look);
         }
       }
-      if (snowy) topTint = tint(0.94 + hash01(x, y, 403) * 0.06, 0.96 + hash01(x, y, 404) * 0.04, 1);
+      if (snowy) topTint = tint(0.9 + hash01(x, y, 403) * 0.07, 0.93 + hash01(x, y, 404) * 0.05, 0.98 + hash01(x, y, 406) * 0.02);
       add(topTex, c.x, c.y, raised, d + 0.5, 'top', topTint, ((h >>> 12) & 1) === 1);
 
       // ---- overlays: fringes, wet banks, foam ------------------------------------------------

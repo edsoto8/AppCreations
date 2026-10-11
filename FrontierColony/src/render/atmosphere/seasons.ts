@@ -68,7 +68,8 @@ export function seasonLook(time: Pick<TimeState, 'day' | 'timeOfDay' | 'season'>
   const cur = ANCHORS[time.season];
   const prev = ANCHORS[ORDER[(ORDER.indexOf(time.season) + 3) % 4]!];
   // blend from the previous season's look over the first day; snow also builds up a little more slowly
-  const t = smoothstep(0, 1, inSeason);
+  // the very first day of a new game has no "previous season" to blend from
+  const t = time.day === 1 ? 1 : smoothstep(0, 1, inSeason);
   const base = mixAnchor(prev, cur, t);
   let snow = base.snow;
   if (time.season === 'winter') snow = lerp(prev.snow, 1, smoothstep(0, 2, inSeason));

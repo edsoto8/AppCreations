@@ -296,8 +296,8 @@ export class GameController implements GameControllerApi {
     deleteSlot(this.storage, slot);
   }
 
-  centerOn(tile: TilePos | { x: number; y: number }): void {
-    this.renderer?.centerOn(tile, { animate: true });
+  centerOn(tile: TilePos | { x: number; y: number }, opts: { animate?: boolean } = {}): void {
+    this.renderer?.centerOn(tile, { animate: opts.animate ?? true });
   }
 
   zoomBy(factor: number): void {
@@ -340,7 +340,8 @@ export class GameController implements GameControllerApi {
 
   private autosave(): void {
     // Before the player starts or loads a game the state is the main-menu demo world: never autosave it.
-    if (!this.store.getState().gameStarted || this.faulted || this.state.outcome.status === 'lost') return;
+    const ui = this.store.getState();
+    if (!ui.gameStarted || !ui.prefs.autosave || this.faulted || this.state.outcome.status === 'lost') return;
     const result = saveToSlot(this.storage, 'autosave', this.state);
     if (!result.ok) this.store.getState().pushToast(`Autosave failed: ${result.error}`, 'warning');
   }

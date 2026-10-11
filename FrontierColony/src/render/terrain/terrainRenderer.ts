@@ -195,7 +195,7 @@ export class TerrainRenderer {
    * Cull and (re)build. `view` is the visible world rectangle; chunks within a margin of it are kept
    * built so panning never shows a hole. `immediate` builds everything needed right now.
    */
-  update(view: ViewRect, immediate = false, zoom = 1): void {
+  update(view: ViewRect, immediate = false, zoom = 1, frameMs = 16): void {
     if (!this.model) return;
     this.frame++;
     const wantLive = this.liveGround ? zoom > 1.25 : zoom > 1.45;
@@ -222,7 +222,7 @@ export class TerrainRenderer {
     }
     const stale = (c: Chunk): boolean => !c.built || c.dirty || (modeChanged && c.mode !== 'none') || (c.mode === 'live') !== wantLive;
     const lookKey = this.look.key + (this.tex.seasonal ? '+' : '-');
-    let lookBudget = immediate ? Infinity : 1;
+    let lookBudget = immediate ? Infinity : Math.min(4, Math.max(1, Math.round(frameMs / 33)));
     for (const c of needNow) {
       if (stale(c)) this.rebuild(c);
       else if (c.lookKey !== lookKey && lookBudget > 0) {

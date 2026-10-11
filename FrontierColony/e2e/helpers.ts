@@ -271,7 +271,7 @@ export async function openBuildingInspectorByClick(page: Page, buildingId: numbe
         const name = (await page.getByTestId('inspector-name').textContent())?.trim();
         if (name === expectedName) return;
         // Wrong building (a neighbour): close the inspector and try the next tile.
-        await page.getByTestId('panel-close').click();
+        await inspector.getByTestId('panel-close').click();
       }
     }
   throw new Error(`could not open the ${expectedName} inspector by clicking its footprint`);

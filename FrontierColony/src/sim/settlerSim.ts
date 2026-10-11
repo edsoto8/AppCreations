@@ -436,12 +436,30 @@ function foodSource(state: GameState, s: Settler): { b: Building; dist: number }
     const store = nearestBuilding(state, s, isEatingPoint);
     if (store) return store;
   }
-  return nearestBuilding(state, s, (b) => b.output.food >= 1);
+  return nearestBuilding(state, s, (b) => b.output.food - claimedFromOutput(state, s, b.id, 'food') >= 1);
+}
+
+/**
+ * Where a thirsty settler can drink: the nearest drinking point while the stockpile has water, otherwise
+ * a well (any building) whose output buffer holds water that nobody else has claimed (GAME_DESIGN §4.1, M6).
+ */
+function drinkSource(state: GameState, s: Settler): { b: Building; dist: number } | null {
+  if (state.colony.stock.water >= 1) {
+    const point = nearestBuilding(state, s, isDrinkingPoint);
+    if (point) return point;
+  }
+  return nearestBuilding(state, s, (b) => b.output.water - claimedFromOutput(state, s, b.id, 'water') >= 1);
+}
+
+/** Is there any water to drink: in the stockpile or in a completed building's buffer? */
+function hasDrinkableWater(state: GameState): boolean {
+  if (state.colony.stock.water >= 1) return true;
+  return state.buildings.some((b) => b.status === 'complete' && b.output.water >= 1);
 }
 
 /** Can resting still heal this settler? Health only regenerates when fed and not parched. */
 function canRegenerate(state: GameState, s: Settler): boolean {
-  return s.needs.hunger >= HEALTH.regenMinHunger && !(s.status.dehydrated && state.colony.stock.water < 1);
+  return s.needs.hunger >= HEALTH.regenMinHunger && !(s.status.dehydrated && !hasDrinkableWater(state));
 }
 
 // --- start functions -------------------------------------------------------------------------
@@ -520,12 +538,15 @@ function plannedToSite(state: GameState, self: Settler, siteId: number, resource
 }
 
 /** Units of `resource` other haulers are on their way to pick up from a building's output buffer. */
-function claimedFromOutput(state: GameState, self: Settler, buildingId: number, resource: ResourceType): number {
+export function claimedFromOutput(state: GameState, self: Settler, buildingId: number, resource: ResourceType): number {
   let sum = 0;
   for (const o of state.settlers) {
     if (o !== self && o.task.kind === 'haul' && o.task.fromBuildingId === buildingId && o.task.resource === resource && o.carrying === null) {
       sum += o.task.amount;
     }
+    // An eater or drinker on its way reserves 1 unit, so a hauler cannot empty the buffer from under it.
+    if (o !== self && o.task.kind === 'eat' && resource === 'food' && o.task.buildingId === buildingId) sum += 1;
+    if (o !== self && o.task.kind === 'drink' && resource === 'water' && o.task.buildingId === buildingId) sum += 1;
   }
   return sum;
 }
@@ -701,12 +722,14 @@ function toolsOnHand(state: GameState): number {
 }
 
 /**
- * Smallest buffer worth a hauling trip. During a food or water shortage anything is worth carrying
- * to the larder, and tools are always carried one by one (they are made one at a time).
+ * Smallest buffer worth a hauling trip. With under a day of food or water in the larder anything is worth
+ * carrying there, and tools are always carried one by one (they are made one at a time).
  */
-function minLoadFor(state: GameState, resource: ResourceType): number {
-  if (resource === 'tools') return 1;
-  if ((resource === 'food' || resource === 'water') && shortageBonus(state, resource) > 0) return 1;
+export function minLoadFor(state: GameState, resource: ResourceType): number {
+  if (resource === 'tools') return AI.haul.toolsMinLoad;
+  if ((resource === 'food' || resource === 'water') && state.colony.stock[resource] < state.settlers.length * 2 * AI.haul.lowStockDays) {
+    return AI.haul.lowStockMinLoad;
+  }
   return AI.haul.minLoad;
 }
 
@@ -794,7 +817,7 @@ function workCandidates(ctx: TickContext, s: Settler, out: Candidate[]): void {
     if (b.output[recipe.output] >= def.outputCap) continue;
     if (buildingMult(ctx, b) <= 0) continue;
     // Famine: food or water already waiting in the buffer must reach the larder before more is made.
-    if ((recipe.output === 'food' || recipe.output === 'water') && state.colony.stock[recipe.output] < pop && b.output[recipe.output] >= 1) continue;
+    if ((recipe.output === 'food' || recipe.output === 'water') && state.colony.stock[recipe.output] < pop * 2 * AI.famine.stockDays && b.output[recipe.output] >= 1) continue;
     let shortage = 0;
     if (recipe.output === 'food') shortage = shortageBonus(state, 'food');
     else if (recipe.output === 'water') shortage = shortageBonus(state, 'water');
@@ -891,7 +914,7 @@ function haulCandidates(ctx: TickContext, s: Settler, out: Candidate[], capacity
       if (avail < minLoadFor(state, r) || state.colony.stock[r] >= capacity) continue;
       const fill = b.output[r] / def.outputCap;
       // Food and water short in the larder: moving them there is as urgent as making them (§5.3 shortage bonus).
-      const urgency = r === 'food' || r === 'water' ? shortageBonus(state, r) : 0;
+      const urgency = r === 'food' || r === 'water' ? AI.haul.shortageMult * shortageBonus(state, r) : 0;
       const bonus = AI.haul.fillBonus * fill + (fill >= 1 ? AI.haul.fullBonus : 0) + urgency;
       if (best === null || bonus > best.bonus) best = { b, r, avail, bonus };
     }
@@ -958,9 +981,10 @@ function buildCandidates(ctx: TickContext, s: Settler): Candidate[] {
       }
     }
     // 2. drink
-    const starvingFallback = stock.food === 0 && n.hunger < DRINK.starvingMaxHunger && s.status.drinkCooldownHours <= 0;
-    if (stock.water >= 1 && (s.status.dehydrated || starvingFallback)) {
-      const point = nearestBuilding(state, s, isDrinkingPoint);
+    const noFood = stock.food < 1 && foodSource(state, s) === null;
+    const starvingFallback = noFood && n.hunger < DRINK.starvingMaxHunger && s.status.drinkCooldownHours <= 0;
+    if (s.status.dehydrated || starvingFallback) {
+      const point = drinkSource(state, s);
       if (point) {
         const b = point.b;
         out.push({
@@ -1052,10 +1076,9 @@ function decide(ctx: TickContext, s: Settler): void {
 /** The critical response to apply right now, or null (GAME_DESIGN §5.5). */
 function criticalResponse(ctx: TickContext, s: Settler): 'eat' | 'drink' | 'rest' | null {
   const n = s.needs;
-  const stock = ctx.state.colony.stock;
   if (n.hunger < AI.critical.hungerBelow) {
-    if (stock.food >= 1 || ctx.state.buildings.some((b) => b.status === 'complete' && b.output.food >= 1)) return 'eat';
-    if (stock.water >= 1 && s.status.drinkCooldownHours <= 0) return 'drink';
+    if (foodSource(ctx.state, s) !== null) return 'eat';
+    if (s.status.drinkCooldownHours <= 0 && drinkSource(ctx.state, s) !== null) return 'drink';
   }
   // Resting only helps while health can regenerate (fed, not parched); otherwise the settler goes looking for food.
   if (n.health < AI.critical.healthRestBelow && canRegenerate(ctx.state, s)) return 'rest';
@@ -1073,7 +1096,7 @@ function applyCritical(ctx: TickContext, s: Settler, response: 'eat' | 'drink' |
       return;
     }
     case 'drink': {
-      const p = nearestBuilding(state, s, isDrinkingPoint);
+      const p = drinkSource(state, s);
       if (p) startDrink(state, s, p.b);
       else failTask(state, s);
       return;
@@ -1173,7 +1196,7 @@ function stepTask(ctx: TickContext, s: Settler): void {
       const ok =
         b !== null &&
         b.status === 'complete' &&
-        (t.kind === 'eat' ? isEatingPoint(b) || b.output.food >= 1 : isDrinkingPoint(b));
+        (t.kind === 'eat' ? isEatingPoint(b) || b.output.food >= 1 : isDrinkingPoint(b) || b.output.water >= 1);
       if (!ok) return failTask(state, s);
       if (t.phase === 'moving') {
         const r = walk(ctx, s);
@@ -1204,9 +1227,11 @@ function stepTask(ctx: TickContext, s: Settler): void {
             s.status.dehydrated = true;
           }
         }
-      } else if (stock.water >= DRINK.water) {
+      } else if (stock.water >= DRINK.water || (b as Building).output.water >= DRINK.water) {
         const hadFood = stock.food > 0;
-        stock.water -= DRINK.water;
+        // From the stockpile at a drinking point, otherwise straight from the well's buffer.
+        if (stock.water >= DRINK.water && isDrinkingPoint(b as Building)) stock.water -= DRINK.water;
+        else (b as Building).output.water -= DRINK.water;
         recordConsumed(state, 'water', DRINK.water);
         ctx.events.push({ type: 'resourceConsumed', resource: 'water', amount: DRINK.water, reason: 'drink' });
         s.status.dehydrated = false;
@@ -1406,7 +1431,7 @@ function stepWork(ctx: TickContext, s: Settler, t: Extract<Task, { kind: 'work' 
   const recipe = def.production;
   const bmult = buildingMult(ctx, b);
   if (bmult <= 0 || b.output[recipe.output] >= def.outputCap) return failTaskQuiet(state, s);
-  if ((recipe.output === 'food' || recipe.output === 'water') && state.colony.stock[recipe.output] < state.settlers.length && b.output[recipe.output] >= 1) {
+  if ((recipe.output === 'food' || recipe.output === 'water') && state.colony.stock[recipe.output] < state.settlers.length * 2 * AI.famine.stockDays && b.output[recipe.output] >= 1) {
     return failTaskQuiet(state, s); // famine: the waiting goods go to the larder first
   }
 

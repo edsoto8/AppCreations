@@ -294,43 +294,6 @@ export function makeHillsGround(seed: number): Art {
   return art;
 }
 
-export function makeHillsGroundOld(seed: number): Art {
-  const art = createArt(TILE_FRAME_W, TILE_FRAME_H);
-  const rng = mulberry32(seed * 3571 + 21);
-  paintBase(art, { seed: seed + 500, ramp: HILL_GROUND, freq: 0.08, contrast: 1.7, grain: 0.14 });
-  const { ctx } = art;
-  ctx.save();
-  clipTileDiamond(ctx);
-  // grass patches creeping in
-  for (let i = 0; i < 5; i++) {
-    const [x, y] = randInDiamond(rng, 0.85);
-    const r = 3 + rng() * 5;
-    const g = ctx.createRadialGradient(x, y, 0, x, y, r);
-    g.addColorStop(0, css([112, 150, 82], 0.55));
-    g.addColorStop(1, css([112, 150, 82], 0));
-    ctx.fillStyle = g;
-    ctx.save();
-    ctx.translate(x, y);
-    ctx.scale(1, 0.5);
-    ctx.translate(-x, -y);
-    ctx.beginPath();
-    ctx.arc(x, y, r, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
-  }
-  for (let i = 0; i < 10; i++) {
-    const [x, y] = randInDiamond(rng, 0.9);
-    ctx.fillStyle = css(rng() < 0.5 ? [96, 86, 72] : [196, 186, 164], 0.55);
-    ctx.beginPath();
-    ctx.ellipse(x, y, 0.8 + rng() * 1.2, 0.5 + rng() * 0.6, rng() * 3, 0, Math.PI * 2);
-    ctx.fill();
-  }
-  ctx.restore();
-  scatterBlades(art, rng, 14, [88, 112, 66], [150, 176, 104], 2.6);
-  addGrain(art, 7, seed + 17);
-  return art;
-}
-
 export function makeRockGround(seed: number): Art {
   const art = createArt(TILE_FRAME_W, TILE_FRAME_H);
   const rng = mulberry32(seed * 2713 + 33);

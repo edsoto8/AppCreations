@@ -65,8 +65,9 @@ export class Atmosphere {
     screenH: number;
     view: { x0: number; y0: number; x1: number; y1: number };
     entities: EntityLayer;
+    fires: readonly { x: number; y: number; age: number; burn: number }[];
   }): void {
-    const { state, dt, world, screenW, screenH, view, entities } = args;
+    const { state, dt, world, screenW, screenH, view, entities, fires } = args;
     const hour = state.time.timeOfDay;
     const droughtOn = state.activeEvents.some((e) => e.kind === 'drought') ? 1 : 0;
     this.droughtLevel += (droughtOn - this.droughtLevel) * (1 - Math.exp(-dt / 4));
@@ -102,12 +103,12 @@ export class Atmosphere {
 
     // night lights
     this.light = lightStrength(hour) * (state.weather.current === 'storm' ? 1 : 1);
-    this.updateLights(state, entities, view, hour);
+    this.updateLights(state, entities, view, hour, fires);
   }
 
-  private updateLights(state: Readonly<GameState>, entities: EntityLayer, view: { x0: number; y0: number; x1: number; y1: number }, hour: number): void {
+  private updateLights(state: Readonly<GameState>, entities: EntityLayer, view: { x0: number; y0: number; x1: number; y1: number }, hour: number, fires: readonly { x: number; y: number; age: number; burn: number }[]): void {
     const strength = this.light;
-    if (strength < 0.03) {
+    if (strength < 0.03 && fires.length === 0) {
       for (let i = 0; i < this.lightCount; i++) this.lights[i]!.s.visible = false;
       this.lightCount = 0;
       return;
@@ -121,7 +122,7 @@ export class Atmosphere {
     const t = performance.now() / 1000;
     let n = 0;
     const margin = 120;
-    for (const v of entities.buildingViews()) {
+    for (const v of strength < 0.03 ? [] : entities.buildingViews()) {
       const x = v.root.position.x;
       const y = v.root.position.y;
       if (x < view.x0 - margin || x > view.x1 + margin || y < view.y0 - margin - 120 || y > view.y1 + margin) continue;
@@ -160,6 +161,17 @@ export class Atmosphere {
           }
         }
       }
+    }
+    // wildfire glow (visible by day too, stronger at night)
+    for (const f of fires) {
+      if (f.age < 0 || n >= LIGHT_POOL) continue;
+      const s = this.lights[n++]!.s;
+      const inten = Math.min(1, f.age / 3) * (1 - Math.max(0, (f.age - f.burn * 0.7) / (f.burn * 0.3)));
+      s.visible = true;
+      s.position.set(f.x, f.y - 8);
+      s.tint = 0xff7a30;
+      s.scale.set(1.5 + 0.2 * Math.sin(t * 9 + f.x));
+      s.alpha = inten * (0.35 + 0.5 * strength) * (0.8 + 0.2 * Math.sin(t * 13 + f.y));
     }
     for (let i = n; i < this.lightCount; i++) this.lights[i]!.s.visible = false;
     this.lightCount = n;

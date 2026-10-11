@@ -167,6 +167,7 @@ export function populationCheck(ctx: TickContext): void {
   const state = ctx.state;
   const pop = state.settlers.length;
   if (pop === 0 || pop >= POPULATION_CAP) return;
+  if (GROWTH.pausedInWinter && state.time.season === 'winter') return;
   const freeBeds = getHousingCapacity(state) - pop;
   if (freeBeds < GROWTH.minFreeBeds) return;
   const stock = state.colony.stock;
@@ -320,6 +321,7 @@ export function dailyChance(state: GameState, kind: DailyKind): number | null {
       return TRADER_OFFERS.some((o) => RESOURCE_TYPES.every((r) => avail[r] >= (o.give[r] ?? 0))) ? EVENTS.traderVisit.p : null;
     }
     case 'wanderer':
+      if (EVENTS.wanderer.notWinter && season === 'winter') return null;
       return day >= EVENTS.wanderer.minDay && pop <= EVENTS.wanderer.maxPop ? EVENTS.wanderer.p : null;
     case 'harvestFestival':
       return season === 'autumn' && state.progress.festivalYear !== currentYear(state) && state.colony.stock.food >= pop * EVENTS.harvestFestival.minFoodPerPop

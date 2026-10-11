@@ -39,7 +39,7 @@ function isMet(state: GameState, id: string, newDay: boolean): boolean {
     case 'winter':
       return state.time.day >= OBJECTIVE_TARGETS.winterDay && pop >= 1;
     case 'thriving': {
-      if (pop < VICTORY.population) return false;
+      if (pop < VICTORY.population || !state.progress.objectivesDone.includes(VICTORY.requiresObjective)) return false;
       let happy = 0;
       for (const s of state.settlers) happy += s.needs.happiness;
       return happy / pop >= VICTORY.minAvgHappiness;

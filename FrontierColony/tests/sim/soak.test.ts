@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { MAP_PRESETS, validateGameState, type Difficulty, type MapPreset } from '../../src/sim';
+import { GAME_HOURS_PER_TICK, MAP_PRESETS, validateGameState, type Difficulty, type GameState, type MapPreset } from '../../src/sim';
+import { START_HOUR } from '../../src/sim/balance';
 import { assertInvariants } from '../../src/sim/testSupport';
 import { playScript, type ScriptItem } from './support/player';
 
@@ -29,8 +30,18 @@ const MONTH: ScriptItem[] = [
   { day: 22, type: 'house' },
 ];
 
-function month(preset: MapPreset, difficulty: Difficulty, seed: string) {
-  return playScript({ seed, preset, difficulty }, MONTH, 30, [10, 20, 30], {
+/** In-game day (1-based, fractional) at which the game was won, or null. */
+function victoryDay(s: GameState): number | null {
+  if (s.outcome.status !== 'won') return null;
+  return 1 + (START_HOUR + (s.outcome.endedTick ?? 0) * GAME_HOURS_PER_TICK) / 24;
+}
+
+/** Pace bounds (GAME_DESIGN §11, docs/balance/M6-tuning.md): the first winter must be survived before victory. */
+const EARLIEST_VICTORY_DAY = 21;
+const LATEST_VICTORY_DAY = 32;
+
+function month(preset: MapPreset, difficulty: Difficulty, seed: string, days = 30) {
+  return playScript({ seed, preset, difficulty }, MONTH, days, [10, 20, 30], {
     onTick: (s, t) => {
       if (t % 150 === 0) assertInvariants(s);
     },
@@ -39,7 +50,7 @@ function month(preset: MapPreset, difficulty: Difficulty, seed: string) {
 
 describe('30-day soak, normal difficulty, sensible player', () => {
   it.each(MAP_PRESETS)('%s: the colony survives its first winter and keeps growing', (preset) => {
-    const report = month(preset, 'normal', 'soak-b');
+    const report = month(preset, 'normal', 'soak-b', LATEST_VICTORY_DAY);
     const s = report.state;
     const at = (day: number) => report.checkpoints.find((c) => c.day === day)!;
     expect(s.outcome.status).not.toBe('lost');
@@ -50,6 +61,11 @@ describe('30-day soak, normal difficulty, sensible player', () => {
     expect(at(30).stock.water).toBeGreaterThan(50);
     expect(s.stats.deaths).toBeLessThanOrEqual(2);
     expect(s.progress.objectivesDone).toEqual(expect.arrayContaining(['roof', 'bread', 'water', 'foundations', 'timber', 'toolmaker', 'winter']));
+    // Pace: no victory before the first winter is over, and a sensible player wins soon after.
+    const won = victoryDay(s);
+    expect(won, 'victory by day 32').not.toBeNull();
+    expect(won ?? 0, `victory on day ${won}`).toBeGreaterThanOrEqual(EARLIEST_VICTORY_DAY);
+    expect(won ?? Infinity, `victory on day ${won}`).toBeLessThanOrEqual(LATEST_VICTORY_DAY);
     expect(validateGameState(JSON.parse(JSON.stringify(s))).ok).toBe(true);
   });
 });

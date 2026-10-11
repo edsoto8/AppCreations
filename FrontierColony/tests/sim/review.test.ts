@@ -13,9 +13,10 @@ import {
   type GameState,
   type SimEvent,
 } from '../../src/sim';
-import { fireEvent } from '../../src/sim/events';
+import { dailyChance, fireEvent, populationCheck } from '../../src/sim/events';
+import { checkObjectives } from '../../src/sim/progression';
 import { makeContext } from '../../src/sim/needs';
-import { campfireSpot, shortageBonus } from '../../src/sim/settlerSim';
+import { campfireSpot, claimedFromOutput, minLoadFor, shortageBonus } from '../../src/sim/settlerSim';
 import { removeSettler } from '../../src/sim/stateOps';
 import { assertInvariants } from '../../src/sim/testSupport';
 import { placeNearTown } from './support/player';
@@ -189,6 +190,8 @@ describe('MAJ-2: food waiting in buffers reaches the larder during a shortage', 
     s.progress.unlocked.push('workshop');
     const shop = instantBuild(s, 'workshop');
     shop.output.tools = 2;
+    s.colony.stock.wood = 0; // no materials: the workshop cannot craft more while the test runs
+    s.colony.stock.stone = 0;
     for (const x of s.settlers) x.needs.hunger = 90;
     const events = run(s, TICKS_PER_DAY / 2);
     expect(events.some((e) => e.type === 'resourceDelivered' && e.resource === 'food')).toBe(true);
@@ -326,5 +329,90 @@ describe('Activity.indoorsBuildingId', () => {
     }
     expect(sawIndoors).toBe(true);
     expect(sawOutdoors).toBe(true);
+  });
+});
+
+describe('M6 tuning rules', () => {
+  function roomy(seed: string): GameState {
+    const s = game(seed);
+    for (let i = 0; i < 4; i++) instantBuild(s, 'house');
+    s.colony.stock = { wood: 100, stone: 50, food: 200, water: 200, tools: 3 };
+    for (const x of s.settlers) x.needs.happiness = 100;
+    return s;
+  }
+
+  it('newcomers arrive in spring but the growth check is paused in winter', () => {
+    const spring = roomy('growth-spring');
+    spring.time.season = 'spring';
+    for (let i = 0; i < 40 && spring.settlers.length === 5; i++) populationCheck(makeContext(spring, [], GAME_HOURS_PER_TICK, true));
+    expect(spring.settlers.length).toBeGreaterThan(5);
+
+    const winter = roomy('growth-winter');
+    winter.time.season = 'winter';
+    for (let i = 0; i < 200; i++) populationCheck(makeContext(winter, [], GAME_HOURS_PER_TICK, true));
+    expect(winter.settlers).toHaveLength(5);
+  });
+
+  it('the wanderer event is not eligible in winter', () => {
+    const s = game('wanderer-winter');
+    s.time.day = 30;
+    s.time.season = 'winter';
+    expect(dailyChance(s, 'wanderer')).toBeNull();
+    s.time.season = 'spring';
+    expect(dailyChance(s, 'wanderer')).not.toBeNull();
+  });
+
+  it('victory needs the winter objective as well as 20 happy settlers', () => {
+    const s = roomy('victory-gate');
+    const proto = s.settlers[0]!;
+    for (let i = 0; i < 16; i++) s.settlers.push({ ...structuredClone(proto), id: 9000 + i });
+    for (const x of s.settlers) x.needs.happiness = 100;
+    s.progress.objectivesDone = s.progress.objectivesDone.filter((o) => o !== 'winter' && o !== 'thriving');
+    checkObjectives(s, []);
+    expect(s.progress.objectivesDone).not.toContain('thriving');
+    expect(s.outcome.status).toBe('playing');
+    s.progress.objectivesDone.push('winter');
+    checkObjectives(s, []);
+    expect(s.progress.objectivesDone).toContain('thriving');
+    expect(s.outcome.status).toBe('won');
+  });
+
+  it('with no water in the stockpile, a dehydrated settler drinks from a well buffer', () => {
+    const s = game('well-buffer');
+    s.colony.stock = { wood: 100, stone: 50, food: 100, water: 0, tools: 3 };
+    const well = instantBuild(s, 'well');
+    well.output.water = 8;
+    for (const x of s.settlers) {
+      x.status.dehydrated = true;
+      x.needs.hunger = 90;
+    }
+    s.time.timeOfDay = 8;
+    run(s, 150, 50); // 3 game hours
+    expect(s.settlers.some((x) => !x.status.dehydrated)).toBe(true);
+    expect(well.output.water).toBeLessThan(8);
+    expect(s.stats.deaths).toBe(0);
+  });
+
+  it('an eater on the way reserves its unit in the farm buffer', () => {
+    const s = game('reserve');
+    const farm = instantBuild(s, 'farm');
+    farm.output.food = 1;
+    const [a, b] = s.settlers as [GameState['settlers'][number], GameState['settlers'][number]];
+    a.task = { kind: 'eat', buildingId: farm.id, phase: 'moving', progress: 0 };
+    expect(claimedFromOutput(s, b, farm.id, 'food')).toBe(1);
+    expect(claimedFromOutput(s, a, farm.id, 'food')).toBe(0);
+    expect(claimedFromOutput(s, b, farm.id, 'water')).toBe(0);
+  });
+
+  it('single units are hauled only with under a day of supply; tools always', () => {
+    const s = game('min-load');
+    const pop = s.settlers.length; // one day of supply is pop x 2
+    s.colony.stock = { wood: 50, stone: 50, food: pop * 2 - 1, water: pop * 2 + 1, tools: 0 };
+    expect(minLoadFor(s, 'food')).toBe(1);
+    expect(minLoadFor(s, 'water')).toBe(6);
+    expect(minLoadFor(s, 'tools')).toBe(1);
+    expect(minLoadFor(s, 'wood')).toBe(6);
+    s.colony.stock.food = 100; // plentiful, though still inside the autumn shortage target
+    expect(minLoadFor(s, 'food')).toBe(6);
   });
 });

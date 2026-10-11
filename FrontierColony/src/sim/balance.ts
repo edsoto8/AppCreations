@@ -480,7 +480,7 @@ export interface DifficultyDef {
 export const DIFFICULTY: Record<Difficulty, DifficultyDef> = {
   relaxed: { needDecayMult: 0.85, productionMult: 1.15, healthDamageMult: 0.75, negEventMult: 0.6, posEventMult: 1.3, growthMult: 1.25, graceDays: 5, desertionHours: 72 },
   normal: { needDecayMult: 1.0, productionMult: 1.0, healthDamageMult: 1.0, negEventMult: 1.0, posEventMult: 1.0, growthMult: 1.0, graceDays: 3, desertionHours: 48 },
-  harsh: { needDecayMult: 1.15, productionMult: 0.9, healthDamageMult: 1.25, negEventMult: 1.4, posEventMult: 0.8, growthMult: 0.8, graceDays: 2, desertionHours: 36 },
+  harsh: { needDecayMult: 1.15, productionMult: 0.9, healthDamageMult: 1.25, negEventMult: 1.4, posEventMult: 0.8, growthMult: 1.0, graceDays: 2, desertionHours: 36 },
 };
 
 // --- Time of day (GAME_DESIGN §2) -----------------------------------------------------------------
@@ -639,7 +639,23 @@ export const AI = {
   },
   traitWorkBonus: { hardworking: 5, lazy: -5 },
   buildTaskBonus: { any: 10, houseWhileHomeless: 10, farmOrWellInShortage: 10, shortageThreshold: 12 },
-  haul: { minLoad: 6, fillBonus: 25, fullBonus: 15, supplySiteBonus: 15, pickupHours: 0.1, dropHours: 0.1 },
+  haul: {
+    minLoad: 6,
+    fillBonus: 25,
+    fullBonus: 15,
+    supplySiteBonus: 15,
+    pickupHours: 0.1,
+    dropHours: 0.1,
+    /** Multiplier on the shortage bonus added to the urgency of hauling food or water out of a buffer. */
+    shortageMult: 1.0,
+    /** Below this many days of supply (pop x 2 per day) food and water are hauled in loads of `lowStockMinLoad`. */
+    lowStockDays: 1,
+    lowStockMinLoad: 1,
+    /** Tools are hauled one at a time. */
+    toolsMinLoad: 1,
+  },
+  /** Famine rule: while stock is under this many days of supply, food and water buffers are emptied before more is made. */
+  famine: { stockDays: 0.5 },
   /** First decision of a settler happens on ticks where `tick % decisionStaggerTicks === id % decisionStaggerTicks`. */
   decisionStaggerTicks: 10,
   /** Game hours an idle settler waits after a failed path before deciding again. */
@@ -684,9 +700,9 @@ export const OBJECTIVES: readonly ObjectiveDef[] = [
   { id: 'growing', title: 'Growing Settlement', description: 'Reach 10 settlers.' },
   { id: 'larder', title: 'Ready for Winter', description: 'Have food for 5 days per settler when winter begins.' },
   { id: 'winter', title: 'Survive the Winter', description: 'Reach day 21 with at least one settler alive.' },
-  { id: 'thriving', title: 'Thriving Frontier', description: 'Reach 20 settlers with an average happiness of at least 50.' },
+  { id: 'thriving', title: 'Thriving Frontier', description: 'Survive your first winter, then reach 20 settlers with an average happiness of at least 50.' },
 ];
-export const VICTORY = { population: 20, minAvgHappiness: 50 } as const;
+export const VICTORY = { population: 20, minAvgHappiness: 50, requiresObjective: 'winter' } as const;
 /** Objective thresholds. */
 export const OBJECTIVE_TARGETS = { foundationsBuildings: 3, toolsCrafted: 5, growingPopulation: 10, larderFoodPerSettler: 10, winterDay: 21 } as const;
 
@@ -730,10 +746,12 @@ export const GROWTH = {
   minWaterDays: 2,
   minAvgHappiness: 50,
   noDeathWithinHours: 24,
-  baseChance: 0.5,
+  baseChance: 0.4,
   perExtraBed: 0.1,
   maxExtraBeds: 3,
-  pairChance: 0.3,
+  pairChance: 0.2,
+  /** No growth check in winter. */
+  pausedInWinter: true,
   pairMinFreeBeds: 2,
 } as const;
 /** Days per year (4 seasons). */
@@ -756,7 +774,7 @@ export const SUPPLY_CACHE_REWARDS: readonly Partial<Record<ResourceType, number>
 
 export const EVENTS = {
   traderVisit: { positive: true, p: 0.1, minDay: 3, windowHours: 12 },
-  wanderer: { positive: true, p: 0.07, minDay: 2, maxPop: 28, pairChance: 0.4, windowHours: 12 },
+  wanderer: { positive: true, p: 0.06, minDay: 2, maxPop: 28, pairChance: 0.3, windowHours: 12, notWinter: true },
   harvestFestival: { positive: true, p: 0.35, minFoodPerPop: 6, foodCostPerPop: 2, socializeHours: 4, windowHours: 6, festivalHours: 48 },
   bountifulHarvest: { positive: true, p: 0.06, durationHours: 48, farmMult: 1.5 },
   richVein: { positive: true, p: 0.05, stonePerTile: 40 },

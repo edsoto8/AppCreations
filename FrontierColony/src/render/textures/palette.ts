@@ -28,8 +28,8 @@ export const FLOWER_COLORS: RGB[] = [
 ];
 
 /** Tints (multiplied over the near-white water texture) from the shore out to the deep. */
-export const WATER_SHORE: RGB = [118, 208, 214];
-export const WATER_SHALLOW: RGB = [86, 178, 206];
+export const WATER_SHORE: RGB = [108, 198, 214];
+export const WATER_SHALLOW: RGB = [88, 180, 208];
 export const WATER_MID: RGB = [58, 138, 190];
 export const WATER_DEEP: RGB = [38, 94, 158];
 

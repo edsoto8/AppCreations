@@ -55,7 +55,8 @@
 }
 
 .panel--center {
-  max-height: min(calc(100vh - 32px), 760px);
+  /* The UI may be scaled (--s), so the viewport height is divided by it. */
+  max-height: min(calc((100vh - 32px) / var(--s, 1)), 760px);
   width: min(var(--panel-w, 520px), 100%);
   animation: pop-in var(--t-med) var(--ease);
 }
