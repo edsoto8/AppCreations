@@ -21,3 +21,6 @@ been run. A milestone is marked done only after its acceptance criteria were ver
 - Environment inspected: Node 22.22, npm 10.9, Chromium 1194 pre-installed (pinned `@playwright/test@1.56.1`).
   Agent tool model aliases opus / sonnet / haiku (all Claude 5.5) and fable (Fable 5.1) available.
 - PLAN.md written. Wave 1 launched: Systems Architect (opus) and Game Designer (opus) in parallel.
+- Game Designer (opus, `claude-opus-5-5`) finished `docs/GAME_DESIGN.md` (~13k words, 16 sections plus a
+  constants appendix and a day-by-day balance proof). Subagent usage: 196k tokens, 13 tool calls, 20.7 min.
+  Lead decision on Appendix B contract additions: all approved except the optional `fishingDock` (deferred).
