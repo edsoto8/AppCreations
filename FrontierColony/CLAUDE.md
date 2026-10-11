@@ -154,5 +154,6 @@ migration step in `src/game/save.ts` (`migrateEnvelope`), and updates `validateG
 - Use the names given in the code (`BuildingType` values such as `lumberCamp`, `ResourceType` values such as `wood`).
 - Unit tests live in `tests/<module>/<name>.test.ts`. They run in node, and DOM-free code needs no jsdom.
 - `window.__frontierColony` (the `GameController`) is a debug and e2e handle. You can call `getState()`,
-  `advanceTicks(n)` and `dispatch(cmd)` on it.
+  `advanceTicks(n)` and `dispatch(cmd)` on it. It is installed only in dev (`npm run dev`), in builds made
+  with `VITE_E2E=1` (Playwright does this) or when the URL has `?debug`.
 - Before you report done, run `npm run typecheck && npm test && npm run build`. If you touched anything visible, also run `npm run test:e2e`.
