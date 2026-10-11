@@ -8,7 +8,7 @@ been run. A milestone is marked done only after its acceptance criteria were ver
 | Milestone | Status | Verified by |
 |---|---|---|
 | M1 Foundation | done | lead: `npm ci`, typecheck, 42/42 unit, build, 1/1 e2e |
-| M2 World Generation | pending | |
+| M2 World Generation | in progress | |
 | M3 Settler Intelligence | pending | |
 | M4 Economy & Construction | pending | |
 | M5 Gameplay | pending | |
@@ -31,3 +31,6 @@ been run. A milestone is marked done only after its acceptance criteria were ver
   `npm run test:e2e` 1/1. Open questions resolved: `src/shared/iso.ts` may be edited by the Graphics Engineer
   (lead-owned otherwise); construction will reserve materials and require hauling (Simulation Engineer, M4);
   `fishingDock` deferred.
+- Wave 2 launched (M2 World Generation), in parallel: Simulation Engineer (sonnet) — seeded noise worldgen +
+  4 presets + start site; Graphics Engineer (sonnet) — chunked iso terrain, camera; UI/UX Engineer (sonnet) —
+  menu, HUD, panel framework, save/load panel; Code Reviewer (opus) — review of the M1 commit.
