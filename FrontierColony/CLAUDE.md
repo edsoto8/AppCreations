@@ -75,6 +75,10 @@ Do not make the edit yourself.
   `deriveRng(seed, name)` (world generation uses `deriveRng(seed, 'worldgen')`). Never use
   `Math.random`, `Date`, `performance.now`, timers or the iteration order of a `Map`/`Set` holding object keys.
   Unit tests check determinism by deep-equality after N ticks.
+- **Engine-independent math.** Only IEEE-exact operations may influence sim state: `+ - * /`, `Math.sqrt`,
+  `Math.floor/ceil/round/trunc`, `Math.abs`, `Math.min/max`, `Math.sign`, `Math.fround`, `Math.imul`.
+  `Math.sin/cos/tan/atan2/exp/log/pow/hypot/cbrt` can return different results in different browsers, so
+  they are banned in `src/sim` (a unit test enforces this). The renderer may use them freely.
 - **Fixed timestep.** `stepGame(state)` advances exactly one tick: `TICK_SECONDS` (0.1) sim seconds
   and `GAME_HOURS_PER_TICK` game hours. It takes no `dt`. The loop in `src/game` runs 0..n ticks per
   frame according to speed. At 1x, sim seconds equal real seconds.
