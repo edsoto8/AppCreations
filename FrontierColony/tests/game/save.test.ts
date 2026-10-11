@@ -6,6 +6,7 @@ import {
   listSaveSlots,
   loadFromSlot,
   saveKey,
+  saveMetaKey,
   saveToSlot,
   serializeGame,
   type KeyValueStorage,
@@ -98,5 +99,23 @@ describe('save / load', () => {
     saveToSlot(storage, 'autosave', state);
     expect(storage.data.get(AUTOSAVE_BACKUP_KEY)).toBe(first);
     expect(storage.data.get(saveKey('autosave'))).not.toBe(first);
+  });
+
+  it('lists slots from the metadata record and falls back to the full save when it is missing or stale', () => {
+    const storage = createMemoryStorage();
+    const state = createGame(DEFAULT_NEW_GAME_OPTIONS);
+    saveToSlot(storage, 'slot2', state, new Date('2026-03-01T10:00:00Z'));
+    expect(storage.data.has(saveMetaKey('slot2'))).toBe(true);
+    const fromMeta = listSaveSlots(storage).find((s) => s.slot === 'slot2')!;
+    expect(fromMeta.summary?.colonyName).toBe(state.colony.name);
+    expect(fromMeta.savedAt).toBe('2026-03-01T10:00:00.000Z');
+
+    // A stale meta record (from another save) is ignored in favour of the real save.
+    storage.data.set(saveMetaKey('slot2'), storage.data.get(saveMetaKey('slot2'))!.replace('2026-03-01T10', '2020-01-01T10'));
+    expect(listSaveSlots(storage).find((s) => s.slot === 'slot2')!.savedAt).toBe('2026-03-01T10:00:00.000Z');
+
+    // Missing meta: still listed, from the full parse.
+    storage.data.delete(saveMetaKey('slot2'));
+    expect(listSaveSlots(storage).find((s) => s.slot === 'slot2')!.summary?.colonyName).toBe(state.colony.name);
   });
 });

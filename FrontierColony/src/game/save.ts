@@ -59,6 +59,37 @@ export function saveKey(slot: SaveSlotId): string {
   return SAVE_KEY_PREFIX + slot;
 }
 
+/**
+ * Small companion record written next to each save, so the save list can be shown without parsing
+ * and validating every full game (about 90 ms for four large saves). Load still validates fully.
+ */
+export const SAVE_META_KEY_PREFIX = `frontierColony.v${STORAGE_LAYOUT_VERSION}.meta.`;
+
+export function saveMetaKey(slot: SaveSlotId): string {
+  return SAVE_META_KEY_PREFIX + slot;
+}
+
+interface SaveMeta {
+  format: typeof SAVE_FORMAT;
+  schemaVersion: number;
+  savedAt: string;
+  summary: SaveSummary;
+}
+
+function readMeta(json: string | null): SaveMeta | null {
+  if (json === null) return null;
+  try {
+    const m = JSON.parse(json) as Partial<SaveMeta> | null;
+    if (!m || m.format !== SAVE_FORMAT || typeof m.savedAt !== 'string' || typeof m.schemaVersion !== 'number') return null;
+    const sum = m.summary as Partial<SaveSummary> | undefined;
+    if (!sum || typeof sum.colonyName !== 'string' || typeof sum.day !== 'number' || typeof sum.timeOfDay !== 'number' ||
+      typeof sum.population !== 'number' || typeof sum.seed !== 'string' || typeof sum.preset !== 'string') return null;
+    return m as SaveMeta;
+  } catch {
+    return null;
+  }
+}
+
 export function summarize(state: GameState): SaveSummary {
   return {
     colonyName: state.colony.name,
@@ -128,6 +159,8 @@ export function saveToSlot(storage: KeyValueStorage, slot: SaveSlotId, state: Ga
       if (previous !== null) storage.setItem(AUTOSAVE_BACKUP_KEY, previous);
     }
     storage.setItem(saveKey(slot), json);
+    const meta: SaveMeta = { format: SAVE_FORMAT, schemaVersion: SAVE_SCHEMA_VERSION, savedAt: now.toISOString(), summary: summarize(state) };
+    storage.setItem(saveMetaKey(slot), JSON.stringify(meta));
     return { ok: true, bytes: json.length };
   } catch (err) {
     const quota = err instanceof Error && /quota/i.test(`${err.name} ${err.message}`);
@@ -149,6 +182,7 @@ export function loadFromSlot(storage: KeyValueStorage, slot: SaveSlotId): LoadRe
 export function deleteSlot(storage: KeyValueStorage, slot: SaveSlotId): void {
   try {
     storage.removeItem(saveKey(slot));
+    storage.removeItem(saveMetaKey(slot));
     if (slot === 'autosave') storage.removeItem(AUTOSAVE_BACKUP_KEY);
   } catch {
     // Storage unavailable: nothing to delete.
@@ -164,6 +198,16 @@ export function listSaveSlots(storage: KeyValueStorage): SaveSlotInfo[] {
       return { slot, exists: false, savedAt: null, summary: null, error: 'Browser storage is not available.' };
     }
     if (json === null) return { slot, exists: false, savedAt: null, summary: null, error: null };
+    let meta: SaveMeta | null = null;
+    try {
+      meta = readMeta(storage.getItem(saveMetaKey(slot)));
+    } catch {
+      meta = null;
+    }
+    // Trust the metadata only if it matches the stored save's timestamp; otherwise fall back to a full parse.
+    if (meta && meta.schemaVersion <= SAVE_SCHEMA_VERSION && json.includes(`"savedAt":${JSON.stringify(meta.savedAt)}`)) {
+      return { slot, exists: true, savedAt: meta.savedAt, summary: meta.summary, error: null };
+    }
     const result = deserializeGame(json);
     return result.ok
       ? { slot, exists: true, savedAt: result.envelope.savedAt, summary: result.envelope.summary, error: null }

@@ -178,6 +178,8 @@ export class GameController implements GameControllerApi {
       ui.select(null);
     }
     ui.setSnapshot(buildHudSnapshot(this.state, ui.selection));
+    // Stock, settlers and sites change while the cursor rests: keep the placement ghost current.
+    if (ui.buildMode) this.syncRendererWithStore(ui);
   }
 
   // --- store → renderer --------------------------------------------------------------------

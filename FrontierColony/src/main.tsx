@@ -18,7 +18,11 @@ declare global {
     __frontierColony?: GameController;
   }
 }
-window.__frontierColony = controller;
+// The handle exposes the live, mutable game: install it only for development, for the e2e build
+// (`VITE_E2E=1`, set by playwright.config.ts) or when the player opts in with `?debug`.
+if (import.meta.env.DEV || import.meta.env.VITE_E2E === '1' || new URLSearchParams(window.location.search).has('debug')) {
+  window.__frontierColony = controller;
+}
 
 const rootElement = document.getElementById('root');
 if (!rootElement) throw new Error('#root element missing');
