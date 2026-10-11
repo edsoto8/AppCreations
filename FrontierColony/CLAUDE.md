@@ -29,7 +29,10 @@ src/
   sim/      pure simulation: types.ts (contract), index.ts (public API), balance.ts (tuning),
             constants.ts (engine constants), rng.ts, queries.ts, validate.ts, names.ts
   shared/   iso.ts (projection math), types.ts (Selection, GameSpeed, OverlayMode, PlacementGhost)
-  render/   PixiJS renderer: types.ts (GameRenderer contract), index.ts (createRenderer)
+  render/   PixiJS renderer: types.ts (GameRenderer contract), index.ts (createRenderer), renderer.ts
+            (IsoRenderer), camera.ts, input.ts (DOM pointer events), layers.ts, depthLayer.ts (one render
+            group per iso diagonal), terrain/ (chunked ground), entities/ (settlers, buildings, overlays),
+            effects/ (pooled particles, floating text), textures/ (procedural Canvas-2D art baked to atlases)
   store/    Zustand UI store (uiStore.ts) + HUD snapshot builder (snapshot.ts)
   game/     GameController (loop, commands, renderer/store glue), clock.ts, save.ts, React context
   ui/       React components overlaid on the canvas
@@ -114,6 +117,9 @@ Do not make the edit yourself.
 - Read the state and never mutate it. Interpolate settlers with `prevPos + (pos - prevPos) * frame.alpha`.
 - Animate settlers from `settler.activity.kind`, never from `settler.task` (that one is internal to the sim).
 - Use `frame.events` for one-shot effects such as particles. Ignore event types you do not know.
+- Structural tile changes (`world.revision`) trigger a full terrain diff; resource-only changes arrive as
+  `tileChanged` events and dirty only the affected chunk. Never rescan the whole map per frame.
+- Settler colours and hair/hat rules in `render/entities/palettes.ts` mirror `ui` avatar rules: change both together.
 - All iso math goes through `src/shared/iso.ts`. For one click, report exactly one of settler, building
   or tile, in that priority order. A drag pans the camera and is never a click.
 
