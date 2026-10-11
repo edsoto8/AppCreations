@@ -192,6 +192,12 @@ decay are multiplied by the difficulty `needDecayMult` and by traits. Health dam
 - **Dehydrated** status: health −1.5/h, moodlet −8. Cleared by any drink or by a meal that included water.
   **[contract +]** `Settler.status.dehydrated: boolean`.
 - **Rain barrels:** while the weather is `rain` or `storm`, the town center adds +0.5 water/h to the stock.
+- **Emergency meals and drinks (M6).** While `stock.food < 1`, every completed building whose output buffer holds
+  ≥ 1 food (a farm or fishing dock) also counts as an eating point. The meal takes 1 food from that buffer and
+  1 water from the stock if there is any; otherwise the eater becomes dehydrated, as usual. In the same way, while
+  `stock.water < 1`, a completed well whose buffer holds ≥ 1 water serves drinks from its buffer. The eater or
+  drinker reserves its 1 unit when choosing the target, so haulers cannot take it. This applies to normal and to
+  critical eating/drinking. It means food that exists anywhere can always be eaten.
 
 ### 4.2 Energy and sleep
 
@@ -223,7 +229,15 @@ decay are multiplied by the difficulty `needDecayMult` and by traits. Health dam
 
 - **Health < 50:** work speed ×0.8 and moodlet "Hurt" −10.
 - **Health < 25 (critical):** the settler rests in their bed (or by the campfire) until health ≥ 50. This is
-  activity `resting`, which counts as sleep for restore rates.
+  activity `resting`, which counts as sleep for restore rates. **Rest only happens while it can heal (M6):**
+  - `canRegenerate` = `hunger ≥ 25` **and** not (dehydrated with no drinkable water: `stock.water < 1` and no
+    well buffer with ≥ 1 water).
+  - Rest is **not started** while `canRegenerate` is false. The settler makes a normal decision instead and goes
+    to eat or drink (emergency meals, 4.1).
+  - An ongoing rest **ends** as soon as health ≥ 50 or `canRegenerate` turns false. After that, a normal
+    `decide()` runs.
+  - Sickness does not block rest. It stops regeneration only for its duration, and resting is still the best
+    thing a sick, fed settler can do.
 - **Death:** health ≤ 0. The cause is the largest damage source over the last 6 h: "starvation", "thirst",
   "sickness", "exhaustion", "cold" or "wolves". **[contract +]** `Settler.status.damageLog` (rolling per-cause
   totals for that 6 h window).
@@ -319,8 +333,8 @@ is never re-evaluated while carrying (it finishes the delivery first).
 
 | # | Candidate | Available when | Raw score |
 |---|---|---|---|
-| 1 | `eat` | food ≥ 1, an eating point is reachable, hunger < 50 | `40 + 2.2 × (50 − hunger) − 0.3 × min(dist, 40)` |
-| 2 | `drink` | water ≥ 1 and (dehydrated, or (food == 0 and hunger < 40 and drink cooldown elapsed)) | dehydrated: `75`; else same as eat |
+| 1 | `eat` | hunger < 50 and either stock food ≥ 1 with a reachable eating point, or (stock food < 1) a reachable building buffer with ≥ 1 unreserved food (4.1) | `40 + 2.2 × (50 − hunger) − 0.3 × min(dist, 40)` |
+| 2 | `drink` | drinkable water (stock ≥ 1, or a well buffer ≥ 1 while stock < 1) and (dehydrated, or (no edible food anywhere and hunger < 40 and drink cooldown elapsed)) | dehydrated: `75`; else same as eat |
 | 3 | `sleep` | energy < 90 (or resting, see 5.5) | `1.2 × (90 − energy) + nightBonus − 0.2 × min(dist, 40)`; `nightBonus` = 60 inside the personal night window, else 0 |
 | 4 | `socialize` | happiness < 90 and at least one other settler is awake and not working; not `loner` | `20 + 0.5 × max(0, 75 − happiness) + (dusk ? 40 : 0) + (sociable ? 15 : 0) − (socialized active ? 40 : 0)` |
 | 5 | work: `farm`, `gatherWood`, `mineStone`, `fetchWater`, `craftTools`, `build` | see 5.3 | `workScore` (5.3) |
@@ -367,25 +381,46 @@ it is a farm or well and the matching food or water shortage bonus is > 12.
 
 | Activity | Target | Available when |
 |---|---|---|
-| `farm` | completed farm with a free worker slot | not winter; output buffer < cap |
+| `farm` | completed farm with a free worker slot | not winter; output buffer < cap; **not in famine** (below) |
 | `gatherWood` | lumber camp with a free slot, or the town center forage slot | a forest tile with resource > 0 within the work radius; output buffer < cap |
 | `mineStone` | mine with a free slot, or the town center forage slot | a hills/mountain tile with resource > 0 within the radius, standable via a walkable neighbour; buffer < cap |
-| `fetchWater` | completed well with a free slot | buffer < cap |
+| `fetchWater` | completed well with a free slot | buffer < cap; **not in famine** (below; for water) |
 | `craftTools` | completed workshop with a free slot | `toolsInStock < toolTarget` and stock has 3 wood and 2 stone (unreserved) |
 | `build` | construction site with fewer builders than `maxBuilders` | `workDone / buildHours < deliveredFraction` (6.6) |
+
+**Famine rule (M6).** For `r` in {food, water}: while `stock[r] < pop × 2 × 0.5` (half a day of supply,
+`AI.famine.stockDays`), production work at a building whose own `output[r] ≥ 1` is unavailable. A settler
+already working there stops at its next tick, quietly with no log line. The goods that already exist must
+reach the larder (or be eaten on the spot) before more are made. Once the buffer is empty, production work is
+available again, so production resumes immediately and the rule never idles a farm with an empty buffer. This
+applies to farms, wells and fishing docks.
 
 ### 5.4 Hauling
 
 Haul candidates (category `hauling`):
 
-- **Empty a building:** a building output with ≥ 6 units of one resource, and stock below cap for that resource.
-  `taskBonus = 25 × fill + (fill ≥ 1 ? 15 : 0)`, where `fill = output / outputCap`.
+- **Empty a building:** a building output with ≥ `minLoad(r)` unreserved units of one resource, and stock below
+  cap for that resource.
+  `taskBonus = 25 × fill + (fill ≥ 1 ? 15 : 0) + urgency(r)`, where `fill = output / outputCap`.
+  - `urgency(r)` = `1.0 × shortageBonus(r)` (5.3) for food and water (0..25), and 0 for everything else
+    (`AI.haul.shortageMult`). Moving food to the larder is exactly as urgent as producing it.
+  - `minLoad(r)`:
+    - **1** for food and water while `stock[r] < pop × 2 × 1` (under one day of supply, `AI.haul.lowStockDays`).
+    - **1** for tools, always (they are made one at a time).
+    - **6** otherwise.
+
+  With the low threshold only below one day of supply, autumn's 8-day food target does not cause a stream of
+  1-unit trips.
 - **Supply a site:** a construction site whose materials are not yet fully delivered (counting goods already being
   carried to it). `taskBonus = +15`.
 
 The hauler reserves `min(carryCapacity, available)`, walks to the source, picks up (0.1 h), walks to the
 destination and drops (0.1 h). The destination is the nearest eating point/storage with room, or the site.
 One resource type per trip. XP goes to `hauling`.
+
+Worked famine check: stock food 0, farm buffer 18/30, a hauler with skill 2 standing 5 tiles away scores
+55 + 4 + 15 (fill) + 25 (urgency) − 2 = **97**. That beats any other work (wood/stone max about 55 + 20 + 15 = 90),
+and the farm itself is unavailable under the famine rule. So the food reaches the larder.
 
 Production workers whose own building output is full lose their work candidate and naturally pick haul or other
 work. Gatherers of wood and stone carry their own output (6.3) and do not need haulers unless they drop at their
@@ -395,9 +430,10 @@ camp.
 
 | Condition | Response |
 |---|---|
-| hunger < 15 | `eat` (or `drink` if food == 0) gets +200 and interrupts anything, including sleep |
+| hunger < 15 | `eat` gets +200 and interrupts anything, including sleep and rest. Food comes from the stock, or from a building buffer when the stock is empty (4.1). If there is no edible food anywhere: `drink` (starvation fallback). |
 | energy < 5 | Collapse: sleep on the spot immediately |
-| health < 25 | `sleep` as `resting` gets +200 and continues until health ≥ 50 (wake rule suspended) |
+| health < 25 **and** `canRegenerate` (4.3) | `sleep` as `resting` gets +200 and continues until health ≥ 50 or `canRegenerate` turns false (wake rule suspended) |
+| health < 25 and not `canRegenerate` | No rest. Normal `decide()`: eating, drinking and hauling food are what save this settler. |
 
 Critical interrupts emit `needCritical` (contract `SimEvent`) once per episode for the UI.
 
@@ -671,7 +707,8 @@ nearby", "Farms need grassland", "Can't build on water/forest/hills/mountains", 
 
 Newcomers only; there are no births. The rule is simple and easy to read.
 
-Checked daily at 08:00. All of these must hold:
+Checked daily at 08:00, **except in winter** (M6: nobody travels the frontier in the snow, so winter is a holding
+period that the colony must survive with the people it has). All of these must hold:
 
 1. `freeBeds ≥ 1`, where `freeBeds = 4 + 4 × completedHouses − pop` (damaged houses excluded).
 2. food ≥ pop × 4 (2 days) and water ≥ pop × 4.
@@ -679,14 +716,28 @@ Checked daily at 08:00. All of these must hold:
 4. pop < **30** (hard cap).
 5. No settler died in the last 24 h.
 
-Then roll `p = (0.50 + 0.10 × min(freeBeds − 1, 3)) × growthMult[difficulty]` (0.50–0.80 on normal). On success,
-**1 newcomer**, or **2** if `freeBeds ≥ 2` and a second roll < 0.30. Newcomers appear on a random walkable map-edge
+Then roll `p = (0.40 + 0.10 × min(freeBeds − 1, 3)) × growthMult[difficulty]` (0.40–0.70 on normal). On success,
+**1 newcomer**, or **2** if `freeBeds ≥ 2` and a second roll < 0.20. Newcomers appear on a random walkable map-edge
 tile connected to the town center and walk in. Their needs are hunger 70, energy 80, happiness 65 and health 100,
 and they get the newcomer specialty bonus (3.2). Log/toast: "{name} has arrived and joined {colony}." (good)
 Everyone gains `newcomer` +4.
 
-Expected pace: about 0.75 newcomers/day while the conditions hold, so 5 → 20 takes about 20 qualifying days, plus
-wanderer events. Victory lands around day 22–30 (65–90 min at 1x).
+**Victory needs the first winter survived** (11: `thriving` requires the `winter` objective), so victory can
+never come before day 21.
+
+**Measured pace (M6 retune).** These are headless runs of the committed sim plus the M6 starvation fixes, with the
+growth numbers above and the soak's "sensible player" build order, over 4 presets × 8 seeds. Victory day is given
+as p10 / p25 / median / p75 / p90:
+
+| Difficulty | Pop day 10 | Pop day 15 | Pop day 20 | Victory day | Won by day 50 | Lost |
+|---|---|---|---|---|---|---|
+| normal | 10 (8–12) | 14 (11–17) | **15 (12–19)** | 22.3 / 23.3 / **26.3** / 28.3 / 30.3 | 32/32 | 0 |
+| relaxed | 12 | 16 | 18 | 21 / 21.3 / **22.3** / 24.3 / 25.3 | 32/32 | 0 |
+| harsh | 6 | 7 | 7 (5–9) | 32.3 / 35.3 / **42.3** / 45.3 / 47.3 | 25/32 | 3 |
+
+Before M6 the normal median was day 17.3 (15.3–21.3). Normal now matches the arc: about 15 settlers through
+winter and victory in year-2 spring, around 80 minutes at 1x. Harsh growth is held back mainly by the food and
+water gates. A harsh player has to over-build wells and farms to grow, which is the intended difference.
 
 ---
 
@@ -757,7 +808,7 @@ buttons, and time out to the default after the window. **[contract +]** `PlayerC
 | # | Id | Kind | Trigger | p/day | Effect | Duration | Toast text |
 |---|---|---|---|---|---|---|---|
 | 1 | `traderVisit` ⚖ | + | day ≥ 3; at least one offer affordable | 0.10 | One offer chosen at random among affordable ones: (a) 30 wood → 25 food; (b) 25 food → 20 stone; (c) 30 wood + 10 stone → 4 tools; (d) 30 food → 35 wood; (e) 20 wood → 25 water. Accept: swap immediately. | 12 h window, auto-decline | "A traveling trader pulls up at the town center: {give} for {get}?" |
-| 2 | `wanderer` ⚖* | + | day ≥ 2; pop ≤ 28 | 0.07 | 1 settler (60%) or 2 (40%). If freeBeds ≥ group size: they **auto-join** (no decision). Otherwise decision: Accept (they sleep by the campfire) or Turn away. | 12 h window, auto-decline | "{n} wanderer(s) ask to join. {There are beds for them. / There are no free beds; they would sleep outdoors.}" |
+| 2 | `wanderer` ⚖* | + | day ≥ 2; pop ≤ 28; **not winter** | 0.06 | 1 settler (70%) or 2 (30%). If freeBeds ≥ group size: they **auto-join** (no decision). Otherwise decision: Accept (they sleep by the campfire) or Turn away. | 12 h window, auto-decline | "{n} wanderer(s) ask to join. {There are beds for them. / There are no free beds; they would sleep outdoors.}" |
 | 3 | `harvestFestival` ⚖ | + | autumn; once per year; food ≥ pop × 6 | 0.35 | Accept: consumes pop × 2 food. All settlers go to the town center to socialize for 4 h (critical needs still override), then gain `festival` +15 for 48 h. | 6 h window, auto-decline | "The harvest is in! Hold a festival? (costs {n} food)" |
 | 4 | `bountifulHarvest` | + | not winter; ≥ 1 farm | 0.06 | Farms ×1.5 | 48 h | "The crops are coming in thick and heavy. Farms +50% for 2 days." |
 | 5 | `richVein` | + | ≥ 1 mine | 0.05 | Every hills/mountain tile in one random mine's radius gains +40 stone | instant | "Miners struck a rich seam at the {mine}!" |
@@ -791,11 +842,14 @@ early still counts. **[contract +]** `GameState.progress: {objectivesDone: strin
 | 7 | `growing` | Growing Settlement | Reach 10 settlers | n/a |
 | 8 | `larder` | Ready for Winter | At 00:00 on the first day of winter, food ≥ pop × 10 | n/a |
 | 9 | `winter` | Survive the Winter | Reach day 21 with pop ≥ 1 | n/a |
-| 10 | `thriving` | **Thriving Frontier** | pop ≥ **20** and average happiness ≥ 50 (checked hourly) | **Victory** |
+| 10 | `thriving` | **Thriving Frontier** | `winter` objective done **and** pop ≥ **20** and average happiness ≥ 50 (checked hourly) | **Victory** |
 
 Unlock order: start with `house`, `farm`, `well`, `lumberCamp`, `mine` (+ `fishingDock`); then `storage`
 (objective 4); then `workshop` (objective 5). Locked buildings show in the build menu greyed out with their
 unlock text.
+
+Tooltip for `thriving`: "Survive your first winter, then reach 20 settlers with average happiness of at
+least 50."
 
 **Victory:** set `outcome.status = 'won'` with the reason "Thriving Frontier: 20 settlers call {colony} home."
 and show the victory screen with stats (days, peak pop, deaths, buildings). It offers **Keep playing**, which
@@ -857,7 +911,7 @@ other lose condition.
 | `healthDamageMult` | 0.75 | 1.00 | 1.25 |
 | `negEventMult` | 0.6 | 1.0 | 1.4 |
 | `posEventMult` | 1.3 | 1.0 | 0.8 |
-| `growthMult` | 1.25 | 1.00 | 0.80 |
+| `growthMult` | 1.25 | 1.00 | 1.00 (M6: was 0.80; harsh growth is already throttled by the food/water gates) |
 | `graceDays` (no negative events before) | 5 | 3 | 2 |
 | `desertionHours` | 72 | 48 | 36 |
 | Specialty skill range | 6–8 | 5–7 | 4–6 |
@@ -998,7 +1052,8 @@ export const HEALTH = {
   sickDamage: 1,
   coldNightDamage: 1, coldSnapNightDamage: 2,           // sleeping outdoors in winter
   hurtBelow: 50, hurtWorkMult: 0.8, sickWorkMult: 0.7,
-  criticalRestBelow: 25, restUntil: 50,
+  criticalRestBelow: 25, restUntil: 50,           // M6: rest only while canRegenerate (hunger >= regenMinHunger
+                                                  // and not dehydrated-without-drinkable-water); ends when it turns false
   damageLogHours: 6,
 } as const;
 
@@ -1063,7 +1118,13 @@ export const AI = {
     tools: { max: 20, perPop: 0.6, min: 3 },             // toolTarget = max(min, ceil(pop * perPop))
   },
   buildTaskBonus: { any: 10, houseWhileHomeless: 10, farmOrWellInShortage: 10, shortageThreshold: 12 },
-  haul: { minLoad: 6, fillBonus: 25, fullBonus: 15, supplySiteBonus: 15, pickupHours: 0.1, dropHours: 0.1 },
+  haul: { minLoad: 6, fillBonus: 25, fullBonus: 15, supplySiteBonus: 15, pickupHours: 0.1, dropHours: 0.1,
+          // M6: food/water buffers get urgency = shortageMult * shortageBonus(r); minLoad drops to
+          // lowStockMinLoad while stock[r] < pop * 2 * lowStockDays; tools always use toolsMinLoad.
+          shortageMult: 1.0, lowStockDays: 1, lowStockMinLoad: 1, toolsMinLoad: 1 },
+  // M6 famine rule: production work at a building holding >= 1 of r (food/water) is unavailable
+  // while stock[r] < pop * 2 * stockDays.
+  famine: { stockDays: 0.5 },
   decisionStaggerTicks: 10,
 } as const;
 
@@ -1126,10 +1187,11 @@ export const BUILDINGS = {
 export const GROWTH = {
   checkHour: 8, minFreeBeds: 1, minFoodDays: 2, minWaterDays: 2, minAvgHappiness: 50,
   noDeathWithinHours: 24,
-  baseChance: 0.5, perExtraBed: 0.1, maxExtraBeds: 3,
-  pairChance: 0.3, pairMinFreeBeds: 2,
+  baseChance: 0.4, perExtraBed: 0.1, maxExtraBeds: 3,      // M6: baseChance 0.5 -> 0.4
+  pairChance: 0.2, pairMinFreeBeds: 2,                      // M6: pairChance 0.3 -> 0.2
+  pausedInWinter: true,                                     // M6: no growth check in winter
 } as const;
-export const VICTORY = { population: 20, minAvgHappiness: 50 } as const;
+export const VICTORY = { population: 20, minAvgHappiness: 50, requiresObjective: 'winter' } as const; // M6: gate
 
 // ===== WEATHER =====
 export const WEATHER_DURATION_HOURS = { clear: [6, 18], cloudy: [4, 12], rain: [3, 9], storm: [2, 5], snow: [4, 12] } as const;
@@ -1168,7 +1230,7 @@ export const EVENTS = {
                                 { give: { wood: 30, stone: 10 }, get: { tools: 4 } },
                                 { give: { food: 30 }, get: { wood: 35 } },
                                 { give: { wood: 20 }, get: { water: 25 } } ] },
-  wanderer:         { positive: true,  p: 0.07, minDay: 2, maxPop: 28, pairChance: 0.4, decisionIfNoBeds: true, windowHours: 12 },
+  wanderer:         { positive: true,  p: 0.06, minDay: 2, maxPop: 28, pairChance: 0.3, notWinter: true, decisionIfNoBeds: true, windowHours: 12 }, // M6
   harvestFestival:  { positive: true,  p: 0.35, season: 'autumn', oncePerYear: true, minFoodPerPop: 6, foodCostPerPop: 2,
                       socializeHours: 4, decision: true, windowHours: 6 },
   bountifulHarvest: { positive: true,  p: 0.06, notWinter: true, needsFarm: true, durationHours: 48, farmMult: 1.5 },
@@ -1188,7 +1250,7 @@ export const EVENTS = {
 export const DIFFICULTY = {
   relaxed: { needDecayMult: 0.85, productionMult: 1.15, healthDamageMult: 0.75, negEventMult: 0.6, posEventMult: 1.3, growthMult: 1.25, graceDays: 5 },
   normal:  { needDecayMult: 1.0,  productionMult: 1.0,  healthDamageMult: 1.0,  negEventMult: 1.0, posEventMult: 1.0, growthMult: 1.0,  graceDays: 3 },
-  harsh:   { needDecayMult: 1.15, productionMult: 0.9,  healthDamageMult: 1.25, negEventMult: 1.4, posEventMult: 0.8, growthMult: 0.8,  graceDays: 2 },
+  harsh:   { needDecayMult: 1.15, productionMult: 0.9,  healthDamageMult: 1.25, negEventMult: 1.4, posEventMult: 0.8, growthMult: 1.0,  graceDays: 2 }, // M6: growthMult 0.8 -> 1.0
 } as const;
 
 // ===== WARNINGS =====

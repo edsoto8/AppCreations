@@ -108,3 +108,8 @@ been run. A milestone is marked done only after its acceptance criteria were ver
   retune), CRIT-1/MAJ-1 regressions (4 pass), e2e specs for M5 features and cancel/demolish, sturdier speed and
   save/load specs. QA twice ended its turn before running the full e2e suite (it backgrounds long runs); the
   lead will run the e2e suite after the M6 wave instead. Rain collection lacks a `resourceProduced` event (minor).
+- Game Designer (resumed) amended GAME_DESIGN §4.3/§5.4/§5.5/§8/§11 and wrote `docs/balance/M6-tuning.md`:
+  rest only when regeneration is possible, buffer eating/drinking, famine work lock, winter growth pause, victory
+  gated on "Survive the Winter". Its 32-game headless model: normal victory p10/median/p90 = day 22/26/30, 0 lost;
+  harsh median day 42, 3/32 lost. Usage this round: ~113k tokens, 35 tool calls, 28 min. Simulation Engineer
+  applying the tuning.
