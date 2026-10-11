@@ -56,3 +56,8 @@ been run. A milestone is marked done only after its acceptance criteria were ver
 - Lead: snapshot now carries the selected entity's detail; `buildingPlaced` toast. Integration commit 8eb93b6
   (typecheck, 212/212 unit, build green).
 - QA Engineer (haiku) launched: Playwright e2e suite + Vitest soak/regression tests in `e2e/` and `tests/qa/`.
+- Graphics Engineer (sonnet, `claude-sonnet-5-5`) finished renderer M2: procedural canvas-drawn atlas, chunked
+  terrain with render groups and culling, shoreline foam, 3 tree species, depletion via `tileChanged`, eased
+  camera with cursor-anchored zoom, drag fling, pinch, keyboard pan. ~2 ms JS per frame at any zoom on 128×128.
+  Usage: 365k tokens, 85 tool calls, 42.8 min. Continued into renderer M3+M4 (animated settlers, building art,
+  construction, placement ghost, gather feedback) plus a fix for 1-level elevation steps that read as fences.

@@ -2,7 +2,7 @@
  * Read-only query helpers over GameState. Pure functions: safe to call from the renderer, the UI
  * and tests. They never mutate state and never use randomness.
  */
-import { BUILDING_DEFS, GAME_HOURS_PER_TICK, TERRAIN_DEFS } from './balance';
+import { BUILDING_DEFS, TERRAIN_DEFS } from './balance';
 import { getWalkRegions } from './grid';
 import {
   RESOURCE_TYPES,
@@ -29,6 +29,35 @@ export function costToAmounts(cost: ResourceCost): ResourceAmounts {
   const out = emptyResources();
   for (const r of RESOURCE_TYPES) out[r] = cost[r] ?? 0;
   return out;
+}
+
+/**
+ * Materials construction sites still need, per resource: `required - delivered - carried`
+ * (goods a hauler has already picked up are no longer in the stock, so they are not owed twice).
+ * GAME_DESIGN §6.6 step 1.
+ */
+export function getOutstandingMaterials(state: GameState): ResourceAmounts {
+  const out = emptyResources();
+  for (const b of state.buildings) {
+    const c = b.construction;
+    if (c === null || c.kind !== 'new') continue;
+    for (const r of RESOURCE_TYPES) {
+      let carried = 0;
+      for (const s of state.settlers) {
+        if (s.task.kind === 'haul' && s.task.toBuildingId === b.id && s.task.resource === r && s.carrying) carried += s.carrying.amount;
+      }
+      out[r] += Math.max(0, c.required[r] - c.delivered[r] - carried);
+    }
+  }
+  return out;
+}
+
+/** Stock minus what construction sites have reserved: what the player can still spend on new orders. */
+export function getAvailableStock(state: GameState): ResourceAmounts {
+  const out = getOutstandingMaterials(state);
+  const avail = emptyResources();
+  for (const r of RESOURCE_TYPES) avail[r] = state.colony.stock[r] - out[r];
+  return avail;
 }
 
 export function canAfford(stock: ResourceAmounts, cost: ResourceCost): boolean {
@@ -116,18 +145,20 @@ export function getHousingCapacity(state: GameState): number {
 }
 
 /**
- * Net change of each stock per in-game day, measured over the last (up to) 24 hourly samples
- * plus the current stock. Zero until at least one sample exists.
+ * Net change (produced - consumed) of each resource per in-game day, over the last (up to) 24 hourly
+ * samples plus the current partial hour. One-off spending on construction is not counted.
  */
 export function getResourceRates(state: GameState): ResourceAmounts {
   const rates = emptyResources();
-  const history = state.stats.history;
-  if (history.length === 0) return rates;
-  const from = history[Math.max(0, history.length - 24)];
-  if (!from) return rates;
-  const hours = (state.time.tick - from.tick) * GAME_HOURS_PER_TICK;
-  if (hours <= 0) return rates;
-  for (const r of RESOURCE_TYPES) rates[r] = ((state.colony.stock[r] - from.stock[r]) / hours) * 24;
+  const history = state.stats.history.slice(-24);
+  const partial = state.time.timeOfDay - Math.floor(state.time.timeOfDay);
+  const elapsed = history.length + partial;
+  if (elapsed < 1) return rates;
+  for (const r of RESOURCE_TYPES) {
+    let net = state.stats.producedThisHour[r] - state.stats.consumedThisHour[r];
+    for (const h of history) net += h.produced[r] - h.consumed[r];
+    rates[r] = (net / elapsed) * 24;
+  }
   return rates;
 }
 
@@ -195,7 +226,7 @@ export function canPlaceBuilding(state: GameState, type: BuildingType, x: number
     fail('blocked', 'Settlers could not reach this spot.');
   }
 
-  if (error === null && !canAfford(state.colony.stock, def.cost)) {
+  if (error === null && !canAfford(getAvailableStock(state), def.cost)) {
     fail('insufficientResources', `Not enough resources for a ${def.name}.`);
   }
 

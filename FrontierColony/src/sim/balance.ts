@@ -659,3 +659,32 @@ export const TOOLS = {
 } as const;
 export const OUTDOOR_JOBS: readonly JobCategory[] = ['farming', 'woodcutting', 'mining', 'water', 'building'];
 export const BUILD_RATE = 1.0;
+
+/** Durability of one tool in worker-hours of tool-using work (GAME_DESIGN §6.4). */
+export const TOOL_DURABILITY_HOURS = TOOLS.durabilityHours;
+/** A well gets this multiplier when water lies within `radius` tiles (GAME_DESIGN §6.3). */
+export const WELL_NEAR_WATER = { radius: 4, mult: 1.5 } as const;
+
+// --- Progression (GAME_DESIGN §11) --------------------------------------------------------------------
+
+export interface ObjectiveDef {
+  id: string;
+  title: string;
+  description: string;
+}
+/** In display order. Conditions are evaluated in progression.ts; unlocks come from `BuildingDef.unlockedBy`. */
+export const OBJECTIVES: readonly ObjectiveDef[] = [
+  { id: 'roof', title: 'Roof Over Heads', description: 'Complete a house.' },
+  { id: 'bread', title: 'Daily Bread', description: 'Complete a farm.' },
+  { id: 'water', title: 'Fresh Water', description: 'Complete a well.' },
+  { id: 'foundations', title: 'Lay the Foundations', description: 'Complete 3 buildings. Unlocks the storage.' },
+  { id: 'timber', title: 'Stone and Timber', description: 'Complete a lumber camp and a mine. Unlocks the workshop.' },
+  { id: 'toolmaker', title: 'Toolmaker', description: 'Craft 5 tools in total.' },
+  { id: 'growing', title: 'Growing Settlement', description: 'Reach 10 settlers.' },
+  { id: 'larder', title: 'Ready for Winter', description: 'Have food for 5 days per settler when winter begins.' },
+  { id: 'winter', title: 'Survive the Winter', description: 'Reach day 21 with at least one settler alive.' },
+  { id: 'thriving', title: 'Thriving Frontier', description: 'Reach 20 settlers with an average happiness of at least 50.' },
+];
+export const VICTORY = { population: 20, minAvgHappiness: 50 } as const;
+/** Objective thresholds. */
+export const OBJECTIVE_TARGETS = { foundationsBuildings: 3, toolsCrafted: 5, growingPopulation: 10, larderFoodPerSettler: 10, winterDay: 21 } as const;

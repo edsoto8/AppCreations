@@ -17,6 +17,8 @@ import type { GameSpeed, OverlayMode, Selection } from '../shared/types';
 import type { HudSnapshot } from './snapshot';
 
 export type Screen = 'mainMenu' | 'playing';
+/** Which view the main menu opens on (set by `showMainMenu`, e.g. after game over). */
+export type MenuView = 'home' | 'newGame' | 'load';
 export type PanelId = 'build' | 'settlers' | 'priorities' | 'events' | 'stats' | 'saveLoad' | 'settings';
 
 export interface Toast {
@@ -39,6 +41,10 @@ export interface UiState {
   gameMenuOpen: boolean;
   /** Pause flag to restore when the game menu closes. */
   pausedBeforeMenu: boolean;
+  /** The view the main menu should open on next. */
+  menuView: MenuView;
+  /** Id of the newest event-log entry the player has seen (drives the unread badge); null until first measured. */
+  eventsSeenId: number | null;
   speed: GameSpeed;
   paused: boolean;
   selection: Selection | null;
@@ -57,7 +63,9 @@ export type EscapeResult = 'closedGameMenu' | 'closedPanel' | 'cancelledBuild' |
 export interface UiActions {
   setScreen(screen: Screen): void;
   /** Go to the main menu: pauses the game and closes menus/panels/build mode. The game stays resumable. */
-  showMainMenu(): void;
+  showMainMenu(view?: MenuView): void;
+  /** Record the newest log id the player has seen. Never moves backwards except to a smaller id after a new game (pass `force`). */
+  markEventsSeen(id: number, force?: boolean): void;
   /** Switch to the in-game screen after a game was started or loaded (the controller sets the pause flag). */
   enterGame(): void;
   /** Leave the main menu for the game that is still running behind it, restoring its pause flag. */
@@ -97,6 +105,8 @@ export const initialUiState: UiState = {
   gameStarted: true,
   gameMenuOpen: false,
   pausedBeforeMenu: false,
+  menuView: 'home',
+  eventsSeenId: null,
   speed: 1,
   paused: false,
   selection: null,
@@ -115,9 +125,11 @@ export function createUiStore(initial: Partial<UiState> = {}): StoreApi<UiStore>
     ...initialUiState,
     ...initial,
     setScreen: (screen) => set({ screen }),
-    showMainMenu: () =>
+    markEventsSeen: (id, force = false) => set((s) => (force || s.eventsSeenId === null || id > s.eventsSeenId ? { eventsSeenId: id } : s)),
+    showMainMenu: (view = 'home') =>
       set((s) => ({
         screen: 'mainMenu',
+        menuView: view,
         // Keep the pause state from before the game menu so "Resume" returns to what the player had.
         paused: true,
         pausedBeforeMenu: s.gameMenuOpen ? s.pausedBeforeMenu : s.paused,
@@ -127,7 +139,7 @@ export function createUiStore(initial: Partial<UiState> = {}): StoreApi<UiStore>
         selection: null,
       })),
     enterGame: () =>
-      set({ screen: 'playing', gameStarted: true, gameMenuOpen: false, openPanel: null, buildMode: null }),
+      set({ screen: 'playing', gameStarted: true, gameMenuOpen: false, openPanel: null, buildMode: null, eventsSeenId: null }),
     resumeGame: () => set((s) => ({ screen: 'playing', paused: s.pausedBeforeMenu })),
     playAtSpeed: (speed) => set({ speed, paused: false }),
     openGameMenu: () =>
