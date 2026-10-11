@@ -8,9 +8,9 @@ been run. A milestone is marked done only after its acceptance criteria were ver
 | Milestone | Status | Verified by |
 |---|---|---|
 | M1 Foundation | done | lead: `npm ci`, typecheck, 42/42 unit, build, 1/1 e2e |
-| M2 World Generation | in progress | |
-| M3 Settler Intelligence | pending | |
-| M4 Economy & Construction | pending | |
+| M2 World Generation | done (renderer polish still in progress) | lead: typecheck, 212/212 unit, build; worldgen determinism + 200-seed start-site tests |
+| M3 Settler Intelligence | done | lead: 212/212 unit incl. A* vs Dijkstra, 2-day autonomy, starvation, mid-path save determinism; screenshot review |
+| M4 Economy & Construction | in progress (UI done; sim hauling/production running) | |
 | M5 Gameplay | pending | |
 | M6 Visual Polish | pending | |
 | M7 Testing & Optimization | pending | |
@@ -45,3 +45,14 @@ been run. A milestone is marked done only after its acceptance criteria were ver
   with rates/tooltips, panel/tooltip/toast framework, working Save/Load panel, hotkeys, Esc menu; 50 new tests.
   Usage: 266k tokens, 67 tool calls, 19.7 min. Lead applied its requests (smoke test `/?quickstart`, autosave
   guarded by `gameStarted`). Continued into UI M3+M4 (settler roster/inspector, build menu, building inspector).
+- Simulation Engineer finished sim M3 + M1-review contract fixes: A* (binary heap, region early-reject), needs
+  with 24 moodlets, utility AI, semantic `validateGameState` with fuzz tests, `assertInvariants`. 0.047 ms/tick
+  for 30 settlers on a large map. Lead approved its `world.revision` rule (structural changes only) and amended
+  CLAUDE.md; Graphics Engineer told to redraw resources from `tileChanged` events. Cumulative usage: 470k tokens,
+  87 tool calls, 39.3 min (M2+M3). Continued into sim M4.
+- UI/UX Engineer finished UI M3+M4: settler roster with procedural avatars, live settler inspector, hover card,
+  build catalogue with unlock state, placement hint bar, building inspector with cancel/demolish, net rates from
+  hourly samples. Cumulative usage: 399k tokens, 120 tool calls, 39.4 min. Continued into UI M5.
+- Lead: snapshot now carries the selected entity's detail; `buildingPlaced` toast. Integration commit 8eb93b6
+  (typecheck, 212/212 unit, build green).
+- QA Engineer (haiku) launched: Playwright e2e suite + Vitest soak/regression tests in `e2e/` and `tests/qa/`.
