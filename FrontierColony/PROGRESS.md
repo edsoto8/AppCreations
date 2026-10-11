@@ -34,3 +34,10 @@ been run. A milestone is marked done only after its acceptance criteria were ver
 - Wave 2 launched (M2 World Generation), in parallel: Simulation Engineer (sonnet) — seeded noise worldgen +
   4 presets + start site; Graphics Engineer (sonnet) — chunked iso terrain, camera; UI/UX Engineer (sonnet) —
   menu, HUD, panel framework, save/load panel; Code Reviewer (opus) — review of the M1 commit.
+- Code Reviewer (opus) M1 review: 0 critical, 5 major, 14 minor, 9 nit (`docs/reviews/M1-review.md`). Usage: 234k
+  tokens, 32 tool calls, 11.0 min. Lead fixed MAJ-2 (loop fault isolation, validated saves, autosave backup) and
+  MIN-9 (no reused e2e server), added the engine-independent math rule (MIN-7) to CLAUDE.md. MAJ-1/3/4/5 and
+  MIN-1..4/8 routed to the Simulation Engineer with its M3 brief.
+- Simulation Engineer (sonnet, `claude-sonnet-5-5`) finished sim M2: gradient noise, 4 presets, start-site search
+  with guarantees, founder generation, walk-region labelling; 63 sim tests; largest map ≤112 ms worst case.
+  Usage: 253k tokens, 37 tool calls, 15.5 min. Continued straight into sim M3 (needs, A*, utility AI).
