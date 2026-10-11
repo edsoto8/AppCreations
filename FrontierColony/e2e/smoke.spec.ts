@@ -7,7 +7,7 @@ test('app loads, renders the canvas without console errors, and time advances', 
   });
   page.on('pageerror', (err) => errors.push(err.message));
 
-  await page.goto('/');
+  await page.goto('/?quickstart');
 
   const canvas = page.getByTestId('game-canvas');
   await expect(canvas).toBeVisible();

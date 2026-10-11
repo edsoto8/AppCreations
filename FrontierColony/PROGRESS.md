@@ -41,3 +41,7 @@ been run. A milestone is marked done only after its acceptance criteria were ver
 - Simulation Engineer (sonnet, `claude-sonnet-5-5`) finished sim M2: gradient noise, 4 presets, start-site search
   with guarantees, founder generation, walk-region labelling; 63 sim tests; largest map ≤112 ms worst case.
   Usage: 253k tokens, 37 tool calls, 15.5 min. Continued straight into sim M3 (needs, A*, utility AI).
+- UI/UX Engineer (sonnet, `claude-sonnet-5-5`) finished UI M2: main menu + New Game (preset cards), HUD top bar
+  with rates/tooltips, panel/tooltip/toast framework, working Save/Load panel, hotkeys, Esc menu; 50 new tests.
+  Usage: 266k tokens, 67 tool calls, 19.7 min. Lead applied its requests (smoke test `/?quickstart`, autosave
+  guarded by `gameStarted`). Continued into UI M3+M4 (settler roster/inspector, build menu, building inspector).

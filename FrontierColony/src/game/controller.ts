@@ -333,7 +333,8 @@ export class GameController implements GameControllerApi {
   }
 
   private autosave(): void {
-    if (this.faulted || this.state.outcome.status === 'lost') return;
+    // Before the player starts or loads a game the state is the main-menu demo world: never autosave it.
+    if (!this.store.getState().gameStarted || this.faulted || this.state.outcome.status === 'lost') return;
     const result = saveToSlot(this.storage, 'autosave', this.state);
     if (!result.ok) this.store.getState().pushToast(`Autosave failed: ${result.error}`, 'warning');
   }
