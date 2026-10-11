@@ -65,3 +65,10 @@ been run. A milestone is marked done only after its acceptance criteria were ver
   objectives tracker, warnings strip, game-over/victory overlay, season/weather tooltips, stats sparklines;
   112 UI/store tests. Cumulative usage: 504k tokens. Open items routed to sim: document decision payload keys,
   "lasted 1 days" grammar, decision window length; worldgen 300 ms timing test flaked under parallel load.
+- Simulation Engineer finished sim M4: material reservation + hauling, builders limited by delivered share,
+  recipe production (farm seasonal, well, workshop), gatherer buffers, tile/haul/work-slot reservations, storage
+  cap, tools, objectives/unlocks/victory, stats. Fixed 3 bugs found while playtesting (collapse/hunger task
+  thrash starved settlers with full stores; gatherers ignored bedtime; placement could wall in the town center).
+  Balance (normal, sensible script): all builds 0.2–0.6 days; 16/16 preset×seed runs kept 5 settlers alive 16
+  days; neglect (no farm) first death day 9.8 vs design day 9–10. 0.113 ms/tick for 30 settlers.
+  Usage this round: 117k tokens, 38 tool calls, 17.3 min. Continued into sim M5.
