@@ -682,6 +682,7 @@ describe('survival and failure (GAME_DESIGN §12)', () => {
       s.settlers.push(copy);
     }
     for (const x of s.settlers) x.needs.happiness = 90;
+    s.progress.objectivesDone.push('winter'); // victory needs the first winter survived (M6)
     const events = run(s, 100);
     expect(s.outcome.status).toBe('won');
     expect(s.outcome.reason).toBe('Thriving Frontier: 20 settlers call New Hope home.');
@@ -761,7 +762,7 @@ describe('priorities and difficulty', () => {
     };
     expect(count('harsh')).toBeGreaterThan(count('relaxed'));
     expect(DIFFICULTY.relaxed.desertionHours).toBe(72);
-    expect(DIFFICULTY.harsh.growthMult).toBe(0.8);
+    expect(DIFFICULTY.harsh.growthMult).toBe(1.0);
   });
 });
 

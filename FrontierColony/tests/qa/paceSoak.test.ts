@@ -38,13 +38,6 @@ const MONTH: ScriptItem[] = [
 const PRESETS: MapPreset[] = ['continent', 'archipelago', 'highlands', 'riverValley'];
 const WINTER_END_DAY = 20;
 const EARLIEST_VICTORY_DAY = 21;
-/**
- * MAJ-3: on seed soak-b, victory currently lands on day 14-17 for these presets (measured with this
- * build order). They are it.fails until the growth retune lands; flip them to plain `it` then.
- * riverValley already meets the window and stays a plain test.
- */
-const KNOWN_EARLY_VICTORY: MapPreset[] = ['continent', 'archipelago', 'highlands'];
-
 /** In-game day (1-based) for a tick, using the same clock as the HUD. */
 function dayOf(tick: number): number {
   return 1 + Math.floor((START_HOUR + tick * GAME_HOURS_PER_TICK) / 24);
@@ -71,9 +64,7 @@ describe('pace of a sensible 30-day normal game', () => {
   }
 
   for (const preset of PRESETS) {
-    const known = KNOWN_EARLY_VICTORY.includes(preset);
-    const check = known ? it.fails : it;
-    check(`${preset}: victory does not come before day ${EARLIEST_VICTORY_DAY}${known ? ' (MAJ-3: fails until the growth retune lands)' : ''}`, () => {
+    it(`${preset}: victory does not come before day ${EARLIEST_VICTORY_DAY}`, () => {
       const s = play(preset).state;
       if (s.outcome.status === 'won') {
         const day = dayOf(s.outcome.endedTick ?? 0);

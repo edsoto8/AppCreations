@@ -31,7 +31,8 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: `VITE_E2E=1 npm run build && npx vite preview --port ${PORT} --strictPort`,
+    // Own output dir: a plain `npm run build` elsewhere must not swap the e2e bundle (which has the debug handle).
+    command: `npx tsc -b && VITE_E2E=1 npx vite build --outDir dist-e2e && npx vite preview --outDir dist-e2e --port ${PORT} --strictPort`,
     url: `http://localhost:${PORT}`,
     reuseExistingServer: false,
     timeout: 180_000,

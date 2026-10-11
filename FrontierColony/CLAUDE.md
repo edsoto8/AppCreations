@@ -16,7 +16,7 @@ Read `SPEC.md` for the product and architecture, `PLAN.md` for milestones and th
 | `npm run typecheck` | `tsc -b` (app + tests project and node/e2e project) |
 | `npm test` | Vitest unit tests, run once (`tests/**/*.test.ts`, node environment) |
 | `npm run test:watch` | Vitest in watch mode |
-| `npm run test:e2e` | Playwright (Chromium only). Builds, starts `vite preview` on port 4173, then runs `e2e/` |
+| `npm run test:e2e` | Playwright (Chromium only). Builds to `dist-e2e/` with `VITE_E2E=1`, starts `vite preview` on port 4173, then runs `e2e/` |
 
 Playwright's Chromium is pre-installed (`PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers`) and matches
 `@playwright/test@1.56.1` exactly. Keep that version pinned and **never run `playwright install`**.

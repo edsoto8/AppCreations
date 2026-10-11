@@ -76,8 +76,11 @@ export {
   WATER_PER_SETTLER_DAY,
   POPULATION_CAP,
   DIFFICULTY,
+  DAY_PHASES,
+  MOOD_BANDS,
   type ObjectiveDef,
   type MoodletDef,
+  type MoodBandDef,
 } from './balance';
 export { hashSeed } from './rng';
 export * from './grid';

@@ -118,3 +118,9 @@ been run. A milestone is marked done only after its acceptance criteria were ver
   replay tutorial), toast grouping, number roll-up, responsive pass at 1920/1280/1024 widths, a11y labels.
   Caught and fixed a React #185 selector loop. Cumulative usage: 665k tokens, 99 tool calls this round, 58.5 min.
   Lead applied its requests: autosave honours the pref; `centerOn(tile, { animate })`.
+- Simulation Engineer applied the M6 tuning: 32/32 normal games won (victory day min 21.0, median 25.3, max 35.3),
+  harsh 25/32 won, 4 lost; normal population medians 10/16/23.5 at days 10/20/30. Exported `DAY_PHASES`,
+  `MOOD_BANDS`. Lead flipped QA's 3 pace `it.fails` to plain `it` (they pass).
+- Lead: worldgen timing test now asserts on the fastest of 5 samples (CPU contention only adds time; the median
+  flaked at >300 ms with 5 agents running). e2e builds to its own `dist-e2e/` after QA found a shared-`dist` race
+  where another agent's plain build removed the debug handle mid-run.

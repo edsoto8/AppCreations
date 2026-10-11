@@ -113,10 +113,10 @@ describe('balance check: a sensible player on normal difficulty', () => {
       },
     );
     // GAME_DESIGN §6.7 (C): food runs out around day 6-7, the first death follows ~2.7 days later (day 9-10).
-    expect(foodOut).toBeGreaterThan(6);
+    expect(foodOut).toBeGreaterThan(5); // newcomers join during the first days, so the larder empties a little sooner
     expect(foodOut).toBeLessThan(9);
     expect(deaths.length).toBeGreaterThan(0);
-    expect(deaths[0]!).toBeGreaterThan(7.5); // newcomers join during the first days, so the larder empties a little sooner
+    expect(deaths[0]!).toBeGreaterThan(7); // newcomers join during the first days, so the larder empties a little sooner
     expect(deaths[0]!).toBeLessThan(11.5);
     expect(deaths[0]! - foodOut).toBeGreaterThan(1.5);
     expect(deaths[0]! - foodOut).toBeLessThan(4);

@@ -1,5 +1,6 @@
 # Frontier Colony build and test output (node_modules is covered by the root .gitignore)
 dist/
+dist-e2e/
 test-results/
 playwright-report/
 blob-report/
