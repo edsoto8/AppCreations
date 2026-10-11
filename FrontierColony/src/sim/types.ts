@@ -103,8 +103,10 @@ export interface WorldState {
   /** Id of the building whose footprint covers the tile, or 0. Kept in sync by the sim. */
   building: number[];
   /**
-   * Incremented whenever any tile array changes after creation. Renderers cache terrain
-   * geometry and rebuild (or patch from `tileChanged` events) when this changes.
+   * Incremented whenever the *structure* of the map changes after creation: a terrain code,
+   * elevation or building footprint. Renderers cache terrain geometry and rebuild (or patch from
+   * `tileChanged` events) when this changes. A change of only `resource` (a tree being chopped,
+   * a seam being quarried) emits `tileChanged` but does NOT bump the revision, so it stays cheap.
    */
   revision: number;
 }
@@ -164,6 +166,10 @@ export interface ActiveRandomEvent {
   hoursRemaining: number;
   /** 0..1 strength rolled when the event started. */
   magnitude: number;
+  /** Entity the event affects (e.g. the farm hit by crop blight, the settler who is sick), or null. */
+  targetId: EntityId | null;
+  /** Tile the event is centred on (e.g. wildfire), or null. */
+  tile: TilePos | null;
 }
 
 export type LogSeverity = 'info' | 'good' | 'warning' | 'danger';
@@ -313,8 +319,13 @@ export type Task =
   | (TaskBase & { kind: 'work'; buildingId: EntityId })
   | (TaskBase & { kind: 'eat'; buildingId: EntityId })
   | (TaskBase & { kind: 'drink'; buildingId: EntityId })
+  /** `buildingId` is the bed (house or town center); null = bedroll by the campfire. `progress` is 1 for a nap. */
   | (TaskBase & { kind: 'sleep'; buildingId: EntityId | null })
-  | (TaskBase & { kind: 'socialize'; withSettlerId: EntityId | null });
+  /** Critical-health rest (counts as sleep for restore rates) until health reaches the rest threshold. */
+  | (TaskBase & { kind: 'rest'; buildingId: EntityId | null })
+  | (TaskBase & { kind: 'socialize'; withSettlerId: EntityId | null })
+  /** Desertion: walking to a map edge, then the settler leaves the colony. */
+  | (TaskBase & { kind: 'depart'; edgeTile: TilePos });
 export type TaskKind = Task['kind'];
 
 export interface Carrying {
@@ -345,6 +356,13 @@ export interface SettlerStatus {
   lastSocializedTick: number | null;
   /** Rolling health damage per cause ("starvation", "cold", ...) used to name the cause of death. */
   damageLog: Record<string, number>;
+  /**
+   * Per-episode flags for `needCritical`: true once the event was sent for the current episode,
+   * cleared when the need recovers. Keyed by need.
+   */
+  needAlerts: Record<NeedType, boolean>;
+  /** The settler slept outdoors during the last night (raises sickness odds, GAME_DESIGN §10). */
+  sleptOutdoorsLastNight: boolean;
 }
 
 export interface Settler {
@@ -438,6 +456,19 @@ export interface BuildingDef {
    */
   requiresNearby: { terrain: Terrain[]; radius: number; minCount: number } | null;
   maxWorkers: number;
+  /** Builders allowed at once on the construction site (GAME_DESIGN §7.1 "Max builders"). */
+  maxBuilders: number;
+  /** Radius (Chebyshev, from the footprint edge) in which workers gather tiles; 0 for buildings that do not gather. */
+  workRadius: number;
+  /** Capacity of the building's output buffer, per resource (0 = no buffer). */
+  outputCap: number;
+  /**
+   * Town-center style forage slots: this many settlers can gather wood and this many stone from
+   * tiles within `workRadius` at `rateMult` speed. Null for buildings without forage.
+   */
+  forage: { wood: number; stone: number; rateMult: number } | null;
+  /** Settlers can drink here when complete (eating points and wells). */
+  drinkingPoint: boolean;
   /** Settlers this building can house (houses, town center). */
   housing: number;
   /** Storage capacity added per resource while complete. */
@@ -454,11 +485,21 @@ export interface BuildingDef {
 export type BuildingStatus = 'construction' | 'complete';
 
 export interface ConstructionState {
+  /**
+   * `'new'`: a blueprint being built for the first time (cancellable, emits `buildingCompleted`).
+   * `'repair'`: a completed building that was damaged and is being repaired (not cancellable,
+   * emits `buildingRepaired`, does not count toward stats or objectives).
+   */
+  kind: 'new' | 'repair';
   /** 0..1, = workDone / buildHours. Renderer draws scaffolding from this. */
   progress: number;
   /** Worker-hours applied so far. */
   workDone: number;
-  /** Materials still owed to the site (copy of def.cost at placement). */
+  /**
+   * TOTAL materials needed to finish the site. Constant: a copy of `def.cost` taken at placement
+   * (all zero for repairs). Never decreases. What is still missing is `required - delivered`
+   * (minus goods already being carried to the site).
+   */
   required: ResourceAmounts;
   /** Materials hauled to the site so far. Cancelling refunds these to the stock. */
   delivered: ResourceAmounts;
@@ -473,10 +514,8 @@ export interface Building {
   status: BuildingStatus;
   /** Non-null exactly while `status === 'construction'`. */
   construction: ConstructionState | null;
-  /** Settlers currently assigned to work here (or build it). */
-  workerIds: EntityId[];
-  /** Settlers living here (houses / town center). */
-  residentIds: EntityId[];
+  // Workers and residents are NOT stored here: the settler side is the single source of truth
+  // (`Settler.workplaceId`, `Settler.homeId`). Use `getWorkers` / `getResidents` (queries.ts).
   /** Produced goods waiting to be hauled to storage. */
   output: ResourceAmounts;
   /** 0..1 progress of the current production cycle. */
@@ -488,8 +527,20 @@ export interface Building {
 // Colony, stats, outcome
 // ---------------------------------------------------------------------------------------------
 
+/** A settler who died, kept for the statistics screen and for unique-name checks. */
+export interface GraveEntry {
+  id: EntityId;
+  name: string;
+  diedDay: number;
+  cause: string;
+}
+
 export interface ColonyState {
   name: string;
+  /** Every settler name ever used (living, dead or departed); new settlers avoid these. */
+  usedNames: string[];
+  /** Settlers who died, oldest first. */
+  graveyard: GraveEntry[];
   /** Colony-wide stockpile held in the town center and storage buildings. */
   stock: ResourceAmounts;
   priorities: Priorities;
@@ -502,6 +553,9 @@ export interface StatsSample {
   timeOfDay: number;
   stock: ResourceAmounts;
   population: number;
+  /** Totals produced / consumed during the hour that ended with this sample. */
+  produced: ResourceAmounts;
+  consumed: ResourceAmounts;
 }
 
 export interface ColonyStats {
@@ -520,8 +574,9 @@ export interface ColonyStats {
 }
 
 /**
- * 'won' does not stop the game: the colony continues as a sandbox once the player acknowledges
- * victory (`progress.victoryAcknowledged`). Only 'lost' stops the simulation.
+ * 'won' does not stop the simulation. The colony stays 'won' until the player sends
+ * `acknowledgeVictory`; that sets `progress.victoryAcknowledged = true` and returns the status to
+ * 'playing' (sandbox mode), and victory never triggers again. Only 'lost' stops the simulation.
  */
 export type GameStatus = 'playing' | 'won' | 'lost';
 
@@ -620,7 +675,7 @@ export type PlayerCommand =
   | { type: 'renameColony'; name: string }
   /** Answer a PendingDecision. */
   | { type: 'resolveEvent'; eventId: number; accept: boolean }
-  /** Dismiss the victory screen and continue in sandbox mode. */
+  /** Dismiss the victory screen: status returns to 'playing' and the colony continues as a sandbox. */
   | { type: 'acknowledgeVictory' };
 export type PlayerCommandType = PlayerCommand['type'];
 
@@ -664,6 +719,8 @@ export type SimEvent =
   | { type: 'tileChanged'; x: number; y: number }
   | { type: 'buildingPlaced'; buildingId: EntityId; buildingType: BuildingType }
   | { type: 'buildingCompleted'; buildingId: EntityId; buildingType: BuildingType }
+  /** A damaged building finished its repair (not a new completion). */
+  | { type: 'buildingRepaired'; buildingId: EntityId; buildingType: BuildingType }
   | { type: 'buildingRemoved'; buildingId: EntityId; buildingType: BuildingType; reason: 'cancelled' | 'demolished' | 'destroyed' }
   | { type: 'settlerBorn'; settlerId: EntityId }
   | { type: 'settlerArrived'; settlerId: EntityId }

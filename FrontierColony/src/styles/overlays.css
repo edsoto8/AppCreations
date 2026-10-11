@@ -1,0 +1,215 @@
+/* Overlays: tooltips, toasts, pause indicator. */
+
+/* ---------- Tooltip ---------- */
+.tooltip {
+  position: fixed;
+  z-index: var(--z-tooltip);
+  max-width: 300px;
+  padding: 9px 11px;
+  border-radius: var(--r-md);
+  background: var(--glass-strong);
+  border: 1px solid var(--glass-border-strong);
+  box-shadow: var(--shadow-lg), var(--glass-inset);
+  font-size: var(--fs-sm);
+  line-height: 1.45;
+  color: var(--text);
+  pointer-events: none;
+  animation: tooltip-in var(--t-fast) var(--ease);
+}
+
+@keyframes tooltip-in {
+  from {
+    opacity: 0;
+  }
+}
+
+.tooltip__title {
+  margin-bottom: 3px;
+  font-family: var(--font-display);
+  font-size: var(--fs-md);
+  font-weight: 700;
+  color: var(--accent-bright);
+}
+
+.tooltip__body p {
+  margin: 0 0 4px;
+  color: var(--text-dim);
+}
+
+.tooltip__body p:last-child {
+  margin-bottom: 0;
+}
+
+.tt-stats {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 14px;
+  margin: 6px 0 4px;
+  padding-top: 6px;
+  border-top: 1px solid var(--glass-border);
+}
+
+.tt-stats dt {
+  color: var(--text-faint);
+}
+
+.tt-stats dd {
+  margin: 0;
+  text-align: right;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
+.tooltip__body .tt-alert {
+  margin-top: 4px;
+  font-weight: 700;
+}
+
+.tt-alert--warning {
+  color: var(--warning) !important;
+}
+
+.tt-alert--danger {
+  color: var(--danger) !important;
+}
+
+/* ---------- Toasts ---------- */
+.toast-host {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  pointer-events: none;
+}
+
+.toast-layer {
+  z-index: 70;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: 0 12px 24px;
+}
+
+.toast-layer--game {
+  /* Clear of the toolbar. */
+  padding-bottom: calc(var(--toolbar-clear) + var(--gutter));
+}
+
+.toast-layer > .toast-host {
+  position: static;
+  pointer-events: none;
+}
+
+.toast {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: min(480px, calc(100vw - 24px));
+  padding: 8px 8px 8px 12px;
+  border-radius: var(--r-md);
+  background: var(--glass-strong);
+  border: 1px solid var(--glass-border-strong);
+  border-left: 4px solid var(--toast-color, var(--info));
+  box-shadow: var(--shadow-md);
+  -webkit-backdrop-filter: var(--blur);
+  backdrop-filter: var(--blur);
+  animation: toast-in 260ms var(--ease);
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.97);
+  }
+}
+
+.toast--info { --toast-color: var(--info); }
+.toast--good { --toast-color: var(--good); }
+.toast--warning { --toast-color: var(--warning); }
+.toast--danger { --toast-color: var(--danger); }
+
+.toast__icon {
+  color: var(--toast-color);
+}
+
+.toast__msg {
+  flex: 1;
+  font-size: var(--fs-md);
+  font-weight: 500;
+}
+
+.toast__close {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-faint);
+}
+
+.toast__close:hover {
+  background: var(--glass-hover);
+  color: var(--text);
+}
+
+/* ---------- Pause indicator ---------- */
+.hud-top-center {
+  position: absolute;
+  top: 2px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  pointer-events: none !important;
+  max-width: calc(100% - 24px);
+}
+
+.hud-top-center > * {
+  pointer-events: auto;
+}
+
+.pause-pill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 14px;
+  border-radius: var(--r-pill);
+  background: rgba(34, 26, 19, 0.82);
+  border: 1px solid rgba(217, 104, 60, 0.7);
+  color: #ffd2bd;
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  box-shadow: var(--shadow-md);
+  pointer-events: none !important;
+  animation: pause-breathe 2.4s ease-in-out infinite;
+}
+
+.pause-pill .kbd {
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.pause-frame {
+  position: fixed;
+  inset: 0;
+  pointer-events: none !important;
+  box-shadow: inset 0 0 0 2px rgba(217, 104, 60, 0.35), inset 0 0 140px rgba(10, 6, 3, 0.35);
+}
+
+@keyframes pause-breathe {
+  50% {
+    border-color: rgba(217, 104, 60, 0.3);
+  }
+}

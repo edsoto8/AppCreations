@@ -177,7 +177,7 @@ export class GameController implements GameControllerApi {
     ) {
       ui.select(null);
     }
-    ui.setSnapshot(buildHudSnapshot(this.state));
+    ui.setSnapshot(buildHudSnapshot(this.state, ui.selection));
   }
 
   // --- store → renderer --------------------------------------------------------------------
@@ -343,6 +343,8 @@ export class GameController implements GameControllerApi {
 /** Toast text for notable sim events (null = no toast). */
 function toastFor(e: SimEvent, state: GameState): { message: string; severity: 'info' | 'good' | 'warning' | 'danger' } | null {
   switch (e.type) {
+    case 'buildingPlaced':
+      return { message: `${BUILDING_DEFS[e.buildingType].name} placed. Settlers will start building.`, severity: 'info' };
     case 'buildingCompleted':
       return { message: `${BUILDING_DEFS[e.buildingType].name} completed.`, severity: 'good' };
     case 'settlerBorn':

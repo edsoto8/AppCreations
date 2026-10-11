@@ -93,7 +93,10 @@ Do not make the edit yourself.
   Ids are never reused. `0` means "none" in tile arrays.
 - **Tiles.** These are flat row-major `number[]` arrays: `index = y * width + x` (use `tileIndex`). They
   are `terrain` (`Terrain` codes), `elevation` (0..`MAX_ELEVATION`), `resource` (units left) and
-  `building` (occupying id or 0). Bump `world.revision` and emit `tileChanged` whenever a tile changes after creation.
+  `building` (occupying id or 0). Emit `tileChanged` whenever a tile changes after creation. Bump
+  `world.revision` only for structural changes (terrain, elevation, building footprint) — not for `resource`
+  depletion, which happens every few ticks. The renderer redraws trees and rocks from `tileChanged` events
+  and rebuilds everything on `setWorld` (new or loaded game).
 - **Tuning numbers live in `src/sim/balance.ts`**, and their values come from `docs/GAME_DESIGN.md`.
   Engine constants (tick rate, schema version, map sizes, limits) live in `src/sim/constants.ts`.
   Do not hard-code gameplay numbers anywhere else.

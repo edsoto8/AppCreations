@@ -1,0 +1,113 @@
+/*
+ * Design tokens for the Frontier Colony UI.
+ * Art direction: "dusk glass and brass": warm dark-wood translucent panels over the map, parchment text,
+ * brass/amber accents, a serif display face for titles and a clean system sans for everything else.
+ * All colours, radii, shadows, spacing and motion come from here; component CSS never hard-codes them.
+ */
+:root {
+  color-scheme: dark;
+
+  /* Surfaces */
+  --bg-deep: #120e0a;
+  --glass: rgba(34, 26, 19, 0.84);
+  --glass-strong: rgba(26, 20, 14, 0.95);
+  --glass-soft: rgba(52, 40, 29, 0.55);
+  --glass-hover: rgba(88, 68, 45, 0.5);
+  --glass-border: rgba(238, 206, 152, 0.2);
+  --glass-border-strong: rgba(238, 206, 152, 0.38);
+  --glass-inset: inset 0 1px 0 rgba(255, 240, 212, 0.08);
+  --scrim: rgba(12, 9, 6, 0.62);
+
+  /* Text */
+  --text: #f4e9d1;
+  --text-dim: #c3b394;
+  --text-faint: #94856a;
+  --text-on-accent: #24180a;
+
+  /* Accent (brass) */
+  --accent: #e8ae4d;
+  --accent-bright: #f8cd78;
+  --accent-deep: #a8742a;
+  --accent-wash: rgba(232, 174, 77, 0.16);
+  --ember: #d9683c;
+
+  /* Status */
+  --good: #8bcf70;
+  --warning: #f0b445;
+  --danger: #ea6652;
+  --info: #7fb9dc;
+
+  /* Resources */
+  --c-wood: #b9824a;
+  --c-wood-dark: #7a4f27;
+  --c-stone: #a4a9ae;
+  --c-stone-dark: #6a7077;
+  --c-food: #e9c34f;
+  --c-food-dark: #b48a1c;
+  --c-water: #62b4e6;
+  --c-water-dark: #2f78b1;
+  --c-tools: #c9d2da;
+  --c-tools-dark: #6f7d8a;
+  --c-housing: #d9825b;
+  --c-people: #e2c08c;
+
+  /* Type */
+  --font-ui: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-display: 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Book Antiqua', 'URW Palladio L', Georgia, serif;
+  --font-mono: ui-monospace, 'SF Mono', 'Cascadia Mono', Consolas, monospace;
+  --fs-xs: 11px;
+  --fs-sm: 12.5px;
+  --fs-md: 14px;
+  --fs-lg: 16px;
+  --fs-xl: 20px;
+  --fs-2xl: 28px;
+
+  /* Shape and elevation */
+  --r-sm: 6px;
+  --r-md: 10px;
+  --r-lg: 14px;
+  --r-pill: 999px;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.45);
+  --shadow-md: 0 6px 18px rgba(0, 0, 0, 0.45), 0 1px 3px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 18px 48px rgba(0, 0, 0, 0.6), 0 2px 6px rgba(0, 0, 0, 0.5);
+  --blur: blur(10px) saturate(1.2);
+
+  /* Spacing */
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 24px;
+  --s-6: 32px;
+  --gutter: 10px;
+
+  /* Layers */
+  --z-hud: 10;
+  --z-panel: 20;
+  --z-toast: 30;
+  --z-modal: 40;
+  --z-menu: 50;
+  --z-tooltip: 60;
+
+  /* Motion */
+  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --t-fast: 120ms;
+  --t-med: 220ms;
+
+  /* Layout, updated by media queries */
+  --topbar-h: 64px;
+  --toolbar-clear: 72px;
+}
+
+@media (max-width: 1100px) {
+  :root {
+    --fs-md: 13.5px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --t-fast: 0ms;
+    --t-med: 0ms;
+  }
+}

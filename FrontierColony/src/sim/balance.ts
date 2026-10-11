@@ -15,10 +15,16 @@ import {
   type BuildingDef,
   type BuildingType,
   type Difficulty,
+  type JobCategory,
+  type MapPreset,
+  type MapSize,
   type Priorities,
   type ResourceAmounts,
+  type Season,
+  type SkillType,
   type TerrainDef,
   type TraitId,
+  type WeatherKind,
 } from './types';
 
 // --- Pacing -----------------------------------------------------------------------------------
@@ -37,10 +43,47 @@ export const DAYLIGHT_HOURS = { start: 5, end: 20 } as const;
 // --- Settlers ---------------------------------------------------------------------------------
 
 export const STARTING_SETTLERS = 5;
-/** Walking speed on moveCost-1 terrain, tiles per sim second. */
-export const SETTLER_WALK_SPEED = 1.6;
+export const POPULATION_CAP = 30;
+/** Starting needs of founders (GAME_DESIGN §3.1). Hunger and energy get a uniform integer jitter of +-`hungerEnergyJitter`. */
+export const SETTLER_START_NEEDS = { hunger: 80, energy: 90, happiness: 65, health: 100, hungerEnergyJitter: 10 } as const;
+export const NEWCOMER_START_NEEDS = { hunger: 70, energy: 80, happiness: 65, health: 100 } as const;
+/** Walking speed on moveCost-1 terrain, tiles per sim second (= 18 tiles per game hour). */
+export const SETTLER_WALK_SPEED = 2.4;
+export const CARRYING_WALK_MULT = 0.9;
 /** Base units a settler carries at once (GAME_DESIGN: 10 + hauling level). */
 export const CARRY_CAPACITY = 10;
+export const CARRY_PER_HAULING_LEVEL = 1;
+/** Work speed multiplier = base + perLevel * skill level. */
+export const SKILL_SPEED = { base: 0.75, perLevel: 0.05 } as const;
+/** Skill rolls for new settlers (GAME_DESIGN §3.2). */
+export const SKILL_SPAWN = { baseMin: 1, baseMax: 4, secondaryMin: 3, secondaryMax: 5 } as const;
+/** Specialty skill level range by difficulty [min, max]. */
+export const SPECIALTY_RANGE: Record<Difficulty, readonly [number, number]> = {
+  relaxed: [6, 8],
+  normal: [5, 7],
+  harsh: [4, 6],
+};
+/** Specialties of founders #1..#3 (the remaining founders roll a random specialty). */
+export const FOUNDER_SPECIALTIES: readonly SkillType[] = ['farming', 'construction', 'woodcutting'];
+/** Newcomers gain +1 specialty level per `perDays` elapsed days, up to `max`. */
+export const NEWCOMER_SPECIALTY_BONUS = { perDays: 5, max: 3 } as const;
+export const XP_PER_WORK_HOUR = 1;
+/** xpToNext(level) = XP_TO_NEXT_LEVEL_PER_LEVEL * (level + 1). */
+export const XP_TO_NEXT_LEVEL_PER_LEVEL = 10;
+/** Probability of rolling one or two traits. */
+export const TRAIT_COUNT_WEIGHTS = { one: 0.6, two: 0.4 } as const;
+/** A settler never has both traits of a pair. */
+export const TRAIT_EXCLUSIVE_PAIRS: readonly (readonly [TraitId, TraitId])[] = [
+  ['hardworking', 'lazy'],
+  ['cheerful', 'gloomy'],
+  ['glutton', 'frugal'],
+  ['tough', 'frail'],
+  ['nightOwl', 'earlyBird'],
+  ['sociable', 'loner'],
+  ['nimble', 'clumsy'],
+];
+/** Maximum number of founders that may have the given trait. */
+export const FOUNDER_TRAIT_LIMITS: Partial<Record<TraitId, number>> = { lazy: 1, gloomy: 1 };
 
 // --- Colony -----------------------------------------------------------------------------------
 
@@ -75,8 +118,116 @@ export const TERRAIN_DEFS: Record<Terrain, TerrainDef> = {
   [Terrain.Mountain]: { name: 'Mountain', walkable: false, moveCost: 0, buildable: false },
 };
 
-/** Initial harvestable units per tile. */
+/** Initial harvestable units per tile (the average; world generation varies tiles around it, see WORLDGEN). */
 export const TILE_RESOURCE_START = { forestWood: 40, hillsStone: 60, mountainStone: 120 } as const;
+
+/** Forest regrowth and spread (GAME_DESIGN §6.5). `max` is the cap a forest tile regrows to. */
+export const FOREST_REGROWTH = { perDay: 2, max: 40, spreadChance: 0.03, spreadMinForestNeighbours: 3, spreadStartWood: 8 } as const;
+
+// --- World generation (GAME_DESIGN Appendix A) --------------------------------------------------
+
+/** Per-preset generator tuning. Shares are fractions; forest/hills/mountain are fractions of land tiles. */
+export interface WorldgenPresetDef {
+  /** Target fraction of water tiles before fords/cleanup (includes the ocean ring or lakes). */
+  waterShare: number;
+  forestShare: number;
+  hillsShare: number;
+  mountainShare: number;
+  /** Water within this many steps of land is shallow; one more step is shallow where noise allows. */
+  shallowRange: number;
+  /** Beach chance thresholds: a flat coastal tile becomes sand when beach noise (-1..1) exceeds the value. */
+  beachNoise: { adjacent: number; second: number };
+}
+
+export const WORLDGEN_PRESETS: Record<MapPreset, WorldgenPresetDef> = {
+  continent: {
+    waterShare: 0.3,
+    forestShare: 0.25,
+    hillsShare: 0.12,
+    mountainShare: 0.05,
+    shallowRange: 2,
+    beachNoise: { adjacent: -1, second: 0.05 },
+  },
+  archipelago: {
+    waterShare: 0.55,
+    forestShare: 0.25,
+    hillsShare: 0.08,
+    mountainShare: 0.02,
+    shallowRange: 2,
+    beachNoise: { adjacent: -1, second: -0.25 },
+  },
+  highlands: {
+    waterShare: 0.1,
+    forestShare: 0.2,
+    hillsShare: 0.3,
+    mountainShare: 0.15,
+    shallowRange: 2,
+    beachNoise: { adjacent: 0.1, second: 2 },
+  },
+  riverValley: {
+    waterShare: 0.15,
+    forestShare: 0.25,
+    hillsShare: 0.12,
+    mountainShare: 0.1,
+    shallowRange: 2,
+    beachNoise: { adjacent: 0.0, second: 2 },
+  },
+};
+
+/** Generator constants that are not per preset. */
+export const WORLDGEN = {
+  /** Tiles at the map edge that are forced to water on continent and archipelago maps. */
+  oceanBorder: 3,
+  /** Number of islands (including the start island) on archipelago maps: [min, max] by map size. */
+  islandCount: { small: [4, 5], medium: [5, 6], large: [6, 7] } as Record<MapSize, readonly [number, number]>,
+  /** Minimum land area of the archipelago start island (tiles) and its share of all island land. */
+  startIslandMinTiles: 800,
+  /** Minimum open water between island coastlines (before fords). */
+  islandGap: 4,
+  /** Planned island area is scaled up by this factor to make up for coast erosion and crowding. */
+  islandAreaBoost: 1.3,
+  startIslandShare: 0.42,
+  /** Land components smaller than this are removed (turned to water). */
+  minLandComponent: 10,
+  /** Water components smaller than this are filled with land. */
+  minWaterComponent: 6,
+  /** Fraction of the wood on a forest tile at the sparse edge of a grove (core tiles hold the full amount). */
+  forestMinDensity: 0.6,
+  /** Hills and mountain deposit size varies by +-(variation / 2) around the base amount, richer toward ridges. */
+  hillsVariation: 0.5,
+  mountainVariation: 0.2,
+  /** Flat land at or above this fraction of the lowland height range is raised to elevation 1. */
+  lowlandRiseAt: 0.6,
+  /** Flat land this close (steps) to water stays at elevation 0. */
+  coastFlatDistance: 2,
+  /** Number of river fords by map size (riverValley). */
+  riverFords: { small: 2, medium: 3, large: 4 } as Record<MapSize, number>,
+  /** River half width as a fraction of the map edge. */
+  riverHalfWidth: 0.075,
+  /** Full generation passes tried before falling back to a hand-stamped start pad. */
+  maxAttempts: 6,
+} as const;
+
+/**
+ * Start-site guarantees around the 3x3 town center (GAME_DESIGN Appendix A). Radii are Chebyshev
+ * distances from the footprint edge. `reach` limits are walking steps over walkable terrain.
+ */
+export const START_SITE = {
+  forest: { radius: 8, min: 10 },
+  stone: { radius: 8, min: 3 },
+  grass: { radius: 10, min: 40 },
+  water: { radius: 15, min: 1 },
+  /** A lumber camp / mine site must exist within this distance of the town center. */
+  siteRadius: 15,
+  /** Land tiles (any land terrain) the start landmass must contain. */
+  minLandTiles: 600,
+  /** The start must be at least this many tiles from every map edge. */
+  edgeMargin: 10,
+  /** Walking-step limits for forest / stone / water to count as reachable from the town center. */
+  reach: { forest: 18, stone: 18, water: 26 },
+  /** Candidates validated in score order before the generation attempt is given up. */
+  maxCandidatesChecked: 120,
+} as const;
 
 // --- Buildings --------------------------------------------------------------------------------
 
@@ -94,6 +245,11 @@ export const BUILDING_DEFS: Record<BuildingType, BuildingDef> = {
     allowedTerrain: BUILD_LAND,
     requiresNearby: null,
     maxWorkers: 0,
+    maxBuilders: 0,
+    workRadius: 8,
+    outputCap: 0,
+    forage: { wood: 1, stone: 1, rateMult: 0.5 },
+    drinkingPoint: true,
     housing: 4,
     storage: 150,
     production: null,
@@ -112,6 +268,11 @@ export const BUILDING_DEFS: Record<BuildingType, BuildingDef> = {
     allowedTerrain: BUILD_LAND,
     requiresNearby: null,
     maxWorkers: 0,
+    maxBuilders: 3,
+    workRadius: 0,
+    outputCap: 0,
+    forage: null,
+    drinkingPoint: false,
     housing: 4,
     storage: 0,
     production: null,
@@ -130,6 +291,11 @@ export const BUILDING_DEFS: Record<BuildingType, BuildingDef> = {
     allowedTerrain: [Terrain.Grass],
     requiresNearby: null,
     maxWorkers: 2,
+    maxBuilders: 4,
+    workRadius: 0,
+    outputCap: 30,
+    forage: null,
+    drinkingPoint: false,
     housing: 0,
     storage: 0,
     production: { output: 'food', amount: 4, cycleHours: 4, inputs: {}, skill: 'farming' },
@@ -148,6 +314,11 @@ export const BUILDING_DEFS: Record<BuildingType, BuildingDef> = {
     allowedTerrain: BUILD_LAND,
     requiresNearby: { terrain: [Terrain.Forest], radius: 6, minCount: 8 },
     maxWorkers: 2,
+    maxBuilders: 3,
+    workRadius: 6,
+    outputCap: 30,
+    forage: null,
+    drinkingPoint: false,
     housing: 0,
     storage: 0,
     production: null,
@@ -166,6 +337,11 @@ export const BUILDING_DEFS: Record<BuildingType, BuildingDef> = {
     allowedTerrain: BUILD_LAND,
     requiresNearby: { terrain: [Terrain.Hills, Terrain.Mountain], radius: 4, minCount: 3 },
     maxWorkers: 2,
+    maxBuilders: 3,
+    workRadius: 4,
+    outputCap: 30,
+    forage: null,
+    drinkingPoint: false,
     housing: 0,
     storage: 0,
     production: null,
@@ -184,6 +360,11 @@ export const BUILDING_DEFS: Record<BuildingType, BuildingDef> = {
     allowedTerrain: BUILD_LAND,
     requiresNearby: null,
     maxWorkers: 1,
+    maxBuilders: 2,
+    workRadius: 0,
+    outputCap: 30,
+    forage: null,
+    drinkingPoint: true,
     housing: 0,
     storage: 0,
     production: { output: 'water', amount: 4, cycleHours: 2, inputs: {}, skill: 'hauling' },
@@ -202,6 +383,11 @@ export const BUILDING_DEFS: Record<BuildingType, BuildingDef> = {
     allowedTerrain: BUILD_LAND,
     requiresNearby: null,
     maxWorkers: 0,
+    maxBuilders: 3,
+    workRadius: 0,
+    outputCap: 0,
+    forage: null,
+    drinkingPoint: true,
     housing: 0,
     storage: 120,
     production: null,
@@ -220,6 +406,11 @@ export const BUILDING_DEFS: Record<BuildingType, BuildingDef> = {
     allowedTerrain: BUILD_LAND,
     requiresNearby: null,
     maxWorkers: 1,
+    maxBuilders: 3,
+    workRadius: 0,
+    outputCap: 10,
+    forage: null,
+    drinkingPoint: false,
     housing: 0,
     storage: 0,
     production: { output: 'tools', amount: 1, cycleHours: 3, inputs: { wood: 3, stone: 2 }, skill: 'crafting' },
@@ -237,18 +428,234 @@ export interface TraitDef {
 }
 
 export const TRAIT_DEFS: Record<TraitId, TraitDef> = {
-  hardworking: { name: 'Hardworking', description: 'Works faster.' },
-  lazy: { name: 'Lazy', description: 'Works slower and rests more.' },
-  cheerful: { name: 'Cheerful', description: 'Happiness drops more slowly.' },
-  gloomy: { name: 'Gloomy', description: 'Happiness drops faster.' },
-  glutton: { name: 'Glutton', description: 'Gets hungry faster.' },
-  frugal: { name: 'Frugal', description: 'Eats less.' },
-  tough: { name: 'Tough', description: 'Resists sickness and bad weather.' },
-  frail: { name: 'Frail', description: 'Gets sick more easily.' },
-  nightOwl: { name: 'Night Owl', description: 'Prefers to work late and sleep in.' },
-  earlyBird: { name: 'Early Bird', description: 'Up at dawn, to bed early.' },
-  sociable: { name: 'Sociable', description: 'Gains happiness from company.' },
-  loner: { name: 'Loner', description: 'Prefers working alone.' },
-  nimble: { name: 'Nimble', description: 'Walks faster.' },
-  clumsy: { name: 'Clumsy', description: 'Walks slower and drops things.' },
+  hardworking: { name: 'Hardworking', description: 'Puts in an honest day and then some. Works 15% faster but tires sooner.' },
+  lazy: { name: 'Lazy', description: "Never met a hammock they didn't like. Works 15% slower." },
+  cheerful: { name: 'Cheerful', description: 'Sees the bright side of mud. Happiness +8.' },
+  gloomy: { name: 'Gloomy', description: 'Expects the worst and is rarely disappointed. Happiness -8.' },
+  glutton: { name: 'Glutton', description: 'Eats a quarter more, and loves a full belly.' },
+  frugal: { name: 'Frugal', description: 'Gets by on little. Eats 15% less.' },
+  tough: { name: 'Tough', description: 'Frontier-hardened. Shrugs off cold, rain and fever.' },
+  frail: { name: 'Frail', description: 'Catches every cold going. Takes 30% more damage.' },
+  nightOwl: { name: 'Night Owl', description: 'Comes alive after dark. Works at night without penalty.' },
+  earlyBird: { name: 'Early Bird', description: 'Up before the rooster. Works the dawn at full speed.' },
+  sociable: { name: 'Sociable', description: 'Needs company. Gets twice the joy from a chat.' },
+  loner: { name: 'Loner', description: 'Happiest left alone.' },
+  nimble: { name: 'Nimble', description: 'Light on their feet. Walks 20% faster.' },
+  clumsy: { name: 'Clumsy', description: 'All thumbs. Builds and crafts 15% slower.' },
 };
+
+/** Mechanical trait effects (1 = no effect; absent fields are neutral). GAME_DESIGN §3.3. */
+export const TRAIT_EFFECTS = {
+  hardworking: { workSpeed: 1.15, energyDecay: 1.1, workScore: 5 },
+  lazy: { workSpeed: 0.85, energyDecay: 0.9, workScore: -5, wanderScore: 15 },
+  cheerful: { happinessBaseline: 8 },
+  gloomy: { happinessBaseline: -8 },
+  glutton: { hungerDecay: 1.25, wellFedMoodlet: 4, wellFedAtHunger: 70 },
+  frugal: { hungerDecay: 0.85 },
+  tough: { healthDamage: 0.7, sicknessDuration: 0.5, ignoresWeatherMood: true },
+  frail: { healthDamage: 1.3, healthRegen: 0.75, sicknessPickWeight: 2 },
+  nightOwl: { noLightPenalty: ['dawn', 'dusk', 'night'] },
+  earlyBird: { noLightPenalty: ['dawn'] },
+  sociable: { socializeScore: 15, socializedMoodlet: 12, lonelyMoodlet: -5, lonelyAfterHours: 24 },
+  loner: { happinessBaseline: 4, socializeScore: -20, noSocialMoodlets: true },
+  nimble: { walkSpeed: 1.2 },
+  clumsy: { walkSpeed: 0.9, constructionSpeed: 0.85, craftingSpeed: 0.85 },
+} as const;
+
+// --- Difficulty (GAME_DESIGN §14) ----------------------------------------------------------------
+
+export interface DifficultyDef {
+  needDecayMult: number;
+  productionMult: number;
+  healthDamageMult: number;
+  negEventMult: number;
+  posEventMult: number;
+  growthMult: number;
+  graceDays: number;
+  /** Continuous hours in the Breaking mood band before a settler deserts. */
+  desertionHours: number;
+}
+
+export const DIFFICULTY: Record<Difficulty, DifficultyDef> = {
+  relaxed: { needDecayMult: 0.85, productionMult: 1.15, healthDamageMult: 0.75, negEventMult: 0.6, posEventMult: 1.3, growthMult: 1.25, graceDays: 5, desertionHours: 72 },
+  normal: { needDecayMult: 1.0, productionMult: 1.0, healthDamageMult: 1.0, negEventMult: 1.0, posEventMult: 1.0, growthMult: 1.0, graceDays: 3, desertionHours: 48 },
+  harsh: { needDecayMult: 1.15, productionMult: 0.9, healthDamageMult: 1.25, negEventMult: 1.4, posEventMult: 0.8, growthMult: 0.8, graceDays: 2, desertionHours: 36 },
+};
+
+// --- Time of day (GAME_DESIGN §2) -----------------------------------------------------------------
+
+export const DAY_PHASES = { dawnStart: 5, dayStart: 7, duskStart: 18, nightStart: 20 } as const;
+export const LIGHT_WORK_MULT = { dawn: 0.85, day: 1.0, dusk: 0.85, night: 0.6 } as const;
+export const NIGHT_WALK_MULT = 0.9;
+/** Personal night window [startHour, endHour), wrapping midnight. */
+export const PERSONAL_NIGHT_WINDOW: Record<'default' | 'nightOwl' | 'earlyBird', readonly [number, number]> = {
+  default: [20, 5],
+  nightOwl: [0, 8],
+  earlyBird: [19, 4],
+};
+
+// --- Weather effects (GAME_DESIGN §9) ---------------------------------------------------------------
+
+export const WEATHER_EFFECTS: Record<WeatherKind, { outdoorWork: number; farmGrowth: number; walk: number; energyDecay: number; wellMult: number }> = {
+  clear: { outdoorWork: 1.0, farmGrowth: 1.0, walk: 1.0, energyDecay: 1.0, wellMult: 1.0 },
+  cloudy: { outdoorWork: 1.0, farmGrowth: 1.0, walk: 1.0, energyDecay: 1.0, wellMult: 1.0 },
+  rain: { outdoorWork: 0.85, farmGrowth: 1.25, walk: 0.9, energyDecay: 1.0, wellMult: 1.0 },
+  storm: { outdoorWork: 0.6, farmGrowth: 0.6, walk: 0.75, energyDecay: 1.15, wellMult: 1.0 },
+  snow: { outdoorWork: 0.8, farmGrowth: 0, walk: 0.8, energyDecay: 1.2, wellMult: 0.8 },
+};
+export const SEASON_ENERGY_DECAY_MULT: Record<Season, number> = { spring: 1.0, summer: 1.0, autumn: 1.0, winter: 1.1 };
+export const SEASON_FARM_MULT: Record<Season, number> = { spring: 1.0, summer: 1.25, autumn: 1.0, winter: 0 };
+
+// --- Needs (GAME_DESIGN §4) ------------------------------------------------------------------------
+
+export const HUNGER_DECAY = 4.0;
+export const MEAL = { food: 1, water: 1, hungerRestore: 48, hours: 0.5, maxHungerToEat: 50 } as const;
+export const DRINK = { water: 1, hours: 0.15, starvingHungerRestore: 8, starvingCooldownHours: 4, starvingMaxHunger: 40 } as const;
+export const ENERGY_DECAY = { working: 4.0, awakeOther: 3.0 } as const;
+export const SLEEP_RESTORE = { bed: 9, outdoors: 6 } as const;
+export const SLEEP_WAKE = { full: 100, nap: 90 } as const;
+export const COLLAPSE_ENERGY = 5;
+/** Outdoor bedrolls are placed within this many tiles of the town center. */
+export const OUTDOOR_SLEEP_RADIUS_FROM_TOWN_CENTER = 3;
+
+export const HEALTH = {
+  regen: 1,
+  regenInBed: 3,
+  regenMinHunger: 25,
+  regenMinEnergy: 20,
+  starvingBelowHunger: 10,
+  starvingDamage: 2.5,
+  dehydratedDamage: 1.5,
+  exhaustedDamage: 1,
+  sickDamage: 1,
+  coldNightDamage: 1,
+  coldSnapNightDamage: 2,
+  hurtBelow: 50,
+  hurtWorkMult: 0.8,
+  sickWorkMult: 0.7,
+  criticalRestBelow: 25,
+  restUntil: 50,
+  damageLogHours: 6,
+} as const;
+
+export const HAPPINESS = { start: 65, baseTarget: 50, driftPerHour: 4 } as const;
+
+export interface MoodBandDef {
+  id: 'inspired' | 'content' | 'unhappy' | 'miserable' | 'breaking';
+  min: number;
+  workMult: number;
+  workScoreMult: number;
+  sulkChancePerHour: number;
+  sulkHours: number;
+  refusesWork: boolean;
+}
+/** Checked top-down. */
+export const MOOD_BANDS: readonly MoodBandDef[] = [
+  { id: 'inspired', min: 80, workMult: 1.1, workScoreMult: 1, sulkChancePerHour: 0, sulkHours: 0, refusesWork: false },
+  { id: 'content', min: 50, workMult: 1.0, workScoreMult: 1, sulkChancePerHour: 0, sulkHours: 0, refusesWork: false },
+  { id: 'unhappy', min: 30, workMult: 0.9, workScoreMult: 1, sulkChancePerHour: 0, sulkHours: 0, refusesWork: false },
+  { id: 'miserable', min: 15, workMult: 0.75, workScoreMult: 0.85, sulkChancePerHour: 0.05, sulkHours: 2, refusesWork: false },
+  { id: 'breaking', min: 0, workMult: 0, workScoreMult: 0, sulkChancePerHour: 0, sulkHours: 0, refusesWork: true },
+];
+
+export interface MoodletDef {
+  value: number;
+  /** Duration in game hours for timed moodlets; absent for state moodlets (re-evaluated hourly). */
+  hours?: number;
+  maxStacks?: number;
+}
+export const MOODLETS: Record<string, MoodletDef> = {
+  sleptInHouse: { value: 6, hours: 18 },
+  sleptOutdoors: { value: -10, hours: 18 },
+  sleptOutdoorsCold: { value: -15, hours: 18 },
+  hungry: { value: -8 },
+  starving: { value: -20 },
+  dehydrated: { value: -8 },
+  tired: { value: -6 },
+  hurt: { value: -10 },
+  sick: { value: -8 },
+  fineWeather: { value: 3 },
+  rain: { value: -3 },
+  storm: { value: -8 },
+  snow: { value: -3 },
+  socialized: { value: 6, hours: 12 },
+  lonely: { value: -5 },
+  overworked: { value: -6 },
+  colonistDied: { value: -12, hours: 72, maxStacks: 3 },
+  colonistLeft: { value: -5, hours: 48, maxStacks: 2 },
+  newcomer: { value: 4, hours: 24, maxStacks: 2 },
+  fullLarder: { value: 5 },
+  emptyLarder: { value: -8 },
+  wellFed: { value: 4 },
+  festival: { value: 15, hours: 48 },
+  wolves: { value: -5 },
+};
+export const MOODLET_THRESHOLDS = {
+  hungryBelow: 25,
+  starvingBelow: 10,
+  tiredBelow: 20,
+  overworkedHours: 12,
+  fullLarderFoodDays: 5,
+  fullLarderWaterDays: 3,
+  sociableSocializedValue: 12,
+  lonelyAfterHours: 24,
+} as const;
+
+// --- Utility AI (GAME_DESIGN §5) ---------------------------------------------------------------------
+
+export const AI = {
+  priorityBase: { 1: 40, 2: 55, 3: 70 } as Record<number, number>,
+  skillScorePerLevel: 2,
+  distPenaltyPerTile: 0.4,
+  distPenaltyMaxTiles: 50,
+  commitmentBonus: 15,
+  jitterMax: 4,
+  reevalHours: { work: 1.0, wander: 0.25 },
+  storageFullPenalty: 30,
+  eat: { base: 40, slope: 2.2, maxHunger: 50, distPenaltyPerTile: 0.3, distMaxTiles: 40 },
+  drink: { dehydratedScore: 75 },
+  sleep: { maxEnergy: 90, slope: 1.2, nightBonus: 60, distPenaltyPerTile: 0.2, distMaxTiles: 40 },
+  socialize: {
+    maxHappiness: 90,
+    base: 20,
+    slope: 0.5,
+    slopeBelow: 75,
+    duskBonus: 40,
+    cooldownPenalty: 40,
+    hours: 1,
+    partnerRadius: 4,
+    partnerOverlapHours: 0.5,
+    sociableBonus: 15,
+  },
+  wander: { score: 12, lazyBonus: 15, hours: 0.5, radius: 6 },
+  critical: { hungerBelow: 15, energyCollapseBelow: 5, healthRestBelow: 25, bonus: 200 },
+  shortage: {
+    food: { max: 25, targetDays: 3, autumnTargetDays: 8 },
+    water: { max: 25, targetDays: 3 },
+    wood: { max: 15, target: 50 },
+    stone: { max: 15, target: 30 },
+    tools: { max: 20, perPop: 0.6, min: 3 },
+  },
+  traitWorkBonus: { hardworking: 5, lazy: -5 },
+  buildTaskBonus: { any: 10, houseWhileHomeless: 10, farmOrWellInShortage: 10, shortageThreshold: 12 },
+  haul: { minLoad: 6, fillBonus: 25, fullBonus: 15, supplySiteBonus: 15, pickupHours: 0.1, dropHours: 0.1 },
+  /** First decision of a settler happens on ticks where `tick % decisionStaggerTicks === id % decisionStaggerTicks`. */
+  decisionStaggerTicks: 10,
+  /** Game hours an idle settler waits after a failed path before deciding again. */
+  pathFailCooldownHours: 0.25,
+  /** Max A* node expansions per search. */
+  pathIterationCap: 20000,
+} as const;
+
+// --- Economy: work (GAME_DESIGN §6) ------------------------------------------------------------------------
+
+export const GATHER_RATE = { wood: 2.0, stone: 1.25 } as const;
+export const TOOLS = {
+  productivityMult: 1.4,
+  durabilityHours: 48,
+  usedBy: ['farming', 'woodcutting', 'mining', 'water', 'building'] as readonly JobCategory[],
+  craftInputs: { wood: 3, stone: 2 },
+  craftHours: 3,
+} as const;
+export const OUTDOOR_JOBS: readonly JobCategory[] = ['farming', 'woodcutting', 'mining', 'water', 'building'];
+export const BUILD_RATE = 1.0;

@@ -3,6 +3,7 @@
  * and tests. They never mutate state and never use randomness.
  */
 import { BUILDING_DEFS, GAME_HOURS_PER_TICK, TERRAIN_DEFS } from './balance';
+import { getWalkRegions } from './grid';
 import {
   RESOURCE_TYPES,
   type Building,
@@ -84,6 +85,16 @@ export function getBuildingAt(state: GameState, x: number, y: number): Building 
   if (!inBounds(w, x, y)) return null;
   const id = w.building[tileIndex(w, x, y)] ?? 0;
   return id === 0 ? null : getBuilding(state, id);
+}
+
+/** Settlers whose workplace (or construction site) is the given building. Derived from `Settler.workplaceId`. */
+export function getWorkers(state: GameState, buildingId: EntityId): Settler[] {
+  return state.settlers.filter((s) => s.workplaceId === buildingId);
+}
+
+/** Settlers living in the given building. Derived from `Settler.homeId`. */
+export function getResidents(state: GameState, buildingId: EntityId): Settler[] {
+  return state.settlers.filter((s) => s.homeId === buildingId);
 }
 
 export function getPopulation(state: GameState): number {
@@ -180,9 +191,35 @@ export function canPlaceBuilding(state: GameState, type: BuildingType, x: number
     }
   }
 
+  if (error === null && !hasAccess(state, type, x, y)) {
+    fail('blocked', 'Settlers could not reach this spot.');
+  }
+
   if (error === null && !canAfford(state.colony.stock, def.cost)) {
     fail('insufficientResources', `Not enough resources for a ${def.name}.`);
   }
 
   return { ok: error === null, error, message, tiles };
+}
+
+/**
+ * True when a footprint at (x, y) has at least one free walkable neighbour tile that lies in the
+ * same walkable region as the town center (so settlers can reach it).
+ */
+function hasAccess(state: GameState, type: BuildingType, x: number, y: number): boolean {
+  const w = state.world;
+  const town = state.buildings.find((b) => b.type === 'townCenter');
+  if (!town) return true;
+  const { labels } = getWalkRegions(w);
+  const region = labels[(town.origin.y - 1) * w.width + town.origin.x - 1] as number;
+  const { w: fw, h: fh } = BUILDING_DEFS[type].footprint;
+  for (let ty = y - 1; ty <= y + fh; ty++) {
+    for (let tx = x - 1; tx <= x + fw; tx++) {
+      const inside = tx >= x && tx < x + fw && ty >= y && ty < y + fh;
+      if (inside || !inBounds(w, tx, ty)) continue;
+      const i = ty * w.width + tx;
+      if (w.building[i] === 0 && labels[i] === region && region !== -1) return true;
+    }
+  }
+  return false;
 }

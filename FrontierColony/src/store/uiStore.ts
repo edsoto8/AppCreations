@@ -29,6 +29,16 @@ export interface Toast {
 
 export interface UiState {
   screen: Screen;
+  /**
+   * True once a game has been started or loaded in this page session. The main menu offers
+   * "Resume" only then, and the controller should only autosave on page hide when this is true
+   * (otherwise the placeholder demo world would overwrite the player's real autosave).
+   */
+  gameStarted: boolean;
+  /** The Esc game menu (resume / save-load / main menu) is open. */
+  gameMenuOpen: boolean;
+  /** Pause flag to restore when the game menu closes. */
+  pausedBeforeMenu: boolean;
   speed: GameSpeed;
   paused: boolean;
   selection: Selection | null;
@@ -41,8 +51,27 @@ export interface UiState {
   toasts: Toast[];
 }
 
+/** What a press of Escape did (see `pressEscape`). */
+export type EscapeResult = 'closedGameMenu' | 'closedPanel' | 'cancelledBuild' | 'clearedSelection' | 'openedGameMenu' | 'none';
+
 export interface UiActions {
   setScreen(screen: Screen): void;
+  /** Go to the main menu: pauses the game and closes menus/panels/build mode. The game stays resumable. */
+  showMainMenu(): void;
+  /** Switch to the in-game screen after a game was started or loaded (the controller sets the pause flag). */
+  enterGame(): void;
+  /** Leave the main menu for the game that is still running behind it, restoring its pause flag. */
+  resumeGame(): void;
+  /** Choose a speed and unpause. */
+  playAtSpeed(speed: GameSpeed): void;
+  openGameMenu(): void;
+  /** Close the game menu; restores the pause flag it saved unless `restorePause` is false. */
+  closeGameMenu(restorePause?: boolean): void;
+  /**
+   * Escape key: closes the game menu, else cancels build mode, else closes the open panel, else clears the
+   * selection, else opens the game menu. Does nothing on the main menu.
+   */
+  pressEscape(): EscapeResult;
   setSpeed(speed: GameSpeed): void;
   setPaused(paused: boolean): void;
   togglePause(): void;
@@ -65,6 +94,9 @@ export const MAX_TOASTS = 5;
 
 export const initialUiState: UiState = {
   screen: 'playing',
+  gameStarted: true,
+  gameMenuOpen: false,
+  pausedBeforeMenu: false,
   speed: 1,
   paused: false,
   selection: null,
@@ -79,10 +111,55 @@ export const initialUiState: UiState = {
 /** Create an independent store (tests create their own; the app uses `uiStore`). */
 export function createUiStore(initial: Partial<UiState> = {}): StoreApi<UiStore> {
   let nextToastId = 1;
-  return createStore<UiStore>()((set) => ({
+  return createStore<UiStore>()((set, get) => ({
     ...initialUiState,
     ...initial,
     setScreen: (screen) => set({ screen }),
+    showMainMenu: () =>
+      set((s) => ({
+        screen: 'mainMenu',
+        // Keep the pause state from before the game menu so "Resume" returns to what the player had.
+        paused: true,
+        pausedBeforeMenu: s.gameMenuOpen ? s.pausedBeforeMenu : s.paused,
+        gameMenuOpen: false,
+        openPanel: null,
+        buildMode: null,
+        selection: null,
+      })),
+    enterGame: () =>
+      set({ screen: 'playing', gameStarted: true, gameMenuOpen: false, openPanel: null, buildMode: null }),
+    resumeGame: () => set((s) => ({ screen: 'playing', paused: s.pausedBeforeMenu })),
+    playAtSpeed: (speed) => set({ speed, paused: false }),
+    openGameMenu: () =>
+      set((s) =>
+        s.gameMenuOpen || s.screen !== 'playing'
+          ? s
+          : { gameMenuOpen: true, pausedBeforeMenu: s.paused, paused: true, buildMode: null },
+      ),
+    closeGameMenu: (restorePause = true) =>
+      set((s) => (s.gameMenuOpen ? { gameMenuOpen: false, paused: restorePause ? s.pausedBeforeMenu : s.paused } : s)),
+    pressEscape: () => {
+      const s = get();
+      if (s.screen !== 'playing') return 'none';
+      if (s.gameMenuOpen) {
+        s.closeGameMenu();
+        return 'closedGameMenu';
+      }
+      if (s.buildMode) {
+        set({ buildMode: null });
+        return 'cancelledBuild';
+      }
+      if (s.openPanel) {
+        set({ openPanel: null });
+        return 'closedPanel';
+      }
+      if (s.selection) {
+        set({ selection: null });
+        return 'clearedSelection';
+      }
+      s.openGameMenu();
+      return 'openedGameMenu';
+    },
     setSpeed: (speed) => set({ speed }),
     setPaused: (paused) => set({ paused }),
     togglePause: () => set((s) => ({ paused: !s.paused })),
@@ -95,14 +172,22 @@ export function createUiStore(initial: Partial<UiState> = {}): StoreApi<UiStore>
     setSnapshot: (snapshot) => set({ snapshot }),
     pushToast: (message, severity = 'info') =>
       set((s) => ({
-        toasts: [...s.toasts, { id: nextToastId++, message, severity, createdAt: performance.now() }].slice(-MAX_TOASTS),
+        // An identical toast already on screen is replaced (moved to the end with a fresh timer), so
+        // a repeated failure does not stack up copies.
+        toasts: [
+          ...s.toasts.filter((t) => t.message !== message || t.severity !== severity),
+          { id: nextToastId++, message, severity, createdAt: performance.now() },
+        ].slice(-MAX_TOASTS),
       })),
     dismissToast: (id) => set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })),
   }));
 }
 
-/** The app-wide store instance. */
-export const uiStore = createUiStore();
+/**
+ * The app-wide store instance. The app boots on the main menu with the (demo) world paused behind it;
+ * tests that call `createUiStore()` get the in-game defaults instead.
+ */
+export const uiStore = createUiStore({ screen: 'mainMenu', gameStarted: false, paused: true });
 
 /** React hook: `const speed = useUiStore((s) => s.speed)`. Select narrowly to avoid re-renders. */
 export function useUiStore<T>(selector: (state: UiStore) => T): T {

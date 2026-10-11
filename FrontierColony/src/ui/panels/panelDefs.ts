@@ -1,0 +1,114 @@
+/**
+ * Static description of every panel: used by the toolbar, the panel host and the keyboard shortcuts.
+ * To make a panel real (M3+): keep its entry here and replace its placeholder in PanelHost.tsx.
+ */
+import type { PanelId } from '../../store';
+import type { IconName } from '../components/Icon';
+import type { PanelPlacement } from '../components/Panel';
+import { PANEL_HOTKEYS } from '../lib/hotkeys';
+
+export interface PanelDef {
+  id: PanelId;
+  title: string;
+  /** Toolbar label. */
+  short: string;
+  icon: IconName;
+  placement: PanelPlacement;
+  width: number;
+  /** One-line description (toolbar tooltip). */
+  blurb: string;
+  /** Milestone that fills the panel in; null when it is already functional. */
+  comingIn: string | null;
+  /** Shown on the toolbar. */
+  inToolbar: boolean;
+}
+
+export const PANEL_DEFS: Record<PanelId, PanelDef> = {
+  build: {
+    id: 'build',
+    title: 'Build',
+    short: 'Build',
+    icon: 'build',
+    placement: 'left',
+    width: 380,
+    blurb: 'Place houses, farms, camps and workshops.',
+    comingIn: null,
+    inToolbar: true,
+  },
+  settlers: {
+    id: 'settlers',
+    title: 'Settlers',
+    short: 'Settlers',
+    icon: 'settlers',
+    placement: 'right',
+    width: 380,
+    blurb: 'See who lives here, what they are doing and how they feel.',
+    comingIn: null,
+    inToolbar: true,
+  },
+  priorities: {
+    id: 'priorities',
+    title: 'Work Priorities',
+    short: 'Priorities',
+    icon: 'priorities',
+    placement: 'right',
+    width: 380,
+    blurb: 'Tell the colony which jobs matter most.',
+    comingIn: 'M5',
+    inToolbar: true,
+  },
+  events: {
+    id: 'events',
+    title: 'Colony Log',
+    short: 'Events',
+    icon: 'events',
+    placement: 'right',
+    width: 400,
+    blurb: 'A running history of arrivals, weather, accidents and discoveries.',
+    comingIn: 'M5',
+    inToolbar: true,
+  },
+  stats: {
+    id: 'stats',
+    title: 'Statistics',
+    short: 'Stats',
+    icon: 'compass',
+    placement: 'right',
+    width: 400,
+    blurb: 'Charts of stock and population over time.',
+    comingIn: 'M5',
+    inToolbar: false,
+  },
+  saveLoad: {
+    id: 'saveLoad',
+    title: 'Save & Load',
+    short: 'Save / Load',
+    icon: 'save',
+    placement: 'center',
+    width: 560,
+    blurb: 'Save your colony to a slot, or load an earlier one.',
+    comingIn: null,
+    inToolbar: true,
+  },
+  settings: {
+    id: 'settings',
+    title: 'Settings',
+    short: 'Settings',
+    icon: 'settings',
+    placement: 'center',
+    width: 520,
+    blurb: 'Controls and options.',
+    comingIn: 'M6',
+    inToolbar: true,
+  },
+};
+
+export const TOOLBAR_PANELS: PanelDef[] = (['build', 'settlers', 'priorities', 'events', 'saveLoad', 'settings'] as const).map(
+  (id) => PANEL_DEFS[id],
+);
+
+/** The keyboard shortcut (upper-case letter) for a panel, or null. */
+export function hotkeyFor(panel: PanelId): string | null {
+  const entry = Object.entries(PANEL_HOTKEYS).find(([, id]) => id === panel);
+  return entry ? entry[0].toUpperCase() : null;
+}
