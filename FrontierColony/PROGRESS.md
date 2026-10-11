@@ -88,3 +88,14 @@ been run. A milestone is marked done only after its acceptance criteria were ver
 - UI follow-ups: affordability from `getAvailableStock`, reserved stock in tooltips, mirrored constants removed.
 - Lead e2e run on an idle machine: 13/15. Failures are test-side: save/load reads the clock after load resumes the
   game; the speed test samples a 1 s window while headless SwiftShader renders ~1–3 fps.
+- Wave M6 launched: Graphics (day/night, weather, seasons, event visuals, hills fix, GPU cost), UI (minimap,
+  onboarding, settings, typed decisions, responsive/a11y), QA (e2e fixes + M5 coverage), Code Reviewer (opus)
+  core-systems review of 87a094e.
+- Core-systems review (`docs/reviews/M5-review.md`): 1 critical, 3 major, 11 minor, 7 nit. Verdict "not release
+  ready" until CRIT-1 (rest deadlock starves colonies with food in farm buffers), MAJ-1 (dangling wolves target
+  blocks all saves), MAJ-2 (farming outscores hauling food in famine) are fixed; MAJ-3 victory too early (day
+  14–20 vs design 22–30). Reviewer usage: 388k tokens, 86 tool calls, 21.8 min.
+  Routing: Simulation Engineer — CRIT-1, MAJ-1, MAJ-2, MIN-1..6, new `Activity.indoorsBuildingId` contract field;
+  Game Designer (resumed) — amend §5.4/§5.5, retune §8 growth in `docs/balance/M6-tuning.md`; Graphics — use
+  the new field instead of label regex; QA — TEST-1/3/4/5. Lead fixed MIN-7 (save metadata keys, fast listing),
+  MIN-8 (ghost refresh), MIN-9 (debug handle gated to dev / `VITE_E2E=1` / `?debug`).
