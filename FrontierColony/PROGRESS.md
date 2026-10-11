@@ -61,3 +61,7 @@ been run. A milestone is marked done only after its acceptance criteria were ver
   camera with cursor-anchored zoom, drag fling, pinch, keyboard pan. ~2 ms JS per frame at any zoom on 128×128.
   Usage: 365k tokens, 85 tool calls, 42.8 min. Continued into renderer M3+M4 (animated settlers, building art,
   construction, placement ghost, gather feedback) plus a fix for 1-level elevation steps that read as fences.
+- UI/UX Engineer finished UI M5: priorities panel, colony log with unread badge, decision cards with countdown,
+  objectives tracker, warnings strip, game-over/victory overlay, season/weather tooltips, stats sparklines;
+  112 UI/store tests. Cumulative usage: 504k tokens. Open items routed to sim: document decision payload keys,
+  "lasted 1 days" grammar, decision window length; worldgen 300 ms timing test flaked under parallel load.
