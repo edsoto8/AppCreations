@@ -124,3 +124,7 @@ been run. A milestone is marked done only after its acceptance criteria were ver
 - Lead: worldgen timing test now asserts on the fastest of 5 samples (CPU contention only adds time; the median
   flaked at >300 ms with 5 agents running). e2e builds to its own `dist-e2e/` after QA found a shared-`dist` race
   where another agent's plain build removed the debug handle mid-run.
+- QA round 2 final: `npm test` 41 files / 452 passed. Two full e2e runs on the isolated `dist-e2e` build: 23/25
+  each; failures were build.spec (test clicked the town-center tile; fixed by clicking the footprint, committed)
+  and smoke.spec (5–6 ticks in 5 s at 1x — headless SwiftShader at ~1 fps under load; renderer GPU cost is being
+  reduced in M6). Cumulative QA usage: 427k tokens, 140 tool calls, 78.7 min.
