@@ -99,3 +99,8 @@ been run. A milestone is marked done only after its acceptance criteria were ver
   Game Designer (resumed) — amend §5.4/§5.5, retune §8 growth in `docs/balance/M6-tuning.md`; Graphics — use
   the new field instead of label regex; QA — TEST-1/3/4/5. Lead fixed MIN-7 (save metadata keys, fast listing),
   MIN-8 (ghost refresh), MIN-9 (debug handle gated to dev / `VITE_E2E=1` / `?debug`).
+- Simulation Engineer fixed CRIT-1, MAJ-1, MAJ-2, MIN-1..6 and nits 1/2/4 with 25 regression tests
+  (`tests/sim/review.test.ts`); added `Activity.indoorsBuildingId` and a `goodsLost` event. Growth retune waits on
+  the Game Designer's `docs/balance/M6-tuning.md`.
+- Lead: `SAVE_SCHEMA_VERSION` 1 → 2 with a v1→v2 migration in `src/game/save.ts` (+ test). Checkpoint 78c1e81:
+  typecheck clean, 426 unit tests pass + 3 expected-fail (QA pace-bound soaks pending the retune), build ok.
