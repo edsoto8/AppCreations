@@ -1,5 +1,6 @@
 /** Public surface of the game controller, as used by the React UI (via useGameController). */
 import type { CommandResult, GameState, NewGameOptions, PlayerCommand, TilePos } from '../sim';
+import type { CameraState } from '../render/types';
 import type { GameSpeed } from '../shared/types';
 import type { LoadResult, SaveResult, SaveSlotId, SaveSlotInfo } from './save';
 
@@ -19,6 +20,11 @@ export interface GameControllerApi {
   /** Move the camera to a world point in tile units. */
   centerOn(tile: TilePos | { x: number; y: number }): void;
   zoomBy(factor: number): void;
+  /**
+   * Camera centre (iso screen pixels, as in `shared/iso.ts`) and zoom, or null before the renderer
+   * is mounted. The canvas fills the viewport, so the visible area is the window size / zoom.
+   */
+  getCamera(): CameraState | null;
   /** Run n ticks immediately regardless of pause (debug / tests). */
   advanceTicks(n: number): void;
 }

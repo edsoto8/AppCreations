@@ -24,7 +24,7 @@ import {
   type SimEvent,
   type TilePos,
 } from '../sim';
-import type { CreateRenderer, GameRenderer, PointerButton } from '../render/types';
+import type { CameraState, CreateRenderer, GameRenderer, PointerButton } from '../render/types';
 import type { GameSpeed } from '../shared/types';
 import { SNAPSHOT_INTERVAL_MS, buildHudSnapshot, type UiStore } from '../store';
 import { MAX_FRAME_MS, advanceClock } from './clock';
@@ -300,6 +300,10 @@ export class GameController implements GameControllerApi {
 
   zoomBy(factor: number): void {
     this.renderer?.zoomBy(factor);
+  }
+
+  getCamera(): CameraState | null {
+    return this.renderer?.getCamera() ?? null;
   }
 
   advanceTicks(n: number): void {
