@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  AUTOSAVE_BACKUP_KEY,
   createMemoryStorage,
   deserializeGame,
   listSaveSlots,
@@ -74,5 +75,28 @@ describe('save / load', () => {
     const state = createGame(DEFAULT_NEW_GAME_OPTIONS);
     expect(saveToSlot(failing, 'slot1', state)).toEqual({ ok: false, error: 'Not enough browser storage to save.' });
     expect(loadFromSlot(failing, 'slot1')).toMatchObject({ ok: false });
+  });
+
+  it('refuses to write a state that would not load back, keeping the previous save', () => {
+    const storage = createMemoryStorage();
+    const good = createGame(DEFAULT_NEW_GAME_OPTIONS);
+    expect(saveToSlot(storage, 'slot1', good).ok).toBe(true);
+    const before = storage.data.get(saveKey('slot1'));
+    const bad = createGame(DEFAULT_NEW_GAME_OPTIONS);
+    bad.settlers[0]!.pos.x = Number.NaN;
+    const result = saveToSlot(storage, 'slot1', bad);
+    expect(result.ok).toBe(false);
+    expect(storage.data.get(saveKey('slot1'))).toBe(before);
+  });
+
+  it('keeps the replaced autosave as a one-generation backup', () => {
+    const storage = createMemoryStorage();
+    const state = createGame(DEFAULT_NEW_GAME_OPTIONS);
+    saveToSlot(storage, 'autosave', state);
+    const first = storage.data.get(saveKey('autosave'));
+    stepGame(state);
+    saveToSlot(storage, 'autosave', state);
+    expect(storage.data.get(AUTOSAVE_BACKUP_KEY)).toBe(first);
+    expect(storage.data.get(saveKey('autosave'))).not.toBe(first);
   });
 });

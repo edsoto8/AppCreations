@@ -63,6 +63,11 @@ export class GameController implements GameControllerApi {
   private pendingEvents: SimEvent[] = [];
   private mountToken = 0;
   private unsubscribeStore: (() => void) | null = null;
+  /**
+   * Set when a tick or render threw. The state may be half-updated, so the loop stays paused and
+   * autosave is off until a new game or a load replaces the state.
+   */
+  private faulted = false;
   private readonly onPageHide = () => this.autosave();
 
   constructor(options: GameControllerOptions) {
@@ -117,16 +122,30 @@ export class GameController implements GameControllerApi {
     const frameMs = Math.min(Math.max(now - this.lastFrameAt, 0), MAX_FRAME_MS);
     this.lastFrameAt = now;
     const ui = this.store.getState();
-    const paused = ui.paused || this.state.outcome.status === 'lost';
+    const paused = ui.paused || this.faulted || this.state.outcome.status === 'lost';
     const clock = advanceClock(this.accumulatorMs, frameMs, ui.speed, paused);
     this.accumulatorMs = clock.accumulatorMs;
-    for (let i = 0; i < clock.steps; i++) this.runTick();
-
-    const events = this.pendingEvents;
-    this.pendingEvents = [];
-    this.renderer?.render(this.state, { alpha: clock.alpha, frameMs, nowMs: now, speed: paused ? 0 : ui.speed, events });
-    if (this.snapshotDirty && now - this.lastSnapshotAt >= SNAPSHOT_INTERVAL_MS) this.publishSnapshot(now);
+    try {
+      for (let i = 0; i < clock.steps; i++) this.runTick();
+      const events = this.pendingEvents;
+      this.pendingEvents = [];
+      this.renderer?.render(this.state, { alpha: clock.alpha, frameMs, nowMs: now, speed: paused ? 0 : ui.speed, events });
+      if (this.snapshotDirty && now - this.lastSnapshotAt >= SNAPSHOT_INTERVAL_MS) this.publishSnapshot(now);
+    } catch (err) {
+      this.fault(err);
+    }
   };
+
+  /** Stop the simulation after an unexpected error, without letting it reach autosave. */
+  private fault(err: unknown): void {
+    this.pendingEvents = [];
+    if (this.faulted) return;
+    this.faulted = true;
+    console.error('Frontier Colony: simulation halted after an error', err);
+    const ui = this.store.getState();
+    ui.setPaused(true);
+    ui.pushToast('Something went wrong and the game was paused. Autosave is off; load a save to continue.', 'danger');
+  }
 
   private runTick(): void {
     const events = stepGame(this.state);
@@ -284,15 +303,25 @@ export class GameController implements GameControllerApi {
   }
 
   advanceTicks(n: number): void {
-    for (let i = 0; i < n && this.state.outcome.status !== 'lost'; i++) this.runTick();
-    if (!this.renderer) this.pendingEvents = [];
-    this.publishSnapshot(performance.now());
+    try {
+      for (let i = 0; i < n && !this.faulted && this.state.outcome.status !== 'lost'; i++) this.runTick();
+      if (!this.renderer) this.pendingEvents = [];
+      this.publishSnapshot(performance.now());
+    } catch (err) {
+      this.fault(err);
+    }
+  }
+
+  /** True after an error halted the simulation (see `fault`). */
+  isFaulted(): boolean {
+    return this.faulted;
   }
 
   // --- internals ---------------------------------------------------------------------------
 
   private replaceState(state: GameState): void {
     this.state = state;
+    this.faulted = false;
     this.accumulatorMs = 0;
     this.pendingEvents = [];
     const ui = this.store.getState();
@@ -304,7 +333,9 @@ export class GameController implements GameControllerApi {
   }
 
   private autosave(): void {
-    if (this.state.outcome.status !== 'lost') saveToSlot(this.storage, 'autosave', this.state);
+    if (this.faulted || this.state.outcome.status === 'lost') return;
+    const result = saveToSlot(this.storage, 'autosave', this.state);
+    if (!result.ok) this.store.getState().pushToast(`Autosave failed: ${result.error}`, 'warning');
   }
 }
 

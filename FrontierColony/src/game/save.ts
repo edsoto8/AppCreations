@@ -111,9 +111,22 @@ export function deserializeGame(json: string): LoadResult {
   return { ok: true, state: validation.state, envelope: migrated.env as unknown as SaveEnvelope };
 }
 
+/** Key holding the autosave that the latest autosave replaced (one generation of backup). */
+export const AUTOSAVE_BACKUP_KEY = `${SAVE_KEY_PREFIX}autosave.prev`;
+
+/**
+ * Serialize, check that the result loads back, then write. A state that would not load (for
+ * example a NaN that JSON turns into null) is refused, so it never replaces a good save.
+ */
 export function saveToSlot(storage: KeyValueStorage, slot: SaveSlotId, state: GameState, now: Date = new Date()): SaveResult {
   try {
     const json = serializeGame(state, now);
+    const check = deserializeGame(json);
+    if (!check.ok) return { ok: false, error: `Save refused: the game state is invalid (${check.error})` };
+    if (slot === 'autosave') {
+      const previous = storage.getItem(saveKey(slot));
+      if (previous !== null) storage.setItem(AUTOSAVE_BACKUP_KEY, previous);
+    }
     storage.setItem(saveKey(slot), json);
     return { ok: true, bytes: json.length };
   } catch (err) {
@@ -136,6 +149,7 @@ export function loadFromSlot(storage: KeyValueStorage, slot: SaveSlotId): LoadRe
 export function deleteSlot(storage: KeyValueStorage, slot: SaveSlotId): void {
   try {
     storage.removeItem(saveKey(slot));
+    if (slot === 'autosave') storage.removeItem(AUTOSAVE_BACKUP_KEY);
   } catch {
     // Storage unavailable: nothing to delete.
   }
