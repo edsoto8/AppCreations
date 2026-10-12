@@ -275,10 +275,10 @@ export class GameController implements GameControllerApi {
   }
 
   saveGame(slot: SaveSlotId): SaveResult {
+    // Writes to the autosave slot follow the autosave rules (setting on, a real game, no fault).
+    if (slot === 'autosave') return this.autosave() ?? { ok: false, error: 'Autosave is off for this game.' };
     const result = saveToSlot(this.storage, slot, this.state);
-    if (slot !== 'autosave') {
-      this.store.getState().pushToast(result.ok ? 'Game saved.' : result.error, result.ok ? 'good' : 'danger');
-    }
+    this.store.getState().pushToast(result.ok ? 'Game saved.' : result.error, result.ok ? 'good' : 'danger');
     return result;
   }
 
@@ -347,12 +347,14 @@ export class GameController implements GameControllerApi {
     this.publishSnapshot(performance.now());
   }
 
-  private autosave(): void {
+  /** Returns null when autosave does not apply (setting off, menu demo world, faulted or lost game). */
+  private autosave(): SaveResult | null {
     // Before the player starts or loads a game the state is the main-menu demo world: never autosave it.
     const ui = this.store.getState();
-    if (!ui.gameStarted || !ui.prefs.autosave || this.faulted || this.state.outcome.status === 'lost') return;
+    if (!ui.gameStarted || !ui.prefs.autosave || this.faulted || this.state.outcome.status === 'lost') return null;
     const result = saveToSlot(this.storage, 'autosave', this.state);
     if (!result.ok) this.store.getState().pushToast(`Autosave failed: ${result.error}`, 'warning');
+    return result;
   }
 }
 

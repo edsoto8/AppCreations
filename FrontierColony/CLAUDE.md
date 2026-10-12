@@ -26,20 +26,42 @@ All dependency versions are exact pins. Only the lead adds or upgrades dependenc
 
 ```
 src/
-  sim/      pure simulation: types.ts (contract), index.ts (public API), balance.ts (tuning),
-            constants.ts (engine constants), rng.ts, queries.ts, validate.ts, names.ts
+  sim/      pure simulation. Public API: index.ts (createGame, stepGame, applyCommand, re-exports)
+            types.ts (contract)   balance.ts (tuning)   constants.ts (engine constants, SAVE_SCHEMA_VERSION)
+            worldgen.ts + noise.ts (world generation)   settlerSim.ts (per-tick settlers, utility AI)
+            needs.ts (needs/mood/work-speed formulas)   settlerGen.ts (names, skills, traits)
+            pathfinding.ts (A*) + grid.ts (lookup tables, region labels per world revision)
+            events.ts (schedule, random events, decisions, growth, damage, forest regrowth)
+            weather.ts   progression.ts (objectives, unlocks, victory)   stateOps.ts (shared mutations)
+            queries.ts (read-only helpers)   validate.ts (save validation)   rng.ts   names.ts
+            testSupport.ts (assertInvariants for tests; not part of the public API)
   shared/   iso.ts (projection math), types.ts (Selection, GameSpeed, OverlayMode, PlacementGhost)
   render/   PixiJS renderer: types.ts (GameRenderer contract), index.ts (createRenderer), renderer.ts
-            (IsoRenderer), camera.ts, input.ts (DOM pointer events), layers.ts, depthLayer.ts (one render
-            group per iso diagonal), terrain/ (chunked ground), entities/ (settlers, buildings, overlays),
-            effects/ (pooled particles, floating text), textures/ (procedural Canvas-2D art baked to atlases)
-  store/    Zustand UI store (uiStore.ts) + HUD snapshot builder (snapshot.ts)
-  game/     GameController (loop, commands, renderer/store glue), clock.ts, save.ts, React context
-  ui/       React components overlaid on the canvas
-  styles/   CSS
-  main.tsx  creates the controller, provides it to React, installs window.__frontierColony
-tests/      Vitest unit tests mirroring src/ (tests/sim, tests/shared, tests/game, tests/store)
-e2e/        Playwright specs
+            (IsoRenderer), camera.ts, input.ts (DOM pointer/wheel/touch/keyboard), layers.ts, depthLayer.ts
+            (one render group per iso diagonal), depthKeys.ts (painter's-order keys),
+            terrain/ (TerrainModel, 16x16 chunks baked to RenderTextures when zoomed out, occluders),
+            entities/ (settlers, buildings, pose.ts, palettes.ts, overlays),
+            effects/ (pooled particles, floating text, falling trees),
+            atmosphere/ (daylight, night lights, season look, weather particles),
+            textures/ (procedural Canvas-2D art baked to atlases), util/ (colour, noise, sprite helpers)
+  store/    Zustand UI store (uiStore.ts), HUD snapshot + selection detail builders (snapshot.ts),
+            player preferences (prefs.ts)
+  game/     GameController (loop, commands, renderer/store glue, fault handling), clock.ts (fixed-step
+            accumulator), save.ts (storage format), types.ts (GameControllerApi), React context
+  ui/       React components overlaid on the canvas: App.tsx, GameCanvas.tsx, hud/, panels/, menu/,
+            components/ (shared widgets, ErrorBoundary), lib/ (pure, unit-tested helpers and hooks)
+  styles/   CSS split by area; global.css imports them (tokens.css via base.css)
+  main.tsx  creates the controller, provides it to React, installs window.__frontierColony (see Conventions)
+tests/      Vitest unit tests (node environment):
+              sim/     RNG, worldgen, A*, settlers, economy, gameplay, commands, validation, determinism rules,
+                       review regressions, soaks (support/player.ts is a scripted "sensible player")
+              qa/      strict invariants, save/load/continue equivalence, junk commands, pace, regressions, soak
+                       (invariants.ts holds the shared checks)
+              game/    clock, save format        store/  UI flow, game flow, prefs, toasts, snapshots
+              render/  pure renderer logic (camera, depth, occluders, pose, terrain model, atmosphere)
+              shared/  iso projection            ui/     pure UI helpers (format, hotkeys, placement, tour, ...)
+e2e/        Playwright specs (*.spec.ts). Import `test`/`expect` from e2e/fixtures.ts (fails a test on any
+            console error); helpers.ts has quickstart and state readers; window.d.ts types the debug handle
 ```
 
 | Module | May import | Must NOT import |
@@ -106,7 +128,7 @@ Do not make the edit yourself.
 - **Needs** are 0..100, and **100 is best** for all four (hunger 100 means well fed).
 - `applyCommand` never throws on bad input. It returns `{ ok: false, error, message }` and leaves the state unchanged.
 - Functions marked `// M1 stub — replaced by …` are placeholders that work. Replace them, but keep
-  their signatures.
+  their signatures. (As of v1.0 none remain.)
 
 ## Renderer rules (src/render)
 
@@ -132,6 +154,11 @@ Do not make the edit yourself.
 - The store holds UI intent (speed, paused, selection, buildMode, overlay, panels). The controller
   subscribes to it and applies it. Commands, saving and loading go through `useGameController()`.
 - Give elements that tests need a stable `data-testid`.
+- A few components read the live state on demand through `controller.getState()`, strictly read-only and
+  never stored: the minimap (about 20 Hz on its own rAF), the hover card, the placement hint, the stats
+  history, and inspector detail before the next snapshot. The selected settler and building detail
+  normally arrives in the snapshot (`selectedSettler`, `selectedBuilding`).
+- Pure UI logic goes in `src/ui/lib/` so it can be unit tested in node (`tests/ui/`).
 
 ## Save format
 
@@ -139,6 +166,24 @@ Do not make the edit yourself.
 summary, state }`. The slots are `autosave`, `slot1`, `slot2` and `slot3`. Autosave runs at each new day and on `pagehide`.
 Any breaking change to `GameState` bumps `SAVE_SCHEMA_VERSION` (`src/sim/constants.ts`), adds a
 migration step in `src/game/save.ts` (`migrateEnvelope`), and updates `validateGameState`.
+
+Other facts about the format (details in SPEC.md §6):
+
+- The current schema is **v2**. `migrateEnvelope` upgrades v1 saves by adding `Activity.indoorsBuildingId = null`.
+  Saves from a newer version are refused.
+- **Meta records.** `frontierColony.v1.meta.<slot>` holds `{ format, schemaVersion, savedAt, summary }` so the
+  slot list can be built without parsing the full save. It is trusted only when its `savedAt` matches the save;
+  otherwise the full save is parsed.
+- **Summary.** The summary shown to the player is always rebuilt from the validated state on load.
+- **Autosave backup.** `frontierColony.v1.save.autosave.prev` is a best-effort, one-generation backup of the
+  previous autosave. Loading a damaged autosave falls back to it, with a warning toast. On a quota error the
+  backup is dropped and the write is retried once.
+- **Refused saves.** A state that would not load back is never written, so the previous save survives.
+- **Autosave preference.** Autosave honours the Settings preference (`prefs.autosave`), and runs only after the
+  player has started or loaded a game (`gameStarted`). It is off while the controller is faulted, and never
+  saves a lost game. Leaving to the main menu also autosaves (`src/ui/lib/gameFlow.ts`).
+- **Preferences.** UI prefs are stored under `frontierColony.v1.prefs` (`src/store/prefs.ts`).
+- **Crash recovery.** The crash-recovery screen can clear every `frontierColony.*` key.
 
 ## Conventions
 
@@ -153,6 +198,10 @@ migration step in `src/game/save.ts` (`migrateEnvelope`), and updates `validateG
 - Use discriminated unions with a `type` or `kind` field. A `switch` over a union must be exhaustive.
 - Use the names given in the code (`BuildingType` values such as `lumberCamp`, `ResourceType` values such as `wood`).
 - Unit tests live in `tests/<module>/<name>.test.ts`. They run in node, and DOM-free code needs no jsdom.
+  Cross-cutting QA suites live in `tests/qa/`.
+- E2E builds go to `dist-e2e/`, never `dist/`. `playwright.config.ts` runs `tsc -b`, then `VITE_E2E=1 vite build
+  --outDir dist-e2e`, then `vite preview --outDir dist-e2e`.
+- `?quickstart` (with optional `seed`, `preset`, `size`, `difficulty` and `name`) skips the main menu. Dev and e2e use it.
 - `window.__frontierColony` (the `GameController`) is a debug and e2e handle. You can call `getState()`,
   `advanceTicks(n)` and `dispatch(cmd)` on it. It is installed only in dev (`npm run dev`), in builds made
   with `VITE_E2E=1` (Playwright does this) or when the URL has `?debug`.
