@@ -41,6 +41,19 @@ describe('toast grouping', () => {
     expect(toasts).toHaveLength(MAX_TOASTS);
   });
 
+  it('groups repeated loss messages', () => {
+    let toasts: Toast[] = [];
+    for (let i = 0; i < 3; i++) toasts = t(toasts, 'Storage full: wood lost', 'warning');
+    expect(toasts).toHaveLength(1);
+    expect(toasts[0]).toMatchObject({ message: 'Storage full: wood lost', count: 3 });
+    toasts = [];
+    for (const m of ['Storage full: 5 wood lost', 'Storage full: 3 wood lost']) toasts = t(toasts, m, 'warning');
+    expect(toasts).toHaveLength(1);
+    expect(toasts[0]).toMatchObject({ message: 'Storage full: 8 wood lost', count: 2 });
+    toasts = t(toasts, 'Storage full: 2 stone lost', 'warning');
+    expect(toasts.map((x) => x.message)).toEqual(['Storage full: 8 wood lost', 'Storage full: 2 stone lost']);
+  });
+
   it('is wired into the store', () => {
     const store = createUiStore();
     for (let i = 0; i < 5; i++) store.getState().pushToast('+5 wood', 'good');

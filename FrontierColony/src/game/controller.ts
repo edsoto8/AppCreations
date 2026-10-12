@@ -148,6 +148,7 @@ export class GameController implements GameControllerApi {
     console.error('Frontier Colony: simulation halted after an error', err);
     const ui = this.store.getState();
     ui.setPaused(true);
+    ui.setSimHalted(true);
     ui.pushToast('Something went wrong and the game was paused. Autosave is off; load a save to continue.', 'danger');
   }
 
@@ -335,6 +336,7 @@ export class GameController implements GameControllerApi {
   private replaceState(state: GameState): void {
     this.state = state;
     this.faulted = false;
+    this.store.getState().setSimHalted(false);
     this.accumulatorMs = 0;
     this.pendingEvents = [];
     const ui = this.store.getState();

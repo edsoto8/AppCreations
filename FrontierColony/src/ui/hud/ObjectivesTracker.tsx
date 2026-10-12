@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
+import type { BuildingStatus, BuildingType } from '../../sim';
 import { useUiStore } from '../../store';
 import { Icon } from '../components/Icon';
 import { currentObjective, newlyDone, nextUnlock, objectiveRows, type ObjectiveRow } from '../lib/objectives';
@@ -30,6 +31,7 @@ function Row({ row, fresh }: { row: ObjectiveRow; fresh: boolean }) {
 
 /** Collapsible objectives widget (bottom-left of the playfield). Completed objectives pop with a check animation. */
 export function ObjectivesTracker() {
+  // Only primitives and strings: the snapshot's arrays are new objects every tick, so they are reduced here.
   const input = useUiStore(
     useShallow((s) => {
       const snap = s.snapshot;
@@ -40,13 +42,13 @@ export function ObjectivesTracker() {
         food: Math.floor(snap.stock.food),
         done: snap.progress.objectivesDone.join(','),
         toolsCrafted: snap.progress.toolsCrafted,
-        // A signature of what the objectives look at, so unrelated snapshot changes do not re-render.
-        sig: `${snap.buildings.map((b) => `${b.type}${b.status[0]}`).join('|')}#${Math.round(snap.settlers.reduce((a, x) => a + x.needs.happiness, 0) / Math.max(1, snap.settlers.length))}`,
+        /** "house:c,farm:s,..." (type and status) of every building. */
+        buildings: snap.buildings.map((b) => `${b.type}:${b.status}`).join(','),
+        happiness: Math.round(snap.settlers.reduce((a, x) => a + x.needs.happiness, 0) / Math.max(1, snap.settlers.length)),
+        settlers: snap.settlers.length,
       };
     }),
   );
-  const buildings = useUiStore((s) => s.snapshot?.buildings);
-  const settlers = useUiStore((s) => s.snapshot?.settlers);
   const [open, setOpen] = useState(false);
   const [fresh, setFresh] = useState<ReadonlySet<string>>(new Set());
   const seen = useRef<Set<string> | null>(null);
@@ -59,8 +61,14 @@ export function ObjectivesTracker() {
             population: input.population,
             stock: { food: input.food },
             progress: { objectivesDone: input.done ? input.done.split(',') : [], toolsCrafted: input.toolsCrafted },
-            buildings: buildings ?? [],
-            settlers: settlers ?? [],
+            buildings: input.buildings
+              ? input.buildings.split(',').map((x) => {
+                  const [type, status] = x.split(':');
+                  return { type: type as BuildingType, status: status as BuildingStatus };
+                })
+              : [],
+            // Only the average mood is used, so one stand-in settler carries it.
+            settlers: input.settlers > 0 ? [{ needs: { happiness: input.happiness } }] : [],
           })
         : [],
     [input],

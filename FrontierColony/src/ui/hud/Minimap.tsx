@@ -52,6 +52,8 @@ export function Minimap() {
     if (!ctx) return;
     let raf = 0;
     let last = 0;
+    // Looked up once and again only if React replaced it.
+    let view: HTMLCanvasElement | null = null;
 
     const draw = (now: number) => {
       raf = requestAnimationFrame(draw);
@@ -90,7 +92,7 @@ export function Minimap() {
       }
 
       const cam = controller.getCamera();
-      const view = document.querySelector<HTMLCanvasElement>('[data-testid="game-canvas"]');
+      if (!view || !view.isConnected) view = document.querySelector<HTMLCanvasElement>('[data-testid="game-canvas"]');
       if (cam && view) {
         const corners = viewportCorners(cam, view.clientWidth, view.clientHeight).map((c) => tileToMinimap(c.x, c.y, N, S));
         ctx.beginPath();

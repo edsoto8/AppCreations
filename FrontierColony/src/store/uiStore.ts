@@ -54,6 +54,8 @@ export interface UiState {
   prefs: Prefs;
   /** Index of the tutorial step being shown, or null when the tour is not running. */
   tourStep: number | null;
+  /** The simulation stopped after an error; the game cannot continue until a save is loaded. */
+  simHalted: boolean;
   speed: GameSpeed;
   paused: boolean;
   selection: Selection | null;
@@ -101,6 +103,8 @@ export interface UiActions {
   togglePanel(panel: PanelId): void;
   setSnapshot(snapshot: HudSnapshot | null): void;
   pushToast(message: string, severity?: LogSeverity): void;
+  /** Set by the controller when the sim faults; cleared on new game or load. */
+  setSimHalted(halted: boolean): void;
   setPrefs(patch: Partial<Prefs>): void;
   /** Start (or restart) the tutorial tour at step 0. */
   startTour(): void;
@@ -124,6 +128,7 @@ export const initialUiState: UiState = {
   eventsSeenId: null,
   prefs: DEFAULT_PREFS,
   tourStep: null,
+  simHalted: false,
   speed: 1,
   paused: false,
   selection: null,
@@ -136,6 +141,8 @@ export const initialUiState: UiState = {
 };
 
 const GAIN = /^([+\u2212-])(\d+(?:\.\d+)?) (.+)$/;
+/** "5 wood lost" style messages: same wording with a different amount add up. */
+const LOST = /^(.*?)(\d+(?:\.\d+)?) ([a-z]+) lost(.*)$/i;
 
 /**
  * Add a toast, merging it into one already on screen when it says the same thing: an identical
@@ -148,11 +155,21 @@ export function mergeToast(toasts: Toast[], message: string, severity: LogSeveri
     if (t.severity !== severity) return false;
     if (t.message === message) return true;
     const other = GAIN.exec(t.message);
-    return gain !== null && other !== null && other[1] === gain[1] && other[3] === gain[3];
+    if (gain !== null && other !== null && other[1] === gain[1] && other[3] === gain[3]) return true;
+    const l1 = LOST.exec(message);
+    const l2 = LOST.exec(t.message);
+    return l1 !== null && l2 !== null && l1[1] === l2[1] && l1[3] === l2[3] && l1[4] === l2[4];
   });
   if (!same) return [...toasts, { id, message, severity, createdAt: now, count: 1, updatedAt: now }].slice(-MAX_TOASTS);
   const rest = toasts.filter((t) => t !== same);
   const a = GAIN.exec(same.message);
+  const lost = LOST.exec(message);
+  const lostA = LOST.exec(same.message);
+  if (!gain && lost && lostA && lost[2] !== undefined && lostA[2] !== undefined) {
+    const total = Number(lostA[2]) + Number(lost[2]);
+    const text = `${lost[1]}${Number.isInteger(total) ? total : total.toFixed(1)} ${lost[3]} lost${lost[4]}`;
+    return [...rest, { ...same, message: text, count: same.count + 1, updatedAt: now }];
+  }
   if (gain && a) {
     const total = Number(a[2]) + Number(gain[2]);
     const text = `${gain[1]}${Number.isInteger(total) ? total : total.toFixed(1)} ${gain[3]}`;
@@ -182,7 +199,7 @@ export function createUiStore(initial: Partial<UiState> = {}): StoreApi<UiStore>
         selection: null,
       })),
     enterGame: () =>
-      set({ screen: 'playing', gameStarted: true, gameMenuOpen: false, openPanel: null, buildMode: null, eventsSeenId: null }),
+      set({ screen: 'playing', gameStarted: true, gameMenuOpen: false, openPanel: null, buildMode: null, eventsSeenId: null, simHalted: false }),
     resumeGame: () => set((s) => ({ screen: 'playing', paused: s.pausedBeforeMenu })),
     playAtSpeed: (speed) => set({ speed, paused: false }),
     openGameMenu: () =>
@@ -227,6 +244,7 @@ export function createUiStore(initial: Partial<UiState> = {}): StoreApi<UiStore>
     setSnapshot: (snapshot) => set({ snapshot }),
     pushToast: (message, severity = 'info') =>
       set((s) => ({ toasts: mergeToast(s.toasts, message, severity, nextToastId++, performance.now()) })),
+    setSimHalted: (simHalted) => set({ simHalted }),
     setPrefs: (patch) => set((s) => ({ prefs: { ...s.prefs, ...patch } })),
     startTour: () => set({ tourStep: 0 }),
     setTourStep: (tourStep) => set({ tourStep }),

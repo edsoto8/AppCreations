@@ -579,3 +579,93 @@
     width: min(420px, calc(100% - 24px));
   }
 }
+
+/* ---------- Crash recovery screen ---------- */
+.recovery {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: radial-gradient(ellipse at center, #2a2016, var(--bg-deep) 70%);
+  color: var(--text);
+}
+
+.recovery__card {
+  width: min(520px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 24px 26px;
+  background: var(--glass-strong);
+  border-color: rgba(234, 102, 82, 0.5);
+}
+
+.recovery__title {
+  font-family: var(--font-display);
+  font-size: var(--fs-2xl);
+  color: var(--accent-bright);
+}
+
+.recovery__detail {
+  padding: 8px 10px;
+  border-radius: var(--r-sm);
+  background: rgba(0, 0, 0, 0.35);
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  color: var(--text-dim);
+  word-break: break-word;
+  user-select: text;
+}
+
+.recovery__ok {
+  color: var(--good);
+  font-weight: 700;
+}
+
+.recovery__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.recovery__confirm p {
+  margin-bottom: 8px;
+  color: var(--warning);
+}
+
+.recovery__hint {
+  font-size: var(--fs-sm);
+  color: var(--text-faint);
+}
+
+/* ---------- Simulation halted banner and disabled speed controls ---------- */
+.halted-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px 8px 12px;
+  max-width: min(560px, 100%);
+  border-radius: var(--r-md);
+  background: rgba(60, 22, 18, 0.95);
+  border: 1px solid var(--danger);
+  box-shadow: var(--shadow-md);
+  font-weight: 600;
+}
+
+.halted-banner svg {
+  flex: none;
+  color: var(--danger);
+}
+
+.speed-controls.is-halted {
+  opacity: 0.5;
+}
+
+.speed-btn:disabled {
+  cursor: not-allowed;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: var(--text-faint) !important;
+}

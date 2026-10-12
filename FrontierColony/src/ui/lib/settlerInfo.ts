@@ -130,13 +130,12 @@ const MOODLET_LABELS: Record<string, string> = {
 
 /** True when the UI has a written label for this moodlet id. */
 export function hasMoodletLabel(id: string): boolean {
-  return id in MOODLET_LABELS;
+  return Object.hasOwn(MOODLET_LABELS, id);
 }
 
 /** Human label for a moodlet id; unknown ids are prettified from camelCase. */
 export function moodletLabel(id: string): string {
-  const known = MOODLET_LABELS[id];
-  if (known) return known;
+  if (Object.hasOwn(MOODLET_LABELS, id)) return MOODLET_LABELS[id]!;
   const spaced = id.replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase();
   return spaced.charAt(0).toUpperCase() + spaced.slice(1);
 }

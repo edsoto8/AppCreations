@@ -39,7 +39,7 @@ export const PANEL_HOTKEYS: Record<string, PanelId> = {
 export const SPEED_HOTKEYS: Record<string, GameSpeed> = { '1': 1, '2': 2, '3': 4 };
 
 /** Which action (if any) a key press means, given the UI state. */
-export function resolveHotkey(input: HotkeyInput, ui: Pick<UiStore, 'screen' | 'gameMenuOpen'> & Partial<Pick<UiStore, 'openPanel' | 'buildMode'>>): HotkeyAction | null {
+export function resolveHotkey(input: HotkeyInput, ui: Pick<UiStore, 'screen' | 'gameMenuOpen'> & Partial<Pick<UiStore, 'openPanel' | 'buildMode' | 'simHalted'>>): HotkeyAction | null {
   if (ui.screen !== 'playing') return null;
   if (input.ctrlKey || input.metaKey || input.altKey) return null;
   if (input.key === 'Escape') return input.focus === 'editable' && input.repeat ? null : { type: 'escape' };
@@ -47,6 +47,9 @@ export function resolveHotkey(input: HotkeyInput, ui: Pick<UiStore, 'screen' | '
   if (input.shiftKey && input.code && /^Digit[1-9]$/.test(input.code)) {
     return ui.openPanel === 'build' || ui.buildMode ? { type: 'buildSelect', index: Number(input.code.slice(5)) - 1 } : null;
   }
+  // A halted simulation cannot be resumed: pause and speed keys do nothing.
+  const halted = ui.simHalted === true;
+  if (halted && (input.key === ' ' || input.key === 'Spacebar' || SPEED_HOTKEYS[input.key] !== undefined)) return null;
   if (input.key === ' ' || input.key === 'Spacebar') {
     // On a focused button Space means "press it".
     return input.focus === 'button' ? null : { type: 'togglePause' };

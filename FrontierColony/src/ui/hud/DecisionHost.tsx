@@ -1,3 +1,5 @@
+import { useMemo } from 'react';
+import type { PendingDecision } from '../../sim';
 import { useGameController } from '../../game';
 import { useUiStore } from '../../store';
 import { Icon } from '../components/Icon';
@@ -8,13 +10,19 @@ import { describeDecision, formatCountdown, realSecondsLeft } from '../lib/event
  * screen. The map stays visible and usable around it; the rest wait in a queue.
  */
 export function DecisionHost() {
-  const decisions = useUiStore((s) => s.snapshot?.pendingDecisions);
-  const log = useUiStore((s) => s.snapshot?.recentLog);
+  // One string: the first decision (hours rounded to a tenth), how many wait, and its log line.
+  const packed = useUiStore((s) => {
+    const snap = s.snapshot;
+    const first = snap?.pendingDecisions[0];
+    if (!snap || !first) return null;
+    const message = snap.recentLog.find((l) => l.id === first.eventId)?.message ?? null;
+    return JSON.stringify({ d: { ...first, hoursLeft: Math.round(first.hoursLeft * 10) / 10 }, count: snap.pendingDecisions.length, message });
+  });
   const speed = useUiStore((s) => s.speed);
   const controller = useGameController();
-  if (!decisions || decisions.length === 0) return null;
-  const current = decisions[0]!;
-  const message = log?.find((l) => l.id === current.eventId)?.message ?? null;
+  const parsed = useMemo(() => (packed ? (JSON.parse(packed) as { d: PendingDecision; count: number; message: string | null }) : null), [packed]);
+  if (!parsed) return null;
+  const { d: current, count, message } = parsed;
   const view = describeDecision(current, message);
   const fraction = Math.max(0, Math.min(1, current.hoursLeft / Math.max(0.001, current.windowHours)));
   const seconds = realSecondsLeft(current.hoursLeft) / speed;
@@ -29,9 +37,9 @@ export function DecisionHost() {
         <h2 id="decision-title" className="decision__title" data-testid="decision-title">
           {view.title}
         </h2>
-        {decisions.length > 1 && (
+        {count > 1 && (
           <span className="decision__queue" data-testid="decision-queue" title="More decisions are waiting">
-            1 of {decisions.length}
+            1 of {count}
           </span>
         )}
       </div>

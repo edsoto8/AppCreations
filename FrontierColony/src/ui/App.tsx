@@ -11,6 +11,8 @@ import { useHotkeys } from './lib/useHotkeys';
 import { usePrefsSync, useUiScale } from './lib/usePrefsSync';
 import { GameMenu } from './menu/GameMenu';
 import { MainMenu } from './menu/MainMenu';
+import { ErrorBoundary } from './components/ErrorBoundary';
+import { HaltedBanner } from './hud/HaltedBanner';
 import { DecisionHost } from './hud/DecisionHost';
 import { HoverCard } from './hud/HoverCard';
 import { Minimap } from './hud/Minimap';
@@ -38,6 +40,7 @@ function GameUi() {
         <TopBar />
         <div className="hud-middle">
           <div className="hud-top-center">
+            <HaltedBanner />
             <WarningsStrip />
             <PlacementBar />
             <PauseIndicator />
@@ -59,8 +62,8 @@ function GameUi() {
   );
 }
 
-/** App shell: the canvas fills the viewport; React UI is overlaid on top, scaled by the UI size preference. */
-export function App() {
+/** The canvas fills the viewport; React UI is overlaid on top, scaled by the UI size preference. */
+function AppShell() {
   const screen = useUiStore((s) => s.screen);
   const scale = useUiScale();
   useHotkeys();
@@ -84,5 +87,14 @@ export function App() {
       {screen === 'playing' && <HoverCard />}
       <TourHost />
     </div>
+  );
+}
+
+/** App root. Any render error shows the recovery screen instead of a blank page. */
+export function App() {
+  return (
+    <ErrorBoundary>
+      <AppShell />
+    </ErrorBoundary>
   );
 }

@@ -16,6 +16,15 @@ export function HoverCard() {
   const controller = useGameController();
   const scale = useUiScale();
   const ref = useRef<HTMLDivElement>(null);
+  const bars = useRef(new Map<string, HTMLElement>());
+  const barRect = (name: string) => {
+    let el = bars.current.get(name);
+    if (!el || !el.isConnected) {
+      el = document.querySelector<HTMLElement>(`[data-testid="${name}"]`) ?? undefined;
+      if (el) bars.current.set(name, el);
+    }
+    return el?.getBoundingClientRect() ?? null;
+  };
   const pointer = useRef({ x: 0, y: 0, overCanvas: false });
 
   useEffect(() => {
@@ -28,7 +37,16 @@ export function HoverCard() {
       const h = el.offsetHeight * scale;
       const left = x + 18 + w > window.innerWidth - 8 ? x - 18 - w : x + 18;
       const top = Math.max(8, Math.min(y + 14, window.innerHeight - h - 8));
-      el.style.transform = `translate(${Math.max(8, left)}px, ${top}px) scale(${scale})`;
+      let finalLeft = Math.max(8, left);
+      let finalTop = top;
+      // Never cover the toolbar or the top bar: slide above or below them.
+      for (const name of ['toolbar', 'top-bar']) {
+        const bar = barRect(name);
+        if (!bar) continue;
+        const overlaps = finalLeft < bar.right && finalLeft + w > bar.left && finalTop < bar.bottom && finalTop + h > bar.top;
+        if (overlaps) finalTop = name === 'toolbar' ? Math.max(8, bar.top - h - 6) : Math.min(window.innerHeight - h - 8, bar.bottom + 6);
+      }
+      el.style.transform = `translate(${finalLeft}px, ${finalTop}px) scale(${scale})`;
     };
     const onMove = (e: PointerEvent) => {
       pointer.current = { x: e.clientX, y: e.clientY, overCanvas: e.target instanceof HTMLCanvasElement };
