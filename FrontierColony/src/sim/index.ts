@@ -417,6 +417,8 @@ function removeBuilding(state: GameState, id: EntityId, reason: 'cancelled' | 'd
     for (const r of RESOURCE_TYPES) refund[r] = b.construction.delivered[r];
   } else {
     for (const r of RESOURCE_TYPES) refund[r] = Math.floor((def.cost[r] ?? 0) * DEMOLISH_REFUND);
+    // Materials already delivered to a repair come back too (they are never silently lost).
+    if (b.construction) for (const r of RESOURCE_TYPES) refund[r] += b.construction.delivered[r];
   }
   // Goods waiting in the building's output buffer go back to the stock.
   for (const r of RESOURCE_TYPES) refund[r] += b.output[r];

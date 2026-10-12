@@ -226,41 +226,50 @@ export function canPlaceBuilding(state: GameState, type: BuildingType, x: number
   }
 
   // The most expensive check (a flood fill over the map) comes last.
-  if (error === null && !hasAccess(state, type, x, y)) {
-    fail('blocked', 'Settlers could not reach this spot.');
+  if (error === null) {
+    const access = hasAccess(state, type, x, y);
+    if (access !== null) fail('blocked', access);
   }
 
   return { ok: error === null, error, message, tiles };
 }
 
+const NO_ACCESS = 'Settlers could not reach this spot.';
+
+interface Rect {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
 /**
- * True when, with the new footprint in place, settlers can still walk from the town center to a tile
- * next to every building (the new one included). This stops a placement from walling in the town center
- * or another building, which would leave settlers unable to eat or work.
+ * Flood fill (4-connected is enough: a legal diagonal step implies a 4-connected route) over the walkable,
+ * unbuilt tiles reachable from the ring around the town center, optionally with an extra footprint in place.
+ * Returns the reached tiles and the ring tiles, or null when there is no town center.
  */
-function hasAccess(state: GameState, type: BuildingType, x: number, y: number): boolean {
+function floodFromTown(state: GameState, extra: Rect | null, seedAllRing: boolean): { seen: Uint8Array; ring: number[]; hasTown: boolean } {
   const w = state.world;
   const W = w.width;
   const H = w.height;
+  const seen = new Uint8Array(W * H);
+  const ring: number[] = [];
   const town = state.buildings.find((b) => b.type === 'townCenter');
-  if (!town) return true;
-  const { w: fw, h: fh } = BUILDING_DEFS[type].footprint;
-  const inNew = (tx: number, ty: number) => tx >= x && tx < x + fw && ty >= y && ty < y + fh;
+  if (!town) return { seen, ring, hasTown: false };
+  const inNew = (tx: number, ty: number) => extra !== null && tx >= extra.x && tx < extra.x + extra.w && ty >= extra.y && ty < extra.y + extra.h;
   const passable = (tx: number, ty: number) =>
     tx >= 0 && ty >= 0 && tx < W && ty < H && TERRAIN_DEFS[w.terrain[ty * W + tx] as Terrain].walkable && w.building[ty * W + tx] === 0 && !inNew(tx, ty);
-
-  // Flood fill (4-connected is enough: a legal diagonal step implies a 4-connected route) from the tiles around the town center.
-  const seen = new Uint8Array(W * H);
-  const queue: number[] = [];
-  const ring: number[] = [];
   for (let ty = town.origin.y - 1; ty <= town.origin.y + town.footprint.h; ty++) {
     for (let tx = town.origin.x - 1; tx <= town.origin.x + town.footprint.w; tx++) {
       if (passable(tx, ty)) ring.push(ty * W + tx);
     }
   }
-  if (ring.length === 0) return false;
-  seen[ring[0] as number] = 1;
-  queue.push(ring[0] as number);
+  if (ring.length === 0) return { seen, ring, hasTown: true };
+  const queue: number[] = [];
+  for (const r of seedAllRing ? ring : [ring[0] as number]) {
+    seen[r] = 1;
+    queue.push(r);
+  }
   for (let head = 0; head < queue.length; head++) {
     const cur = queue[head] as number;
     const cx = cur % W;
@@ -273,6 +282,40 @@ function hasAccess(state: GameState, type: BuildingType, x: number, y: number): 
       queue.push(ny * W + nx);
     }
   }
+  return { seen, ring, hasTown: true };
+}
+
+const reachCache = new WeakMap<WorldState, { revision: number; townId: EntityId; seen: Uint8Array }>();
+
+/**
+ * Tiles (flat index, 1 = reached) that settlers can walk to from the ring around the town center, with every
+ * building as it stands now. Cached per world revision. Null when there is no town center.
+ */
+export function getTownReach(state: GameState): Uint8Array | null {
+  const town = state.buildings.find((b) => b.type === 'townCenter');
+  if (!town) return null;
+  const cached = reachCache.get(state.world);
+  if (cached && cached.revision === state.world.revision && cached.townId === town.id) return cached.seen;
+  const { seen } = floodFromTown(state, null, true);
+  reachCache.set(state.world, { revision: state.world.revision, townId: town.id, seen });
+  return seen;
+}
+
+/**
+ * True when, with the new footprint in place, settlers can still walk from the town center to a tile
+ * next to every building (the new one included), and no settler is cut off from the town. This stops a
+ * placement from walling in the town center, another building or a settler (who would then starve beside
+ * full stores). Settlers who were already cut off before the placement do not block it.
+ */
+function hasAccess(state: GameState, type: BuildingType, x: number, y: number): string | null {
+  const w = state.world;
+  const W = w.width;
+  const H = w.height;
+  const town = state.buildings.find((b) => b.type === 'townCenter');
+  if (!town) return null;
+  const { w: fw, h: fh } = BUILDING_DEFS[type].footprint;
+  const { seen, ring, hasTown } = floodFromTown(state, { x, y, w: fw, h: fh }, false);
+  if (!hasTown || ring.length === 0) return NO_ACCESS;
   const touches = (ox: number, oy: number, bw: number, bh: number): boolean => {
     for (let ty = oy - 1; ty <= oy + bh; ty++) {
       for (let tx = ox - 1; tx <= ox + bw; tx++) {
@@ -283,8 +326,24 @@ function hasAccess(state: GameState, type: BuildingType, x: number, y: number): 
     return false;
   };
   // The tiles around the town center must stay one connected area (founders and newcomers arrive there).
-  for (const i of ring) if (!seen[i]) return false;
-  if (!touches(x, y, fw, fh)) return false;
-  for (const b of state.buildings) if (!touches(b.origin.x, b.origin.y, b.footprint.w, b.footprint.h)) return false;
-  return true;
+  for (const i of ring) if (!seen[i]) return NO_ACCESS;
+  if (!touches(x, y, fw, fh)) return NO_ACCESS;
+  for (const b of state.buildings) if (!touches(b.origin.x, b.origin.y, b.footprint.w, b.footprint.h)) return NO_ACCESS;
+  // Nobody may be left standing in a pocket the new footprint closes off (bedroll spots included: they are
+  // chosen among the tiles the town can reach, so only settlers already out there matter).
+  let cutOff: number[] | null = null;
+  for (const s of state.settlers) {
+    const tx = Math.floor(s.pos.x);
+    const ty = Math.floor(s.pos.y);
+    if (tx < 0 || ty < 0 || tx >= W || ty >= H) continue;
+    const i = ty * W + tx;
+    if (seen[i] || w.building[i] !== 0 || (tx >= x && tx < x + fw && ty >= y && ty < y + fh)) continue;
+    if (!TERRAIN_DEFS[w.terrain[i] as Terrain].walkable) continue;
+    (cutOff ??= []).push(i);
+  }
+  if (cutOff !== null) {
+    const before = getTownReach(state);
+    if (before !== null && cutOff.some((i) => before[i] === 1)) return 'This would wall settlers in.';
+  }
+  return null;
 }

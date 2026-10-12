@@ -629,7 +629,7 @@ export const AI = {
     sociableBonus: 15,
   },
   wander: { score: 12, lazyBonus: 15, hours: 0.5, radius: 6 },
-  critical: { hungerBelow: 15, energyCollapseBelow: 5, healthRestBelow: 25, bonus: 200 },
+  critical: { hungerBelow: 15, energyCollapseBelow: 5, healthRestBelow: 25, bonus: 200, adjacentBufferTiles: 3 },
   shortage: {
     food: { max: 25, targetDays: 3, autumnTargetDays: 8 },
     water: { max: 25, targetDays: 3 },

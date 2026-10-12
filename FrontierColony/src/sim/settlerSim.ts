@@ -49,7 +49,7 @@ import {
 import { accessGoal, findPath, isPassable, tileGoal, type PathGoal } from './pathfinding';
 import { getWalkRegions, TERRAIN_MOVE_COST } from './grid';
 import { checkObjectives } from './progression';
-import { getAvailableStock, getStorageCapacity } from './queries';
+import { getAvailableStock, getStorageCapacity, getTownReach } from './queries';
 import { chance, nextFloat, nextInt } from './rng';
 import {
   IDLE_TASK,
@@ -173,37 +173,69 @@ function bedOf(state: GameState, s: Settler): Building | null {
   return b !== null && b.status === 'complete' && BUILDING_DEFS[b.type].housing > 0 ? b : null;
 }
 
-/** Walk region of the tiles around the town center (the first free tile of its ring), or -1. */
-function townRegion(state: GameState, town: Building): number {
-  const world = state.world;
-  const { labels } = getWalkRegions(world);
-  for (let y = town.origin.y - 1; y <= town.origin.y + town.footprint.h; y++) {
-    for (let x = town.origin.x - 1; x <= town.origin.x + town.footprint.w; x++) {
-      const inside = x >= town.origin.x && x < town.origin.x + town.footprint.w && y >= town.origin.y && y < town.origin.y + town.footprint.h;
-      if (!inside && x >= 0 && y >= 0 && x < world.width && y < world.height && isPassable(world, y * world.width + x)) {
-        return labels[y * world.width + x] as number;
-      }
-    }
-  }
-  return -1;
-}
-
-/** A free walkable tile within a few tiles of the town center, one per settler id (the campfire bedroll). */
+/** A free tile within a few tiles of the town center that the town can reach, one per settler id (the campfire bedroll). */
 export function campfireSpot(state: GameState, s: Settler): TilePos | null {
   const town = state.buildings.find((b) => b.type === 'townCenter');
   if (!town) return null;
   const world = state.world;
   const r = OUTDOOR_SLEEP_RADIUS_FROM_TOWN_CENTER;
-  const { labels } = getWalkRegions(world);
-  const home = townRegion(state, town);
+  // Buildings can close off pockets that still carry the town's terrain region, so ask the real reach.
+  const reach = getTownReach(state);
+  if (reach === null) return null;
   const spots: TilePos[] = [];
   for (let y = town.origin.y - r; y < town.origin.y + town.footprint.h + r; y++) {
     for (let x = town.origin.x - r; x < town.origin.x + town.footprint.w + r; x++) {
       if (x < 0 || y < 0 || x >= world.width || y >= world.height) continue;
-      if (isPassable(world, y * world.width + x) && labels[y * world.width + x] === home) spots.push({ x, y });
+      if (isPassable(world, y * world.width + x) && reach[y * world.width + x] === 1) spots.push({ x, y });
     }
   }
   return spots.length === 0 ? null : (spots[s.id % spots.length] as TilePos);
+}
+
+/**
+ * Move a settler to the nearest tile the town can reach (square rings around the settler's tile).
+ * Does nothing when no such tile is found within the search radius.
+ */
+function moveToTownReach(state: GameState, s: Settler, tx: number, ty: number): boolean {
+  const world = state.world;
+  const reach = getTownReach(state);
+  if (reach === null) return false;
+  const maxR = Math.max(world.width, world.height);
+  for (let r = 1; r <= maxR; r++) {
+    for (let dy = -r; dy <= r; dy++) {
+      for (let dx = -r; dx <= r; dx++) {
+        if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+        const x = tx + dx;
+        const y = ty + dy;
+        if (x < 0 || y < 0 || x >= world.width || y >= world.height) continue;
+        if (reach[y * world.width + x] !== 1) continue;
+        s.pos.x = x + 0.5;
+        s.pos.y = y + 0.5;
+        s.prevPos.x = s.pos.x;
+        s.prevPos.y = s.pos.y;
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+/**
+ * Safety net for a settler whose path just failed: if they stand in a pocket the town cannot reach (walled
+ * in by buildings), put them on the nearest tile it can. Returns true when they were moved.
+ */
+function rescueIfCutOff(state: GameState, s: Settler): boolean {
+  const world = state.world;
+  const tx = Math.floor(s.pos.x);
+  const ty = Math.floor(s.pos.y);
+  if (tx < 0 || ty < 0 || tx >= world.width || ty >= world.height) return false;
+  const i = ty * world.width + tx;
+  if (world.building[i] !== 0) return false; // inside a building: not a pocket
+  const reach = getTownReach(state);
+  if (reach === null || reach[i] === 1) return false;
+  if (!moveToTownReach(state, s, tx, ty)) return false;
+  pushLog(state, 'info', `${s.name} was walled in and has been moved back to the town.`, { settlerId: s.id });
+  return true;
 }
 
 /** Give homeless settlers free beds in completed buildings (lowest settler id first). */
@@ -234,21 +266,24 @@ export function ejectSettlers(state: GameState, b: Building): void {
     const tx = Math.floor(s.pos.x);
     const ty = Math.floor(s.pos.y);
     if (tx < b.origin.x || ty < b.origin.y || tx >= b.origin.x + b.footprint.w || ty >= b.origin.y + b.footprint.h) continue;
-    let placed = false;
-    for (let r = 1; r <= 6 && !placed; r++) {
-      for (let dy = -r; dy <= r && !placed; dy++) {
-        for (let dx = -r; dx <= r; dx++) {
-          if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
-          const x = tx + dx;
-          const y = ty + dy;
-          if (x < 0 || y < 0 || x >= world.width || y >= world.height) continue;
-          if (!isPassable(world, y * world.width + x)) continue;
-          s.pos.x = x + 0.5;
-          s.pos.y = y + 0.5;
-          s.prevPos.x = s.pos.x;
-          s.prevPos.y = s.pos.y;
-          placed = true;
-          break;
+    // The nearest tile the town can reach; failing that, the nearest free tile at all.
+    if (!moveToTownReach(state, s, tx, ty)) {
+      let placed = false;
+      for (let r = 1; r <= 6 && !placed; r++) {
+        for (let dy = -r; dy <= r && !placed; dy++) {
+          for (let dx = -r; dx <= r; dx++) {
+            if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+            const x = tx + dx;
+            const y = ty + dy;
+            if (x < 0 || y < 0 || x >= world.width || y >= world.height) continue;
+            if (!isPassable(world, y * world.width + x)) continue;
+            s.pos.x = x + 0.5;
+            s.pos.y = y + 0.5;
+            s.prevPos.x = s.pos.x;
+            s.prevPos.y = s.pos.y;
+            placed = true;
+            break;
+          }
         }
       }
     }
@@ -267,6 +302,7 @@ function planMove(state: GameState, s: Settler, goal: PathGoal): PlanResult {
   const result = findPath(state.world, Math.floor(s.pos.x), Math.floor(s.pos.y), goal);
   if (result === null) {
     s.path = [];
+    rescueIfCutOff(state, s);
     return 'fail';
   }
   s.path = result.path;
@@ -431,7 +467,12 @@ function buildingGoal(b: Building): PathGoal {
  * Where a hungry settler can get a meal: the nearest eating point while the stockpile has food, otherwise
  * the nearest building whose output buffer holds food (a farm: an emergency meal; GAME_DESIGN §5.5).
  */
-function foodSource(state: GameState, s: Settler): { b: Building; dist: number } | null {
+function foodSource(state: GameState, s: Settler, critical = false): { b: Building; dist: number } | null {
+  if (critical) {
+    // A starving settler standing next to a farm with food in its buffer eats right there instead of walking to the larder.
+    const near = nearestBuilding(state, s, (b) => b.output.food - claimedFromOutput(state, s, b.id, 'food') >= 1);
+    if (near && near.dist <= AI.critical.adjacentBufferTiles) return near;
+  }
   if (state.colony.stock.food >= 1) {
     const store = nearestBuilding(state, s, isEatingPoint);
     if (store) return store;
@@ -533,6 +574,17 @@ function plannedToSite(state: GameState, self: Settler, siteId: number, resource
   let sum = 0;
   for (const o of state.settlers) {
     if (o !== self && o.task.kind === 'haul' && o.task.toBuildingId === siteId && o.task.resource === resource) sum += o.task.amount;
+  }
+  return sum;
+}
+
+/** Units of `resource` other settlers are carrying (or about to carry) to the stockpile. */
+function inboundToStores(state: GameState, self: Settler, resource: ResourceType): number {
+  let sum = 0;
+  for (const o of state.settlers) {
+    if (o === self || o.task.kind !== 'haul' || o.task.resource !== resource) continue;
+    const dest = findBuilding(state, o.task.toBuildingId);
+    if (dest !== null && dest.status === 'complete' && isEatingPoint(dest)) sum += o.task.amount;
   }
   return sum;
 }
@@ -925,8 +977,10 @@ function haulCandidates(ctx: TickContext, s: Settler, out: Candidate[], capacity
     const score = dest
       ? workScore(state, s, 'hauling', chosen.bonus, octile(s.pos.x, s.pos.y, chosen.b.origin.x + chosen.b.footprint.w / 2, chosen.b.origin.y + chosen.b.footprint.h / 2))
       : null;
-    if (dest && score !== null) {
-      const amount = Math.min(carry, Math.floor(chosen.avail));
+    if (dest && score !== null && Math.floor(capacity - state.colony.stock[chosen.r] - inboundToStores(state, s, chosen.r)) >= 1) {
+      // Never pick up more than the stockpile has room for once the loads already on their way have landed.
+      const room = Math.floor(capacity - state.colony.stock[chosen.r] - inboundToStores(state, s, chosen.r));
+      const amount = Math.min(carry, Math.floor(chosen.avail), room);
       out.push({
         sig: `haul:${chosen.b.id}:${dest.b.id}:${chosen.r}`,
         score,
@@ -1077,7 +1131,7 @@ function decide(ctx: TickContext, s: Settler): void {
 function criticalResponse(ctx: TickContext, s: Settler): 'eat' | 'drink' | 'rest' | null {
   const n = s.needs;
   if (n.hunger < AI.critical.hungerBelow) {
-    if (foodSource(ctx.state, s) !== null) return 'eat';
+    if (foodSource(ctx.state, s, true) !== null) return 'eat';
     if (s.status.drinkCooldownHours <= 0 && drinkSource(ctx.state, s) !== null) return 'drink';
   }
   // Resting only helps while health can regenerate (fed, not parched); otherwise the settler goes looking for food.
@@ -1090,7 +1144,7 @@ function applyCritical(ctx: TickContext, s: Settler, response: 'eat' | 'drink' |
   abortSettlerTask(state, s);
   switch (response) {
     case 'eat': {
-      const p = foodSource(state, s);
+      const p = foodSource(state, s, true);
       if (p) startEat(state, s, p.b);
       else failTask(state, s);
       return;
