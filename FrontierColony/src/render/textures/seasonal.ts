@@ -7,6 +7,7 @@ import type { Texture } from 'pixi.js';
 import { AtlasBuilder } from './atlas';
 import type { Art } from './canvas';
 import { bakeHouse, bakeLumberCamp, bakeMine, bakeStorage, bakeTownCenter, bakeWell, bakeWorkshop, HOUSE_VARIANTS } from './buildings';
+import { makeBankStrip } from './cliffs';
 import { applySnow, makeForestFloor, makeGrassTile, makeHillsGround, makeRockGround, makeSandTile } from './groundTiles';
 import { makeTreeCluster, TREE_LEVELS } from './trees';
 
@@ -19,6 +20,7 @@ export interface SeasonalSet {
   treesBare: Record<Deciduous, Texture[][]>;
   pineSnow: Texture[][];
   grassSnow: Texture[];
+  bankSnow: Texture[];
   forestSnow: Texture[];
   hillsSnow: Texture[];
   rockSnow: Texture[];
@@ -60,6 +62,7 @@ export class SeasonalBaker {
     tree('birch', 'winter');
     tree('pine', 'winter');
     for (let i = 0; i < 4; i++) add(`snow.grass.${i}`, () => applySnow(makeGrassTile(i + 1), 100 + i));
+    for (let i = 0; i < 3; i++) add(`snow.bank.${i}`, () => applySnow(makeBankStrip('grass', i + 1), 600 + i, 0.9));
     for (let i = 0; i < 3; i++) add(`snow.forest.${i}`, () => applySnow(makeForestFloor(i + 1), 200 + i, 0.8));
     for (let i = 0; i < 3; i++) add(`snow.hills.${i}`, () => applySnow(makeHillsGround(i + 1), 300 + i, 0.85));
     for (let i = 0; i < 2; i++) add(`snow.rock.${i}`, () => applySnow(makeRockGround(i + 1), 400 + i, 0.9));
@@ -109,6 +112,7 @@ export class SeasonalBaker {
       treesBare: { oak: grid('winter.oak'), birch: grid('winter.birch') },
       pineSnow: grid('winter.pine'),
       grassSnow: range('snow.grass', 4),
+      bankSnow: range('snow.bank', 3),
       forestSnow: range('snow.forest', 3),
       hillsSnow: range('snow.hills', 3),
       rockSnow: range('snow.rock', 2),

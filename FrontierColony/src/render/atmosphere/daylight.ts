@@ -8,7 +8,36 @@ import { clamp, lerp, smoothstep } from '../util/noise';
 export type Rgb = readonly [number, number, number];
 
 const NIGHT: Rgb = [0.34, 0.42, 0.7];
-const TWILIGHT_WARM: Rgb = [1.0, 0.8, 0.62];
+
+/** Sky colour through the day: [hour, multiply colour]. Dawn is rosy gold, dusk deeper orange then violet. */
+const SKY: readonly (readonly [number, Rgb])[] = [
+  [0, NIGHT],
+  [4.8, NIGHT],
+  [5.7, [0.5, 0.46, 0.72]],
+  [6.4, [0.98, 0.74, 0.62]],
+  [7.2, [1.0, 0.88, 0.76]],
+  [8.4, [1, 1, 1]],
+  [16.4, [1, 1, 1]],
+  [17.5, [1.0, 0.9, 0.76]],
+  [18.5, [1.0, 0.7, 0.54]],
+  [19.3, [0.62, 0.5, 0.66]],
+  [20.1, [0.4, 0.44, 0.7]],
+  [20.9, NIGHT],
+  [24, NIGHT],
+];
+
+function skyColor(hour: number): Rgb {
+  const h = ((hour % 24) + 24) % 24;
+  for (let i = 1; i < SKY.length; i++) {
+    const b = SKY[i]!;
+    if (h <= b[0]) {
+      const a = SKY[i - 1]!;
+      const k = smoothstep(a[0], b[0], h);
+      return [lerp(a[1][0], b[1][0], k), lerp(a[1][1], b[1][1], k), lerp(a[1][2], b[1][2], k)];
+    }
+  }
+  return NIGHT;
+}
 
 /** 0 at night, 1 in full daylight, with smooth dawn (05–08) and dusk (17–20). */
 export function dayFactor(hour: number): number {
@@ -71,20 +100,13 @@ export function weatherTint(kind: WeatherKind, intensity: number, drought: numbe
 /** Final multiply colour for the scene (each channel 0..1). */
 export function ambientColor(hour: number, kind: WeatherKind, intensity: number, drought: number): Rgb {
   const d = dayFactor(hour);
-  const tw = twilight(hour);
   const w = weatherTint(kind, intensity, drought);
-  let r = lerp(NIGHT[0], 1, d);
-  let g = lerp(NIGHT[1], 1, d);
-  let b = lerp(NIGHT[2], 1, d);
+  let [r, g, b] = skyColor(hour);
   if (w.nightLift > 0) {
     r = lerp(r, 1, w.nightLift * (1 - d));
     g = lerp(g, 1, w.nightLift * (1 - d));
     b = lerp(b, 1, w.nightLift * (1 - d));
   }
-  const warm = tw * 0.85;
-  r *= lerp(1, TWILIGHT_WARM[0], warm);
-  g *= lerp(1, TWILIGHT_WARM[1], warm);
-  b *= lerp(1, TWILIGHT_WARM[2], warm);
   return [r * w.tint[0], g * w.tint[1], b * w.tint[2]];
 }
 

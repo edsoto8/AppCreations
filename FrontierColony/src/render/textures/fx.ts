@@ -215,7 +215,7 @@ export function makeStreak(): Art {
   g.addColorStop(0.6, 'rgba(255,255,255,0.9)');
   g.addColorStop(1, 'rgba(255,255,255,0.15)');
   ctx.fillStyle = g;
-  ctx.fillRect(1.2, 0, 1.6, 28);
+  ctx.fillRect(1, 0, 2, 28);
   return art;
 }
 

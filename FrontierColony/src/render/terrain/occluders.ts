@@ -87,11 +87,7 @@ export class Occluders {
 
   constructor(depth: DepthLayer) {
     this.depth = depth;
-    for (let i = 0; i < POOL; i++) {
-      const s = new Sprite();
-      s.visible = false;
-      this.free.push(s);
-    }
+    this.fill();
   }
 
   /** Start a frame: returns the stamp to use for queries. */
@@ -137,6 +133,20 @@ export class Occluders {
       }
     }
     this.active = this.active.filter((r) => r.occ !== null);
+  }
+
+  /** Forget every attachment (the depth bands are being recreated). */
+  reset(): void {
+    this.destroy();
+    this.fill();
+  }
+
+  private fill(): void {
+    for (let i = 0; i < POOL; i++) {
+      const s = new Sprite();
+      s.visible = false;
+      this.free.push(s);
+    }
   }
 
   destroy(): void {

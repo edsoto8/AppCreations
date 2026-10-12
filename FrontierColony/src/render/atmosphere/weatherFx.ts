@@ -69,7 +69,7 @@ export class WeatherFx {
     for (let i = 0; i < RAIN_CAP; i++) {
       const s = new Sprite(tex.fx.streak);
       s.visible = false;
-      s.alpha = 0.5;
+      s.alpha = 0.62;
       this.screen.addChild(s);
       this.drops.push({ s, x: Math.random() * 1600, y: Math.random() * 900, speed: 0.8 + Math.random() * 0.5, landY: 0 });
     }

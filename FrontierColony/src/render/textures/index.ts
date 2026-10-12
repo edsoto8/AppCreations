@@ -57,6 +57,7 @@ import {
   makeSandTile,
   makeWaterTile,
   makeWetEdge,
+  makeWaterBlend,
   type EdgeDir,
   type FringeMaterial,
 } from './groundTiles';
@@ -78,6 +79,7 @@ export interface TextureSet {
   fringe: Record<FringeMaterial, EdgeSet>;
   wet: EdgeSet;
   foam: EdgeSet;
+  waterBlend: EdgeSet;
   cliffs: Record<CliffMaterial, { lip: Texture[]; mid: Texture[] }>;
   bankGrass: Texture[];
   bankSand: Texture[];
@@ -160,6 +162,7 @@ export function buildTextureSet(): TextureSet {
   const fringeKeys: Record<string, string> = {};
   for (const m of fringeMats) EDGE_DIRS.forEach((d, i) => (fringeKeys[`${m}.${d}`] = add(`fringe.${m}.${d}`, makeFringe(m, d, 100 + i * 17 + m.length))));
   const wetKeys = EDGE_DIRS.map((d, i) => add(`wet.${d}`, makeWetEdge(d, 200 + i)));
+  const blendKeys = EDGE_DIRS.map((d) => add(`waterblend.${d}`, makeWaterBlend(d)));
   const foamKeys = EDGE_DIRS.map((d, i) => add(`foam.${d}`, makeFoamEdge(d, 300 + i)));
 
   const cliffMats: CliffMaterial[] = ['soil', 'rock', 'sand'];
@@ -293,6 +296,7 @@ export function buildTextureSet(): TextureSet {
     fringe,
     wet: edgeSet(wetKeys),
     foam: edgeSet(foamKeys),
+    waterBlend: edgeSet(blendKeys),
     cliffs,
     bankGrass: ts(bankGrass),
     bankSand: ts(bankSand),

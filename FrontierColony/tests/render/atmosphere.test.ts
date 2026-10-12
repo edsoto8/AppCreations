@@ -61,6 +61,21 @@ describe('ambientColor', () => {
     expect(r).toBeGreaterThan(b);
   });
 
+  it('sunrise and sunset are rosy gold: bright red, clearly less blue; and the colour never jumps', () => {
+    for (const h of [6.4, 18.5]) {
+      const [r, g, b] = ambientColor(h, 'clear', 0, 0);
+      expect(r).toBeGreaterThan(0.9);
+      expect(b).toBeLessThan(r - 0.25);
+      expect(g).toBeGreaterThan(b);
+    }
+    let prev = ambientColor(0, 'clear', 0, 0);
+    for (let h = 0.1; h <= 24; h += 0.1) {
+      const c = ambientColor(h, 'clear', 0, 0);
+      expect(Math.abs(c[0] - prev[0]) + Math.abs(c[1] - prev[1]) + Math.abs(c[2] - prev[2])).toBeLessThan(0.2);
+      prev = c;
+    }
+  });
+
   it('storms are darker than clear skies; drought is warmer', () => {
     const clear = ambientColor(12, 'clear', 0, 0);
     const storm = ambientColor(12, 'storm', 1, 0);

@@ -20,21 +20,18 @@ export type { GameRenderer, RendererCallbacks, FrameInfo, CameraState, CreateRen
 
 export const createRenderer: CreateRenderer = async (host, callbacks) => {
   const app = new Application();
-  const dbg = new URLSearchParams(typeof location !== 'undefined' ? location.search : '').get('gpu') ?? '';
-  const flag = (k: string): string | null => (dbg.split(',').find((x) => x.startsWith(k)) ?? null)?.slice(k.length) ?? null;
   await app.init({
     resizeTo: host,
     background: 0x141c2b,
-    antialias: flag('aa') !== '0',
+    antialias: true,
     autoStart: false,
     preference: 'webgl',
     powerPreference: 'high-performance',
-    resolution: flag('res') ? Number(flag('res')) : Math.min(window.devicePixelRatio || 1, 2),
+    resolution: Math.min(window.devicePixelRatio || 1, 2),
     autoDensity: true,
     eventFeatures: { move: false, globalMove: false, click: false, wheel: false },
   });
   app.ticker.stop();
-  if (flag('mt')) app.renderer.limits.maxBatchableTextures = Number(flag('mt'));
   app.canvas.setAttribute('data-testid', 'game-canvas');
   host.appendChild(app.canvas);
   const t0 = performance.now();

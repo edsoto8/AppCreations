@@ -73,6 +73,23 @@ export class EntityLayer {
     return this.buildings.values();
   }
 
+  /** World-pixel box and depth of every visible settler and building (to redraw baked objects in front of them). */
+  forEachBox(cb: (x0: number, y0: number, x1: number, y1: number, z: number) => void): void {
+    for (const v of this.settlers.values()) {
+      if (v.hidden) continue;
+      const x = v.root.position.x;
+      const y = v.root.position.y;
+      cb(x - 16, y - 46, x + 16, y + 10, v.root.zIndex);
+    }
+    for (const v of this.buildings.values()) {
+      const x = v.root.position.x;
+      const y = v.root.position.y;
+      const hw = (v.w + v.h) * 16 + 8;
+      const hh = (v.w + v.h) * 8;
+      cb(x - hw, y - hh - v.height - 28, x + hw, y + hh + 24, v.root.zIndex);
+    }
+  }
+
   attachEffects(fx: Effects): void {
     this.effects = fx;
   }

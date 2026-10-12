@@ -12,7 +12,7 @@ been run. A milestone is marked done only after its acceptance criteria were ver
 | M3 Settler Intelligence | done | lead: 212/212 unit incl. A* vs Dijkstra, 2-day autonomy, starvation, mid-path save determinism; screenshot review |
 | M4 Economy & Construction | done | lead: typecheck, 364/364 unit (incl. economy balance runs), build, e2e 13/15 (2 test-timing issues, routed to QA); screenshot review |
 | M5 Gameplay | done (sim + UI) | lead: same run; 30-day soaks 8/8 normal survive, 6/8 harsh |
-| M6 Visual Polish | pending | |
+| M6 Visual Polish | done | lead: typecheck, 456/456 unit, build, e2e 25/25 twice back to back on an idle machine; screenshot review |
 | M7 Testing & Optimization | pending | |
 | M8 Final Release | pending | |
 
@@ -128,3 +128,12 @@ been run. A milestone is marked done only after its acceptance criteria were ver
   each; failures were build.spec (test clicked the town-center tile; fixed by clicking the footprint, committed)
   and smoke.spec (5–6 ticks in 5 s at 1x — headless SwiftShader at ~1 fps under load; renderer GPU cost is being
   reduced in M6). Cumulative QA usage: 427k tokens, 140 tool calls, 78.7 min.
+- Graphics Engineer finished renderer M6: keyframed day/night sky with window/campfire/torch lights, pooled
+  rain/snow/storm/lightning/cloud shadows, gradual seasonal re-skin (autumn foliage, winter snow, frozen
+  shallows), wildfire/sick/newcomer/damage visuals, grassy hills with sparse outcrops, varied mountains,
+  alpha-reveal construction, `indoorsBuildingId` instead of label regex. GPU work: baked chunk RenderTextures with
+  skyline meshes + pooled occluders; headless 1280×720 medium map 3.3 → ~11 fps, overdraw 5.19 → 1.34, sprites
+  1931 → 145. 62 render tests. Cumulative usage: ~321k tokens this round, 295 tool calls, 118 min.
+- Lead verification of M6: `tsc -b` clean, 456/456 unit tests, build ok, `npm run test:e2e` 25/25 twice in a row.
+  Known cosmetic defects for the final polish round: grassy bank strips stay green-grey in winter, sand beaches
+  are not snow-covered.

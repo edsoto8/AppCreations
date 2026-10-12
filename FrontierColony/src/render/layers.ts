@@ -1,10 +1,12 @@
 /**
  * Scene-graph layout. Everything inside `world` is transformed by the camera.
  *
- *   ground    static chunked terrain (sea-level tiles, flat decals)
+ *   ground    static chunked terrain: one baked picture per chunk (ground + trees, rocks, hills) when zoomed
+ *             out, live flat-tile sprites when zoomed in (see terrain/terrainRenderer.ts)
  *   waterFx   animated shimmer and shoreline foam
  *   decals    dynamic ground overlays (reserved for tracks, construction pads ...)
- *   objects   depth-sorted: raised tiles, trees, rocks, mountains, buildings, settlers
+ *   objects   depth-sorted: buildings, settlers, redrawn "occluders" from baked chunks, and (zoomed in)
+ *             raised tiles, trees, rocks, mountains
  *   effects   particles (reserved for M6)
  *   overlays  hover, selection, placement ghost, map overlays
  *   labels    UI in the world: activity bubbles, names (reserved for M3)

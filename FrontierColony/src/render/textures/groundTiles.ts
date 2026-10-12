@@ -417,6 +417,20 @@ export function makeWetEdge(dir: EdgeDir, seed: number): Art {
   return art;
 }
 
+/** Soft white wash along one edge of a water tile; tinted with the neighbour's colour it melts the tile steps. */
+export function makeWaterBlend(dir: EdgeDir): Art {
+  const art = createArt(TILE_FRAME_W, TILE_FRAME_H);
+  paintTilePixels(art, (p, out) => {
+    const e = edgeDistance(dir, p.nx, p.ny);
+    const k = 1 - smoothstep(0, 0.62, e);
+    out[0] = 255;
+    out[1] = 255;
+    out[2] = 255;
+    out[3] = k * k * 0.5;
+  });
+  return art;
+}
+
 /** Foam band on water tiles next to land: bright thin line plus a soft wash. */
 export function makeFoamEdge(dir: EdgeDir, seed: number): Art {
   const art = createArt(TILE_FRAME_W, TILE_FRAME_H);

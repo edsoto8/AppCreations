@@ -16,6 +16,7 @@ import { EntityLayer } from './entities/entityLayer';
 import { Overlays } from './entities/overlays';
 import { InputController } from './input';
 import { createLayers, type Layers } from './layers';
+import type { OccRec } from './terrain/occluders';
 import { TerrainRenderer } from './terrain/terrainRenderer';
 import type { TextureSet } from './textures';
 import type { CameraState, FrameInfo, GameRenderer, PointerButton, RendererCallbacks } from './types';
@@ -51,7 +52,6 @@ export class IsoRenderer implements GameRenderer {
   private animTime = 0;
   private suppressFell = false;
   private bakeTimer = 0;
-  private dbgHide = '';
 
   private readonly app: Application;
   private readonly callbacks: RendererCallbacks;
@@ -151,6 +151,11 @@ export class IsoRenderer implements GameRenderer {
     const look = seasonLook(state.time, this.atmosphere.drought, state.weather.current, state.weather.intensity);
     this.terrain.setLook(look);
     this.entities.update(state, frame.alpha, time, frameDt, cam.zoom, this.animTime, look.snow, this.atmosphere.light);
+    // baked trees, rocks and hills that stand in front of a settler or building are redrawn over it
+    const stamp = this.terrain.beginOccluders();
+    const wanted: OccRec[] = [];
+    this.entities.forEachBox((x0, y0, x1, y1, z) => this.terrain.collectOccluders(x0, y0, x1, y1, z, stamp, wanted));
+    this.terrain.endOccluders(wanted, stamp);
     this.atmosphere.update({ state, dt: frameDt, world: this.layers.world, screenW: this.app.screen.width, screenH: this.app.screen.height, view, entities: this.entities, fires: this.effects.activeFires() });
 
     this.effects.update(frame.speed === 0 ? frameDt * 0.35 : frameDt);
@@ -165,21 +170,6 @@ export class IsoRenderer implements GameRenderer {
     }
     cam.moved = false;
 
-    if (!this.dbgHide) this.dbgHide = new URLSearchParams(location.search).get('hide') ?? '-';
-    if (this.dbgHide !== '-') {
-      const L = this.layers;
-      const h = this.dbgHide;
-      L.ground.visible = !h.includes('g');
-      L.waterFx.visible = !h.includes('w');
-      L.objects.visible = !h.includes('o');
-      L.effects.visible = !h.includes('e');
-      L.overlays.visible = !h.includes('v');
-      L.labels.visible = !h.includes('l');
-    }
-    if (this.dbgHide !== '-' && this.dbgHide.includes('x')) {
-      this.stats.frames++;
-      return;
-    }
     this.app.render();
     const dt = performance.now() - t0;
     this.stats.cpuMs = this.stats.frames === 0 ? dt : this.stats.cpuMs * 0.95 + dt * 0.05;
