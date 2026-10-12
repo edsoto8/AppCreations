@@ -364,3 +364,35 @@ Add the `r8` day-36 placement as a regression test.
 | Lead | MIN-1 (summary from the state), MIN-6 (docs) | MIN-2, MIN-3 | Nits 3, 4, 7 and 8 |
 | UI | MIN-1 (error boundary) | MIN-3 (banner) | Nits 1, 6 and 9 |
 | Graphics | | MIN-4, MIN-7 | MIN-5. Measure V11 on real hardware. |
+
+---
+
+## MAJ-1 re-verification (HEAD `b2ff042`, 2026-10-12)
+
+**The fix holds.** I re-ran the original sweep against two scratch worktrees: the baseline `7e41bbc` and HEAD `b2ff042`.
+
+**What the sweep did:**
+
+- 4 presets × 12 seeds × 40 days, normal difficulty, the same 29-building script, plus the relaxed `riverValley`/`r8` game.
+- My own flood fill from the town ring checked every settler's tile every 50 ticks. It does not use the sim's code.
+- Placement used one inline ring search shared by both trees. It timed each `canPlaceBuilding` call and counted "cannot reach" refusals.
+
+| | Baseline `7e41bbc` | HEAD `b2ff042` |
+|---|---|---|
+| Games that trapped a settler | **11 / 48** | **0 / 48** |
+| Settlers trapped / of those who died | 21 / 9 | 0 / 0 |
+| Starvation deaths with 5 or more food in stock | 9 | 0 |
+| `r8` (relaxed river valley) | 2 trapped, 2 starved (day 38, 508 food) | 0 trapped, 0 deaths, won |
+| Longest a settler stayed trapped | 725 h | 0 h |
+| Buildings placed / script items never placed | 1,421 / 0 | 1,420 / 1 (one `riverValley` item) |
+| "Cannot reach" refusals / candidate spots checked | 421 / 209,265 (0.20%) | 430 / 208,094 (0.21%) |
+| `canPlaceBuilding`, mean per preset | 0.008–0.022 ms | 0.006–0.022 ms |
+| Mean placement ring from the town center | 5.97 | 5.95 |
+
+**Placement:** no measurable slowdown, and essentially no extra restriction. There were 9 more refusals in about 208k checks, and one late item went unplaced in 48 games.
+
+**Tests:** the new `tests/sim/walledIn.test.ts` and `review.test.ts` pass, 42 of 42.
+
+**Limit:** no game reached the pocket-rescue fallback, so the sweep does not exercise it. Only the unit tests cover it.
+
+**MAJ-1 is closed. No release blockers remain from this review.**
