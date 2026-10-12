@@ -2,7 +2,7 @@
  * Owns the chunk grid: builds chunks lazily as they come into view, rebuilds only the chunks whose
  * tiles changed (detected by diffing against `world.revision`), culls the rest and animates the water.
  */
-import { Container, MeshSimple, RenderTexture, type Renderer, type Sprite } from 'pixi.js';
+import { Container, MeshSimple, RenderTexture, Texture, type Renderer, type Sprite } from 'pixi.js';
 import type { WorldState } from '../../sim';
 import { MAX_ELEVATION, Terrain } from '../../sim';
 import { ELEVATION_STEP } from '../../shared/iso';
@@ -10,7 +10,7 @@ import { NEUTRAL_LOOK, type SeasonLook } from '../atmosphere/seasons';
 import type { DepthLayer } from '../depthLayer';
 import type { Layers } from '../layers';
 import type { TextureSet } from '../textures';
-import { buildChunk, clearChunk, createChunk, destroyBake, type Chunk } from './chunkBuilder';
+import { buildChunk, clearChunk, createChunk, destroyBake, destroyMesh, type Chunk } from './chunkBuilder';
 import { OccIndex, Occluders, type OccRec } from './occluders';
 import { CHUNK_SIZE, TerrainModel } from './model';
 
@@ -42,6 +42,12 @@ export class TerrainRenderer {
   private bakeRes = 1;
   private hiRes = 1.25;
   private readonly occluders: Occluders;
+  /**
+   * Pixi keeps one shared shader for textured meshes and leaves it bound to the texture of the mesh drawn
+   * last; destroying that render texture then logs a BindGroup warning. This degenerate, off-screen mesh is
+   * drawn after every chunk so the shader always ends the frame bound to a texture that is never destroyed.
+   */
+  private readonly parking: MeshSimple;
   private look: SeasonLook = NEUTRAL_LOOK;
 
   constructor(layers: Layers, tex: TextureSet, depth: DepthLayer, renderer: Renderer) {
@@ -53,6 +59,14 @@ export class TerrainRenderer {
     this.bakeRes = this.hiRes;
     this.occluders = new Occluders(depth);
     layers.ground.sortableChildren = true;
+    this.parking = new MeshSimple({
+      texture: Texture.WHITE,
+      vertices: new Float32Array([-60000, -60000, -59999, -60000, -59999, -59999, -60000, -59999]),
+      uvs: new Float32Array([0, 0, 1, 0, 1, 1, 0, 1]),
+      indices: new Uint32Array([0, 1, 2, 0, 2, 3]),
+    });
+    this.parking.geometry.batchMode = 'no-batch';
+    layers.labels.addChild(this.parking);
   }
 
   /** Rebuild everything for a new or loaded world. */
@@ -89,6 +103,7 @@ export class TerrainRenderer {
   destroy(): void {
     this.clear();
     this.occluders.destroy();
+    destroyMesh(this.parking);
   }
 
   private approximateBounds(c: Chunk, w: number, h: number): void {
@@ -291,8 +306,9 @@ export class TerrainRenderer {
       idx.set([v, v + 1, v + 2, v, v + 2, v + 3], cnt * 6);
       cnt++;
     }
-    c.bake?.destroy();
+    destroyMesh(c.bake);
     const mesh = new MeshSimple({ texture: c.rt, vertices: verts.subarray(0, cnt * 8), uvs: uvs.subarray(0, cnt * 8), indices: idx.subarray(0, cnt * 6) });
+    mesh.geometry.batchMode = 'no-batch';
     mesh.zIndex = c.cx + c.cy;
     mesh.visible = c.shown;
     this.layers.ground.addChild(mesh);
@@ -364,7 +380,8 @@ export class TerrainRenderer {
     }
     const stale = (c: Chunk): boolean => !c.built || c.dirty || (modeChanged && c.mode !== 'none') || (c.mode === 'live') !== wantLive || (c.mode === 'baked' && c.res !== this.bakeRes);
     const lookKey = this.look.key + (this.tex.seasonal ? '+' : '-');
-    let lookBudget = immediate ? Infinity : Math.min(4, Math.max(1, Math.round(frameMs / 33)));
+    // season re-skins rebuild whole chunks: at most one every third frame (two when frames are already slow)
+    let lookBudget = immediate ? Infinity : frameMs > 40 ? 2 : this.frame % 3 === 0 ? 1 : 0;
     // a chunk that was never built is built at once (no holes); changed ones are redone a couple per frame
     let redo = immediate ? Infinity : 2;
     for (const c of needNow) {

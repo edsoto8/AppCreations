@@ -111,9 +111,17 @@ export function clearChunk(chunk: Chunk): void {
   chunk.built = false;
 }
 
+/** Pixi's Mesh.destroy leaves its geometry (and the GL buffers behind it) alive; free those too. */
+export function destroyMesh(mesh: MeshSimple | null): void {
+  if (!mesh) return;
+  const geometry = mesh.geometry;
+  mesh.destroy();
+  geometry.destroy(true);
+}
+
 /** Free the baked image of a chunk too. */
 export function destroyBake(chunk: Chunk): void {
-  chunk.bake?.destroy();
+  destroyMesh(chunk.bake);
   chunk.rt?.destroy(true);
   chunk.bake = null;
   chunk.rt = null;
@@ -350,11 +358,11 @@ export function buildChunk(chunk: Chunk, model: TerrainModel, tex: TextureSet, d
         if (levels <= 0) continue;
         const top = tileToScreen(f.right ? x + 1 : x, f.right ? y : y + 1, e);
         const set = tex.cliffs[water ? 'soil' : mat];
+        const frostTile = !water && tex.seasonal !== null && look.snow > 0 && hash01(x, y, 401) < look.snow;
         const shade = f.right ? 0xb9b4b2 : 0xffffff;
         const waterSide = water ? (f.right ? 0x4a7aa0 : 0x6a9cbf) : shade;
         if (levels === 1 && !oob && !water && (t === Terrain.Grass || t === Terrain.Forest || t === Terrain.Sand)) {
-          const frosted = t !== Terrain.Sand && tex.seasonal !== null && look.snow > 0 && hash01(x, y, 401) < look.snow;
-          const arr = t === Terrain.Sand ? tex.bankSand : frosted ? tex.seasonal!.bankSnow : tex.bankGrass;
+          const arr = t === Terrain.Sand ? (frostTile ? tex.seasonal!.bankSandFrost : tex.bankSand) : frostTile ? tex.seasonal!.bankSnow : tex.bankGrass;
           const s = new Sprite(arr[(h + (f.right ? 3 : 0)) % arr.length]!);
           s.position.set(top.x, top.y);
           if (f.right) {
@@ -369,7 +377,7 @@ export function buildChunk(chunk: Chunk, model: TerrainModel, tex: TextureSet, d
         }
         for (let k = 0; k < levels; k++) {
           const lip = k === 0 && t !== Terrain.Mountain && !water;
-          const arr = lip ? set.lip : set.mid;
+          const arr = lip ? (frostTile && mat !== 'sand' ? tex.seasonal!.lipSnow[mat] : set.lip) : set.mid;
           const tx = arr[(h + k * 7 + (f.right ? 3 : 0)) % arr.length]!;
           const s = new Sprite(tx);
           s.position.set(top.x, top.y + k * ELEVATION_STEP);

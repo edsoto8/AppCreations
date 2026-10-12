@@ -26,6 +26,12 @@ function isTypingTarget(t: EventTarget | null): boolean {
   return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || t.isContentEditable;
 }
 
+/** Keys drive the camera only when nothing in the UI layer has focus (the canvas, body or page itself). */
+export function isGameFocus(t: EventTarget | null, canvas: HTMLElement): boolean {
+  if (!(t instanceof HTMLElement)) return true;
+  return t === canvas || t === document.body || t === document.documentElement;
+}
+
 export class InputController {
   private readonly pointers = new Map<number, PointerInfo>();
   private press: {
@@ -223,7 +229,7 @@ export class InputController {
   }
 
   private readonly onKeyDown = (e: KeyboardEvent): void => {
-    if (isTypingTarget(e.target) || e.ctrlKey || e.metaKey || e.altKey) return;
+    if (e.defaultPrevented || isTypingTarget(e.target) || !isGameFocus(e.target, this.canvas) || e.ctrlKey || e.metaKey || e.altKey) return;
     const key = e.key.toLowerCase();
     if (!['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright', 'shift'].includes(key)) return;
     if (key.startsWith('arrow')) e.preventDefault();

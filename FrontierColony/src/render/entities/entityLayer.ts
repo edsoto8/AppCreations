@@ -87,6 +87,11 @@ export class EntityLayer {
       const hw = (v.w + v.h) * 16 + 8;
       const hh = (v.w + v.h) * 8;
       cb(x - hw, y - hh - v.height - 28, x + hw, y + hh + 24, v.root.zIndex);
+      for (const f of v.fixtures) {
+        const fx = f.node.position.x;
+        const fy = f.node.position.y;
+        cb(fx - 14, fy - 42, fx + 14, fy + 8, f.node.zIndex);
+      }
     }
   }
 
@@ -190,6 +195,7 @@ export class EntityLayer {
       v.setDrop((hi - lo) * 12);
       this.depth.setDepth(v.root, buildingDepth(b.origin.x, b.origin.y, w, h));
       v.update(b, state, timeSec, dt, fx, fill, this.snow, this.light);
+      v.placeFixtures((node, z) => this.depth.setDepth(node, z));
     }
     for (const [id, v] of this.buildings) {
       if (!v.seen) {

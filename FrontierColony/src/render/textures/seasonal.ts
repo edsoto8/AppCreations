@@ -7,7 +7,7 @@ import type { Texture } from 'pixi.js';
 import { AtlasBuilder } from './atlas';
 import type { Art } from './canvas';
 import { bakeHouse, bakeLumberCamp, bakeMine, bakeStorage, bakeTownCenter, bakeWell, bakeWorkshop, HOUSE_VARIANTS } from './buildings';
-import { makeBankStrip } from './cliffs';
+import { makeBankStrip, makeCliffStrip } from './cliffs';
 import { applySnow, makeForestFloor, makeGrassTile, makeHillsGround, makeRockGround, makeSandTile } from './groundTiles';
 import { makeTreeCluster, TREE_LEVELS } from './trees';
 
@@ -21,6 +21,8 @@ export interface SeasonalSet {
   pineSnow: Texture[][];
   grassSnow: Texture[];
   bankSnow: Texture[];
+  bankSandFrost: Texture[];
+  lipSnow: { soil: Texture[]; rock: Texture[] };
   forestSnow: Texture[];
   hillsSnow: Texture[];
   rockSnow: Texture[];
@@ -62,11 +64,14 @@ export class SeasonalBaker {
     tree('birch', 'winter');
     tree('pine', 'winter');
     for (let i = 0; i < 4; i++) add(`snow.grass.${i}`, () => applySnow(makeGrassTile(i + 1), 100 + i));
-    for (let i = 0; i < 3; i++) add(`snow.bank.${i}`, () => applySnow(makeBankStrip('grass', i + 1), 600 + i, 0.9));
+    for (let i = 0; i < 3; i++) add(`snow.bank.${i}`, () => makeBankStrip('snow', i + 1));
+    for (let i = 0; i < 2; i++) add(`snow.bankSand.${i}`, () => applySnow(makeBankStrip('sand', i + 1), 700 + i, 0.6));
+    for (let i = 0; i < 3; i++) add(`snow.lip.soil.${i}`, () => makeCliffStrip('soil', 'lip', i + 1, true));
+    for (let i = 0; i < 3; i++) add(`snow.lip.rock.${i}`, () => makeCliffStrip('rock', 'lip', i + 1, true));
     for (let i = 0; i < 3; i++) add(`snow.forest.${i}`, () => applySnow(makeForestFloor(i + 1), 200 + i, 0.8));
     for (let i = 0; i < 3; i++) add(`snow.hills.${i}`, () => applySnow(makeHillsGround(i + 1), 300 + i, 0.85));
     for (let i = 0; i < 2; i++) add(`snow.rock.${i}`, () => applySnow(makeRockGround(i + 1), 400 + i, 0.9));
-    for (let i = 0; i < 2; i++) add(`snow.sand.${i}`, () => applySnow(makeSandTile(i + 1), 500 + i, 0.4));
+    for (let i = 0; i < 2; i++) add(`snow.sand.${i}`, () => applySnow(makeSandTile(i + 1), 500 + i, 0.62));
     for (let i = 0; i < HOUSE_VARIANTS; i++) add(`snow.house.${i}`, () => bakeHouse(i, true));
     add('snow.townCenter', () => bakeTownCenter(true));
     add('snow.storage', () => bakeStorage(true));
@@ -113,6 +118,8 @@ export class SeasonalBaker {
       pineSnow: grid('winter.pine'),
       grassSnow: range('snow.grass', 4),
       bankSnow: range('snow.bank', 3),
+      bankSandFrost: range('snow.bankSand', 2),
+      lipSnow: { soil: range('snow.lip.soil', 3), rock: range('snow.lip.rock', 3) },
       forestSnow: range('snow.forest', 3),
       hillsSnow: range('snow.hills', 3),
       rockSnow: range('snow.rock', 2),

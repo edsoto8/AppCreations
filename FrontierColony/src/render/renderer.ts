@@ -7,7 +7,7 @@ import { MAX_ELEVATION, Terrain, getBuildingAt, inBounds, tileIndex, type GameSt
 import { pickTile, tileToScreen } from '../shared/iso';
 import type { OverlayMode, PlacementGhost, Selection } from '../shared/types';
 import { Atmosphere } from './atmosphere/atmosphere';
-import { seasonLook } from './atmosphere/seasons';
+import { NEUTRAL_LOOK, seasonLook, type SeasonLook } from './atmosphere/seasons';
 import { SeasonalBaker } from './textures/seasonal';
 import { Camera } from './camera';
 import { DepthLayer } from './depthLayer';
@@ -52,6 +52,24 @@ export class IsoRenderer implements GameRenderer {
   private animTime = 0;
   private suppressFell = false;
   private bakeTimer = 0;
+  private occStamp = 0;
+  private readonly occWanted: OccRec[] = [];
+  private readonly collectBox = (x0: number, y0: number, x1: number, y1: number, z: number): void => {
+    this.terrain.collectOccluders(x0, y0, x1, y1, z, this.occStamp, this.occWanted);
+  };
+  private readonly atmArgs: Parameters<Atmosphere['update']>[0] = {
+    state: null as never,
+    dt: 0,
+    world: null as never,
+    screenW: 0,
+    screenH: 0,
+    view: { x0: 0, y0: 0, x1: 0, y1: 0 },
+    entities: null as never,
+    fires: [],
+  };
+  /** Season look, recomputed only when one of its (coarsely quantised) inputs moves. */
+  private look = NEUTRAL_LOOK;
+  private lookSig = [-1, -1, -1, -1, -1, ''] as [number, number, number, number, number, string];
 
   private readonly app: Application;
   private readonly callbacks: RendererCallbacks;
@@ -148,15 +166,24 @@ export class IsoRenderer implements GameRenderer {
     this.terrain.animate(time);
     const frameDt = Math.min(frame.frameMs, 100) / 1000;
     this.animTime += frame.speed === 0 ? 0 : frameDt * Math.min(2, Math.sqrt(frame.speed));
-    const look = seasonLook(state.time, this.atmosphere.drought, state.weather.current, state.weather.intensity);
+    const look = this.currentLook(state);
     this.terrain.setLook(look);
     this.entities.update(state, frame.alpha, time, frameDt, cam.zoom, this.animTime, look.snow, this.atmosphere.light);
     // baked trees, rocks and hills that stand in front of a settler or building are redrawn over it
-    const stamp = this.terrain.beginOccluders();
-    const wanted: OccRec[] = [];
-    this.entities.forEachBox((x0, y0, x1, y1, z) => this.terrain.collectOccluders(x0, y0, x1, y1, z, stamp, wanted));
-    this.terrain.endOccluders(wanted, stamp);
-    this.atmosphere.update({ state, dt: frameDt, world: this.layers.world, screenW: this.app.screen.width, screenH: this.app.screen.height, view, entities: this.entities, fires: this.effects.activeFires() });
+    this.occStamp = this.terrain.beginOccluders();
+    this.occWanted.length = 0;
+    this.entities.forEachBox(this.collectBox);
+    this.terrain.endOccluders(this.occWanted, this.occStamp);
+    const a = this.atmArgs;
+    a.state = state;
+    a.dt = frameDt;
+    a.world = this.layers.world;
+    a.screenW = this.app.screen.width;
+    a.screenH = this.app.screen.height;
+    a.view = view;
+    a.entities = this.entities;
+    a.fires = this.effects.activeFires();
+    this.atmosphere.update(a);
 
     this.effects.update(frame.speed === 0 ? frameDt * 0.35 : frameDt);
 
@@ -174,6 +201,25 @@ export class IsoRenderer implements GameRenderer {
     const dt = performance.now() - t0;
     this.stats.cpuMs = this.stats.frames === 0 ? dt : this.stats.cpuMs * 0.95 + dt * 0.05;
     this.stats.frames++;
+  }
+
+  private currentLook(state: Readonly<GameState>): SeasonLook {
+    const t = state.time;
+    const drought = Math.round(this.atmosphere.drought * 50);
+    const intensity = Math.round(state.weather.intensity * 50);
+    const hour = Math.floor(t.timeOfDay * 6);
+    const season = t.season === 'spring' ? 0 : t.season === 'summer' ? 1 : t.season === 'autumn' ? 2 : 3;
+    const sig = this.lookSig;
+    if (sig[0] !== t.day || sig[1] !== hour || sig[2] !== drought || sig[3] !== intensity || sig[4] !== season || sig[5] !== state.weather.current) {
+      sig[0] = t.day;
+      sig[1] = hour;
+      sig[2] = drought;
+      sig[3] = intensity;
+      sig[4] = season;
+      sig[5] = state.weather.current;
+      this.look = seasonLook(t, drought / 50, state.weather.current, intensity / 50);
+    }
+    return this.look;
   }
 
   setPlacementGhost(ghost: PlacementGhost | null): void {

@@ -13,8 +13,8 @@ been run. A milestone is marked done only after its acceptance criteria were ver
 | M4 Economy & Construction | done | lead: typecheck, 364/364 unit (incl. economy balance runs), build, e2e 13/15 (2 test-timing issues, routed to QA); screenshot review |
 | M5 Gameplay | done (sim + UI) | lead: same run; 30-day soaks 8/8 normal survive, 6/8 harsh |
 | M6 Visual Polish | done | lead: typecheck, 456/456 unit, build, e2e 25/25 twice back to back on an idle machine; screenshot review |
-| M7 Testing & Optimization | pending | |
-| M8 Final Release | pending | |
+| M7 Testing & Optimization | done | release review (0 crit / 1 major / 7 minor) fixed and re-verified by the reviewer; 487/487 unit; e2e 27/27 twice |
+| M8 Final Release | done | clean `npm ci` + typecheck + test + build + e2e ×2; `npm run dev` HTTP 200; docs refreshed |
 
 ## Log
 
@@ -141,3 +141,31 @@ been run. A milestone is marked done only after its acceptance criteria were ver
   (production build, quickstart seed `playtest-7`, medium continent): farm, well, house and lumber camp placed via
   commands, all completed by day 3, a newcomer joined, needs and activities sensible, no console errors.
   Frame-rate sampling was invalid (load average 6.5 on 4 cores from the reviewer's probes); re-measure when idle.
+- M7 release review (`docs/reviews/M7-release-review.md`): verdict "ship after three fixes"; all M5 fixes confirmed
+  real by probes. Fix wave in parallel: Simulation (MAJ-1 walled-in settlers, haul cap, repair refund; later skill
+  and trait tests), Graphics (GL buffer leak, BindGroup warning, per-frame garbage, arrow-key focus, winter banks
+  and beaches, campfire depth), UI (error boundary with data reset, halted-sim banner, render nits, goods-lost
+  toast grouping, hover card, map overlay toggle), Architect (SPEC.md v1.0 and CLAUDE.md refresh), Lead (summary
+  from validated state, main-slot-first autosave with best-effort backup and damaged-autosave fallback, no ticks
+  after victory, goods-lost toast, autosave-slot writes obey autosave rules, `simHalted` wiring, recovery e2e).
+- Reviewer re-ran its sweep on the MAJ-1 fix: trapped-settler games 11/48 → 0/48, deaths 9 → 0, placement check
+  speed unchanged.
+- **Final lead verification (01:05 UTC), from `rm -rf node_modules && npm ci`:** typecheck 0 errors; `npm test` 46
+  files / 487 passed; `npm run build` ok; `npm run test:e2e` 27/27 twice back to back; `npm run dev` HTTP 200;
+  scripted playtest with 0 console errors.
+
+## Completion criteria
+
+| Criterion | Evidence |
+|---|---|
+| The game starts without errors | e2e `smoke.spec.ts` (console-error fixture), playtest 0 console errors, `npm run dev` 200 |
+| A procedurally generated world appears | `tests/sim/worldgen.test.ts` (4 presets, determinism, 200 start sites), e2e determinism, screenshots |
+| Settlers move and act autonomously | `tests/sim/settlers.test.ts`, e2e `autonomy.spec.ts`, playtest activity labels |
+| Resources are produced and consumed | `tests/sim/economy.test.ts`, QA resource ledger in `tests/qa/strictInvariants.test.ts` |
+| Buildings can be constructed | e2e `build.spec.ts`, `buildings.spec.ts`; playtest (4 buildings completed by day 3) |
+| The simulation progresses over time | 30–32-day soaks per preset and difficulty; e2e `speed.spec.ts` |
+| Players can meaningfully influence colony development | placement, priorities (`tests/sim/gameplay.test.ts`: priority 0 stops a job), decisions (e2e `m5.spec.ts`), neglect vs sensible-play runs diverge (economy tests) |
+| Save and load works | `tests/game/save.test.ts`, `tests/qa/saveLoadEquivalence.test.ts`, e2e `saveload.spec.ts` and `recovery.spec.ts` |
+| Automated tests pass | 487/487 unit, 27/27 e2e (twice) |
+| The production build succeeds | `npm run build` after a clean `npm ci` |
+| The interface is visually polished | three independent screenshot reviews by the lead; see `docs/screenshots/` |

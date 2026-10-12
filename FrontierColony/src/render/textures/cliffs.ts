@@ -22,7 +22,7 @@ function ramp(r: Ramp, t: number): RGB {
   return t < 0.5 ? mixRgb(r.dark, r.mid, t * 2) : mixRgb(r.mid, r.light, (t - 0.5) * 2);
 }
 
-export function makeCliffStrip(material: CliffMaterial, kind: CliffKind, seed: number): Art {
+export function makeCliffStrip(material: CliffMaterial, kind: CliffKind, seed: number, snowCap = false): Art {
   const art = createArt(CLIFF_W, CLIFF_H, 0, 0);
   const { canvas, ctx } = art;
   const W = canvas.width;
@@ -54,9 +54,14 @@ export function makeCliffStrip(material: CliffMaterial, kind: CliffKind, seed: n
       if (kind === 'lip' && material !== 'sand') {
         const lip = 2.4 + valueNoise(along * 0.42, 4, seed + 5) * 2.2;
         if (v < lip) {
-          const g = mixRgb(GRASS.dark, GRASS.mid, clamp(0.35 + (valueNoise(along * 0.8, v, seed) - 0.5), 0, 1));
-          c = mixRgb(g, [70, 120, 62], smoothstep(lip - 1.2, lip, v) * 0.7);
-          shade = 0.9 + (v < 1 ? 0.12 : 0);
+          if (snowCap) {
+            c = mixRgb([246, 250, 255], [208, 220, 238], smoothstep(lip - 1.4, lip, v));
+            shade = 0.97;
+          } else {
+            const g = mixRgb(GRASS.dark, GRASS.mid, clamp(0.35 + (valueNoise(along * 0.8, v, seed) - 0.5), 0, 1));
+            c = mixRgb(g, [70, 120, 62], smoothstep(lip - 1.2, lip, v) * 0.7);
+            shade = 0.9 + (v < 1 ? 0.12 : 0);
+          }
         } else if (v < lip + 2.2) {
           shade *= 0.8 + 0.2 * smoothstep(lip, lip + 2.2, v); // shadow tucked under the lip
         }
@@ -83,7 +88,7 @@ export const BANK_H = CLIFF_H + 8;
  * A one-level step on meadow or beach: a short grassy (or sandy) slope with a soft ambient-occlusion
  * band spilling onto the lower tile, instead of a hard soil cliff.
  */
-export function makeBankStrip(material: 'grass' | 'sand', seed: number): Art {
+export function makeBankStrip(material: 'grass' | 'sand' | 'snow', seed: number): Art {
   const art = createArt(CLIFF_W, BANK_H, 0, 0);
   const { canvas, ctx } = art;
   const W = canvas.width;
@@ -91,10 +96,11 @@ export function makeBankStrip(material: 'grass' | 'sand', seed: number): Art {
   const img = ctx.createImageData(W, H);
   const data = img.data;
   const grass = material === 'grass';
-  const top: RGB = grass ? [150, 196, 98] : [240, 226, 182];
-  const mid: RGB = grass ? [112, 164, 80] : [222, 202, 154];
-  const low: RGB = grass ? [92, 138, 70] : [196, 172, 126];
-  const earth: RGB = grass ? [122, 112, 70] : [176, 150, 108];
+  const snow = material === 'snow';
+  const top: RGB = snow ? [248, 251, 255] : grass ? [150, 196, 98] : [240, 226, 182];
+  const mid: RGB = snow ? [232, 240, 250] : grass ? [112, 164, 80] : [222, 202, 154];
+  const low: RGB = snow ? [208, 220, 238] : grass ? [92, 138, 70] : [196, 172, 126];
+  const earth: RGB = snow ? [214, 224, 238] : grass ? [122, 112, 70] : [176, 150, 108];
   for (let py = 0; py < H; py++) {
     const ly = (py + 0.5) / TEX_SCALE;
     for (let px = 0; px < W; px++) {

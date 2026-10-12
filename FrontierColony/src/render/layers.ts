@@ -4,12 +4,13 @@
  *   ground    static chunked terrain: one baked picture per chunk (ground + trees, rocks, hills) when zoomed
  *             out, live flat-tile sprites when zoomed in (see terrain/terrainRenderer.ts)
  *   waterFx   animated shimmer and shoreline foam
- *   decals    dynamic ground overlays (reserved for tracks, construction pads ...)
+ *   decals    dynamic ground overlays (wildfire scorch marks; the burnt ground regrows)
  *   objects   depth-sorted: buildings, settlers, redrawn "occluders" from baked chunks, and (zoomed in)
  *             raised tiles, trees, rocks, mountains
- *   effects   particles (reserved for M6)
+ *   effects   pooled particles, floating text, falling trees, wildfire flames and smoke
  *   overlays  hover, selection, placement ghost, map overlays
- *   labels    UI in the world: activity bubbles, names (reserved for M3)
+ *   labels    floating "+2 wood" style text (also holds the off-screen mesh that keeps
+ *             Pixi's shared mesh shader off destroyed baked textures)
  */
 import { Container } from 'pixi.js';
 

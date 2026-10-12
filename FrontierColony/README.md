@@ -64,6 +64,7 @@ to choose), and `?debug` exposes the game controller as `window.__frontierColony
 | `B` `T` `P` `J` `G` `F` `O` `H` | Build, Settlers, Priorities, Events log, Stats, Save/Load, Settings, How to Play |
 | `Shift`+`1`…`7` | Pick a building while the Build panel is open |
 | Click the minimap | Jump the camera there |
+| `V` | Cycle the map overlay: off, resources left, buildable ground |
 
 ### Saving
 
@@ -95,5 +96,7 @@ npm test             # Vitest: sim, balance soaks, save/load, store, UI logic, r
 npm run test:e2e     # Playwright (Chromium): builds to dist-e2e/ and drives the real game
 ```
 
-The e2e suite uses Playwright 1.56.1 and expects its Chromium to be installed (`npx playwright install chromium`
-on a fresh machine). It runs WebGL through software rendering (SwiftShader), so it is slow; allow several minutes.
+The e2e suite uses Playwright 1.56.1 (pinned). On a fresh machine, install its browser once with
+`npx playwright@1.56.1 install chromium`. Environments that already provide Chromium for Playwright 1.56 (such as
+the one this was built in) need nothing. The tests run WebGL through software rendering (SwiftShader), so the
+suite takes about 4–5 minutes.

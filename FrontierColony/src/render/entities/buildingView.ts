@@ -17,6 +17,13 @@ export interface BuildingFx {
   particles: Particles;
 }
 
+const PILE_WOOD: readonly number[] = [1, 6, 14, 26];
+const PILE_FOOD: readonly number[] = [1, 5, 12];
+const PILE_TOOLS: readonly number[] = [1, 3, 6];
+const DEL_WOOD: readonly number[] = [1, 12, 24];
+const PILE_FOOD2: readonly number[] = [1, 6, 14];
+const DEL_TOOLS: readonly number[] = [1, 2, 4];
+
 export class BuildingView {
   readonly id: number;
   readonly type: Building['type'];
@@ -28,13 +35,18 @@ export class BuildingView {
   private readonly skirt = new Graphics();
   private readonly snowSprite = new Sprite();
   private snowTexKey = '';
-  private readonly fixtures: { base: Sprite; flame: Sprite; u: number; v: number; kind: 'campfire' | 'torch'; phase: number }[] = [];
+  /**
+   * Campfire and torches stand outside the footprint, so each is its own depth-sorted node (a raised tile in
+   * front of the building must not be able to cover them just because the building sorts earlier).
+   */
+  readonly fixtures: { node: Container; base: Sprite; flame: Sprite; u: number; v: number; kind: 'campfire' | 'torch'; phase: number }[] = [];
   private drop = -1;
   readonly w: number;
   readonly h: number;
   private readonly piles: Sprite[] = [];
   private readonly tex: TextureSet;
-  private key = '';
+  private readonly keyParts: number[] = new Array<number>(12).fill(0);
+  private readonly lastParts: number[] = new Array<number>(12).fill(-1);
   private status: Building['status'] | '' = '';
   private smokeAt = 0;
   private pop = 0;
@@ -63,21 +75,33 @@ export class BuildingView {
     this.snowSprite.visible = false;
     this.root.addChild(this.skirt, this.pad, this.blueprint, this.base, this.snowSprite, this.scaffold, ...this.piles);
     for (const f of fixturesFor(b.type)) {
+      const node = new Container();
       const base = new Sprite(f.kind === 'campfire' ? tex.fx.campfire : tex.fx.torch);
-      const p = P(f.u, f.v, 0);
-      base.position.set(p.x, p.y);
       const flame = new Sprite(tex.fx.flame);
-      flame.position.set(p.x, p.y - (f.kind === 'campfire' ? 9 : 31));
-      flame.scale.set(f.kind === 'campfire' ? 1.2 : 0.7);
+      flame.position.set(0, f.kind === 'campfire' ? -8 : -31);
+      flame.scale.set(f.kind === 'campfire' ? 1.9 : 0.7);
       flame.blendMode = 'add';
-      this.root.addChild(base, flame);
-      this.fixtures.push({ base, flame, u: f.u, v: f.v, kind: f.kind, phase: Math.random() * 6.28 });
+      node.addChild(base, flame);
+      this.fixtures.push({ node, base, flame, u: f.u, v: f.v, kind: f.kind, phase: Math.random() * 6.28 });
     }
     this.height = buildingHeight(b.type);
   }
 
   destroy(): void {
     this.root.destroy({ children: true });
+    for (const f of this.fixtures) f.node.destroy({ children: true });
+  }
+
+  /** Put each fixture at its own spot and depth (called after the root's position and depth are set). */
+  placeFixtures(setDepth: (node: Container, z: number) => void): void {
+    const rx = this.root.position.x;
+    const ry = this.root.position.y;
+    const rz = this.root.zIndex;
+    for (const f of this.fixtures) {
+      const p = P(f.u, f.v, 0);
+      f.node.position.set(rx + p.x, ry + p.y);
+      setDepth(f.node, rz + f.u + f.v + 0.1);
+    }
   }
 
   /** Earth skirt down to the lowest footprint tile when the ground is uneven (px of drop). */
@@ -111,13 +135,32 @@ export class BuildingView {
     const delW = c ? c.delivered.wood : 0;
     const delS = c ? c.delivered.stone : 0;
     const delT = c ? c.delivered.tools : 0;
-    const key = [b.status, c?.kind ?? '', Math.round(progress * 40), stage, pileLevel(outW, [1, 6, 14, 26]), pileLevel(outS, [1, 6, 14, 26]), pileLevel(outF, [1, 5, 12]), pileLevel(outT, [1, 3, 6]), Math.round(stockFill * 6), pileLevel(delW, [1, 12, 24]), pileLevel(delS, [1, 6, 14]), pileLevel(delT, [1, 2, 4])].join('|');
+    // change detection without per-frame string building: compare a fixed set of small integers
+    const kp = this.keyParts;
+    kp[0] = b.status === 'construction' ? 1 : b.status === 'complete' ? 2 : 3;
+    kp[1] = c ? (c.kind === 'repair' ? 2 : 1) : 0;
+    kp[2] = Math.round(progress * 40);
+    kp[3] = stage;
+    kp[4] = pileLevel(outW, PILE_WOOD);
+    kp[5] = pileLevel(outS, PILE_WOOD);
+    kp[6] = pileLevel(outF, PILE_FOOD);
+    kp[7] = pileLevel(outT, PILE_TOOLS);
+    kp[8] = Math.round(stockFill * 6);
+    kp[9] = pileLevel(delW, DEL_WOOD);
+    kp[10] = pileLevel(delS, PILE_FOOD2);
+    kp[11] = pileLevel(delT, DEL_TOOLS);
+    let changed = false;
+    for (let i = 0; i < kp.length; i++) {
+      if (kp[i] !== this.lastParts[i]) {
+        changed = true;
+        this.lastParts[i] = kp[i]!;
+      }
+    }
 
     if (this.status !== '' && this.status !== b.status && b.status === 'complete') this.pop = 0.5;
     this.status = b.status;
 
-    if (key !== this.key) {
-      this.key = key;
+    if (changed) {
       this.rebuild(b, building, repair, progress, stage, { outW, outS, outF, outT, delW, delS, delT }, stockFill);
     }
 
@@ -153,7 +196,7 @@ export class BuildingView {
       const flick = 0.85 + 0.15 * Math.sin(timeSec * 11 + f.phase) + 0.08 * Math.sin(timeSec * 23 + f.phase * 2);
       const base = f.kind === 'campfire' ? 0.35 : 0.3;
       f.flame.alpha = (base + (1 - base) * light) * Math.min(1, flick);
-      const sc = (f.kind === 'campfire' ? 1.0 : 0.62) * (0.7 + 0.5 * light) * flick;
+      const sc = (f.kind === 'campfire' ? 1.7 : 0.62) * (0.7 + 0.5 * light) * flick;
       f.flame.scale.set(sc * (1 + 0.06 * Math.sin(timeSec * 17 + f.phase)), sc * flick);
       f.flame.rotation = Math.sin(timeSec * 5 + f.phase) * 0.08;
     }

@@ -1,5 +1,7 @@
 # Frontier Colony — Development Plan
 
+**Status: complete.** All eight milestones are done; see PROGRESS.md for evidence and BENCHMARK.md for the run report.
+
 The lead coordinator (main Claude Code session) owns this plan. Each work package is handed to a real
 Claude Code subagent launched with the Agent tool. Its `model` parameter picks the model tier.
 
