@@ -32,6 +32,7 @@ import {
   SLEEP_WAKE,
   TOOLS,
   TRAIT_EFFECTS,
+  XP_PER_WORK_HOUR,
   XP_TO_NEXT_LEVEL_PER_LEVEL,
 } from './balance';
 import { NEED_MAX, SKILL_MAX } from './constants';
@@ -133,8 +134,9 @@ function skillOf(category: JobCategory): SkillType {
   }
 }
 
-function grantXp(s: Settler, skill: SkillType, hours: number): void {
-  s.xp[skill] += hours * 1;
+/** Practice: `hours` of work give XP; a skill levels up at `XP_TO_NEXT_LEVEL_PER_LEVEL * (level + 1)` XP, up to SKILL_MAX. */
+export function grantXp(s: Settler, skill: SkillType, hours: number): void {
+  s.xp[skill] += hours * XP_PER_WORK_HOUR;
   const level = s.skills[skill];
   if (level < SKILL_MAX && s.xp[skill] >= XP_TO_NEXT_LEVEL_PER_LEVEL * (level + 1)) {
     s.xp[skill] -= XP_TO_NEXT_LEVEL_PER_LEVEL * (level + 1);

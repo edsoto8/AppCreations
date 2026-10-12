@@ -2,16 +2,21 @@
  * Public API of the simulation. Everything outside src/sim imports from this file only.
  *
  *   createGame(options)            -> new GameState (deterministic for the same options)
- *   stepGame(state)                -> advances exactly ONE fixed tick (TICK_SECONDS), mutating state
- *   applyCommand(state, command)   -> applies a player command between ticks, mutating state
+ *   stepGame(state)                -> advances exactly ONE fixed tick (TICK_SECONDS), mutating state and
+ *                                     returning transient SimEvents: time and weather, settler needs and
+ *                                     the utility-AI task machine, construction, production and hauling,
+ *                                     random events and decisions, population growth, objectives, victory
+ *                                     and defeat
+ *   applyCommand(state, command)   -> applies a player command between ticks (placing, cancelling and
+ *                                     demolishing buildings, priorities, decisions, speed-independent
+ *                                     settings); never throws, returns { ok, error, message }
  *   canPlaceBuilding / getTile / ... read-only queries (queries.ts)
  *   validateGameState(unknown)     -> structural and value check for loaded saves (validate.ts)
+ *   balance exports                -> tuning tables (balance.ts) re-exported for the UI and tests
  *
- * Determinism: same createGame options + same sequence of (tick, command) pairs ⇒ identical
+ * Determinism: same createGame options + same sequence of (tick, command) pairs => identical
  * state. Randomness comes only from `state.rng` (rng.ts). No Math.random, Date, timers or DOM.
- *
- * Functions marked "M1 stub" are functional placeholders that keep the app alive; the
- * Simulation Engineer replaces them (economy, events, weather) without changing signatures.
+ * Only IEEE-exact math (+ - * /, sqrt, floor/ceil/round/trunc, abs, min/max, sign) touches state.
  */
 import {
   BUILDING_DEFS,
