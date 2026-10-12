@@ -53,7 +53,9 @@ export interface SaveSlotInfo {
 }
 
 export type SaveResult = { ok: true; bytes: number } | { ok: false; error: string };
-export type LoadResult = { ok: true; state: GameState; envelope: SaveEnvelope } | { ok: false; error: string };
+export type LoadResult =
+  | { ok: true; state: GameState; envelope: SaveEnvelope; /** Set when a damaged autosave was replaced by its backup. */ restoredFromBackup?: true }
+  | { ok: false; error: string };
 
 export function saveKey(slot: SaveSlotId): string {
   return SAVE_KEY_PREFIX + slot;
@@ -160,7 +162,10 @@ export function deserializeGame(json: string): LoadResult {
   if (!migrated.ok) return migrated;
   const validation = validateGameState(migrated.env.state);
   if (!validation.ok) return { ok: false, error: `Save data is invalid: ${validation.error}.` };
-  return { ok: true, state: validation.state, envelope: migrated.env as unknown as SaveEnvelope };
+  // The envelope's own summary is untrusted (it is not part of the validated state): rebuild it.
+  const envelope = { ...(migrated.env as unknown as SaveEnvelope), summary: summarize(validation.state) };
+  if (typeof envelope.savedAt !== 'string') envelope.savedAt = '';
+  return { ok: true, state: validation.state, envelope };
 }
 
 /** Key holding the autosave that the latest autosave replaced (one generation of backup). */
@@ -171,21 +176,64 @@ export const AUTOSAVE_BACKUP_KEY = `${SAVE_KEY_PREFIX}autosave.prev`;
  * example a NaN that JSON turns into null) is refused, so it never replaces a good save.
  */
 export function saveToSlot(storage: KeyValueStorage, slot: SaveSlotId, state: GameState, now: Date = new Date()): SaveResult {
+  let json: string;
   try {
-    const json = serializeGame(state, now);
-    const check = deserializeGame(json);
-    if (!check.ok) return { ok: false, error: `Save refused: the game state is invalid (${check.error})` };
-    if (slot === 'autosave') {
-      const previous = storage.getItem(saveKey(slot));
-      if (previous !== null) storage.setItem(AUTOSAVE_BACKUP_KEY, previous);
+    json = serializeGame(state, now);
+  } catch {
+    return { ok: false, error: 'Saving failed.' };
+  }
+  const check = deserializeGame(json);
+  if (!check.ok) return { ok: false, error: `Save refused: the game state is invalid (${check.error})` };
+
+  // The main slot is written first; the autosave backup is best-effort and must never cost the save.
+  let previous: string | null = null;
+  try {
+    previous = slot === 'autosave' ? storage.getItem(saveKey(slot)) : null;
+  } catch {
+    previous = null;
+  }
+  try {
+    writeWithQuotaRetry(storage, saveKey(slot), json);
+  } catch (err) {
+    return { ok: false, error: isQuotaError(err) ? 'Not enough browser storage to save.' : 'Saving failed.' };
+  }
+  if (previous !== null) {
+    try {
+      storage.setItem(AUTOSAVE_BACKUP_KEY, previous);
+    } catch {
+      safeRemove(storage, AUTOSAVE_BACKUP_KEY);
     }
-    storage.setItem(saveKey(slot), json);
+  }
+  // The save landed; a missing meta record only makes the list fall back to parsing the save.
+  try {
     const meta: SaveMeta = { format: SAVE_FORMAT, schemaVersion: SAVE_SCHEMA_VERSION, savedAt: now.toISOString(), summary: summarize(state) };
     storage.setItem(saveMetaKey(slot), JSON.stringify(meta));
-    return { ok: true, bytes: json.length };
+  } catch {
+    safeRemove(storage, saveMetaKey(slot));
+  }
+  return { ok: true, bytes: json.length };
+}
+
+function isQuotaError(err: unknown): boolean {
+  return err instanceof Error && /quota/i.test(`${err.name} ${err.message}`);
+}
+
+function safeRemove(storage: KeyValueStorage, key: string): void {
+  try {
+    storage.removeItem(key);
+  } catch {
+    // Storage unavailable: nothing to remove.
+  }
+}
+
+/** On a quota error, drop the autosave backup (the only expendable data we own) and retry once. */
+function writeWithQuotaRetry(storage: KeyValueStorage, key: string, value: string): void {
+  try {
+    storage.setItem(key, value);
   } catch (err) {
-    const quota = err instanceof Error && /quota/i.test(`${err.name} ${err.message}`);
-    return { ok: false, error: quota ? 'Not enough browser storage to save.' : 'Saving failed.' };
+    if (!isQuotaError(err)) throw err;
+    safeRemove(storage, AUTOSAVE_BACKUP_KEY);
+    storage.setItem(key, value);
   }
 }
 
@@ -197,7 +245,17 @@ export function loadFromSlot(storage: KeyValueStorage, slot: SaveSlotId): LoadRe
     return { ok: false, error: 'Browser storage is not available.' };
   }
   if (json === null) return { ok: false, error: 'This save slot is empty.' };
-  return deserializeGame(json);
+  const result = deserializeGame(json);
+  if (result.ok || slot !== 'autosave') return result;
+  // A damaged autosave falls back to the one it replaced.
+  let backup: string | null = null;
+  try {
+    backup = storage.getItem(AUTOSAVE_BACKUP_KEY);
+  } catch {
+    backup = null;
+  }
+  const restored = backup === null ? null : deserializeGame(backup);
+  return restored?.ok ? { ...restored, restoredFromBackup: true } : result;
 }
 
 export function deleteSlot(storage: KeyValueStorage, slot: SaveSlotId): void {

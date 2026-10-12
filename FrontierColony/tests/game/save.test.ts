@@ -134,4 +134,63 @@ describe('save / load', () => {
     expect(loaded.state.meta.schemaVersion).toBe(2);
     for (const s of loaded.state.settlers) expect(s.activity.indoorsBuildingId).toBeNull();
   });
+
+  it('rebuilds the listed summary from the validated state, ignoring a malformed envelope summary', () => {
+    const storage = createMemoryStorage();
+    const state = createGame(DEFAULT_NEW_GAME_OPTIONS);
+    saveToSlot(storage, 'slot1', state);
+    const env = JSON.parse(storage.data.get(saveKey('slot1'))!) as { summary: Record<string, unknown> };
+    env.summary.colonyName = { evil: 1 };
+    storage.data.set(saveKey('slot1'), JSON.stringify(env));
+    storage.data.delete(saveMetaKey('slot1'));
+    const info = listSaveSlots(storage).find((x) => x.slot === 'slot1')!;
+    expect(info.summary?.colonyName).toBe(state.colony.name);
+  });
+
+  it('loads the previous autosave when the current one is damaged', () => {
+    const storage = createMemoryStorage();
+    const state = createGame(DEFAULT_NEW_GAME_OPTIONS);
+    saveToSlot(storage, 'autosave', state);
+    stepGame(state);
+    saveToSlot(storage, 'autosave', state);
+    storage.data.set(saveKey('autosave'), '{not json');
+    const result = loadFromSlot(storage, 'autosave');
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.restoredFromBackup).toBe(true);
+    // A damaged manual slot has no fallback.
+    storage.data.set(saveKey('slot3'), '{not json');
+    expect(loadFromSlot(storage, 'slot3').ok).toBe(false);
+  });
+
+  it('keeps autosaving when storage has no room for the backup copy', () => {
+    const inner = createMemoryStorage();
+    let limit = Infinity;
+    const used = () => [...inner.data.values()].reduce((n, v) => n + v.length, 0);
+    const storage: KeyValueStorage = {
+      getItem: (k) => inner.getItem(k),
+      removeItem: (k) => inner.removeItem(k),
+      setItem: (k, v) => {
+        const after = used() - (inner.data.get(k)?.length ?? 0) + v.length;
+        if (after > limit) throw Object.assign(new Error('The quota has been exceeded.'), { name: 'QuotaExceededError' });
+        inner.setItem(k, v);
+      },
+    };
+    const state = createGame(DEFAULT_NEW_GAME_OPTIONS);
+    saveToSlot(storage, 'autosave', state);
+    stepGame(state);
+    saveToSlot(storage, 'autosave', state);
+    expect(inner.data.has(AUTOSAVE_BACKUP_KEY)).toBe(true);
+    // Room to rewrite the autosave in place, but not to add a full backup copy beside it
+    // (the reviewer's near-quota case: the old code wrote the backup first and failed).
+    inner.removeItem(AUTOSAVE_BACKUP_KEY);
+    const saveSize = inner.data.get(saveKey('autosave'))!.length;
+    limit = used() + 4000;
+    expect(saveSize).toBeGreaterThan(4000);
+    stepGame(state);
+    const result = saveToSlot(storage, 'autosave', state);
+    expect(result.ok).toBe(true);
+    expect(inner.data.has(AUTOSAVE_BACKUP_KEY)).toBe(false);
+    const loaded = loadFromSlot(storage, 'autosave');
+    expect(loaded.ok && loaded.state.time.tick).toBe(state.time.tick);
+  });
 });

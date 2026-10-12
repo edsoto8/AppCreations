@@ -126,7 +126,11 @@ export class GameController implements GameControllerApi {
     const clock = advanceClock(this.accumulatorMs, frameMs, ui.speed, paused);
     this.accumulatorMs = clock.accumulatorMs;
     try {
-      for (let i = 0; i < clock.steps; i++) this.runTick();
+      for (let i = 0; i < clock.steps; i++) {
+        this.runTick();
+        // Victory pauses through the store and defeat ends the game: run no further ticks this frame.
+        if (this.store.getState().paused || this.state.outcome.status === 'lost') break;
+      }
       const events = this.pendingEvents;
       this.pendingEvents = [];
       this.renderer?.render(this.state, { alpha: clock.alpha, frameMs, nowMs: now, speed: paused ? 0 : ui.speed, events });
@@ -281,7 +285,10 @@ export class GameController implements GameControllerApi {
     const result = loadFromSlot(this.storage, slot);
     if (result.ok) {
       this.replaceState(result.state);
-      this.store.getState().pushToast('Game loaded.', 'good');
+      this.store.getState().pushToast(
+        result.restoredFromBackup ? 'The autosave was damaged, so the previous autosave was loaded.' : 'Game loaded.',
+        result.restoredFromBackup ? 'warning' : 'good',
+      );
     } else {
       this.store.getState().pushToast(result.error, 'danger');
     }
@@ -352,6 +359,8 @@ function toastFor(e: SimEvent, state: GameState): { message: string; severity: '
   switch (e.type) {
     case 'buildingPlaced':
       return { message: `${BUILDING_DEFS[e.buildingType].name} placed. Settlers will start building.`, severity: 'info' };
+    case 'goodsLost':
+      return { message: `Storage full: ${e.amount} ${e.resource} lost.`, severity: 'warning' };
     case 'buildingCompleted':
       return { message: `${BUILDING_DEFS[e.buildingType].name} completed.`, severity: 'good' };
     case 'settlerBorn':
