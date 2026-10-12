@@ -1,6 +1,6 @@
 /**
  * Static description of every panel: used by the toolbar, the panel host and the keyboard shortcuts.
- * To make a panel real (M3+): keep its entry here and replace its placeholder in PanelHost.tsx.
+ * To add a panel: add its id to `PanelId` in the store, an entry here, and a case in PanelHost.tsx.
  */
 import type { PanelId } from '../../store';
 import type { IconName } from '../components/Icon';
@@ -17,8 +17,6 @@ export interface PanelDef {
   width: number;
   /** One-line description (toolbar tooltip). */
   blurb: string;
-  /** Milestone that fills the panel in; null when it is already functional. */
-  comingIn: string | null;
   /** Shown on the toolbar. */
   inToolbar: boolean;
 }
@@ -32,7 +30,6 @@ export const PANEL_DEFS: Record<PanelId, PanelDef> = {
     placement: 'left',
     width: 380,
     blurb: 'Place houses, farms, camps and workshops.',
-    comingIn: null,
     inToolbar: true,
   },
   settlers: {
@@ -43,7 +40,6 @@ export const PANEL_DEFS: Record<PanelId, PanelDef> = {
     placement: 'right',
     width: 380,
     blurb: 'See who lives here, what they are doing and how they feel.',
-    comingIn: null,
     inToolbar: true,
   },
   priorities: {
@@ -54,7 +50,6 @@ export const PANEL_DEFS: Record<PanelId, PanelDef> = {
     placement: 'right',
     width: 430,
     blurb: 'Tell the colony which jobs matter most.',
-    comingIn: null,
     inToolbar: true,
   },
   events: {
@@ -65,7 +60,6 @@ export const PANEL_DEFS: Record<PanelId, PanelDef> = {
     placement: 'right',
     width: 400,
     blurb: 'A running history of arrivals, weather, accidents and discoveries.',
-    comingIn: null,
     inToolbar: true,
   },
   stats: {
@@ -76,7 +70,6 @@ export const PANEL_DEFS: Record<PanelId, PanelDef> = {
     placement: 'right',
     width: 400,
     blurb: 'Charts of stock and population over time.',
-    comingIn: null,
     inToolbar: true,
   },
   saveLoad: {
@@ -87,7 +80,6 @@ export const PANEL_DEFS: Record<PanelId, PanelDef> = {
     placement: 'center',
     width: 560,
     blurb: 'Save your colony to a slot, or load an earlier one.',
-    comingIn: null,
     inToolbar: true,
   },
   help: {
@@ -98,7 +90,6 @@ export const PANEL_DEFS: Record<PanelId, PanelDef> = {
     placement: 'center',
     width: 640,
     blurb: 'Controls, the core loop, survival tips, and how to win or lose.',
-    comingIn: null,
     inToolbar: false,
   },
   settings: {
@@ -109,7 +100,6 @@ export const PANEL_DEFS: Record<PanelId, PanelDef> = {
     placement: 'center',
     width: 520,
     blurb: 'Interface size, autosave, tooltips and the tutorial.',
-    comingIn: null,
     inToolbar: true,
   },
 };

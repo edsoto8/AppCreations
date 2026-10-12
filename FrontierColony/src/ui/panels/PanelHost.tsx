@@ -6,13 +6,12 @@ import { EventsPanel } from './EventsPanel';
 import { PrioritiesPanel } from './PrioritiesPanel';
 import { StatsPanel } from './StatsPanel';
 import { SettlersPanel } from './SettlersPanel';
-import { PlaceholderPanel } from './PlaceholderPanel';
 import { SaveLoadView } from './SaveLoadView';
 import { HowToPlay } from './HowToPlay';
 import { SettingsPanel } from './SettingsPanel';
 import { PANEL_DEFS } from './panelDefs';
 
-/** Renders whichever panel the store says is open. Replace a placeholder here when its milestone lands. */
+
 /** Keeps the last panel mounted for `ms` after it closes, so it can animate out. */
 function useClosing(open: PanelId | null, ms = 150): { shown: PanelId | null; closing: boolean } {
   const [shown, setShown] = useState<PanelId | null>(open);
@@ -70,9 +69,6 @@ export function PanelHost() {
     case 'help':
       body = <HowToPlay />;
       break;
-    default:
-      // Every panel now has a real body; PlaceholderPanel stays available for future panels.
-      body = <PlaceholderPanel icon={def.icon} heading={def.title} blurb={def.blurb} comingIn={def.comingIn ?? 'a later milestone'} />;
   }
 
   return (

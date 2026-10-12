@@ -16,6 +16,7 @@ import { HaltedBanner } from './hud/HaltedBanner';
 import { DecisionHost } from './hud/DecisionHost';
 import { HoverCard } from './hud/HoverCard';
 import { Minimap } from './hud/Minimap';
+import { OverlayToggle } from './hud/OverlayToggle';
 import { TourHost } from './hud/TourHost';
 import { ObjectivesTracker } from './hud/ObjectivesTracker';
 import { WarningsStrip } from './hud/WarningsStrip';
@@ -50,6 +51,7 @@ function GameUi() {
           <InspectorHost />
           <div className="left-dock">
             <ObjectivesTracker />
+            <OverlayToggle />
             <Minimap />
           </div>
           <DecisionHost />

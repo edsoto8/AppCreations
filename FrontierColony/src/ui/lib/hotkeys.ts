@@ -2,12 +2,15 @@
 import type { StoreApi } from 'zustand/vanilla';
 import type { GameSpeed } from '../../shared/types';
 import type { PanelId, UiStore } from '../../store';
+import { nextOverlay } from './overlay';
 
 export type HotkeyAction =
   | { type: 'togglePause' }
   | { type: 'speed'; speed: GameSpeed }
   | { type: 'escape' }
   | { type: 'panel'; panel: PanelId }
+  /** V: cycle the map overlay (off, resources, buildable). */
+  | { type: 'overlay' }
   /** Shift+1..9: pick the Nth building of the catalogue (only while the Build panel or build mode is active). */
   | { type: 'buildSelect'; index: number };
 
@@ -56,6 +59,7 @@ export function resolveHotkey(input: HotkeyInput, ui: Pick<UiStore, 'screen' | '
   }
   const speed = SPEED_HOTKEYS[input.key];
   if (speed !== undefined) return { type: 'speed', speed };
+  if (input.key === 'v' || input.key === 'V') return { type: 'overlay' };
   const panel = PANEL_HOTKEYS[input.key.toLowerCase()];
   if (panel !== undefined) return { type: 'panel', panel };
   return null;
@@ -76,6 +80,9 @@ export function applyHotkey(action: HotkeyAction, store: StoreApi<UiStore>, onBu
       return;
     case 'panel':
       ui.togglePanel(action.panel);
+      return;
+    case 'overlay':
+      ui.setOverlay(nextOverlay(ui.overlay));
       return;
     case 'buildSelect':
       if (onBuildSelect) onBuildSelect(action.index);

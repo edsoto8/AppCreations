@@ -96,3 +96,18 @@ describe('build quick-select', () => {
     expect(picked).toEqual([2]);
   });
 });
+
+describe('overlay hotkey', () => {
+  it('V cycles off, resources, buildable and back', async () => {
+    const { nextOverlay } = await import('../../src/ui/lib/overlay');
+    expect(resolveHotkey(key('v'), playing)).toEqual({ type: 'overlay' });
+    expect(resolveHotkey(key('V'), playing)).toEqual({ type: 'overlay' });
+    expect(resolveHotkey(key('v', { focus: 'editable' }), playing)).toBeNull();
+    expect(nextOverlay('none')).toBe('resources');
+    expect(nextOverlay('resources')).toBe('buildable');
+    expect(nextOverlay('buildable')).toBe('none');
+    const store = createUiStore();
+    applyHotkey({ type: 'overlay' }, store);
+    expect(store.getState().overlay).toBe('resources');
+  });
+});
