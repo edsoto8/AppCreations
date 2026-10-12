@@ -7,7 +7,7 @@ where, set job priorities, and steer the colony through weather, random events a
 TypeScript · React 19 · PixiJS 8 · Zustand 5 · Vite 8 · Vitest · Playwright. No backend: games are saved
 in the browser's localStorage. All art is procedural (drawn in code at startup), so there are no asset files.
 
-![A growing colony](docs/screenshots/m4-gfx-colony.png)
+![A young colony at dusk on day 3](docs/screenshots/final-overview.png)
 
 ## Run it
 

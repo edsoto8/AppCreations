@@ -137,3 +137,7 @@ been run. A milestone is marked done only after its acceptance criteria were ver
 - Lead verification of M6: `tsc -b` clean, 456/456 unit tests, build ok, `npm run test:e2e` 25/25 twice in a row.
   Known cosmetic defects for the final polish round: grassy bank strips stay green-grey in winter, sand beaches
   are not snow-covered.
+- M7 started. Code Reviewer (opus) running the final release review of 7e41bbc. Lead playtest in Chromium
+  (production build, quickstart seed `playtest-7`, medium continent): farm, well, house and lumber camp placed via
+  commands, all completed by day 3, a newcomer joined, needs and activities sensible, no console errors.
+  Frame-rate sampling was invalid (load average 6.5 on 4 cores from the reviewer's probes); re-measure when idle.
