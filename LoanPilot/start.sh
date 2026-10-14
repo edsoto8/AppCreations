@@ -16,4 +16,4 @@ if [[ "$rebuild" == true || ! -f backend/src/LoanPilot.Api/wwwroot/index.html ]]
 fi
 
 echo "Starting LoanPilot on http://localhost:5080 (Ctrl+C to stop)"
-exec dotnet run --project backend/src/LoanPilot.Api -c Release -- "${args[@]}"
+exec dotnet run --project backend/src/LoanPilot.Api -c Release --no-launch-profile -- ${args[@]+"${args[@]}"}

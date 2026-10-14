@@ -14,4 +14,4 @@ if ($Rebuild -or -not (Test-Path 'backend/src/LoanPilot.Api/wwwroot/index.html')
 }
 
 Write-Host 'Starting LoanPilot on http://localhost:5080 (Ctrl+C to stop)'
-dotnet run --project backend/src/LoanPilot.Api -c Release -- @ApiArgs
+dotnet run --project backend/src/LoanPilot.Api -c Release --no-launch-profile -- @ApiArgs

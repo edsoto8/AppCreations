@@ -27,7 +27,7 @@ Manual equivalent:
 
 ```bash
 cd LoanPilot/frontend && npm ci && npm run build      # writes the SPA into the API's wwwroot
-cd .. && dotnet run --project backend/src/LoanPilot.Api -c Release
+cd .. && dotnet run --project backend/src/LoanPilot.Api -c Release --no-launch-profile
 ```
 
 Development (hot reload): run the API (`dotnet run --project backend/src/LoanPilot.Api`) and, in a
