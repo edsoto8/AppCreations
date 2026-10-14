@@ -50,10 +50,10 @@ Status keys: `[ ]` not started · `[~]` in progress · `[x]` verified complete �
 
 | Suite | Result |
 |---|---|
-| LoanPilot.Core.Tests (engine) | 110 passed |
+| LoanPilot.Core.Tests (engine) | 111 passed |
 | LoanPilot.Data.Tests (SQLite) | 81 passed |
 | LoanPilot.Api.Tests (real host) | 16 passed |
-| Front end (Vitest) | 142 passed, 18 files; `tsc` clean |
+| Front end (Vitest) | 146 passed, 18 files; `tsc` clean |
 
 **End-to-end check** (Playwright against `./start.sh` on a fresh data folder): empty state → create a
 loan with a current balance through the form → dashboard → simulator +$100 and save scenario →
@@ -107,3 +107,8 @@ documented local startup).
   written into the repo by hand following the shadcn new-york conventions.
 - Built and verified all six milestones and the advanced features; two independent reviews; final
   validation from a fresh clone.
+- Follow-up: keeping a loan current over time. Saved plans no longer become invalid when the balance
+  date moves past their lump sums (those count as already paid); the Payments page prompts to update the
+  balance once payments are recorded after the balance date, linking to the focused balance field.
+  Verified with unit/API tests and a browser walkthrough (record payment → prompt → update balance →
+  plan still compared, paid lump sum marked).

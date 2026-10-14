@@ -82,6 +82,12 @@ calculated". Rule-based; no AI service involved.
 **Advanced** — refinance comparison with break-even and a rate comparison table; payment history with
 manual entry, CSV import and actual-vs-scheduled tracking; vehicle equity.
 
+**Keeping it up to date** — as you make (extra) payments, enter the new balance from your statement
+in Loan Details (the Payments page reminds you once you've recorded payments after your balance date,
+with a button straight to the field). Everything recalculates from that date. Saved plans keep
+working: lump sums you have already paid are marked "Already paid" and not counted twice, and the rest
+of the plan still applies. Edit or replace plans in the simulator at any time.
+
 **Settings** — light/dark/system theme, display currency, default interest method, comparison budget,
 loan management (including archived loans) and a summary of the calculation rules.
 

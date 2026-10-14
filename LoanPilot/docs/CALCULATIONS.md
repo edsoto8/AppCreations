@@ -73,6 +73,14 @@ common years. Biweekly and weekly dates step 14 or 7 days from the first payment
   payment so far was made on time with no extras (or the number of payments you entered). Every
   figure derived from that estimate is labelled *Estimated*.
 - A balance older than 45 days is flagged as stale.
+- **Keeping it current:** payment records never change the projection (the lender, not LoanPilot,
+  decides how a payment was applied). After making payments, enter the new statement balance and its
+  date; everything — dashboard, schedule, insights and saved plans — restarts from it. The Payments page
+  prompts for this once a recorded payment is newer than the balance date.
+- **Saved plans after a balance update:** lump sums in a plan dated before the new balance date are
+  treated as **already paid** (they are part of that balance) and are not applied again; the rest of the
+  plan — later lump sums and recurring extras — still applies, and the result notes which lump sums
+  were counted as paid. Recurring extras whose end date has passed simply no longer apply.
 
 ## Payoff estimate vs. lender payoff quote
 

@@ -68,11 +68,16 @@ public static class ScenarioComparer
         {
             if (ScenarioValidator.Validate(scenario, analysis, requireName: false, format).Count > 0)
             {
-                notes.Add($"\"{scenario.Name}\" is not valid for the loan's current details (for example a lump sum dated before the balance date) and was skipped. Edit it in the simulator.");
+                notes.Add($"\"{scenario.Name}\" is not valid for the loan's current details (for example a budget below the scheduled payment) and was skipped. Edit it in the simulator.");
                 continue;
             }
 
             rows.Add(Row(analysis, $"scenario:{scenario.Id}", scenario.Name, ComparisonKind.Saved, scenario.Id, scenario));
+            if (analysis.AlreadyPaidLumpSums(scenario) is { Count: > 0 } paid)
+            {
+                notes.Add($"\"{scenario.Name}\": {DisplayFormat.Count(paid.Count)} lump sum{(paid.Count == 1 ? " is" : "s are")} dated before your balance date " +
+                    $"({format.LongDate(analysis.Status.ProjectionStartDate)}) and counted as already paid; the rest of the plan is compared.");
+            }
         }
 
         var payingOff = rows.Where(r => r.PaysOff).ToList();

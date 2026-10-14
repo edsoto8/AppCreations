@@ -164,10 +164,18 @@ public sealed class ApiTests : IDisposable
 
         var badSim = await _client.PostAsync($"/api/loans/{id}/simulate?{Http.AsOf}", Http.Json(new
         {
-            lumpSums = new[] { new { amount = 100m, date = "2025-01-01" } },
+            lumpSums = new[] { new { amount = 0m, date = "2026-12-01" } },
         }));
         Assert.Equal(HttpStatusCode.BadRequest, badSim.StatusCode);
-        Assert.NotNull((await badSim.ReadJson())["errors"]!["lumpSums[0].date"]);
+        Assert.NotNull((await badSim.ReadJson())["errors"]!["lumpSums[0].amount"]);
+
+        // A lump sum dated before the balance date is accepted and reported as already paid.
+        var pastLump = await (await _client.PostAsync($"/api/loans/{id}/simulate?{Http.AsOf}", Http.Json(new
+        {
+            lumpSums = new[] { new { amount = 1000m, date = "2026-09-01" } },
+        }))).ReadJson();
+        Assert.Contains(pastLump["scenario"]!["summary"]!["warnings"]!.AsArray(), w => w!["code"]!.GetValue<string>() == "lump-sum-already-paid");
+        Assert.Equal(0m, pastLump["comparison"]!["interestSaved"]!.GetValue<decimal>());
 
         var target = await (await _client.PostAsync($"/api/loans/{id}/target-payoff?{Http.AsOf}", Http.Json(new { targetDate = "2028-12-31" }))).ReadJson();
         Assert.True(target["achievable"]!.GetValue<bool>());

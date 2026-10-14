@@ -245,7 +245,8 @@ public static class ScenarioValidator
             Add("lumpSums", $"Use at most {MaxLumpSums} lump-sum payments.");
         }
 
-        var earliest = analysis.Status.ProjectionStartDate;
+        // Lump sums dated before the projection start are not errors: they are treated as already paid
+        // (see LoanAnalysis.Project), so a saved plan keeps working after the balance is updated.
         for (var i = 0; i < scenario.LumpSums.Count; i++)
         {
             var lump = scenario.LumpSums[i];
@@ -256,12 +257,6 @@ public static class ScenarioValidator
             else if (lump.Amount > LoanValidator.MaxAmount)
             {
                 Add($"lumpSums[{i}].amount", "The lump sum looks too large.");
-            }
-
-            if (lump.Date < earliest)
-            {
-                Add($"lumpSums[{i}].date",
-                    $"Lump sums must be dated on or after {format.LongDate(earliest)}, when the projection starts.");
             }
 
             if (lump.Note is { Length: > 200 })

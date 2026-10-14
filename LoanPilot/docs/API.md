@@ -202,6 +202,9 @@ interface Preferences { theme: 'system' | 'light' | 'dark'; currency: string; de
   `payoffEstimate.principal` can be below `currentBalance`).
 - `status.remainingTotalCost` = sum of the projected payments. For a loan that never pays off within the
   50-year horizon it excludes what is still owed then (`baseline.endingOwed`).
+- Scenario lump sums dated before `status.projectionStartDate` are not rejected: they are treated as
+  already paid (part of the current balance), not applied, and reported with the warning code
+  `lump-sum-already-paid` in the scenario projection; comparison `notes` mention them too.
 - `costSeries[].month` in the refinance result is the payment number; `breakEvenMonth` is in calendar
   months; `monthlyPaymentChange` is per payment (per month for monthly loans).
 

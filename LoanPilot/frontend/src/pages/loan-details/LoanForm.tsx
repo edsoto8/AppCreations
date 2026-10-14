@@ -1,5 +1,5 @@
-import { useMemo, useState, type FocusEvent, type FormEvent, type ReactNode } from 'react';
-import { useNavigate } from 'react-router';
+import { useEffect, useMemo, useState, type FocusEvent, type FormEvent, type ReactNode } from 'react';
+import { useNavigate, useSearchParams } from 'react-router';
 import { AlertCircleIcon, HistoryIcon, LoaderCircleIcon, SaveIcon } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -76,7 +76,16 @@ export function LoanForm({ mode, initialValues, loan }: LoanFormProps) {
   const { setSelectedLoanId } = useLoanContext();
   const { create, update } = useLoanMutations();
 
-  const [values, setValues] = useState<LoanFormValues>(initialValues);
+  // ?focus=currentBalance (from "Update balance" prompts) opens the current-status fields and focuses the balance.
+  const [searchParams] = useSearchParams();
+  const focusBalance = mode === 'edit' && searchParams.get('focus') === 'currentBalance';
+  const [values, setValues] = useState<LoanFormValues>(() => (focusBalance ? { ...initialValues, inProgress: true } : initialValues));
+  useEffect(() => {
+    if (!focusBalance) return;
+    const field = document.getElementById(fieldId('currentBalance'));
+    field?.scrollIntoView({ block: 'center' });
+    field?.focus();
+  }, [focusBalance]);
   const [touched, setTouched] = useState<ReadonlySet<LoanFormField>>(new Set());
   const [submitted, setSubmitted] = useState(false);
   const [serverErrors, setServerErrors] = useState<FieldErrors>({});
@@ -392,6 +401,16 @@ export function LoanForm({ mode, initialValues, loan }: LoanFormProps) {
             </div>
             <Switch id={fieldId('inProgress')} checked={values.inProgress} onCheckedChange={(c) => set('inProgress', c)} />
           </div>
+          {values.inProgress && focusBalance && (
+            <Alert variant="info" className="sm:col-span-2" data-testid="update-balance-hint">
+              <HistoryIcon />
+              <AlertTitle>Update from your latest statement</AlertTitle>
+              <AlertDescription>
+                Enter the principal balance and the date it applies to. Projections, the dashboard and your saved plans restart from it, so extra
+                payments you have made are included.
+              </AlertDescription>
+            </Alert>
+          )}
           {values.inProgress && (
             <>
               <FormField label="Current principal balance" htmlFor={fieldId('currentBalance')} info="payoffQuote">

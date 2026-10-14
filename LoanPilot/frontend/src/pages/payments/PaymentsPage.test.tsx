@@ -68,6 +68,24 @@ function setup(
 const history = () => screen.getByRole('region', { name: 'Recorded payments' });
 
 describe('PaymentsPage', () => {
+  it('asks to update an entered balance once payments are recorded after the balance date', async () => {
+    setup(
+      { 'GET /api/loans/:id/dashboard': json(makeDashboard({ status: makeStatus({ balanceIsEstimated: false }) })) },
+      [record(1, '2026-09-01', 483.32), record(2, '2026-10-10', 2483.32, undefined, 'Extra')],
+    );
+    const prompt = await screen.findByTestId('update-balance-prompt');
+    expect(prompt).toHaveTextContent('Update your balance to include these payments');
+    expect(prompt).toHaveTextContent('1 payment after your balance date (Oct 1, 2026)');
+    expect(within(prompt).getByRole('link', { name: /Update balance/ })).toHaveAttribute('href', '/loans/1/edit?focus=currentBalance');
+  });
+
+  it('asks for a current balance when the balance is only estimated', async () => {
+    setup({}, [record(1, '2026-10-10', 2483.32)]);
+    const prompt = await screen.findByTestId('update-balance-prompt');
+    expect(prompt).toHaveTextContent('Enter your current balance to include these payments');
+    expect(prompt).toHaveTextContent('the estimated balance assumes only scheduled payments');
+  });
+
   it('lists recorded payments newest first with totals, tracking and equity', async () => {
     setup();
     const rows = within(await screen.findByRole('region', { name: 'Recorded payments' })).getAllByRole('row');
@@ -77,6 +95,7 @@ describe('PaymentsPage', () => {
     expect(rows[2]).toHaveTextContent('$67.17');
     expect(within(history()).getByText('$1,066.64')).toBeInTheDocument(); // total amount
     expect(within(history()).getByText('1 of 2 with a split')).toBeInTheDocument();
+    expect(screen.queryByTestId('update-balance-prompt')).not.toBeInTheDocument(); // no payments after the balance date
 
     // Tracking: chart card, totals, and the server note.
     expect(screen.getByText('Recorded vs scheduled')).toBeInTheDocument();

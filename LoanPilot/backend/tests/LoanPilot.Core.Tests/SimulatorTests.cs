@@ -49,8 +49,36 @@ public sealed class SimulatorTests
     public void Simulate_InvalidScenario_Throws()
     {
         var ex = Assert.Throws<LoanValidationException>(() =>
-            Simulator.Simulate(Existing(), new Scenario { LumpSums = [new LumpSum(100m, new DateOnly(2026, 1, 1))] }));
-        Assert.Equal("lumpSums[0].date", ex.Errors[0].Field);
+            Simulator.Simulate(Existing(), new Scenario { LumpSums = [new LumpSum(0m, new DateOnly(2026, 12, 1))] }));
+        Assert.Equal("lumpSums[0].amount", ex.Errors[0].Field);
+    }
+
+    [Fact]
+    public void Simulate_LumpSumBeforeBalanceDate_IsTreatedAsAlreadyPaid()
+    {
+        // The balance (as of Oct 5, 2026) already reflects a lump sum paid in September.
+        var analysis = Existing();
+        var withPaidLump = new Scenario
+        {
+            RecurringExtras = [new RecurringExtra(100m)],
+            LumpSums = [new LumpSum(2000m, new DateOnly(2026, 9, 15)), new LumpSum(1000m, new DateOnly(2027, 3, 1))],
+        };
+        var remainingPlan = new Scenario
+        {
+            RecurringExtras = [new RecurringExtra(100m)],
+            LumpSums = [new LumpSum(1000m, new DateOnly(2027, 3, 1))],
+        };
+
+        var result = Simulator.Simulate(analysis, withPaidLump);
+        var expected = Simulator.Simulate(analysis, remainingPlan);
+
+        Assert.Equal(expected.Scenario.Summary.TotalInterest, result.Scenario.Summary.TotalInterest);
+        Assert.Equal(expected.Scenario.Summary.PayoffDate, result.Scenario.Summary.PayoffDate);
+        Assert.Equal(1000m, result.Scenario.Rows.Sum(r => r.ExtraPayment - r.RecurringExtra)); // the paid lump is not applied again
+        var notice = Assert.Single(result.Scenario.Summary.Warnings, w => w.Code == "lump-sum-already-paid");
+        Assert.Equal(Severity.Info, notice.Severity);
+        Assert.Contains("September 15, 2026", notice.Message);
+        Assert.DoesNotContain(expected.Scenario.Summary.Warnings, w => w.Code == "lump-sum-already-paid");
     }
 
     [Theory]
@@ -129,8 +157,10 @@ public sealed class SimulatorTests
         Assert.Contains(result.Rows, r => r.Key == "preset:extra-50");
         Assert.Contains(result.Rows, r => r.Key == "preset:extra-100");
         Assert.Contains(result.Rows, r => r.Key == "preset:lump-2000");
-        Assert.DoesNotContain(result.Rows, r => r.Key == "scenario:3");
-        Assert.Contains(result.Notes, n => n.Contains("Stale"));
+        // A plan whose only lump sum predates the balance date stays in the comparison (as already paid).
+        var stale = result.Rows.Single(r => r.Key == "scenario:3");
+        Assert.Equal(0m, stale.InterestSaved);
+        Assert.Contains(result.Notes, n => n.Contains("Stale") && n.Contains("already paid"));
 
         Assert.Equal("scenario:1", result.Best.LowestInterest);
         Assert.Equal("scenario:1", result.Best.FastestPayoff);

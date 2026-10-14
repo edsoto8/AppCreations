@@ -152,14 +152,14 @@ describe('SimulatorPage — server validation', () => {
     const simulate = (req: MockRequest) => {
       const body = req.body as ScenarioInput;
       return body.lumpSums.length > 0
-        ? problem({ 'lumpSums[0].date': ['Lump sums must be dated on or after October 1, 2026, when the projection starts.'] })
+        ? problem({ 'lumpSums[0].date': ['Enter a valid date for this lump sum.'] })
         : json(makeSimulation());
     };
     const { user } = setup({ 'POST /api/loans/:id/simulate': simulate });
     await screen.findByTestId('new-payoff-date');
     await user.click(screen.getByRole('tab', { name: 'One-time lump sum' }));
 
-    const message = await screen.findByText(/Lump sums must be dated on or after October 1, 2026/);
+    const message = await screen.findByText('Enter a valid date for this lump sum.');
     const date = screen.getByLabelText('Payment date');
     expect(date).toHaveAttribute('aria-invalid', 'true');
     expect(date.getAttribute('aria-describedby')).toContain(message.id);
@@ -305,6 +305,23 @@ describe('SimulatorPage — saved scenarios', () => {
     await user.click(within(dialog).getByRole('button', { name: 'Save scenario' }));
     expect(await within(dialog).findByText('That name is already used.')).toBeInTheDocument();
     expect(screen.getByRole('dialog')).toBeInTheDocument();
+  });
+
+  it('marks a saved lump sum dated before the balance date as already paid', async () => {
+    const scenario = makeScenario({
+      lumpSums: [
+        { amount: 2000, date: '2026-09-15', note: 'Paid in September' },
+        { amount: 1500, date: '2027-03-15', note: 'Bonus' },
+      ],
+    });
+    setup({ 'GET /api/loans/:id/scenarios': json([scenario]) }, '/simulator?scenario=7');
+
+    const lumps = within(await screen.findByRole('region', { name: 'Lump sums' }));
+    // Only the September lump sum (before the Oct 1, 2026 balance date) is marked; the plan stays editable.
+    const notes = await lumps.findAllByTestId('already-paid');
+    expect(notes).toHaveLength(1);
+    expect(notes[0]).toHaveTextContent('Already paid');
+    expect(notes[0]).toHaveTextContent('Oct 1, 2026');
   });
 
   it('loads ?scenario=<id> into the editor and can update it', async () => {

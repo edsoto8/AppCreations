@@ -105,8 +105,40 @@ public sealed class LoanAnalysis
             LumpSums = scenario.LumpSums,
         };
 
-    public Projection Project(Scenario? scenario) =>
-        scenario is null || scenario.IsEmpty ? Baseline : AmortizationEngine.Run(RequestFor(scenario), Format);
+    /// <summary>
+    /// Projects the loan under a scenario. Lump sums dated before the projection start (the balance
+    /// date) are treated as already paid — they are part of the current balance — and are not applied
+    /// again; the projection's warnings say so.
+    /// </summary>
+    public Projection Project(Scenario? scenario)
+    {
+        if (scenario is null || scenario.IsEmpty)
+        {
+            return Baseline;
+        }
+
+        var paid = AlreadyPaidLumpSums(scenario);
+        if (paid.Count == 0)
+        {
+            return AmortizationEngine.Run(RequestFor(scenario), Format);
+        }
+
+        var request = RequestFor(scenario) with { LumpSums = scenario.LumpSums.Where(l => l.Date >= Status.ProjectionStartDate).ToList() };
+        var projection = AmortizationEngine.Run(request, Format);
+        var notice = new CalcWarning(
+            "lump-sum-already-paid",
+            (paid.Count == 1
+                ? $"The {Format.Money(paid[0].Amount)} lump sum on {Format.LongDate(paid[0].Date)} is"
+                : $"{DisplayFormat.Count(paid.Count)} lump sums ({Format.Money(paid.Sum(l => l.Amount))} in total) are") +
+            $" dated before your balance date ({Format.LongDate(Status.ProjectionStartDate)}), so {(paid.Count == 1 ? "it is" : "they are")} treated as already paid " +
+            "and already reflected in your current balance. The rest of the plan still applies.",
+            Severity.Info);
+        return projection with { Summary = projection.Summary with { Warnings = [notice, .. projection.Summary.Warnings] } };
+    }
+
+    /// <summary>The scenario's lump sums dated before the projection start.</summary>
+    public IReadOnlyList<LumpSum> AlreadyPaidLumpSums(Scenario scenario) =>
+        scenario.LumpSums.Where(l => l.Date < Status.ProjectionStartDate).OrderBy(l => l.Date).ToList();
 }
 
 public static class LoanAnalyzer

@@ -24,6 +24,7 @@ import { ImportCard } from './ImportCard';
 import { PaymentsTable } from './PaymentsTable';
 import { usePaymentMutations, usePayments, useTracking } from './queries';
 import { TrackingChart, TrackingLegend, TrackingTable } from './TrackingChart';
+import { UpdateBalancePrompt } from './UpdateBalancePrompt';
 
 export function PaymentsPage() {
   const { loans, isLoading, isError, error, selectedLoan } = useLoanContext();
@@ -80,6 +81,8 @@ function PaymentsForLoan({ item }: { item: LoanListItem }) {
         description="Keep a record of what you have paid, import it from a CSV, and see how it tracks against the original schedule."
       />
 
+      <UpdateBalancePrompt loanId={loan.id} status={status} records={records} />
+
       <Alert variant="info">
         <InfoIcon />
         <AlertTitle>Payment records are optional</AlertTitle>
@@ -87,7 +90,8 @@ function PaymentsForLoan({ item }: { item: LoanListItem }) {
           <p>
             LoanPilot projects your loan from its balance and schedule, so you never have to record anything. Records let you check your payments
             against the schedule, and when they are complete (one record for every payment made, each with its interest split), LoanPilot can show the
-            interest you have paid to date.
+            interest you have paid to date. Records never change your projections; to include extra payments, update the current balance in
+            Loan Details.
           </p>
         </AlertDescription>
       </Alert>

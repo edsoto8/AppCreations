@@ -6,6 +6,7 @@ import { FieldError } from '@/components/FormField';
 import { formatDate } from '@/lib/format';
 import { fieldIds, type Draft } from '../scenarioDraft';
 import type { ControlsContext } from './context';
+import { AlreadyPaidNote } from './AlreadyPaidNote';
 
 interface LumpControlsProps {
   value: Draft['lump'];
@@ -41,6 +42,7 @@ export function LumpControls({ value, onChange, errors, ctx }: LumpControlsProps
           onValueChange={(date) => onChange({ ...value, date })}
           error={errors[fieldIds.lumpDate]}
         />
+        <AlreadyPaidNote date={value.date} balanceDate={ctx.minDate} />
       </FormField>
       <FormField label="Note" htmlFor="lump-note" optional>
         <Input

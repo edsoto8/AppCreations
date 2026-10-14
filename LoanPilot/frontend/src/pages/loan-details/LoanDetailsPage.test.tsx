@@ -233,6 +233,23 @@ describe('Loan Details — create', () => {
   });
 });
 
+describe('Loan Details — update balance link', () => {
+  it('opens the current-status fields and focuses the balance for ?focus=currentBalance', async () => {
+    const noBalance: Loan = makeLoan({ id: 4, name: 'Commuter', currentBalance: null, balanceAsOf: null });
+    mockApi({
+      'GET /api/loans': json([makeLoanListItem({ loan: noBalance })]),
+      'GET /api/loans/:id': json(noBalance),
+      'POST /api/calculate/preview': json(makePreview()),
+    });
+    renderWithProviders(null, { route: '/loans/4/edit?focus=currentBalance', routes });
+
+    const balance = await screen.findByLabelText('Current principal balance');
+    expect(screen.getByRole('switch', { name: 'This loan is already in progress' })).toBeChecked();
+    await waitFor(() => expect(balance).toHaveFocus());
+    expect(screen.getByTestId('update-balance-hint')).toHaveTextContent('Update from your latest statement');
+  });
+});
+
 describe('Loan Details — edit', () => {
   const existing: Loan = makeLoan({ id: 3, name: 'Family SUV', currentBalance: 15000, balanceAsOf: '2026-09-01', vehicleValue: 21000 });
 

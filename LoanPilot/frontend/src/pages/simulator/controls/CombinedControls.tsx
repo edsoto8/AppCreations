@@ -8,6 +8,7 @@ import { FieldError, FormField } from '@/components/FormField';
 import { FieldInfo } from '@/components/FieldInfo';
 import { fieldIds, newRowId, type Draft, type LumpRow, type RecurringRow } from '../scenarioDraft';
 import type { ControlsContext } from './context';
+import { AlreadyPaidNote } from './AlreadyPaidNote';
 import { lumpTimingNote } from './LumpControls';
 
 interface CombinedControlsProps {
@@ -103,6 +104,7 @@ export function CombinedControls({ value, onChange, errors, ctx }: CombinedContr
                   />
                 </FormField>
               </div>
+              <AlreadyPaidNote date={row.date} balanceDate={ctx.minDate} />
               <FormField label="Note" htmlFor={`${row.id}-note`} optional>
                 <Input
                   id={`${row.id}-note`}

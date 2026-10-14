@@ -80,7 +80,7 @@ public sealed class ValidationTests
     }
 
     [Fact]
-    public void Scenario_LumpSumBeforeProjectionStart_IsRejected()
+    public void Scenario_InvalidFields_AreReported_PastLumpSumIsNot()
     {
         var analysis = LoanAnalyzer.Analyze(TestLoans.Standard(), TestLoans.Today);
         var scenario = new Scenario
@@ -91,7 +91,8 @@ public sealed class ValidationTests
         };
         var fields = ScenarioValidator.Validate(scenario, analysis, requireName: true).Select(e => e.Field).ToList();
 
-        Assert.Equal(["name", "budgetPayment", "recurringExtras[0].amount", "recurringExtras[1].endDate", "lumpSums[0].date", "lumpSums[1].amount"],
+        // A lump sum dated before the projection start is treated as already paid, not rejected.
+        Assert.Equal(["name", "budgetPayment", "recurringExtras[0].amount", "recurringExtras[1].endDate", "lumpSums[1].amount"],
             fields);
     }
 }
