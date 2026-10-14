@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Pure domain and financial engine: no package dependencies, no I/O. -->
+
+</Project>
