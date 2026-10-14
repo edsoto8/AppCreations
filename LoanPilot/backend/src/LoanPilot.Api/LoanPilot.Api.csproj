@@ -11,6 +11,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- The built front end (npm run build) lands in wwwroot; serve it from the output folder too. -->
+    <Content Update="wwwroot\**" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
     <InternalsVisibleTo Include="LoanPilot.Api.Tests" />
   </ItemGroup>
 

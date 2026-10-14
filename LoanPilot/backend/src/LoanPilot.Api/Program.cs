@@ -1,6 +1,24 @@
-var builder = WebApplication.CreateBuilder(args);
-var app = builder.Build();
+using LoanPilot.Api;
+using Serilog;
 
-app.MapGet("/", () => "Hello World!");
+Log.Logger = new LoggerConfiguration()
+    .WriteTo.Console()
+    .CreateBootstrapLogger();
 
-app.Run();
+try
+{
+    var app = LoanPilotHost.Build(args);
+    app.Run();
+}
+catch (Exception ex) when (ex is not HostAbortedException)
+{
+    Log.Fatal(ex, "LoanPilot failed to start");
+    Environment.ExitCode = 1;
+}
+finally
+{
+    Log.CloseAndFlush();
+}
+
+// Exposed for WebApplicationFactory in tests.
+public partial class Program;

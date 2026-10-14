@@ -146,6 +146,16 @@ public sealed class LoanAnalyzerTests
     }
 
     [Fact]
+    public void NextPayment_IsFirstDueOnOrAfterToday()
+    {
+        // Projection starts Aug 20; Sep 1 and Oct 1 are assumed paid by Oct 14, so Nov 1 (#34) is next.
+        var status = LoanAnalyzer.Analyze(Existing(asOf: new DateOnly(2026, 8, 20)), TestLoans.Today).Status;
+        Assert.Equal(32, status.NextPaymentNumber);
+        Assert.Equal(new DateOnly(2026, 11, 1), status.NextPayment!.Date);
+        Assert.Equal(34, status.NextPayment.Number);
+    }
+
+    [Fact]
     public void StaleBalance_IsFlagged()
     {
         var status = LoanAnalyzer.Analyze(Existing(asOf: new DateOnly(2026, 6, 1)), TestLoans.Today).Status;

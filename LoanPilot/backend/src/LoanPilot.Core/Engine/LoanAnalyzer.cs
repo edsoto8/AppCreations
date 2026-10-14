@@ -201,7 +201,9 @@ public static class LoanAnalyzer
         var startBalance = Money.Round(baseRequest.StartingBalance);
         var repaid = Math.Max(0m, loan.OriginalAmount - startBalance);
         var payoffEstimate = EstimatePayoff(baseRequest, baseline, today);
-        var next = baseline.Rows.FirstOrDefault(r => r.Kind == ScheduleRowKind.Payment);
+        // The next payment due on or after today (earlier projected payments are assumed made on time).
+        var next = baseline.Rows.FirstOrDefault(r => r.Kind == ScheduleRowKind.Payment && r.Date >= today)
+            ?? baseline.Rows.FirstOrDefault(r => r.Kind == ScheduleRowKind.Payment);
         var lifetimeCost = interestPaid is { } known ? loan.OriginalAmount + known + baseline.Summary.TotalInterest : (decimal?)null;
 
         var status = new LoanStatus
