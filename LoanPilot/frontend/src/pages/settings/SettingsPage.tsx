@@ -51,7 +51,7 @@ import { formatCurrency, formatMonthYear, formatPercent, SUPPORTED_CURRENCIES } 
 
 export function SettingsPage() {
   return (
-    <div className="grid gap-6">
+    <div className="grid grid-cols-[minmax(0,1fr)] gap-6">
       <PageHeader title="Settings" description="Preferences are stored with your local LoanPilot data." />
       <PreferencesCard />
       <LoansCard />
@@ -171,7 +171,7 @@ function PreferencesCard() {
           <SettingRow
             label="Comparison budget"
             htmlFor="pref-budget"
-            description="The most you could pay per period. Scenario Comparison highlights the best option within it. Leave blank for none."
+            description="The most you could pay per month. Scenario Comparison highlights the best option within it (biweekly and weekly payments are converted to monthly). Leave blank for none."
           >
             <CurrencyInput
               id="pref-budget"
@@ -343,7 +343,7 @@ const ALLOCATION_RULES: { title: string; body: string }[] = [
   },
   {
     title: 'Two ways to accrue interest',
-    body: 'Monthly periodic charges APR ÷ 12 each period. Daily simple interest charges a daily rate for the actual days between payments, using Actual/365 or Actual/Actual.',
+    body: 'Monthly periodic charges APR ÷ periods per year (÷ 12 for monthly payments) each period. Daily simple interest charges a daily rate for the actual days between payments, using Actual/365 or Actual/Actual.',
   },
   {
     title: 'Existing loans start from your balance',

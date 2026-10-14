@@ -13,7 +13,7 @@ export const MODES: { value: SimulatorMode; label: string; short: string }[] = [
   { value: 'lump', label: 'One-time lump sum', short: 'Lump sum' },
   { value: 'combined', label: 'Combined strategy', short: 'Combined' },
   { value: 'target', label: 'Target payoff date', short: 'Target' },
-  { value: 'budget', label: 'Monthly budget', short: 'Budget' },
+  { value: 'budget', label: 'Budget', short: 'Budget' },
 ];
 
 export function isMode(value: string | null | undefined): value is SimulatorMode {

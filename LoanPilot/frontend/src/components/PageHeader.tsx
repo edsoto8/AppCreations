@@ -1,7 +1,9 @@
-import type { ReactNode } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 
 interface PageHeaderProps {
+  /** Browser tab title when `title` is not plain text. */
+  documentTitle?: string;
   title: ReactNode;
   description?: ReactNode;
   eyebrow?: ReactNode;
@@ -9,7 +11,17 @@ interface PageHeaderProps {
   className?: string;
 }
 
-export function PageHeader({ title, description, eyebrow, actions, className }: PageHeaderProps) {
+export function PageHeader({ title, description, eyebrow, actions, className, documentTitle }: PageHeaderProps) {
+  // Each page announces itself in the browser tab and history.
+  const tabTitle = documentTitle ?? (typeof title === 'string' ? title : null);
+  useEffect(() => {
+    if (tabTitle === null) return;
+    document.title = `${tabTitle} · LoanPilot`;
+    return () => {
+      document.title = 'LoanPilot';
+    };
+  }, [tabTitle]);
+
   return (
     <div className={cn('flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between', className)}>
       <div className="min-w-0">

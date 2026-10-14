@@ -71,6 +71,7 @@ function EditLoan({ id }: { id: number }) {
     <div className="grid gap-6">
       <PageHeader
         eyebrow="Loan details"
+        documentTitle={`${loan.name} · Loan details`}
         title={
           <span className="inline-flex flex-wrap items-center gap-2">
             {loan.name}

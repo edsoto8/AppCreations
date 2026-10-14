@@ -2,6 +2,7 @@ import * as React from 'react';
 import { AlertDialog as AlertDialogPrimitive } from 'radix-ui';
 import { buttonVariants } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { useReturnFocus } from '@/lib/useReturnFocus';
 
 function AlertDialog(props: React.ComponentProps<typeof AlertDialogPrimitive.Root>) {
   return <AlertDialogPrimitive.Root data-slot="alert-dialog" {...props} />;
@@ -28,7 +29,8 @@ function AlertDialogOverlay({ className, ...props }: React.ComponentProps<typeof
   );
 }
 
-function AlertDialogContent({ className, ...props }: React.ComponentProps<typeof AlertDialogPrimitive.Content>) {
+function AlertDialogContent({ className, onOpenAutoFocus, onCloseAutoFocus, ...props }: React.ComponentProps<typeof AlertDialogPrimitive.Content>) {
+  const returnFocus = useReturnFocus(onOpenAutoFocus, onCloseAutoFocus);
   return (
     <AlertDialogPortal>
       <AlertDialogOverlay />
@@ -38,6 +40,8 @@ function AlertDialogContent({ className, ...props }: React.ComponentProps<typeof
           'fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-xl border bg-card p-6 shadow-lg duration-200 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 sm:max-w-md',
           className,
         )}
+        onOpenAutoFocus={returnFocus.onOpenAutoFocus}
+        onCloseAutoFocus={returnFocus.onCloseAutoFocus}
         {...props}
       />
     </AlertDialogPortal>

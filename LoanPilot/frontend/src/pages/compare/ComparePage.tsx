@@ -334,7 +334,7 @@ function CompareBody({
 
       <ChartCard
         title="Payoff timeline"
-        description="Time from today until the last payment, for each strategy."
+        description="Time from the balance date until the last payment, for each strategy."
         refreshing={refreshing}
         chart={<PayoffTimelineBars items={timeline} />}
         table={<PayoffTimelineTable items={timeline} />}

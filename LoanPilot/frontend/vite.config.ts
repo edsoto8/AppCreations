@@ -25,7 +25,12 @@ export default defineConfig({
   build: {
     outDir: '../backend/src/LoanPilot.Api/wwwroot',
     emptyOutDir: true,
-    chunkSizeWarningLimit: 1200,
+    rollupOptions: {
+      output: {
+        // Charts are large and only needed once a page with data renders.
+        manualChunks: (id: string) => (/node_modules\/(recharts|d3-|victory-vendor)/.test(id) ? 'charts' : undefined),
+      },
+    },
   },
   test: {
     environment: 'jsdom',

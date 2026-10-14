@@ -66,6 +66,7 @@ public static class LoanPilotHost
             : context.Request.Path.StartsWithSegments("/api") ? Serilog.Events.LogEventLevel.Information
             : Serilog.Events.LogEventLevel.Debug);
         app.UseCors();
+        app.Use(RejectCrossSiteWrites);
         app.UseDefaultFiles();
         app.UseStaticFiles();
 
@@ -139,7 +140,7 @@ public static class LoanPilotHost
             case PersistenceException persistence:
                 logger.LogError(persistence, "Database error on {Path}", context.Request.Path);
                 result = Results.Problem(statusCode: StatusCodes.Status500InternalServerError, title: "Database error",
-                    detail: persistence.Message);
+                    detail: "The change could not be saved. Details were written to the log file.");
                 break;
             default:
                 logger.LogError(error, "Unhandled error on {Path}", context.Request.Path);
@@ -150,6 +151,31 @@ public static class LoanPilotHost
 
         await result.ExecuteAsync(context);
     }
+
+    /// <summary>
+    /// LoanPilot is a local app: a write (POST/PUT/DELETE) carrying an Origin header must come from a
+    /// localhost page. This blocks other websites from sending "simple" cross-site requests (which CORS
+    /// does not stop) to the API. Requests without an Origin (curl, tests, same-origin GETs) pass.
+    /// </summary>
+    private static async Task RejectCrossSiteWrites(HttpContext context, Func<Task> next)
+    {
+        var method = context.Request.Method;
+        var unsafeMethod = !(HttpMethods.IsGet(method) || HttpMethods.IsHead(method) || HttpMethods.IsOptions(method));
+        if (unsafeMethod && context.Request.Headers.Origin.ToString() is { Length: > 0 } origin && !IsLocalOrigin(origin))
+        {
+            context.RequestServices.GetRequiredService<ILoggerFactory>().CreateLogger("LoanPilot.Security")
+                .LogWarning("Rejected cross-site {Method} {Path} from {Origin}", method, context.Request.Path, origin);
+            await Results.Problem(statusCode: StatusCodes.Status403Forbidden, title: "Cross-site request blocked").ExecuteAsync(context);
+            return;
+        }
+
+        await next();
+    }
+
+    public static bool IsLocalOrigin(string origin) =>
+        Uri.TryCreate(origin, UriKind.Absolute, out var uri)
+        && uri.Scheme is "http" or "https"
+        && (uri.IsLoopback || uri.Host.Equals("localhost", StringComparison.OrdinalIgnoreCase));
 
     private static string ReadableBadRequest(BadHttpRequestException bad) =>
         bad.InnerException is JsonException json

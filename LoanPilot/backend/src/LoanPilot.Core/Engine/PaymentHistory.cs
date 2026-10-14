@@ -9,7 +9,8 @@ public sealed record TrackingResult(IReadOnlyList<TrackingPoint> Points, decimal
 
 public sealed record ImportError(int Line, string Message);
 
-public sealed record PaymentImport(IReadOnlyList<PaymentRecord> Records, IReadOnlyList<ImportError> Errors);
+/// <summary>Parsed records with the 1-based CSV line each came from (<see cref="Lines"/>[i] belongs to <see cref="Records"/>[i]).</summary>
+public sealed record PaymentImport(IReadOnlyList<PaymentRecord> Records, IReadOnlyList<int> Lines, IReadOnlyList<ImportError> Errors);
 
 public static class PaymentHistory
 {
@@ -67,6 +68,7 @@ public static class PaymentHistory
     public static PaymentImport ParseCsv(string csv, long loanId)
     {
         var records = new List<PaymentRecord>();
+        var recordLines = new List<int>();
         var errors = new List<ImportError>();
         var lines = csv.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n');
         for (var i = 0; i < lines.Length; i++)
@@ -141,9 +143,10 @@ public static class PaymentHistory
                 Interest = interest is { } it ? Money.Round(it) : null,
                 Note = string.IsNullOrEmpty(note) ? null : note[..Math.Min(note.Length, 200)],
             });
+            recordLines.Add(lineNumber);
         }
 
-        return new PaymentImport(records, errors);
+        return new PaymentImport(records, recordLines, errors);
     }
 
     public static IReadOnlyList<ValidationError> Validate(PaymentRecord record, Loan loan, DateOnly today)

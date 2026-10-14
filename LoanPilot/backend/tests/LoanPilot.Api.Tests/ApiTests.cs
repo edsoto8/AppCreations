@@ -28,6 +28,28 @@ public sealed class ApiTests : IDisposable
     }
 
     [Fact]
+    public async Task CrossSiteWrite_IsRejected_LocalOriginAllowed()
+    {
+        var id = await _client.CreateLoan();
+        using var evil = new HttpRequestMessage(HttpMethod.Post, $"/api/loans/{id}/archive");
+        evil.Headers.Add("Origin", "http://evil.example");
+        Assert.Equal(HttpStatusCode.Forbidden, (await _client.SendAsync(evil)).StatusCode);
+        Assert.False((await (await _client.GetAsync($"/api/loans/{id}")).ReadJson())["isArchived"]!.GetValue<bool>());
+
+        using var local = new HttpRequestMessage(HttpMethod.Post, $"/api/loans/{id}/archive");
+        local.Headers.Add("Origin", "http://localhost:5173");
+        Assert.Equal(HttpStatusCode.OK, (await _client.SendAsync(local)).StatusCode);
+    }
+
+    [Fact]
+    public async Task ForeignHostHeader_IsRejected()
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/api/loans");
+        request.Headers.Host = "attacker.example";
+        Assert.Equal(HttpStatusCode.BadRequest, (await _client.SendAsync(request)).StatusCode);
+    }
+
+    [Fact]
     public async Task UnknownApiRoute_Returns404Problem()
     {
         var response = await _client.GetAsync("/api/nope");
@@ -267,11 +289,21 @@ public sealed class ApiTests : IDisposable
             new StringContent("date,amount\n2024-05-10,537.77\n06/10/2024,\"$1,037.77\"\nbad,1\n2031-01-01,5\n", Encoding.UTF8, "text/csv"));
         var result = await import.ReadJson();
         Assert.Equal(2, result["imported"]!.GetValue<int>());
-        Assert.Equal(2, result["errors"]!.AsArray().Count);
+        Assert.Equal([4, 5], result["errors"]!.AsArray().Select(e => e!["line"]!.GetValue<int>()));
 
-        Assert.Equal(3, (await (await _client.GetAsync($"/api/loans/{id}/payments")).ReadJson()).AsArray().Count);
+        // Importing the same statement again skips the duplicates instead of doubling the history.
+        var again = await (await _client.PostAsync($"/api/loans/{id}/payments/import?{Http.AsOf}",
+            new StringContent("date,amount\n2024-05-10,537.77\n2024-05-10,537.77\n2024-07-10,537.77\n", Encoding.UTF8, "text/csv"))).ReadJson();
+        Assert.Equal(1, again["imported"]!.GetValue<int>());
+        Assert.Equal(2, again["skipped"]!.GetValue<int>());
+        Assert.Equal([2, 3], again["errors"]!.AsArray().Select(e => e!["line"]!.GetValue<int>()));
+
+        var notCsv = await _client.PostAsync($"/api/loans/{id}/payments/import", new StringContent("date,amount\n2024-08-10,1", Encoding.UTF8, "text/plain"));
+        Assert.Equal(HttpStatusCode.BadRequest, notCsv.StatusCode);
+
+        Assert.Equal(4, (await (await _client.GetAsync($"/api/loans/{id}/payments")).ReadJson()).AsArray().Count);
         var tracking = await (await _client.GetAsync($"/api/loans/{id}/payments/tracking?{Http.AsOf}")).ReadJson();
-        Assert.Equal(537.77m + 537.77m + 1037.77m, tracking["totalActual"]!.GetValue<decimal>());
+        Assert.Equal(537.77m + 537.77m + 1037.77m + 537.77m, tracking["totalActual"]!.GetValue<decimal>());
 
         var dashboard = await (await _client.GetAsync($"/api/loans/{id}/dashboard?{Http.AsOf}")).ReadJson();
         // Only one of the 30 payments made has an interest split, so interest history stays unknown (never invented).

@@ -8,6 +8,9 @@ where `fieldName` matches the request property (camelCase; nested scenario field
 
 Every calculation endpoint accepts an optional `?asOf=yyyy-MM-dd` query to override "today".
 
+The API only answers `localhost` / `127.0.0.1` host names, and rejects writes (POST/PUT/DELETE) whose
+`Origin` header is not a localhost page with **403**, so other websites cannot change your data.
+
 ## Types (TypeScript notation)
 
 ```ts
@@ -180,7 +183,7 @@ interface RefinanceResult {
 
 interface PaymentRecordInput { date: string; amount: number; principal?: number | null; interest?: number | null; note?: string | null; }
 interface PaymentRecord extends PaymentRecordInput { id: number; loanId: number; createdAt: string; }
-interface ImportResult { imported: number; errors: { line: number; message: string }[]; }
+interface ImportResult { imported: number; skipped: number; errors: { line: number; message: string }[]; }   // skipped = duplicates (same date and amount) of recorded payments
 interface TrackingPoint { date: string; scheduledCumulative: number; actualCumulative: number | null; }
 interface TrackingResult { points: TrackingPoint[]; totalScheduled: number; totalActual: number; difference: number; note: string; }
 
@@ -231,6 +234,6 @@ interface Preferences { theme: 'system' | 'light' | 'dark'; currency: string; de
 | `GET /loans/{id}/payments` | | `PaymentRecord[]` (date order) |
 | `POST /loans/{id}/payments` | `PaymentRecordInput` | `201 PaymentRecord` |
 | `DELETE /loans/{id}/payments/{paymentId}` | | `204` |
-| `POST /loans/{id}/payments/import` | `text/csv` body: `date,amount[,principal,interest,note]` | `ImportResult` |
+| `POST /loans/{id}/payments/import` | `text/csv` body (required content type): `date,amount[,principal,interest,note]` | `ImportResult` |
 | `GET /loans/{id}/payments/tracking` | | `TrackingResult` |
 | `GET /preferences` · `PUT /preferences` | `Preferences` | `Preferences` |

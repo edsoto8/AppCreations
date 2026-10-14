@@ -84,7 +84,7 @@ export function SchedulePage() {
         <EmptyState
           icon={<TablePropertiesIcon />}
           title={loans.length === 0 ? 'Add a loan to see its schedule' : 'Select a loan to view its schedule'}
-          description="The schedule lists every payment from today to payoff, with an annual summary, a payment calendar and CSV or Excel export."
+          description="The schedule lists every payment from the balance date to payoff, with an annual summary, a payment calendar and CSV or Excel export."
           action={
             loans.length === 0 ? (
               <Button asChild>
@@ -217,8 +217,8 @@ function ScheduleForLoan({ loan }: { loan: Loan }) {
 
       <Tabs value={view} onValueChange={(v) => setParam('view', v === 'payments' ? null : v)} className="gap-6">
         <Card className="gap-0 py-0">
-          <CardContent className="flex flex-col gap-4 px-4 py-4 sm:px-5 md:flex-row md:items-end md:justify-between">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
+          <CardContent className="flex flex-col gap-4 px-4 py-4 sm:px-5 xl:flex-row xl:items-end xl:justify-between">
+            <div className="flex min-w-0 flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-end">
               <div className="grid gap-1.5">
                 <Label htmlFor="schedule-plan" className="text-xs text-muted-foreground">
                   Plan

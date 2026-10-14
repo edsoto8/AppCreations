@@ -48,7 +48,7 @@ const ACCRUAL_OPTIONS: { value: AccrualMethod; title: string; description: strin
   {
     value: 'monthly',
     title: 'Monthly periodic',
-    description: 'Interest is APR ÷ 12 of the balance each period, no matter how many days the month has. Matches most payment calculators.',
+    description: 'Interest is APR ÷ periods per year (÷ 12 when monthly) of the balance each period, no matter how many days it has. Matches most payment calculators.',
   },
   {
     value: 'dailySimple',

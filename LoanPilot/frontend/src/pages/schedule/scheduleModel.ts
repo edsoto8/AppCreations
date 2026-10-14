@@ -276,6 +276,27 @@ export function nextRowIndex(rows: ScheduleRow[], today: IsoDate): number {
   return rows.findIndex((r) => r.kind === 'payment' && !r.isEstimated && r.date >= today);
 }
 
+/** Folds an iCalendar content line at 75 octets (RFC 5545 §3.1): CRLF followed by a space. */
+export function foldIcsLine(line: string): string {
+  const encoder = new TextEncoder();
+  const parts: string[] = [];
+  let current = '';
+  let size = 0;
+  for (const ch of line) {
+    const bytes = encoder.encode(ch).length;
+    const limit = parts.length === 0 ? 75 : 74; // continuation lines start with a space
+    if (size + bytes > limit) {
+      parts.push(current);
+      current = '';
+      size = 0;
+    }
+    current += ch;
+    size += bytes;
+  }
+  parts.push(current);
+  return parts.join('\r\n ');
+}
+
 /** iCalendar file with one all-day event per upcoming payment. */
 export function buildIcs(rows: ScheduleRow[], loanName: string, currency: string): string {
   const stamp = new Date()
@@ -299,7 +320,9 @@ export function buildIcs(rows: ScheduleRow[], loanName: string, currency: string
       `SUMMARY:${escape(`${what}: ${formatCurrency(r.totalPayment, currency)} (${loanName})`)}`,
       `DESCRIPTION:${escape(`${formatCurrency(r.principal, currency)} principal, ${formatCurrency(r.interest, currency)} interest. Estimated by LoanPilot.`)}`,
       'END:VEVENT',
-    ].join('\r\n');
+    ]
+      .map(foldIcsLine)
+      .join('\r\n');
   });
   return ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//LoanPilot//Payment calendar//EN', 'CALSCALE:GREGORIAN', ...events, 'END:VCALENDAR', ''].join(
     '\r\n',

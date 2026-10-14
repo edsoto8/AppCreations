@@ -169,7 +169,7 @@ export function ImportCard({ importing, onImport }: ImportCardProps) {
             {result.errors.length === 0 ? <CircleCheckIcon /> : <TriangleAlertIcon />}
             <AlertTitle>
               Imported {formatCount(result.imported, 'payment')}
-              {result.errors.length > 0 && `, ${formatCount(result.errors.length, 'line')} skipped`}
+              {result.errors.length > 0 && `, ${formatCount(result.errors.length, 'line')} not imported`}
             </AlertTitle>
             {result.errors.length > 0 && (
               <AlertDescription>
@@ -183,7 +183,10 @@ export function ImportCard({ importing, onImport }: ImportCardProps) {
                     </li>
                   ))}
                 </ul>
-                <p className="text-xs">Fix those lines and import just them again; imported lines are already saved.</p>
+                <p className="text-xs">
+                  Imported lines are saved. Fix the other lines and import again — payments already recorded (same date
+                  and amount) are skipped automatically, so re-importing the whole file is safe.
+                </p>
               </AlertDescription>
             )}
           </Alert>

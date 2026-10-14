@@ -201,7 +201,7 @@ function DashboardView({ data, refreshing }: { data: Dashboard; refreshing: bool
         <ChartCard
           className="lg:col-span-2"
           title="Principal vs interest per payment"
-          description="Early payments are mostly interest; each payment shifts more toward principal."
+          description="Each bar is one payment: the interest part shrinks and the principal part grows as the balance falls."
           legend={<PaymentSplitLegend />}
           refreshing={refreshing}
           chart={<PaymentSplitChart rows={baseline.rows} currency={currency} />}

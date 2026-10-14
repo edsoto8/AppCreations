@@ -21,7 +21,7 @@ export const glossary = {
   amortization: {
     term: 'Amortization',
     definition:
-      'How a fixed payment is split over the life of the loan. Early payments are mostly interest because the balance is high; later payments are mostly principal.',
+      'How a fixed payment is split over the life of the loan. Early payments carry the most interest because the balance is high; later payments go mostly to principal.',
   },
   accrualMethod: {
     term: 'Accrual method',
@@ -31,7 +31,7 @@ export const glossary = {
   monthlyAccrual: {
     term: 'Monthly periodic interest',
     definition:
-      'Interest is charged once per period at APR ÷ 12 on the balance, regardless of how many days are in the month. This is how most payment calculators work.',
+      'Interest is charged once per period at APR ÷ periods per year (÷ 12 for monthly payments) on the balance, regardless of how many days the period has. This is how most payment calculators work.',
   },
   dailySimpleAccrual: {
     term: 'Daily simple interest',

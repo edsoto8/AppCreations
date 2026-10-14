@@ -27,16 +27,27 @@ export interface NumberFieldProps
   grouping?: boolean;
 }
 
-/** Strips everything but digits and one decimal point; limits decimals. */
+/**
+ * Strips everything but digits and one decimal point; limits decimals. A comma followed by one or two
+ * final digits ("1.234,56", "12,5") is read as a decimal comma. A leading minus is kept so min-value
+ * validation can reject it instead of silently flipping the sign.
+ */
 export function sanitizeNumericText(text: string, decimals: number): string {
-  let cleaned = text.replace(/[^\d.]/g, '');
+  const trimmed = text.trim();
+  const negative = trimmed.startsWith('-');
+  let source = trimmed;
+  const decimalComma = /,\d{1,2}$/.test(source) && source.lastIndexOf(',') > source.lastIndexOf('.');
+  if (decimalComma) {
+    source = source.replace(/\./g, '').replace(/,(?=\d{1,2}$)/, '.');
+  }
+  let cleaned = source.replace(/[^\d.]/g, '');
   const firstDot = cleaned.indexOf('.');
   if (firstDot !== -1) {
     const intPart = cleaned.slice(0, firstDot);
     const fracPart = cleaned.slice(firstDot + 1).replace(/\./g, '');
     cleaned = decimals > 0 ? `${intPart}.${fracPart.slice(0, decimals)}` : intPart;
   }
-  return cleaned;
+  return negative && cleaned !== '' ? `-${cleaned}` : cleaned;
 }
 
 export function parseNumericText(text: string): number | null {

@@ -403,6 +403,7 @@ export interface ImportError {
 
 export interface ImportResult {
   imported: number;
+  skipped: number;                // duplicates of payments already recorded (also listed in errors)
   errors: ImportError[];
 }
 

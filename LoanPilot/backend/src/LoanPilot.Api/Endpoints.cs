@@ -366,6 +366,12 @@ public static class Endpoints
                 return LoanNotFound();
             }
 
+            // Requiring text/csv also forces a CORS preflight for cross-site callers.
+            if (request.ContentType is not { } contentType || !contentType.StartsWith("text/csv", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new LoanValidationException([new ValidationError("file", "Send the file as text/csv.")]);
+            }
+
             if (request.ContentLength > MaxImportBytes)
             {
                 throw new LoanValidationException([new ValidationError("file", "The file is too large (limit 1 MB).")]);
@@ -383,16 +389,28 @@ public static class Endpoints
             var errors = parsed.Errors.ToList();
             var today = ws.Today;
             var valid = new List<PaymentRecord>();
-            foreach (var record in parsed.Records)
+            var skipped = 0;
+
+            // A payment with the same date and amount as one already recorded (or earlier in this file) is a
+            // duplicate: importing the same statement twice must not double the history.
+            var seen = ws.Payments.ListForLoan(id).Select(r => (r.Date, r.Amount)).ToHashSet();
+            for (var i = 0; i < parsed.Records.Count; i++)
             {
+                var record = parsed.Records[i];
+                var line = parsed.Lines[i];
                 var problems = PaymentHistory.Validate(record, loan, today);
-                if (problems.Count == 0)
+                if (problems.Count > 0)
                 {
-                    valid.Add(record);
+                    errors.Add(new ImportError(line, problems[0].Message));
+                }
+                else if (!seen.Add((record.Date, record.Amount)))
+                {
+                    skipped++;
+                    errors.Add(new ImportError(line, $"Skipped: a {record.Amount:0.00} payment on {record.Date:yyyy-MM-dd} is already recorded."));
                 }
                 else
                 {
-                    errors.Add(new ImportError(0, $"{record.Date:yyyy-MM-dd} {record.Amount}: {problems[0].Message}"));
+                    valid.Add(record);
                 }
             }
 
@@ -401,7 +419,7 @@ public static class Endpoints
                 ws.Payments.InsertMany(id, valid);
             }
 
-            return Results.Ok(new ImportResult(valid.Count, errors));
+            return Results.Ok(new ImportResult(valid.Count, skipped, errors.OrderBy(e => e.Line).ToList()));
         });
 
         api.MapGet("/loans/{id:long}/payments/tracking", (long id, LoanWorkspace ws) =>

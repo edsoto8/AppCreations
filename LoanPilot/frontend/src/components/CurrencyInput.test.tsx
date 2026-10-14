@@ -136,6 +136,9 @@ describe('sanitizeNumericText', () => {
     expect(sanitizeNumericText('1,234.567', 2)).toBe('1234.56');
     expect(sanitizeNumericText('..5', 2)).toBe('.5');
     expect(sanitizeNumericText('12.3', 0)).toBe('12');
-    expect(sanitizeNumericText('-40', 2)).toBe('40');
+    expect(sanitizeNumericText('-40', 2)).toBe('-40'); // kept so min validation can flag it
+    expect(sanitizeNumericText('1.234,56', 2)).toBe('1234.56'); // decimal comma
+    expect(sanitizeNumericText('12,5', 2)).toBe('12.5');
+    expect(sanitizeNumericText('1,234', 2)).toBe('1234'); // thousands comma
   });
 });

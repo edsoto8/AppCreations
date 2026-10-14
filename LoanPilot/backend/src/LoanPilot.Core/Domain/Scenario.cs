@@ -22,6 +22,7 @@ public sealed class Scenario
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
 
+    [System.Text.Json.Serialization.JsonIgnore]
     public bool IsEmpty => BudgetPayment is null && RecurringExtras.Count == 0 && LumpSums.Count == 0;
 }
 

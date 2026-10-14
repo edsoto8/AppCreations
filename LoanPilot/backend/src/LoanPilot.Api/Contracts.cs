@@ -131,4 +131,4 @@ public sealed record ExportRequest(long? ScenarioId, ScenarioInput? Scenario);
 
 public sealed record PaymentRecordInput(DateOnly? Date, decimal Amount, decimal? Principal = null, decimal? Interest = null, string? Note = null);
 
-public sealed record ImportResult(int Imported, IReadOnlyList<ImportError> Errors);
+public sealed record ImportResult(int Imported, int Skipped, IReadOnlyList<ImportError> Errors);

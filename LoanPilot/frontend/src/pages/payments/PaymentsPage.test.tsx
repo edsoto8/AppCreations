@@ -160,6 +160,7 @@ describe('PaymentsPage', () => {
     const { api, user } = setup({
       'POST /api/loans/:id/payments/import': json({
         imported: 2,
+        skipped: 0,
         errors: [{ line: 4, message: '"bad" is not a date (use yyyy-mm-dd or mm/dd/yyyy).' }],
       }),
     });
@@ -178,7 +179,7 @@ describe('PaymentsPage', () => {
     expect(call.headers.get('Content-Type')).toBe('text/csv');
 
     const result = await screen.findByTestId('import-result');
-    expect(result).toHaveTextContent('Imported 2 payments, 1 line skipped');
+    expect(result).toHaveTextContent('Imported 2 payments, 1 line not imported');
     expect(within(result).getByText('Line 4')).toBeInTheDocument();
     expect(within(result).getByText(/"bad" is not a date/)).toBeInTheDocument();
   });

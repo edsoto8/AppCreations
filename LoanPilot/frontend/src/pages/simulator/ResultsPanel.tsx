@@ -168,7 +168,7 @@ export function ResultsPanel({
       <div className="grid gap-4 xl:grid-cols-2">
         <ChartCard
           title="Interest savings"
-          description="Remaining interest from today to payoff."
+          description="Remaining interest from the balance date to payoff."
           refreshing={refreshing}
           chart={
             <InterestSavingsBars
@@ -191,7 +191,7 @@ export function ResultsPanel({
         />
         <ChartCard
           title="Payoff timeline"
-          description="Time from today until the last payment."
+          description="Time from the balance date until the last payment."
           refreshing={refreshing}
           chart={
             <>

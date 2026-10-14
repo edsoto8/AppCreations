@@ -69,6 +69,11 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
           qc.setQueryData(queryKeys.preferences, saved);
           mirrorToStorage(saved);
         }
+        // The server formats currency into insight/warning text and reads the saved comparison budget,
+        // so loan data must be refetched once those preferences are stored.
+        if ('currency' in patch || 'comparisonBudget' in patch) {
+          await qc.invalidateQueries({ queryKey: ['loans'] });
+        }
       } catch {
         // API unavailable: the localStorage copy keeps the choice until the server is back.
       }

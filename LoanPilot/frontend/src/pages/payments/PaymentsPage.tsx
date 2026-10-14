@@ -209,7 +209,7 @@ function InterestToDateCard({
   const withSplit = records.filter((r) => r.interest !== null && r.interest !== undefined).length;
   if (!status) return <StatCard icon={<CoinsIcon />} label="Interest paid to date" loading={loading} value="—" />;
   const known = status.interestPaidToDate !== null && status.interestPaidSource !== 'unknown';
-  const needed = Math.max(0, status.paymentsMade - withSplit);
+  // The completeness rule lives in the engine; the page only explains how to satisfy it.
   const sub =
     status.interestPaidSource === 'records'
       ? 'From your complete payment records.'
@@ -217,11 +217,7 @@ function InterestToDateCard({
         ? 'The amount you entered in Loan Details.'
         : status.interestPaidSource === 'estimated'
           ? 'Estimated from the original schedule.'
-          : needed > 0
-            ? `Unknown. Record ${formatCount(needed, 'more payment')} with an interest split to show it.`
-            : records.length > withSplit
-              ? `Unknown. ${formatCount(records.length - withSplit, 'record')} still need an interest split.`
-              : 'Unknown for this loan.';
+          : `Unknown. Enter it in Loan Details, or record all ${formatCount(status.paymentsMade, 'payment')} made so far, each with an interest split.`;
   return (
     <StatCard
       icon={<CoinsIcon />}

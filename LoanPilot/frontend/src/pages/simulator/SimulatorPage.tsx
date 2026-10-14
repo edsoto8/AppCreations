@@ -64,7 +64,7 @@ const MODE_META: Record<SimulatorMode, { icon: ReactNode; title: string; descrip
   lump: { icon: <BanknoteIcon />, title: 'One-time lump sum', description: 'Make a single payment straight to principal.' },
   combined: { icon: <LayersIcon />, title: 'Combined strategy', description: 'Mix recurring extras and lump sums, and change amounts over time.' },
   target: { icon: <TargetIcon />, title: 'Target payoff date', description: 'Pick a payoff date and see the payment it takes.' },
-  budget: { icon: <WalletIcon />, title: 'Monthly budget', description: 'Pay a fixed amount you can afford; the surplus goes to principal.' },
+  budget: { icon: <WalletIcon />, title: 'Budget', description: 'Pay a fixed amount you can afford every payment; the surplus goes to principal.' },
 };
 
 const PAGE_TITLE = 'Payoff Simulator';
@@ -257,7 +257,9 @@ function SimulatorWorkspace({ dashboard }: { dashboard: Dashboard }) {
   const hardError = query.isError && !validation.isValidation ? query.error : null;
 
   // ── Saving ─────────────────────────────────────────────────────────────────
-  const solvedTargetExtra = draft.mode === 'target' && target.data?.achievable ? target.data.additionalAmount : null;
+  // Only a result for the date on screen can be saved (not one still loading for a previous date).
+  const targetCurrent = !settling && !target.isFetching && !target.isPlaceholderData;
+  const solvedTargetExtra = draft.mode === 'target' && targetCurrent && target.data?.achievable ? target.data.additionalAmount : null;
   const strategy = scenarioForSave(draft, solvedTargetExtra);
   const dirty = active !== null && (strategy === null || strategyKey(strategy) !== strategyKey(active));
   const fmtShort = (n: number) => formatCurrency(n, currency, { cents: !Number.isInteger(n) });

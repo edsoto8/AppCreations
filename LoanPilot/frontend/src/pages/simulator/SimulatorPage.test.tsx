@@ -200,7 +200,7 @@ describe('SimulatorPage — server validation', () => {
           : json({ budget: 600, extraAmount: 116.68, simulation: makeSimulation() }),
     });
     await screen.findByTestId('new-payoff-date');
-    await user.click(screen.getByRole('tab', { name: 'Monthly budget' }));
+    await user.click(screen.getByRole('tab', { name: 'Budget' }));
     const input = screen.getByLabelText('I can afford per month');
     await user.type(input, '400');
     expect(await screen.findByText('Your budget must be at least your scheduled payment of $483.32.')).toBeInTheDocument();
@@ -355,7 +355,7 @@ describe('SimulatorPage — saved scenarios', () => {
       },
       '/simulator?scenario=9',
     );
-    await waitFor(() => expect(screen.getByRole('tab', { name: 'Monthly budget' })).toHaveAttribute('data-state', 'active'));
+    await waitFor(() => expect(screen.getByRole('tab', { name: 'Budget' })).toHaveAttribute('data-state', 'active'));
     expect(screen.getByLabelText('I can afford per month')).toHaveValue('650.00');
     await waitFor(() => expect(api.callsTo('POST /api/loans/1/budget').at(-1)?.body).toEqual({ budget: 650 }));
   });

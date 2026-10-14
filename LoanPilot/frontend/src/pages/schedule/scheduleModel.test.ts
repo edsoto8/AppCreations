@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { makeRows } from '@/test/fixtures';
 import { historyRows, lumpSumRow, scenarioRows } from './fixtures';
 import {
+  foldIcsLine,
   buildIcs,
   buildRows,
   compareAnnual,
@@ -94,4 +95,18 @@ describe('scheduleModel', () => {
     expect(ics).toContain('DTEND;VALUE=DATE:20261102');
     expect(ics).toContain('SUMMARY:Car payment #34: $483.32 (My car)');
   });
+});
+
+describe('foldIcsLine', () => {
+  it('folds long lines at 75 octets with a leading space on continuations', () => {
+    const line = `SUMMARY:${'x'.repeat(200)}`;
+    const folded = foldIcsLine(line);
+    const parts = folded.split('\r\n');
+    expect(parts.length).toBeGreaterThan(2);
+    expect(parts.every((p) => new TextEncoder().encode(p).length <= 75)).toBe(true);
+    expect(parts.slice(1).every((p) => p.startsWith(' '))).toBe(true);
+    expect(parts.map((p, i) => (i === 0 ? p : p.slice(1))).join('')).toBe(line);
+  });
+
+  it('leaves short lines alone', () => expect(foldIcsLine('BEGIN:VEVENT')).toBe('BEGIN:VEVENT'));
 });
