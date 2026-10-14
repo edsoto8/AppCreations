@@ -3,7 +3,8 @@
 Base URL: `http://localhost:5080/api`. JSON uses camelCase; enums are camelCase strings; dates are
 `"yyyy-MM-dd"`; money and percentages are JSON numbers (dollars, and percent values such as `6.49`).
 Validation failures return **400** `application/problem+json` with `errors: { fieldName: string[] }`
-where `fieldName` matches the request property (camelCase). Missing resources return **404**.
+where `fieldName` matches the request property (camelCase; nested scenario fields look like
+`lumpSums[0].date`, unreadable JSON is reported under `body`). Missing resources return **404**.
 
 Every calculation endpoint accepts an optional `?asOf=yyyy-MM-dd` query to override "today".
 
@@ -57,6 +58,7 @@ interface ScheduleRow {
   cumulativeInterest: number;
   unpaidInterest: number;         // accrued interest still owed after this row (0 unless payment is insufficient)
   isEstimated: boolean;           // true for reconstructed past rows of a loan without a known balance
+  recurringExtra: number;         // part of extraPayment from recurring extras / budget surplus (rest = lump sums)
 }
 
 interface ProjectionSummary {
@@ -70,7 +72,7 @@ interface ProjectionSummary {
   finalPayment: number;
   warnings: CalcWarning[];
 }
-interface Projection { summary: ProjectionSummary; rows: ScheduleRow[]; }
+interface Projection { summary: ProjectionSummary; rows: ScheduleRow[]; endingOwed: number; }
 
 interface NextPayment { number: number; date: string; amount: number; interest: number; principal: number; }
 interface PayoffEstimate { date: string; principal: number; accruedInterest: number; total: number; }
@@ -160,7 +162,8 @@ interface ScheduleResponse {
   history: ScheduleRow[];         // estimated past rows (only for loans without a known balance)
   baseline: Projection;
   scenario: Projection | null;
-  baselineAnnual: AnnualSummaryRow[]; scenarioAnnual: AnnualSummaryRow[] | null;
+  baselineAnnual: AnnualSummaryRow[]; scenarioAnnual: AnnualSummaryRow[] | null;   // include history rows
+  cumulativeInterestFrom: 'origination' | 'projectionStart';   // what cumulativeInterest counts from
 }
 
 interface RefinanceInput { newAprPercent: number; newTermMonths: number; fees: number; feesFinanced: boolean; }
