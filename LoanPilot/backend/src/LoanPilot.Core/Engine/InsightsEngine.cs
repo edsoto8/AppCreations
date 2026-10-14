@@ -179,11 +179,12 @@ public static class InsightsEngine
         var payoffToday = status.PayoffEstimate;
         if (baseline.Summary.TotalInterest > 0m)
         {
-            var avoided = Math.Max(0m, baseline.Summary.TotalPaid - payoffToday.Total);
+            var avoided = LoanAnalyzer.InterestAvoidedByPayoff(analysis);
+            var remainingPayments = baseline.Rows.Where(r => r.Date >= payoffToday.Date).Sum(r => r.TotalPayment);
             insights.Add(new Insight("payoff-today", InsightCategory.Savings, InsightTone.Neutral, "Paying off early",
                 $"Paying off on {f.LongDate(payoffToday.Date)} would take about {f.Money(payoffToday.Total)} and avoid about {f.Money(avoided)} of future interest.",
                 $"Estimated payoff = principal {f.Money(payoffToday.Principal)} + interest accrued to that day {f.Money(payoffToday.AccruedInterest)}. " +
-                $"Interest avoided = remaining scheduled payments {f.Money(baseline.Summary.TotalPaid)} − payoff amount. " +
+                $"Interest avoided = scheduled payments still due from that day {f.Money(remainingPayments)} − payoff amount. " +
                 "This is an estimate: your lender's official payoff quote may include fees and per-diem interest up to the day funds post.",
                 new InsightMetric("Interest avoided", avoided, MetricFormat.Currency)));
         }

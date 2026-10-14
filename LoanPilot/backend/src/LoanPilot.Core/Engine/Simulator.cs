@@ -116,9 +116,16 @@ public static class Simulator
         // Upper bound: everything owed plus a full year of interest (no period is longer than a year)
         // always pays the loan off with the first payment.
         var lowCents = (long)(payment * 100m);
-        var high = Money.RoundUp(status.ProjectionStartBalance * (1m + (analysis.Loan.AprPercent / 100m)) +
+        var firstPeriodYears = Math.Max(1m, (firstDue.DayNumber - analysis.BaseRequest.StartDate.DayNumber) / 365m);
+        var high = Money.RoundUp(status.ProjectionStartBalance * (1m + (analysis.Loan.AprPercent / 100m * firstPeriodYears * 366m / 365m)) +
             analysis.BaseRequest.StartingUnpaidInterest + 1m);
         var highCents = (long)(high * 100m);
+        if (!PaysBy(highCents / 100m))
+        {
+            return new TargetPayoffResult(target, false,
+                $"No regular payment pays the loan off by {format.LongDate(target)}. Pick a later date.", null, null, payment, null);
+        }
+
         while (lowCents < highCents)
         {
             var mid = lowCents + ((highCents - lowCents) / 2);

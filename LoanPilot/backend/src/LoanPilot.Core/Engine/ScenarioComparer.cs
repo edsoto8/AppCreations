@@ -83,9 +83,12 @@ public static class ScenarioComparer
         string? withinBudget = null;
         if (budget is { } limit)
         {
-            withinBudget = payingOff.Where(r => r.RecurringPayment <= limit)
+            var perMonth = analysis.Loan.PaymentFrequency.PeriodsPerYear() / 12m;
+            withinBudget = payingOff.Where(r => Money.Round(r.RecurringPayment * perMonth) <= limit)
                 .OrderBy(r => r.TotalInterest).ThenBy(r => r.PayoffDate).FirstOrDefault()?.Key;
-            notes.Add($"\"Best within budget\" compares each strategy's highest regular payment with {format.Money(limit)}; lump sums are not counted against the monthly budget.");
+            notes.Add(analysis.Loan.PaymentFrequency == PaymentFrequency.Monthly
+                ? $"\"Best within budget\" compares each strategy's highest regular payment with {format.Money(limit)}; lump sums are not counted against the monthly budget."
+                : $"\"Best within budget\" converts each strategy's highest regular payment to a monthly amount (× {analysis.Loan.PaymentFrequency.PeriodsPerYear()} ÷ 12) and compares it with {format.Money(limit)}; lump sums are not counted.");
             if (withinBudget is null)
             {
                 notes.Add("No strategy fits within the budget.");

@@ -147,22 +147,29 @@ public static class LoanAnalyzer
         InterestPaidSource interestSource;
         bool balanceEstimated;
         bool cumulativeFromOrigination;
-        var recordInterest = records.Any(r => r.Interest is not null) ? records.Sum(r => r.Interest ?? 0m) : (decimal?)null;
+        DateOnly projectionStart;
 
         if (loan.CurrentBalance is { } balance && loan.BalanceAsOf is { } asOf)
         {
             // Existing loan with a known balance: project from the as-of date; history is not reconstructed.
             var nextIndex = PaymentCalendar.FirstIndexAfter(loan.FirstPaymentDate, loan.PaymentFrequency, asOf);
             paymentsMade = loan.PaymentsMade ?? nextIndex;
+            var recordInterest = CompleteRecordInterest(records, asOf, paymentsMade);
             (interestPaid, interestSource) = loan.InterestPaidToDate is { } paid
                 ? (paid, InterestPaidSource.Entered)
                 : recordInterest is { } fromRecords
                     ? (fromRecords, InterestPaidSource.Records)
                     : ((decimal?)null, InterestPaidSource.Unknown);
+            // The as-of balance is principal after the last payment; interest has accrued since that
+            // payment's due date (or the loan start), not since the as-of date.
+            var accrualStart = nextIndex > 0
+                ? PaymentCalendar.DueDate(loan.FirstPaymentDate, loan.PaymentFrequency, nextIndex - 1)
+                : loan.StartDate;
+            projectionStart = asOf;
             baseRequest = originalRequest with
             {
                 StartingBalance = balance,
-                StartDate = asOf,
+                StartDate = accrualStart,
                 FirstPaymentIndex = nextIndex,
                 StartingCumulativeInterest = interestPaid ?? 0m,
             };
@@ -180,6 +187,8 @@ public static class LoanAnalyzer
             var last = made > 0 ? scheduleRows[made - 1] : null;
             history = scheduleRows.Take(made).Select(r => r with { IsEstimated = true }).ToList();
             var estimatedInterest = last?.CumulativeInterest ?? 0m;
+            var recordInterest = CompleteRecordInterest(records, last?.Date ?? loan.StartDate, made);
+            projectionStart = last?.Date ?? loan.StartDate;
             (interestPaid, interestSource) = loan.InterestPaidToDate is { } paid
                 ? (paid, InterestPaidSource.Entered)
                 : recordInterest is { } fromRecords
@@ -200,7 +209,7 @@ public static class LoanAnalyzer
         var baseline = AmortizationEngine.Run(baseRequest, format);
         var startBalance = Money.Round(baseRequest.StartingBalance);
         var repaid = Math.Max(0m, loan.OriginalAmount - startBalance);
-        var payoffEstimate = EstimatePayoff(baseRequest, baseline, today);
+        var payoffEstimate = EstimatePayoff(baseRequest, baseline, today > projectionStart ? today : projectionStart);
         // The next payment due on or after today (earlier projected payments are assumed made on time).
         var next = baseline.Rows.FirstOrDefault(r => r.Kind == ScheduleRowKind.Payment && r.Date >= today)
             ?? baseline.Rows.FirstOrDefault(r => r.Kind == ScheduleRowKind.Payment);
@@ -216,12 +225,12 @@ public static class LoanAnalyzer
             MaturityDate = PaymentCalendar.DueDate(loan.FirstPaymentDate, loan.PaymentFrequency, contractCount - 1),
             OriginalScheduleTotalInterest = original.Summary.TotalInterest,
             OriginalScheduleTotalCost = loan.OriginalAmount + original.Summary.TotalInterest,
-            ProjectionStartDate = baseRequest.StartDate,
+            ProjectionStartDate = projectionStart,
             ProjectionStartBalance = startBalance,
             NextPaymentNumber = baseRequest.FirstPaymentIndex + 1,
             CurrentBalance = startBalance,
             BalanceIsEstimated = balanceEstimated,
-            BalanceAsOf = baseRequest.StartDate,
+            BalanceAsOf = projectionStart,
             PrincipalRepaid = repaid,
             PercentRepaid = Math.Clamp(Money.Percent(repaid, loan.OriginalAmount), 0m, 100m),
             PaymentsMade = paymentsMade,
@@ -246,7 +255,7 @@ public static class LoanAnalyzer
 
     /// <summary>
     /// Principal and accrued interest on <paramref name="today"/>, assuming the baseline's scheduled
-    /// payments up to that day were made. Monthly-accrual loans use Actual/365 daily interest for the
+    /// payments due before that day were made (a payment due today is not yet assumed made). Monthly-accrual loans use Actual/365 daily interest for the
     /// partial period, which is how lenders typically quote payoffs.
     /// </summary>
     public static PayoffEstimate EstimatePayoff(AmortizationRequest request, Projection baseline, DateOnly today)
@@ -257,7 +266,7 @@ public static class LoanAnalyzer
         var from = request.StartDate;
         foreach (var row in baseline.Rows)
         {
-            if (row.Date > date)
+            if (row.Date >= date)
             {
                 break;
             }
@@ -270,6 +279,30 @@ public static class LoanAnalyzer
         var basis = request.AccrualMethod == AccrualMethod.DailySimple ? request.DayCountBasis : DayCountBasis.Actual365;
         var accrued = Money.Round(unpaid + InterestAccrual.Daily(balance, request.AprPercent, from, date, basis));
         return new PayoffEstimate(date, balance, accrued, balance + accrued);
+    }
+
+    /// <summary>
+    /// Future interest avoided by paying the loan off on the payoff estimate's date: the baseline
+    /// payments still due from that day on, minus the payoff amount.
+    /// </summary>
+    public static decimal InterestAvoidedByPayoff(LoanAnalysis analysis)
+    {
+        var payoff = analysis.Status.PayoffEstimate;
+        var remaining = analysis.Baseline.Rows.Where(r => r.Date >= payoff.Date).Sum(r => r.TotalPayment);
+        return Math.Max(0m, remaining - payoff.Total);
+    }
+
+    /// <summary>
+    /// Interest paid according to payment records, only when they look complete: at least
+    /// <paramref name="paymentsMade"/> records up to <paramref name="cutoff"/>, every one with an
+    /// interest split. Partial records would understate history, so they count as unknown.
+    /// </summary>
+    private static decimal? CompleteRecordInterest(IReadOnlyList<PaymentRecord> records, DateOnly cutoff, int paymentsMade)
+    {
+        var upTo = records.Where(r => r.Date <= cutoff).ToList();
+        return upTo.Count > 0 && upTo.Count >= paymentsMade && upTo.All(r => r.Interest is not null)
+            ? upTo.Sum(r => r.Interest!.Value)
+            : null;
     }
 
     private static List<CalcWarning> StatusWarnings(Loan loan, DateOnly today, decimal payment, decimal standard,
@@ -297,6 +330,16 @@ public static class LoanAnalyzer
                 $"The balance is from {format.LongDate(asOf)} ({DisplayFormat.Count(today.DayNumber - asOf.DayNumber)} days ago). " +
                 "Projections start from that date; update it from a recent statement for accuracy.",
                 Severity.Warning));
+        }
+
+        var firstPeriodDays = loan.FirstPaymentDate.DayNumber - loan.StartDate.DayNumber;
+        if (loan.AccrualMethod == AccrualMethod.Monthly && loan.PaymentFrequency == PaymentFrequency.Monthly && firstPeriodDays > 45)
+        {
+            warnings.Add(new CalcWarning(
+                "long-first-period",
+                $"The first payment is {DisplayFormat.Count(firstPeriodDays)} days after the loan start. Monthly accrual charges one month of " +
+                "interest for that period; lenders using daily interest charge for the actual days, so your first payment may differ.",
+                Severity.Info));
         }
 
         var tolerance = Math.Max(1m, standard * 0.01m);

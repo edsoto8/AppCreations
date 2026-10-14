@@ -266,7 +266,7 @@ public static class Endpoints
         var payoff = analysis.Status.PayoffEstimate;
         var basePayoff = analysis.Baseline.Summary.PayoffDate;
         options.Add(new DashboardSavingsOption("Pay off today", 0m, payoff.Total,
-            Math.Max(0m, analysis.Baseline.Summary.TotalPaid - payoff.Total),
+            LoanAnalyzer.InterestAvoidedByPayoff(analysis),
             basePayoff is { } d ? Math.Max(0, PaymentCalendar.MonthsBetween(payoff.Date, d)) : 0, payoff.Date));
         return options;
     }

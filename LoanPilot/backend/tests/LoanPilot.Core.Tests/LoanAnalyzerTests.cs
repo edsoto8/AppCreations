@@ -63,7 +63,7 @@ public sealed class LoanAnalyzerTests
     }
 
     [Fact]
-    public void ExistingLoan_InterestFromPaymentRecordsWhenNotEntered()
+    public void ExistingLoan_PartialPaymentRecords_DoNotCountAsKnownInterest()
     {
         var records = new List<PaymentRecord>
         {
@@ -72,7 +72,25 @@ public sealed class LoanAnalyzerTests
         };
         var status = LoanAnalyzer.Analyze(Existing(), TestLoans.Today, records).Status;
 
-        Assert.Equal(125m, status.InterestPaidToDate);
+        Assert.Null(status.InterestPaidToDate);
+        Assert.Equal(InterestPaidSource.Unknown, status.InterestPaidSource);
+        Assert.Null(status.ProjectedLifetimeCost);
+    }
+
+    [Fact]
+    public void ExistingLoan_CompletePaymentRecords_GiveInterestPaid()
+    {
+        var loan = Existing();
+        loan.PaymentsMade = 2;
+        var records = new List<PaymentRecord>
+        {
+            new() { Date = new DateOnly(2024, 2, 1), Amount = 483.32m, Interest = 125m, Principal = 358.32m },
+            new() { Date = new DateOnly(2024, 3, 1), Amount = 483.32m, Interest = 123.21m, Principal = 360.11m },
+            new() { Date = new DateOnly(2026, 11, 1), Amount = 483.32m }, // after the as-of date: ignored
+        };
+        var status = LoanAnalyzer.Analyze(loan, TestLoans.Today, records).Status;
+
+        Assert.Equal(248.21m, status.InterestPaidToDate);
         Assert.Equal(InterestPaidSource.Records, status.InterestPaidSource);
     }
 
@@ -163,7 +181,7 @@ public sealed class LoanAnalyzerTests
     }
 
     [Fact]
-    public void PayoffEstimate_DailyAccrualAddsInterestSinceBalanceDate()
+    public void PayoffEstimate_DailyAccrualAddsInterestSinceLastDueDate()
     {
         var loan = Existing();
         loan.AccrualMethod = AccrualMethod.DailySimple;
@@ -171,7 +189,8 @@ public sealed class LoanAnalyzerTests
 
         Assert.Equal(TestLoans.Today, estimate.Date);
         Assert.Equal(18_000m, estimate.Principal);
-        Assert.Equal(Money.Round(18_000m * 0.06m * 9m / 365m), estimate.AccruedInterest);
+        // The last payment was due Oct 1, so 13 days have accrued by Oct 14 (not 9 days since the Oct 5 balance date).
+        Assert.Equal(Money.Round(18_000m * 0.06m * 13m / 365m), estimate.AccruedInterest);
         Assert.Equal(estimate.Principal + estimate.AccruedInterest, estimate.Total);
     }
 

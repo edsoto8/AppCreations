@@ -62,8 +62,9 @@ public static class RefinanceCalculator
         var format = analysis.Format;
         var baseline = analysis.Baseline;
         var currentOwed = analysis.Status.ProjectionStartBalance + analysis.BaseRequest.StartingUnpaidInterest;
+        // A loan that never pays off still owes its ending balance at the projection horizon.
         var current = new CurrentLoanSide(analysis.Status.ScheduledPayment, baseline.Summary.PaymentCount,
-            baseline.Summary.TotalInterest, baseline.Summary.TotalPaid, baseline.Summary.PayoffDate);
+            baseline.Summary.TotalInterest, baseline.Summary.TotalPaid + baseline.EndingOwed, baseline.Summary.PayoffDate);
 
         var (refinanced, newProjection) = Refinanced(analysis, input, input.NewAprPercent);
         var upfront = input.FeesFinanced ? 0m : Money.Round(input.Fees);
@@ -107,6 +108,11 @@ public static class RefinanceCalculator
 
         DateOnly? breakEvenDate = breakEven is { } be ? series[be].Date : null;
 
+        // Series points are payment periods; report break-even in calendar months.
+        int? breakEvenMonths = breakEvenDate is { } bd
+            ? Math.Max(0, PaymentCalendar.MonthsBetween(analysis.Status.ProjectionStartDate, bd))
+            : null;
+
         var rates = new List<RateComparisonRow>();
         for (var delta = -2m; delta <= 2m; delta += 0.5m)
         {
@@ -126,7 +132,16 @@ public static class RefinanceCalculator
         {
             verdict = "This loan is already paid off, so there is nothing to refinance.";
         }
-        else if (lifetimeSavings > 0m && breakEven is { } month)
+        else if (!baseline.Summary.PaysOff)
+        {
+            verdict = $"Your current payment never pays this loan off, so any refinance that does is an improvement: at {DisplayFormat.Rate(input.NewAprPercent)} " +
+                $"the payment would be {format.Money(refinanced.Payment)}. Talk to your lender soon.";
+        }
+        else if (Math.Abs(lifetimeSavings) < 0.01m)
+        {
+            verdict = "Refinancing on these terms costs about the same as keeping your current loan.";
+        }
+        else if (lifetimeSavings > 0m && breakEvenMonths is { } month)
         {
             verdict = $"Refinancing would save about {format.Money(lifetimeSavings)} overall" +
                 (month > 0 ? $" and pays back its costs after {DisplayFormat.Months(month)}" : "") +
@@ -142,7 +157,7 @@ public static class RefinanceCalculator
             verdict = $"Refinancing on these terms would cost {format.Money(-lifetimeSavings)} more than keeping your current loan.";
         }
 
-        return new RefinanceResult(current, refinanced, paymentChange, lifetimeSavings, breakEven, breakEvenDate, verdict, rates, series);
+        return new RefinanceResult(current, refinanced, paymentChange, lifetimeSavings, breakEvenMonths, breakEvenDate, verdict, rates, series);
     }
 
     private static (RefinancedSide Side, Projection Projection) Refinanced(LoanAnalysis analysis, RefinanceInput input, decimal apr)

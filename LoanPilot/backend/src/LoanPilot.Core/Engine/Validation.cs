@@ -16,6 +16,7 @@ public static class LoanValidator
     public const decimal MaxAmount = 10_000_000m;
     public const int MaxTermMonths = 240;
     public const decimal MaxAprPercent = 100m;
+    public const decimal MinAmount = 100m;
 
     public static IReadOnlyList<ValidationError> Validate(Loan loan, DateOnly today)
     {
@@ -41,9 +42,9 @@ public static class LoanValidator
             Add("vehicleYear", $"Enter a model year between 1900 and {today.Year + 2}.");
         }
 
-        if (loan.OriginalAmount <= 0m)
+        if (loan.OriginalAmount < MinAmount)
         {
-            Add("originalAmount", "The original loan amount must be greater than zero.");
+            Add("originalAmount", "The original loan amount must be at least 100.");
         }
         else if (loan.OriginalAmount > MaxAmount)
         {

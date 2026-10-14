@@ -14,6 +14,8 @@ rounded.
 **Standard payment** (used when you leave the payment blank):
 `P = L · i / (1 − (1 + i)^−n)`, or `L ÷ n` at 0 % APR, rounded to the cent. `(1 + i)^n` is computed
 exactly by repeated squaring. Because the payment is rounded, the last payment absorbs the difference.
+If rounding down would leave a payment that only covers the interest, or a residual larger than one
+payment after payment *n* (very high APR with a long term), the payment is rounded up a cent instead.
 
 ## Accrual methods
 
@@ -62,9 +64,11 @@ common years. Biweekly and weekly dates step 14 or 7 days from the first payment
 ## Existing loans
 
 - **Balance entered:** the projection starts from the balance and its as-of date. The as-of balance is
-  assumed to include all payments due on or before that date; daily interest accrues from that date.
-  History is **not reconstructed**: interest paid to date is shown only if you enter it or record
-  payments with an interest split. Otherwise it is "unknown" and lifetime cost is not shown.
+  assumed to be principal after all payments due on or before that date; under daily accrual, interest
+  accrues from the most recent of those due dates (when that payment posted), not from the as-of date.
+  History is **not reconstructed**: interest paid to date is shown only if you enter it or your payment
+  records are complete (at least as many records as payments made, each with an interest split).
+  Otherwise it is "unknown" and lifetime cost is not shown.
 - **No balance entered:** the balance is **estimated** from the original schedule, assuming every
   payment so far was made on time with no extras (or the number of payments you entered). Every
   figure derived from that estimate is labelled *Estimated*.
@@ -73,7 +77,8 @@ common years. Biweekly and weekly dates step 14 or 7 days from the first payment
 ## Payoff estimate vs. lender payoff quote
 
 The dashboard's "estimated payoff today" is principal plus interest accrued since the last payment
-(daily Actual/365 for monthly-accrual loans), assuming scheduled payments up to today were made. It
+(daily Actual/365 for monthly-accrual loans), assuming scheduled payments due before today were made
+(a payment due today is shown as the next payment and is not yet assumed made). It
 is **not** an official payoff quote: lenders add per-diem interest up to the day funds post, and may
 include fees. Always ask your lender for a payoff quote before paying off a loan.
 
@@ -91,7 +96,8 @@ include fees. Always ask your lender for a payoff quote before paying off a loan
   recurring payment (among strategies that save interest, the one with the smallest regular outlay —
   lump-sum-only strategies count as the scheduled payment), and best within budget (lowest interest
   among strategies whose highest regular payment fits the budget; lump sums are not counted against a
-  monthly budget).
+  monthly budget; for biweekly and weekly loans the regular payment is converted to a monthly amount,
+× periods per year ÷ 12).
 
 ## Refinance
 
@@ -99,7 +105,9 @@ The new loan starts from the same position as the baseline (same principal and u
 first due date), at the new APR and term, with fees either paid upfront or financed into the principal.
 **Lifetime savings** = remaining cost of keeping the loan − (refinanced payments + upfront fees).
 **Break-even** compares your position month by month — everything paid so far (plus upfront fees)
-plus what is still owed — and is the first month from which refinancing is never more expensive.
+plus what is still owed — and is the first payment from which refinancing is never more expensive,
+reported in calendar months. If your current payment never repays the loan, its cost includes what is
+still owed at the 50-year projection horizon.
 
 ## Insights
 

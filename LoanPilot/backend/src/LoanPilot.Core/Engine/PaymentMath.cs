@@ -24,7 +24,13 @@ public static class PaymentMath
 
         var i = PeriodicRate(aprPercent, frequency);
         var growth = Money.Pow(1m + i, payments);
-        return Money.Round(principal * i * growth / (growth - 1m));
+        var exact = principal * i * growth / (growth - 1m);
+        var rounded = Money.Round(exact);
+
+        // Rounding down can leave a payment that only just covers the interest (high APR, long term) or a
+        // residual after the last payment larger than one payment. Round up to the cent in those cases.
+        var residual = (principal * growth) - (rounded * (growth - 1m) / i);
+        return rounded <= principal * i || residual > rounded ? Money.RoundUp(exact) : rounded;
     }
 
     /// <summary>Nominal periodic rate: APR (percent) ÷ 100 ÷ periods per year.</summary>

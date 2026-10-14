@@ -274,7 +274,8 @@ public sealed class ApiTests : IDisposable
         Assert.Equal(537.77m + 537.77m + 1037.77m, tracking["totalActual"]!.GetValue<decimal>());
 
         var dashboard = await (await _client.GetAsync($"/api/loans/{id}/dashboard?{Http.AsOf}")).ReadJson();
-        Assert.Equal("records", dashboard["status"]!["interestPaidSource"]!.GetValue<string>());
+        // Only one of the 30 payments made has an interest split, so interest history stays unknown (never invented).
+        Assert.Equal("unknown", dashboard["status"]!["interestPaidSource"]!.GetValue<string>());
 
         Assert.Equal(HttpStatusCode.NoContent, (await _client.DeleteAsync($"/api/loans/{id}/payments/{paymentId}")).StatusCode);
     }

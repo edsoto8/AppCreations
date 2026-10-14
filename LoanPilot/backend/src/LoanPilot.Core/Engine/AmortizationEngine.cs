@@ -107,7 +107,7 @@ public static class AmortizationEngine
         {
             warnings.Add(new CalcWarning(
                 "insufficient-payment",
-                $"The payment on {format.LongDate(shortfall.Date)} ({format.Money(shortfall.Paid)}) does not cover the " +
+                $"The payment on {format.LongDate(shortfall.Date)} ({format.Money(shortfall.Paid)}) does not exceed the " +
                 $"{format.Money(shortfall.Interest)} of interest charged for that period, so the principal balance does not go down. " +
                 "Unpaid interest is carried forward (not added to principal) and must be paid before principal is reduced.",
                 state.PaidOff ? Severity.Warning : Severity.Critical));
@@ -152,7 +152,15 @@ public static class AmortizationEngine
                 Severity.Info));
         }
 
-        if (lumpsNotApplied > 0)
+        if (lumpsNotApplied > 0 && !state.PaidOff)
+        {
+            warnings.Add(new CalcWarning(
+                "lump-sum-beyond-horizon",
+                $"{DisplayFormat.Count(lumpsNotApplied)} lump-sum payment{(lumpsNotApplied == 1 ? " is" : "s are")} dated beyond the " +
+                $"{request.HorizonYears}-year projection and {(lumpsNotApplied == 1 ? "was" : "were")} not applied.",
+                Severity.Info));
+        }
+        else if (lumpsNotApplied > 0)
         {
             warnings.Add(new CalcWarning(
                 "lump-sum-after-payoff",
@@ -189,7 +197,7 @@ public static class AmortizationEngine
 
             var amount = Money.Round(lump.Amount);
             var start = _balance;
-            if (amount <= _balance)
+            if (amount < _balance)
             {
                 _balance -= amount;
                 Rows.Add(new ScheduleRow(null, date, ScheduleRowKind.LumpSum, start, 0m, amount, amount, 0m, amount,
@@ -272,7 +280,7 @@ public static class AmortizationEngine
 
             var extra = recurring + lump;
             var total = scheduled + extra;
-            if (interest > 0m && total < interest && FirstShortfall is null)
+            if (interest > 0m && start > 0m && total <= interest && FirstShortfall is null)
             {
                 FirstShortfall = new Shortfall(due, interest, total);
             }
