@@ -187,6 +187,21 @@ interface TrackingResult { points: TrackingPoint[]; totalScheduled: number; tota
 interface Preferences { theme: 'system' | 'light' | 'dark'; currency: string; defaultAccrualMethod: AccrualMethod; selectedLoanId: number | null; comparisonBudget: number | null; }
 ```
 
+## Field semantics
+
+- `originalAmount` is the amount financed (after the down payment); `downPayment` is informational.
+- Input limits (400 otherwise): `originalAmount` 100 – 10,000,000; `aprPercent` 0 – 100; `termMonths`
+  1 – 240; `firstPaymentDate` after `startDate` and within a year of it; `balanceAsOf` between
+  `startDate` and today; `vehicleYear` 1900 – (this year + 2); `paymentsMade` 0 – 2 × contract payments.
+- `status.nextPaymentNumber` is the first payment of the projection (the first due after the balance
+  date). `status.nextPayment` is the first payment due **on or after today**; when the balance date is
+  a few weeks old these differ, and the payments in between are assumed made on time (so
+  `payoffEstimate.principal` can be below `currentBalance`).
+- `status.remainingTotalCost` = sum of the projected payments. For a loan that never pays off within the
+  50-year horizon it excludes what is still owed then (`baseline.endingOwed`).
+- `costSeries[].month` in the refinance result is the payment number; `breakEvenMonth` is in calendar
+  months; `monthlyPaymentChange` is per payment (per month for monthly loans).
+
 ## Endpoints
 
 | Method & path | Body | Returns |
