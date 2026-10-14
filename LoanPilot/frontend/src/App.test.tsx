@@ -41,7 +41,9 @@ describe('App shell', () => {
     const selector = await screen.findByRole('button', { name: 'Select loan' });
     await waitFor(() => expect(selector).toHaveTextContent('Pickup'));
     expect(screen.getByRole('link', { name: 'Loan Details' })).toHaveAttribute('href', '/loans/2/edit');
-    expect(await screen.findByText('Pickup: amortization schedule')).toBeInTheDocument();
+    // The schedule page renders for the restored loan (its name appears in the selector and the page eyebrow).
+    expect(await screen.findByRole('heading', { name: 'Amortization schedule' })).toBeInTheDocument();
+    await waitFor(() => expect(screen.getAllByText('Pickup').length).toBeGreaterThanOrEqual(2));
 
     await user.click(selector);
     await user.click(await screen.findByRole('menuitemradio', { name: /Sedan/ }));

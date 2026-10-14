@@ -1,0 +1,178 @@
+/*
+ * Printable loan summary (Amortization Schedule → "Print summary" → Save as PDF).
+ * Every rule is scoped to a document that contains .lp-print, which the schedule page renders only
+ * while printing, so printing any other page is unaffected after this chunk has loaded.
+ */
+@media screen {
+  .lp-print {
+    display: none;
+  }
+}
+
+@media print {
+  @page {
+    size: auto;
+    margin: 14mm 12mm;
+  }
+
+  /* Hide everything that is neither the summary, inside it, nor one of its ancestors
+     (navigation, top bar, controls, toasts, portals). */
+  body:has(.lp-print) *:not(:has(.lp-print)):not(.lp-print):not(.lp-print *) {
+    display: none !important;
+  }
+
+  /* Flatten the app shell around the summary. */
+  body:has(.lp-print) *:has(.lp-print) {
+    display: block !important;
+    position: static !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    max-width: none !important;
+    min-height: 0 !important;
+    height: auto !important;
+    overflow: visible !important;
+    box-shadow: none !important;
+    background: #fff !important;
+  }
+
+  html:has(.lp-print),
+  body:has(.lp-print) {
+    background: #fff !important;
+    color-scheme: light;
+  }
+
+  /* Light ink on paper, even when the app is in dark mode. */
+  .lp-print {
+    --foreground: #09090b;
+    --card-foreground: #09090b;
+    --muted-foreground: #52525b;
+    --muted: #f4f4f5;
+    --border: #d4d4d8;
+    --card: #fff;
+    --background: #fff;
+    --positive: #15803d;
+    --negative: #b91c1c;
+    --primary: #4338ca;
+    display: block !important;
+    color: #09090b;
+    background: #fff;
+    font-size: 10.5pt;
+    line-height: 1.4;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .lp-print-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    gap: 16px;
+    padding-bottom: 10px;
+    margin-bottom: 14px;
+    border-bottom: 2px solid #09090b;
+  }
+
+  .lp-print h1 {
+    font-size: 20pt;
+    font-weight: 650;
+    letter-spacing: -0.01em;
+    margin: 2px 0 2px;
+  }
+
+  .lp-print h2 {
+    font-size: 12pt;
+    font-weight: 600;
+    margin: 18px 0 6px;
+  }
+
+  .lp-print-eyebrow {
+    font-size: 8.5pt;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #4338ca;
+  }
+
+  .lp-print-meta {
+    font-size: 9pt;
+    color: #52525b;
+  }
+
+  .lp-print-figures {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    break-inside: avoid;
+  }
+
+  .lp-print-figures > div {
+    border: 1px solid #d4d4d8;
+    border-radius: 8px;
+    padding: 8px 10px;
+  }
+
+  .lp-print-figures dt {
+    font-size: 8.5pt;
+    color: #52525b;
+  }
+
+  .lp-print-figures dd {
+    font-size: 14pt;
+    font-weight: 600;
+    margin-top: 2px;
+  }
+
+  .lp-print-figures p {
+    font-size: 8pt;
+    color: #52525b;
+  }
+
+  .lp-print table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 9pt;
+  }
+
+  .lp-print thead {
+    display: table-header-group;
+  }
+
+  .lp-print th {
+    height: auto !important;
+    padding: 5px 6px !important;
+    border-bottom: 1px solid #09090b;
+    color: #52525b;
+    font-weight: 600;
+  }
+
+  .lp-print td {
+    padding: 4px 6px !important;
+    border-bottom: 1px solid #e4e4e7;
+  }
+
+  .lp-print tr {
+    break-inside: avoid;
+  }
+
+  .lp-print tfoot td {
+    border-top: 1px solid #09090b;
+    border-bottom: 0;
+    background: #f4f4f5;
+  }
+
+  .lp-print [data-slot='badge'] {
+    border: 1px dashed #a1a1aa;
+    padding: 0 4px;
+    font-size: 7.5pt;
+  }
+
+  .lp-print-notes {
+    margin-top: 14px;
+    display: grid;
+    gap: 4px;
+    font-size: 8pt;
+    color: #52525b;
+    break-inside: avoid;
+  }
+}
