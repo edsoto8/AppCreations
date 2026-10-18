@@ -1,15 +1,31 @@
 /**
  * Document repository over IndexedDB. Every write is validated against the engine schema; every read
- * passes through `migrate()` so documents from older schema versions are upgraded and validated.
+ * passes through `migrate()` so documents from older schema versions are upgraded and validated, and
+ * is checked to be the requested kind stored under its own id.
  */
 import { migrate, StoredDocSchema, zodIssues, type EngineResult, type StoredDoc } from '@rn/engine';
 import { STORES, type Db, type StoreName } from './db';
 
-const STORE_FOR_KIND: Record<StoredDoc['kind'], StoreName> = {
+type Kind = StoredDoc['kind'];
+export type DocOfKind<K extends Kind> = Extract<StoredDoc, { kind: K }>;
+
+const STORE_FOR_KIND: Record<Kind, StoreName> = {
   profile: 'profiles',
   scenario: 'scenarios',
   settings: 'settings',
 };
+
+function readAs<K extends Kind>(raw: unknown, kind: K, key: string): EngineResult<DocOfKind<K>> {
+  const result = migrate(raw);
+  if (result.status !== 'ok') return result;
+  if (result.value.kind !== kind || result.value.id !== key) {
+    return {
+      status: 'invalid',
+      issues: [{ path: [], message: `Stored document "${key}" is not a valid ${kind} document` }],
+    };
+  }
+  return { ...result, value: result.value as DocOfKind<K> };
+}
 
 export class DocumentRepository {
   constructor(private readonly db: Db) {}
@@ -23,23 +39,24 @@ export class DocumentRepository {
     return { status: 'ok', value, warnings: [] };
   }
 
-  /** Read a document by kind and id, migrating it to the current schema. Null if absent. */
-  async get(kind: StoredDoc['kind'], id: string): Promise<EngineResult<StoredDoc> | null> {
+  /** Read a document by kind and id, migrated to the current schema. Null if absent. */
+  async get<K extends Kind>(kind: K, id: string): Promise<EngineResult<DocOfKind<K>> | null> {
     const raw = await this.db.get(STORE_FOR_KIND[kind], id);
-    return raw === undefined ? null : migrate(raw);
+    return raw === undefined ? null : readAs(raw, kind, id);
   }
 
   /** All documents of a kind (each migrated; invalid ones are returned as results, not dropped). */
-  async list(kind: StoredDoc['kind']): Promise<EngineResult<StoredDoc>[]> {
-    const raws = await this.db.getAll(STORE_FOR_KIND[kind]);
-    return raws.map((raw) => migrate(raw));
+  async list<K extends Kind>(kind: K): Promise<EngineResult<DocOfKind<K>>[]> {
+    const store = STORE_FOR_KIND[kind];
+    const [keys, raws] = await Promise.all([this.db.getAllKeys(store), this.db.getAll(store)]);
+    return raws.map((raw, i) => readAs(raw, kind, String(keys[i])));
   }
 
-  async delete(kind: StoredDoc['kind'], id: string): Promise<void> {
+  async delete(kind: Kind, id: string): Promise<void> {
     await this.db.delete(STORE_FOR_KIND[kind], id);
   }
 
-  /** Remove every stored document ("delete all my data"). */
+  /** Remove every stored document. The "delete all my data" UI (M7b) also clears the theme preference. */
   async deleteAll(): Promise<void> {
     const tx = this.db.transaction([...STORES], 'readwrite');
     await Promise.all([...STORES.map((s) => tx.objectStore(s).clear()), tx.done]);

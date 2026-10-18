@@ -32,9 +32,20 @@ export default tseslint.config(
       'no-restricted-imports': ['error', engineBannedImports],
       'no-restricted-globals': [
         'error',
-        ...['window', 'document', 'navigator', 'localStorage', 'sessionStorage', 'indexedDB', 'fetch', 'self'].map(
-          (name) => ({ name, message: 'The engine is pure: no browser globals.' }),
-        ),
+        ...[
+          'window',
+          'document',
+          'navigator',
+          'localStorage',
+          'sessionStorage',
+          'indexedDB',
+          'fetch',
+          'self',
+          'crypto',
+          'performance',
+          'globalThis',
+          'process',
+        ].map((name) => ({ name, message: 'The engine is pure: no browser globals.' })),
       ],
       'no-restricted-properties': [
         'error',

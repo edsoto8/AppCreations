@@ -14,6 +14,7 @@ import {
   EntityIdSchema,
   FilingStatusSchema,
   FractionSchema,
+  InflationRateSchema,
   NominalRateSchema,
   NonNegativeCentsSchema,
   RealRateSchema,
@@ -52,17 +53,31 @@ export const VestingScheduleSchema = z.discriminatedUnion('kind', [
   /** 0% vested until `years` of service, then 100%. */
   z.object({ kind: z.literal('cliff'), years: z.number().int().min(1).max(10) }),
   /** `vestedByYear[k]` = vested fraction after k+1 completed years of service (non-decreasing, ends at 1). */
-  z.object({ kind: z.literal('graded'), vestedByYear: z.array(FractionSchema).min(1).max(10) }),
+  z.object({
+    kind: z.literal('graded'),
+    vestedByYear: z
+      .array(FractionSchema)
+      .min(1)
+      .max(10)
+      .refine((v) => v.every((x, i) => i === 0 || x >= (v[i - 1] ?? 0)) && v[v.length - 1] === 1, {
+        message: 'Graded vesting must not decrease and must end at 100%',
+      }),
+  }),
 ]);
 export type VestingSchedule = z.infer<typeof VestingScheduleSchema>;
 
 export const EmployerMatchRuleSchema = z.object({
-  tiers: z.array(MatchTierSchema).max(5),
+  tiers: z
+    .array(MatchTierSchema)
+    .max(5)
+    .refine((t) => t.reduce((sum, tier) => sum + tier.bandPctOfPay, 0) <= 1 + 1e-9, {
+      message: 'Match tiers cannot cover more than 100% of pay',
+    }),
   /** Non-elective employer contribution as a share of eligible pay, paid regardless of deferrals. */
   flatPctOfPay: FractionSchema.default(0),
   /** Optional plan-specific annual dollar cap on the match (excluding the flat contribution). */
   annualMatchCap: NonNegativeCentsSchema.nullable().default(null),
-  vesting: VestingScheduleSchema.default({ kind: 'immediate' }),
+  vesting: VestingScheduleSchema.default(() => ({ kind: 'immediate' }) as const),
   /** Completed years of service at the start of year 1 (drives vesting). */
   yearsOfServiceAtStart: z.number().int().min(0).max(60).default(0),
 });
@@ -99,23 +114,28 @@ export const RaiseOverrideSchema = z.object({
   rate: NominalRateSchema,
 });
 
-export const PartTimePhaseSchema = z.object({
-  startAge: AgeSchema,
-  endAge: AgeSchema,
-  /** Annual earnings in today's dollars; grows with inflation. FICA applies; no plan deferrals. */
-  annualIncome: NonNegativeCentsSchema,
-});
+export const PartTimePhaseSchema = z
+  .object({
+    startAge: AgeSchema,
+    endAge: AgeSchema,
+    /** Annual earnings in today's dollars; grows with inflation. FICA applies; no plan deferrals. */
+    annualIncome: NonNegativeCentsSchema,
+  })
+  .refine((p) => p.startAge < p.endAge, { message: 'Part-time end age must be after its start age', path: ['endAge'] });
 
 export const EmploymentIncomeSchema = z.object({
   /** Current gross annual base salary (year 1, nominal = today's dollars). */
   baseSalary: NonNegativeCentsSchema,
-  bonus: BonusSchema.default({ kind: 'none' }),
-  bonusGrowth: BonusGrowthSchema.default({ mode: 'withSalary' }),
+  bonus: BonusSchema.default(() => ({ kind: 'none' }) as const),
+  bonusGrowth: BonusGrowthSchema.default(() => ({ mode: 'withSalary' }) as const),
   /** Plan-dependent; default on (labeled in the UI). */
   bonusCountsForDeferrals: z.boolean().default(true),
   bonusCountsForMatch: z.boolean().default(true),
   raise: RaiseSchema,
-  raiseOverrides: z.array(RaiseOverrideSchema).default([]),
+  raiseOverrides: z
+    .array(RaiseOverrideSchema)
+    .refine((o) => new Set(o.map((x) => x.year)).size === o.length, { message: 'Only one raise override per year' })
+    .default(() => []),
   /** Last age with salary is `stopAge - 1`; null = the person's retirement age. */
   stopAge: AgeSchema.nullable().default(null),
   partTime: PartTimePhaseSchema.nullable().default(null),
@@ -194,7 +214,10 @@ export const PersonSchema = z.object({
   /** Longevity assumption; the household runs until the longer-lived person's planning age. */
   planningAge: AgeSchema.default(100),
   employment: EmploymentIncomeSchema.nullable().default(null),
-  workplacePlans: z.array(WorkplacePlanSchema).max(2).default([]),
+  workplacePlans: z
+    .array(WorkplacePlanSchema)
+    .max(2)
+    .default(() => []),
   socialSecurity: SocialSecurityInputSchema,
 });
 export type Person = z.infer<typeof PersonSchema>;
@@ -209,19 +232,28 @@ export const AllocationSchema = z
 export type Allocation = z.infer<typeof AllocationSchema>;
 
 /** Contribution schedule for non-workplace accounts (IRA, HSA, taxable, cash, other). */
-export const ContributionScheduleSchema = z.object({
-  amount: z.discriminatedUnion('kind', [
-    z.object({ kind: z.literal('dollars'), amount: NonNegativeCentsSchema, frequency: z.enum(['annual', 'monthly']) }),
-    z.object({ kind: z.literal('percentOfSalary'), pct: FractionSchema }),
-    /** Contribute the year's allowed maximum (IRA/HSA), after eligibility and earned-income caps. */
-    z.object({ kind: z.literal('maxAllowed') }),
-  ]),
-  growth: GrowthModeSchema.default({ mode: 'flat' }),
-  /** First contribution year; null = year 1. */
-  startYear: CalendarYearSchema.nullable().default(null),
-  /** Last contribution year (inclusive); null = the owner's last working year. */
-  stopYear: CalendarYearSchema.nullable().default(null),
-});
+export const ContributionScheduleSchema = z
+  .object({
+    amount: z.discriminatedUnion('kind', [
+      z.object({
+        kind: z.literal('dollars'),
+        amount: NonNegativeCentsSchema,
+        frequency: z.enum(['annual', 'monthly']),
+      }),
+      z.object({ kind: z.literal('percentOfSalary'), pct: FractionSchema }),
+      /** Contribute the year's allowed maximum (IRA/HSA), after eligibility and earned-income caps. */
+      z.object({ kind: z.literal('maxAllowed') }),
+    ]),
+    growth: GrowthModeSchema.default(() => ({ mode: 'flat' }) as const),
+    /** First contribution year; null = year 1. */
+    startYear: CalendarYearSchema.nullable().default(null),
+    /** Last contribution year (inclusive); null = the owner's last working year. */
+    stopYear: CalendarYearSchema.nullable().default(null),
+  })
+  .refine((c) => c.startYear === null || c.stopYear === null || c.startYear <= c.stopYear, {
+    message: 'Contribution stop year is before its start year',
+    path: ['stopYear'],
+  });
 export type ContributionSchedule = z.infer<typeof ContributionScheduleSchema>;
 
 const AccountBase = z.object({
@@ -291,18 +323,23 @@ export type TaxTreatment = 'taxDeferred' | 'taxFree' | 'taxable';
 // ---------------------------------------------------------------------------------------------
 
 /** A recurring non-employment income stream (rental, annuity, consulting). */
-export const IncomeSourceSchema = z.object({
-  id: EntityIdSchema,
-  name: z.string().trim().min(1).max(60),
-  ownerId: EntityIdSchema.nullable().default(null),
-  startYear: CalendarYearSchema,
-  /** Inclusive; null = through the end of the projection. */
-  endYear: CalendarYearSchema.nullable().default(null),
-  /** Annual amount in today's dollars at year 1. */
-  annualAmount: NonNegativeCentsSchema,
-  growth: GrowthModeSchema.default({ mode: 'inflation' }),
-  taxableFraction: FractionSchema.default(1),
-});
+export const IncomeSourceSchema = z
+  .object({
+    id: EntityIdSchema,
+    name: z.string().trim().min(1).max(60),
+    ownerId: EntityIdSchema.nullable().default(null),
+    startYear: CalendarYearSchema,
+    /** Inclusive; null = through the end of the projection. */
+    endYear: CalendarYearSchema.nullable().default(null),
+    /** Annual amount in today's dollars at year 1. */
+    annualAmount: NonNegativeCentsSchema,
+    growth: GrowthModeSchema.default(() => ({ mode: 'inflation' }) as const),
+    taxableFraction: FractionSchema.default(1),
+  })
+  .refine((x) => x.endYear === null || x.startYear <= x.endYear, {
+    message: 'End year is before start year',
+    path: ['endYear'],
+  });
 export type IncomeSource = z.infer<typeof IncomeSourceSchema>;
 
 export const PensionSchema = z.object({
@@ -313,7 +350,7 @@ export const PensionSchema = z.object({
   annualAmount: NonNegativeCentsSchema,
   /** Whether `annualAmount` is stated in today's dollars or nominal dollars at the start age. */
   amountBasis: z.enum(['todaysDollars', 'nominalAtStart']),
-  cola: GrowthModeSchema.default({ mode: 'flat' }),
+  cola: GrowthModeSchema.default(() => ({ mode: 'flat' }) as const),
   taxableFraction: FractionSchema.default(1),
   payout: z.discriminatedUnion('kind', [
     z.object({ kind: z.literal('annuity') }),
@@ -356,7 +393,11 @@ export const SpendingPlanSchema = z.object({
   currentAnnualSpending: NonNegativeCentsSchema,
   /** Annual retirement spending (today's dollars), a NET (after-tax) need. */
   retirementAnnualSpending: NonNegativeCentsSchema,
-  steps: z.array(SpendingStepSchema).max(10).default([]),
+  steps: z
+    .array(SpendingStepSchema)
+    .max(10)
+    .refine((st) => new Set(st.map((x) => x.fromAge)).size === st.length, { message: 'Only one spending step per age' })
+    .default(() => []),
   /** Annual real change in retirement spending (e.g. -0.01 = 1% less each year in real terms). */
   retirementRealGlide: RealRateSchema.default(0 as RealRate),
   /** User-entered pre-Medicare healthcare line item (today's dollars per year, retired years before 65). */
@@ -397,7 +438,17 @@ export const CapitalMarketSchema = z.object({
   bonds: CapitalMarketAssumptionSchema,
   cash: CapitalMarketAssumptionSchema,
   /** Correlation of log returns, order [stocks, bonds, cash]. Must be 3×3, symmetric, unit diagonal, PSD. */
-  correlation: z.array(z.array(z.number().min(-1).max(1)).length(3)).length(3),
+  correlation: z
+    .array(z.array(z.number().min(-1).max(1)).length(3))
+    .length(3)
+    .refine(
+      (m) =>
+        m.every(
+          (row, i) =>
+            Math.abs((row[i] ?? 0) - 1) < 1e-12 && row.every((v, j) => Math.abs(v - (m[j]?.[i] ?? NaN)) < 1e-12),
+        ),
+      { message: 'Correlation matrix must be symmetric with 1s on the diagonal' },
+    ),
   /** Volatility used for accounts without an allocation (blended-return fallback). */
   blendedVolatility: z.number().min(0).max(1),
   /** Rationale/source shown beside every result that uses these values. */
@@ -406,7 +457,8 @@ export const CapitalMarketSchema = z.object({
 export type CapitalMarket = z.infer<typeof CapitalMarketSchema>;
 
 export const AssumptionsSchema = z.object({
-  inflation: NominalRateSchema,
+  /** Bounded so the deflator (1 + i) stays positive; extreme values are still testable. */
+  inflation: InflationRateSchema,
   /**
    * Geometric (median) nominal returns: the blended-return fallback for accounts with neither an
    * expected return nor an allocation. Precedence: account.expectedReturn, then allocation × CMA
@@ -418,7 +470,7 @@ export const AssumptionsSchema = z.object({
   /** Fixed return offsets for the optimistic / pessimistic deterministic lines (NOT confidence intervals). */
   deterministicOffsets: z
     .object({ optimistic: z.number().min(0).max(0.1), pessimistic: z.number().min(-0.1).max(0) })
-    .default({ optimistic: 0.02, pessimistic: -0.02 }),
+    .default(() => ({ optimistic: 0.02, pessimistic: -0.02 }) as const),
   /** Contributions are always mid-year. Withdrawals mid-year (default) or start of year (conservative). */
   withdrawalTiming: z.enum(['midYear', 'startOfYear']).default('midYear'),
   /** Monthly granularity is deterministic-only. */
@@ -436,7 +488,7 @@ export const AssumptionsSchema = z.object({
         z.object({ mode: z.literal('inflation') }),
         z.object({ mode: z.literal('rate'), rate: NominalRateSchema }),
       ])
-      .default({ mode: 'inflation' }),
+      .default(() => ({ mode: 'inflation' }) as const),
     /** Treatment of provisions after their sunset year (labeled assumption). */
     postSunsetLaw: z.enum(['asWritten']).default('asWritten'),
   }),
@@ -447,11 +499,11 @@ export const AssumptionsSchema = z.object({
           z.object({ mode: z.literal('inflation') }),
           z.object({ mode: z.literal('rate'), rate: NominalRateSchema }),
         ])
-        .default({ mode: 'inflation' }),
+        .default(() => ({ mode: 'inflation' }) as const),
       /** Optional user-set benefit reduction from a year (an assumption, not a prediction). */
       benefitReduction: z.object({ fromYear: CalendarYearSchema, reduction: FractionSchema }).nullable().default(null),
     })
-    .default({ cola: { mode: 'inflation' }, benefitReduction: null }),
+    .default(() => ({ cola: { mode: 'inflation' }, benefitReduction: null }) as const),
   withdrawalStrategy: WithdrawalStrategySchema.default('taxableFirst'),
   /** For `bracketFill`: fill traditional withdrawals up to the top of this ordinary-rate bracket. */
   bracketFillTopRate: z.number().min(0).max(1).nullable().default(null),
@@ -461,7 +513,7 @@ export const AssumptionsSchema = z.object({
       z.object({ mode: z.literal('spent') }),
       z.object({ mode: z.literal('account'), accountId: EntityIdSchema }),
     ])
-    .default({ mode: 'spent' }),
+    .default(() => ({ mode: 'spent' }) as const),
   /** Deterministic success criterion: no depletion before planning age and at least this ending balance (today's $). */
   minimumEndingBalance: NonNegativeCentsSchema.default(ZERO_CENTS),
   /** Deterministic return-shock sequence (scenario D). Overrides all account returns for those years. */
@@ -474,13 +526,15 @@ export const AssumptionsSchema = z.object({
       maxIterations: z.number().int().min(1).max(200).default(50),
       toleranceCents: z.number().int().min(1).max(10_000).default(100),
     })
-    .default({ maxIterations: 50, toleranceCents: 100 }),
+    .default(() => ({ maxIterations: 50, toleranceCents: 100 }) as const),
 });
 export type Assumptions = z.infer<typeof AssumptionsSchema>;
 
 // ---------------------------------------------------------------------------------------------
 // Household (root input entity)
 // ---------------------------------------------------------------------------------------------
+
+const SURPLUS_ACCOUNT_TYPES: ReadonlySet<AccountType> = new Set(['taxableBrokerage', 'cash', 'other']);
 
 export const HouseholdSchema = z
   .object({
@@ -491,14 +545,28 @@ export const HouseholdSchema = z
     stateCode: z.string().length(2).nullable().default(null),
     /** First entry is the primary person (spending steps use the primary person's age). */
     people: z.array(PersonSchema).min(1).max(2),
-    accounts: z.array(AccountSchema).max(50).default([]),
-    otherIncome: z.array(IncomeSourceSchema).max(20).default([]),
-    pensions: z.array(PensionSchema).max(10).default([]),
-    oneTimeEvents: z.array(OneTimeEventSchema).max(50).default([]),
+    accounts: z
+      .array(AccountSchema)
+      .max(50)
+      .default(() => []),
+    otherIncome: z
+      .array(IncomeSourceSchema)
+      .max(20)
+      .default(() => []),
+    pensions: z
+      .array(PensionSchema)
+      .max(10)
+      .default(() => []),
+    oneTimeEvents: z
+      .array(OneTimeEventSchema)
+      .max(50)
+      .default(() => []),
     spending: SpendingPlanSchema,
     assumptions: AssumptionsSchema,
   })
   .superRefine((h, ctx) => {
+    const issue = (path: (string | number)[], message: string) => ctx.addIssue({ code: 'custom', path, message });
+    const planAccountIds = new Set<string>();
     const expectedPeople = h.filingStatus === 'marriedFilingJointly' ? 2 : 1;
     if (h.people.length !== expectedPeople) {
       ctx.addIssue({
@@ -563,21 +631,57 @@ export const HouseholdSchema = z
             });
           }
         }
-        if (!w.planOffersRoth && (w.rothPctOfSalary > 0 || w.rothPctOfBonus > 0 || w.matchDestination === 'roth')) {
-          ctx.addIssue({
-            code: 'custom',
-            path: ['people', pi, 'workplacePlans', wi],
-            message: 'Roth elections need a plan that offers Roth',
-          });
+        const usesRoth =
+          w.rothPctOfSalary > 0 ||
+          w.rothPctOfBonus > 0 ||
+          w.matchDestination === 'roth' ||
+          w.autoEscalation?.appliesTo === 'roth';
+        if (usesRoth && !w.planOffersRoth) {
+          issue(['people', pi, 'workplacePlans', wi], 'Roth elections need a plan that offers Roth');
+        } else if (usesRoth && w.rothAccountId === null) {
+          issue(['people', pi, 'workplacePlans', wi, 'rothAccountId'], 'Roth elections need a Roth workplace account');
+        }
+        for (const id of [w.traditionalAccountId, w.rothAccountId]) {
+          if (id === null) continue;
+          const account = accountsById.get(id);
+          if (account && (account.type === 'workplaceTraditional' || account.type === 'workplaceRoth')) {
+            if (account.planType !== w.planType) {
+              issue(['people', pi, 'workplacePlans', wi, 'planType'], 'Plan type must match its accounts');
+            }
+          }
+          if (planAccountIds.has(id)) {
+            issue(['people', pi, 'workplacePlans', wi], `Account "${id}" is already used by another plan`);
+          }
+          planAccountIds.add(id);
         }
       });
     });
-    if (h.assumptions.surplus.mode === 'account' && !accountsById.has(h.assumptions.surplus.accountId)) {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['assumptions', 'surplus', 'accountId'],
-        message: 'Unknown surplus account',
-      });
+    h.pensions.forEach((pension, i) => {
+      if (!personIds.has(pension.ownerId)) issue(['pensions', i, 'ownerId'], 'Unknown owner');
+      if (pension.payout.kind === 'lumpSum' && !accountsById.has(pension.payout.destinationAccountId)) {
+        issue(['pensions', i, 'payout', 'destinationAccountId'], 'Unknown destination account');
+      }
+    });
+    h.otherIncome.forEach((income, i) => {
+      if (income.ownerId !== null && !personIds.has(income.ownerId))
+        issue(['otherIncome', i, 'ownerId'], 'Unknown owner');
+    });
+    h.oneTimeEvents.forEach((event, i) => {
+      if (event.destinationAccountId !== null && !accountsById.has(event.destinationAccountId)) {
+        issue(['oneTimeEvents', i, 'destinationAccountId'], 'Unknown destination account');
+      }
+    });
+    if (h.assumptions.surplus.mode === 'account') {
+      const surplus = accountsById.get(h.assumptions.surplus.accountId);
+      if (!surplus) {
+        issue(['assumptions', 'surplus', 'accountId'], 'Unknown surplus account');
+      } else if (!SURPLUS_ACCOUNT_TYPES.has(surplus.type)) {
+        // Surplus cash must not bypass workplace, IRA or HSA contribution limits.
+        issue(
+          ['assumptions', 'surplus', 'accountId'],
+          'Surplus can go only to a taxable brokerage, cash or other account',
+        );
+      }
     }
   });
 export type Household = z.infer<typeof HouseholdSchema>;

@@ -57,13 +57,28 @@ RetirementNavigator/
 
 ## Security and privacy
 - No backend, no network calls carrying user data, no analytics, self-hosted fonts.
-- CSP meta tag, injected into the **production build only**:
-  `default-src 'self'; connect-src 'none'; worker-src 'self'; style-src 'self' 'unsafe-inline'`.
+- CSP meta tag (defined in `apps/web/csp.ts`), injected into the **production build only**:
+  `default-src 'self'; connect-src 'none'; worker-src 'self'; style-src 'self' 'unsafe-inline'; object-src 'none'; base-uri 'none'; form-action 'none'`.
+  The last three directives strengthen the brief's policy: they don't fall back to `default-src`.
   - `'unsafe-inline'` styles are needed because Recharts and the Radix/shadcn primitives set inline
     styles.
   - The Vite dev server is exempt, because HMR needs a websocket that `connect-src 'none'` would
     block. E2E, axe and no-outbound tests therefore run against `vite preview`.
 - No `dangerouslySetInnerHTML` with user data. All imports are validated with Zod.
+
+## Tooling decisions (M1)
+- TypeScript 6.0.3: typescript-eslint 8.71 supports `<6.1`; TypeScript 7 (native) came out on 2026-10-18.
+- React Router 8 (HashRouter): works offline, under the CSP and in any static host.
+- shadcn/ui components are hand-written in `apps/web/src/components/ui/` following the shadcn conventions
+  (cva variants, `cn()`, Radix primitives from the `radix-ui` package), because the shadcn registry
+  (ui.shadcn.com) is blocked in the cloud container.
+- `@playwright/test` is pinned to 1.56.1 to match the preinstalled Chromium build (1194) in the cloud
+  container; `playwright.config.ts` uses that binary when present.
+- eslint-plugin-jsx-a11y is not used (no ESLint 10 support); accessibility is enforced by axe in Playwright.
+- The theme is applied before first paint by `public/theme-init.js` (an external file, so the CSP needs no
+  inline script) and mirrored in localStorage; documents live in IndexedDB.
+- Fonts: Inter Variable from `@fontsource-variable/inter`, bundled and served same-origin.
+  `build.assetsInlineLimit: 0` prevents `data:` URIs the CSP would block.
 
 ## MCP servers
 None are added. No concrete advantage for this project has been identified.

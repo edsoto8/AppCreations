@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { migrate, MIGRATIONS } from './migrate';
+import { migrate, migrateWith, MIGRATIONS } from './migrate';
 import { CURRENT_SCHEMA_VERSION } from '../domain/documents';
 import { minimalHouseholdInput } from '../samples/minimal';
 
@@ -68,5 +68,59 @@ describe('migrate', () => {
 
   it('has a migration step for every prior version', () => {
     for (let v = 1; v < CURRENT_SCHEMA_VERSION; v++) expect(MIGRATIONS[v]).toBeTypeOf('function');
+  });
+});
+
+describe('migrateWith (chain mechanics)', () => {
+  it('returns invalid when a step throws, instead of throwing', () => {
+    const r = migrateWith(
+      profileDoc(),
+      {
+        1: () => {
+          throw new Error('boom');
+        },
+      },
+      2,
+    );
+    expect(r).toEqual({ status: 'invalid', issues: [{ path: [], message: 'Could not upgrade from schema 1: boom' }] });
+  });
+
+  it('reports non-Error throws too', () => {
+    const r = migrateWith(
+      profileDoc(),
+      {
+        1: () => {
+          throw 'text';
+        },
+      },
+      2,
+    );
+    expect(r.status === 'invalid' && r.issues[0]!.message).toBe('Could not upgrade from schema 1: text');
+  });
+
+  it('reports a gap in the chain', () => {
+    const r = migrateWith(profileDoc(), {}, 2);
+    expect(r.status === 'invalid' && r.issues[0]!.message).toBe('No migration from schema 1');
+  });
+
+  it('never mutates the caller’s document', () => {
+    const doc = profileDoc();
+    const before = JSON.stringify(doc);
+    migrateWith(
+      doc,
+      {
+        1: (d) => {
+          d['name'] = 'mutated';
+          delete d['household'];
+          return d;
+        },
+      },
+      2,
+    );
+    expect(JSON.stringify(doc)).toBe(before);
+  });
+
+  it('accepts timestamps with an offset', () => {
+    expect(migrate({ ...profileDoc(), updatedAt: '2026-10-18T12:00:00+02:00' }).status).toBe('ok');
   });
 });

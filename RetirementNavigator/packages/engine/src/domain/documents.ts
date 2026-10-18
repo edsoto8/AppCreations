@@ -10,7 +10,7 @@ import { ScenarioSchema } from './scenario';
 
 export const CURRENT_SCHEMA_VERSION = 1 as const;
 
-const Timestamp = z.iso.datetime();
+const Timestamp = z.iso.datetime({ offset: true });
 
 export const ProfileDocSchema = z.object({
   kind: z.literal('profile'),
@@ -35,7 +35,6 @@ export const SettingsDocSchema = z.object({
   schemaVersion: z.literal(CURRENT_SCHEMA_VERSION),
   id: z.literal('settings'),
   updatedAt: Timestamp,
-  theme: z.enum(['light', 'dark', 'system']).default('system'),
   dollarBasis: z.enum(['todays', 'nominal']).default('todays'),
   activeProfileId: EntityIdSchema.nullable().default(null),
   onboardingComplete: z.boolean().default(false),

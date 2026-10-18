@@ -7,15 +7,7 @@
  *
  * Purity: no Date.now(), no Math.random(), no globals. The current year and the PRNG are injected.
  */
-import type {
-  AgeYearsMonths,
-  CalendarYear,
-  Cents,
-  DollarBasis,
-  FilingStatus,
-  Fraction,
-  NominalRate,
-} from './domain/primitives';
+import type { AgeYearsMonths, CalendarYear, Cents, DollarBasis, FilingStatus, Fraction } from './domain/primitives';
 import type { EmployerMatchRule, Household, WorkplacePlan } from './domain/household';
 import type { RulesSet, StandingRules, TaxYearRules } from './domain/rules';
 import type { EngineResult } from './domain/results';
@@ -26,7 +18,7 @@ import type { Insight } from './domain/insight';
 import type { ExportBundle } from './domain/documents';
 import type { ValidationIssue } from './domain/results';
 
-export const CONTRACT_VERSION = '1.0.0';
+export const CONTRACT_VERSION = '1.1.0';
 
 export class NotImplementedError extends Error {
   constructor(fn: string) {
@@ -56,19 +48,8 @@ export interface ResolvedYearRules {
   standing: StandingRules;
 }
 
-/**
- * Resolve the rules for `targetYear`: published values up to `anchorYear`; beyond it (or where a
- * year is `notPublished`), `indexed` values are projected at `indexRate` per year and rounded per
- * their rounding metadata; `statutory-fixed` values are carried unchanged; null stays null.
- */
-export function resolveRules(
-  rules: RulesSet,
-  opts: { anchorYear: CalendarYear; targetYear: CalendarYear; indexRate: NominalRate },
-): ResolvedYearRules {
-  void rules;
-  void opts;
-  throw new NotImplementedError('resolveRules');
-}
+// Implemented in M2 (rules/resolve.ts).
+export { resolveRules } from './rules/resolve';
 
 // =============================================================================================
 // Income and contributions (modules: income/, match/, limits/)

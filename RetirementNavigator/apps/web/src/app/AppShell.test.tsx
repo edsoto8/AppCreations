@@ -62,4 +62,28 @@ describe('AppShell', () => {
     await user.click(within(dialog).getByRole('link', { name: 'Accounts' }));
     expect(screen.getByRole('heading', { level: 1, name: 'Accounts' })).toBeInTheDocument();
   });
+
+  it('skip link focuses the main content without navigating', async () => {
+    const user = userEvent.setup();
+    renderAt('/accounts');
+    await user.click(screen.getByRole('link', { name: 'Skip to content' }));
+    expect(document.getElementById('main')).toHaveFocus();
+    expect(screen.getByRole('heading', { level: 1, name: 'Accounts' })).toBeInTheDocument();
+  });
+
+  it('sets the document title per route', async () => {
+    const user = userEvent.setup();
+    renderAt('/');
+    expect(document.title).toBe('Dashboard · Retirement Navigator');
+    await user.click(within(screen.getByRole('navigation', { name: 'Main' })).getByRole('link', { name: 'HSA' }));
+    expect(document.title).toBe('HSA · Retirement Navigator');
+    expect(document.getElementById('main')).toHaveFocus();
+  });
+
+  it('labels each navigation group', () => {
+    renderAt('/');
+    const nav = screen.getByRole('navigation', { name: 'Main' });
+    expect(within(nav).getByRole('list', { name: 'Plan' })).toBeInTheDocument();
+    expect(within(nav).getByRole('list', { name: 'Tools' })).toBeInTheDocument();
+  });
 });

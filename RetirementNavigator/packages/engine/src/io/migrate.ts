@@ -21,6 +21,15 @@ function invalid(message: string, path: (string | number)[] = []): EngineResult<
 
 /** Upgrade a stored document of any prior schemaVersion to the current one, then validate it. */
 export function migrate(doc: unknown): EngineResult<StoredDoc> {
+  return migrateWith(doc, MIGRATIONS, CURRENT_SCHEMA_VERSION);
+}
+
+/** Migration core with an explicit chain and target version (exposed for tests). */
+export function migrateWith(
+  doc: unknown,
+  migrations: Readonly<Record<number, (doc: RawDoc) => RawDoc>>,
+  targetVersion: number,
+): EngineResult<StoredDoc> {
   if (typeof doc !== 'object' || doc === null || Array.isArray(doc)) {
     return invalid('Expected a document object');
   }
@@ -29,16 +38,22 @@ export function migrate(doc: unknown): EngineResult<StoredDoc> {
   if (typeof version !== 'number' || !Number.isInteger(version) || version < 1) {
     return invalid('Missing or invalid schemaVersion', ['schemaVersion']);
   }
-  if (version > CURRENT_SCHEMA_VERSION) {
+  if (version > targetVersion) {
     return invalid(
-      `This file was created by a newer version of the app (schema ${version}); this version supports up to ${CURRENT_SCHEMA_VERSION}`,
+      `This file was created by a newer version of the app (schema ${version}); this version supports up to ${targetVersion}`,
       ['schemaVersion'],
     );
   }
-  for (let v = version; v < CURRENT_SCHEMA_VERSION; v++) {
-    const step = MIGRATIONS[v];
+  // Steps never see (or mutate) the caller's object. Stored documents are plain JSON data.
+  current = JSON.parse(JSON.stringify(current)) as RawDoc;
+  for (let v = version; v < targetVersion; v++) {
+    const step = migrations[v];
     if (!step) return invalid(`No migration from schema ${v}`, ['schemaVersion']);
-    current = { ...step(current), schemaVersion: v + 1 };
+    try {
+      current = { ...step(current), schemaVersion: v + 1 };
+    } catch (error) {
+      return invalid(`Could not upgrade from schema ${v}: ${error instanceof Error ? error.message : String(error)}`);
+    }
   }
   const parsed = StoredDocSchema.safeParse(current);
   if (!parsed.success) return { status: 'invalid', issues: zodIssues(parsed.error) };

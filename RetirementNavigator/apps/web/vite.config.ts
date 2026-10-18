@@ -3,13 +3,12 @@ import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import { fileURLToPath } from 'node:url';
+import { CSP } from './csp';
 
 /**
- * Content-Security-Policy for the production build (docs/architecture.md).
- * 'unsafe-inline' styles: Recharts and Radix primitives set inline style attributes.
- * Not applied to the dev server: Vite HMR needs a websocket that connect-src 'none' would block.
+ * The CSP meta tag is injected into the production build only: Vite HMR needs a websocket that
+ * connect-src 'none' would block.
  */
-export const CSP = "default-src 'self'; connect-src 'none'; worker-src 'self'; style-src 'self' 'unsafe-inline'";
 
 function cspPlugin(): Plugin {
   return {

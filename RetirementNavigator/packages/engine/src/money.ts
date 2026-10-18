@@ -6,8 +6,9 @@
 import type { Cents } from './domain/primitives';
 
 /**
- * Round half to even. Values within a relative float tolerance of an exact .5 are treated as ties,
- * so that e.g. 2.675 * 100 (= 267.49999999999997 in float64) rounds as the tie it represents.
+ * Round half to even. Values within a float tolerance (1e-9 absolute plus 8 ulp relative) of an
+ * exact .5 are treated as ties, so that e.g. 2.675 * 100 (= 267.49999999999997 in float64) rounds as
+ * the tie it represents. Intended for cent-scale values, where a 1e-9 band is far below precision.
  */
 export function roundHalfEven(value: number): number {
   if (!Number.isFinite(value)) throw new RangeError(`Cannot round non-finite value ${value}`);
@@ -21,9 +22,12 @@ export function roundHalfEven(value: number): number {
   return result === 0 ? 0 : result; // normalize -0
 }
 
-/** Float64 dollars to integer cents (round half to even). */
+/**
+ * Float64 dollars to integer cents (round half to even). Throws RangeError beyond the safe-integer
+ * range (about $90 trillion), which validated inputs cannot reach: a programming-error guard.
+ */
 export function toCents(dollars: number): Cents {
-  return roundHalfEven(dollars * 100) as Cents;
+  return asCents(roundHalfEven(dollars * 100));
 }
 
 /** Integer cents to float64 dollars (for internal math). */

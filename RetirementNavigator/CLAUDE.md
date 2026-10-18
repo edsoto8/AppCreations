@@ -8,8 +8,11 @@ Local-first retirement planning and forecasting web app (pnpm workspace: `packag
 Run all commands from this folder (`RetirementNavigator/`), not the repo root.
 
 ## Commands
-- `pnpm install`
-- `pnpm typecheck` (Phase 0). `pnpm dev`, `pnpm verify` and `pnpm bench` arrive in M1 and M6.
+- `pnpm install` then `pnpm dev` (http://localhost:5173)
+- `pnpm verify`: typecheck, lint, format check, unit tests with coverage, build, E2E (Playwright on `vite preview`)
+- `pnpm test` / `pnpm lint` / `pnpm format` / `pnpm e2e`
+- `pnpm --filter @rn/web screenshots`: PNGs in `apps/web/test-results/screens/` (read them back)
+- E2E uses the preinstalled Chromium in the cloud container; locally run `pnpm --filter @rn/web exec playwright install chromium`
 
 ## Conventions
 - Money is integer cents (`Cents`) at engine boundaries, in storage and in exports; float64 inside.
@@ -19,7 +22,10 @@ Run all commands from this folder (`RetirementNavigator/`), not the repo root.
 - Engine calls return `EngineResult<T>` (`ok | unverified | invalid`) and never throw for user data.
 - Rule values are `Verified<T>`. Never fill a value from memory. Null means unverified, and the engine
   never substitutes a default.
-- TS strict + `noUncheckedIndexedAccess`. Pin exact dependency versions.
+- TS strict + `noUncheckedIndexedAccess`. Pin exact dependency versions (TypeScript stays on 6.0.x until
+  typescript-eslint supports 7).
+- UI primitives are shadcn/ui-style source files in `apps/web/src/components/ui/`, written by hand on `radix-ui`
+  (the shadcn registry is unreachable from the cloud container).
 
 ## Boundaries
 - `packages/engine`: pure TypeScript. No React, DOM, `idb`, `Date.now()` or `Math.random()`.

@@ -1,5 +1,5 @@
 import { describe, expect, it, beforeEach } from 'vitest';
-import { minimalHouseholdInput, type ProfileDoc } from '@rn/engine';
+import { minimalHouseholdInput } from '@rn/engine';
 import { openDatabase } from './db';
 import { DocumentRepository } from './repository';
 
@@ -24,7 +24,7 @@ describe('DocumentRepository (M1 gate: a stored document round-trips through the
     expect(saved.status).toBe('ok');
     const loaded = await repo.get('profile', 'household-1');
     expect(loaded).toEqual(saved);
-    if (loaded?.status === 'ok') expect((loaded.value as ProfileDoc).household.people[0]!.name).toBe('You');
+    if (loaded?.status === 'ok') expect(loaded.value.household.people[0]!.name).toBe('You');
   });
 
   it('rejects invalid documents before writing them', async () => {
@@ -52,5 +52,16 @@ describe('DocumentRepository (M1 gate: a stored document round-trips through the
     await repo.deleteAll();
     expect(await repo.list('profile')).toHaveLength(0);
     expect(await repo.get('settings', 'settings')).toBeNull();
+  });
+
+  it('rejects a document stored under the wrong key or in the wrong store', async () => {
+    const db = await openDatabase(`test-db-${dbCounter}`);
+    await db.put('profiles', profile(), 'other-key');
+    const wrongKey = await repo.get('profile', 'other-key');
+    expect(wrongKey?.status === 'invalid' && wrongKey.issues[0]!.message).toBe(
+      'Stored document "other-key" is not a valid profile document',
+    );
+    await db.put('scenarios', profile(), 'household-1');
+    expect((await repo.get('scenario', 'household-1'))?.status).toBe('invalid');
   });
 });

@@ -33,6 +33,13 @@ export const NominalRateSchema = z
   .brand<'NominalRate'>();
 export type NominalRate = z.infer<typeof NominalRateSchema>;
 
+/** Annual inflation: a nominal rate bounded to (-50%, 50%] so the price level stays positive. */
+export const InflationRateSchema = z
+  .number()
+  .gt(-0.5, { message: 'Inflation must be above -50%' })
+  .max(0.5, { message: 'Inflation must be at most 50%' })
+  .brand<'NominalRate'>();
+
 /** A real (inflation-adjusted) annual rate as a decimal. */
 export const RealRateSchema = z
   .number()

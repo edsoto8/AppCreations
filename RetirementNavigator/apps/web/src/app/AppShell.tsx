@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Outlet, useLocation } from 'react-router';
 import { Compass, Menu } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -23,11 +23,28 @@ export function AppShell() {
   const [menuOpen, setMenuOpen] = useState(false);
   const location = useLocation();
   const current = NAV_ITEMS.find((item) => item.path === location.pathname);
+  const pageLabel = current?.label ?? 'Page not found';
+  const firstRender = useRef(true);
+
+  // Per-route title (WCAG 2.4.2) and focus to the new content after client-side navigation.
+  useEffect(() => {
+    document.title = `${pageLabel} · Retirement Navigator`;
+    if (firstRender.current) {
+      firstRender.current = false;
+      return;
+    }
+    document.getElementById('main')?.focus();
+  }, [location.pathname, pageLabel]);
 
   return (
     <div className="min-h-dvh bg-background">
+      {/* HashRouter owns the URL hash, so the skip link moves focus itself instead of navigating. */}
       <a
         href="#main"
+        onClick={(event) => {
+          event.preventDefault();
+          document.getElementById('main')?.focus();
+        }}
         className="sr-only z-50 rounded-md bg-primary px-4 py-2 text-primary-foreground focus:not-sr-only focus:fixed focus:left-4 focus:top-4"
       >
         Skip to content

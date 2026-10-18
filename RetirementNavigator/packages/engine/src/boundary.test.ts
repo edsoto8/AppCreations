@@ -23,6 +23,7 @@ const BANNED: [RegExp, string][] = [
   [/\blocalStorage\b|\bindexedDB\b/, 'browser storage'],
   [/Date\.now\(|new Date\(/, 'clock read'],
   [/Math\.random\(/, 'global randomness'],
+  [/\bcrypto\.|\bperformance\.|\bglobalThis\b|\bprocess\./, 'host globals (crypto, performance, globalThis, process)'],
   [/\.toFixed\(/, 'toFixed in logic'],
 ];
 

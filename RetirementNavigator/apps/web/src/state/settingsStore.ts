@@ -32,6 +32,17 @@ interface SettingsState {
   setTheme: (theme: ThemePreference) => void;
 }
 
+/** Re-apply "system" when the OS theme changes. Returns an unsubscribe function. */
+export function followSystemTheme(getTheme: () => ThemePreference): () => void {
+  if (typeof window.matchMedia !== 'function') return () => undefined;
+  const query = window.matchMedia('(prefers-color-scheme: dark)');
+  const onChange = () => {
+    if (getTheme() === 'system') applyTheme('system');
+  };
+  query.addEventListener('change', onChange);
+  return () => query.removeEventListener('change', onChange);
+}
+
 export const useSettingsStore = create<SettingsState>((set) => ({
   theme: readStoredTheme(),
   setTheme: (theme) => {
