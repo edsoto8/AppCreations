@@ -23,7 +23,7 @@ import type { OrphanedOp, Scenario, ScenarioPreset } from './domain/scenario';
 import type { ProjectionResult } from './domain/projection';
 import type { MonteCarloChunk, MonteCarloConfig, MonteCarloResult } from './domain/montecarlo';
 import type { Insight } from './domain/insight';
-import type { ExportBundle, StoredDoc } from './domain/documents';
+import type { ExportBundle } from './domain/documents';
 import type { ValidationIssue } from './domain/results';
 
 export const CONTRACT_VERSION = '1.0.0';
@@ -151,7 +151,10 @@ export interface CappedContributions {
 }
 
 /** Apply 402(g), catch-up (50+, 60–63), Roth-catch-up, 401(a)(17) and 415(c) limits with warnings. */
-export function capContributions(req: ContributionRequest, rules: ResolvedYearRules): EngineResult<CappedContributions> {
+export function capContributions(
+  req: ContributionRequest,
+  rules: ResolvedYearRules,
+): EngineResult<CappedContributions> {
   void req;
   void rules;
   throw new NotImplementedError('capContributions');
@@ -301,7 +304,11 @@ export interface GrossUpState {
 // Social Security (module: socialSecurity/)
 // =============================================================================================
 
-export function fullRetirementAge(birthYear: CalendarYear, birthMonth: number, standing: StandingRules): EngineResult<AgeYearsMonths> {
+export function fullRetirementAge(
+  birthYear: CalendarYear,
+  birthMonth: number,
+  standing: StandingRules,
+): EngineResult<AgeYearsMonths> {
   void birthYear;
   void birthMonth;
   void standing;
@@ -332,7 +339,13 @@ export function estimatePia(
 
 /** Spousal benefit on the other spouse's PIA, reduced for claiming before the spouse's FRA. */
 export function spousalBenefit(
-  input: { ownPiaMonthly: Cents; otherPiaMonthly: Cents; birthYear: CalendarYear; birthMonth: number; claimAge: AgeYearsMonths },
+  input: {
+    ownPiaMonthly: Cents;
+    otherPiaMonthly: Cents;
+    birthYear: CalendarYear;
+    birthMonth: number;
+    claimAge: AgeYearsMonths;
+  },
   standing: StandingRules,
 ): EngineResult<{ monthlyExcess: Cents }> {
   void input;
@@ -361,7 +374,10 @@ export function rmdStartAge(birthYear: CalendarYear, standing: StandingRules): E
 }
 
 /** RMD for a year = prior Dec 31 balance / Uniform Lifetime Table period for the age in that year. */
-export function rmdAmount(input: { age: number; priorYearEndBalance: Cents }, standing: StandingRules): EngineResult<Cents> {
+export function rmdAmount(
+  input: { age: number; priorYearEndBalance: Cents },
+  standing: StandingRules,
+): EngineResult<Cents> {
   void input;
   void standing;
   throw new NotImplementedError('rmdAmount');
@@ -439,9 +455,7 @@ export interface OptimizerResult {
 export function optimizeRetirementAge(
   household: Household,
   ctx: EngineContext,
-  criterion:
-    | { kind: 'deterministic' }
-    | { kind: 'monteCarlo'; config: MonteCarloConfig; minSuccessRate: number },
+  criterion: { kind: 'deterministic' } | { kind: 'monteCarlo'; config: MonteCarloConfig; minSuccessRate: number },
   range: { fromAge: number; toAge: number },
 ): EngineResult<OptimizerResult> {
   void household;
@@ -469,7 +483,11 @@ export function runMonteCarloChunk(
   throw new NotImplementedError('runMonteCarloChunk');
 }
 
-export function summarizeMonteCarlo(chunks: MonteCarloChunk[], config: MonteCarloConfig, firstYear: CalendarYear): MonteCarloResult {
+export function summarizeMonteCarlo(
+  chunks: MonteCarloChunk[],
+  config: MonteCarloConfig,
+  firstYear: CalendarYear,
+): MonteCarloResult {
   void chunks;
   void config;
   void firstYear;
@@ -533,8 +551,5 @@ export function importJson(text: string): EngineResult<ExportBundle> {
   throw new NotImplementedError('importJson');
 }
 
-/** Upgrade a stored document of any prior schemaVersion to the current one. */
-export function migrate(doc: unknown): EngineResult<StoredDoc> {
-  void doc;
-  throw new NotImplementedError('migrate');
-}
+// Implemented in M1.
+export { migrate } from './io/migrate';

@@ -8,3 +8,6 @@ export * from './domain/montecarlo';
 export * from './domain/insight';
 export * from './domain/documents';
 export * from './api';
+export * from './money';
+export * from './validation';
+export { minimalHouseholdInput } from './samples/minimal';

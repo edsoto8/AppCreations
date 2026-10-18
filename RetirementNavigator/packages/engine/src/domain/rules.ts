@@ -20,9 +20,11 @@ import { CalendarYearSchema, IsoDateSchema, NonNegativeCentsSchema } from './pri
 export const RuleSourceSchema = z.object({
   /** Publication name/number, e.g. "IRS Notice 2025-67". */
   publication: z.string().min(1),
-  url: z.url().refine((u) => /^https:\/\/(www\.|www-origin\.|eitc\.)?(irs\.gov|ssa\.gov|federalregister\.gov)\//.test(u), {
-    message: 'Sources must be irs.gov, ssa.gov or federalregister.gov',
-  }),
+  url: z
+    .url()
+    .refine((u) => /^https:\/\/(www\.|www-origin\.|eitc\.)?(irs\.gov|ssa\.gov|federalregister\.gov)\//.test(u), {
+      message: 'Sources must be irs.gov, ssa.gov or federalregister.gov',
+    }),
   /** Section, table or page within the publication. */
   locator: z.string().nullable().default(null),
   retrievedOn: IsoDateSchema,
@@ -199,7 +201,13 @@ export const StandingRulesSchema = z.object({
   }),
   rmd: z.object({
     startAgeByBirthYear: verified(
-      z.array(z.object({ fromBirthYear: CalendarYearSchema, toBirthYear: CalendarYearSchema.nullable(), age: z.number().int() })),
+      z.array(
+        z.object({
+          fromBirthYear: CalendarYearSchema,
+          toBirthYear: CalendarYearSchema.nullable(),
+          age: z.number().int(),
+        }),
+      ),
     ),
     /** Uniform Lifetime Table: age -> distribution period. */
     uniformLifetimeTable: verified(z.array(z.object({ age: z.number().int(), period: z.number().positive() }))),

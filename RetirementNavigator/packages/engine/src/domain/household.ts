@@ -170,9 +170,12 @@ export const SocialSecurityInputSchema = z.object({
     }),
     z.object({ kind: z.literal('estimateHistory'), earnings: z.array(EarningsRecordSchema).max(80) }),
   ]),
-  claimAge: AgeYearsMonthsSchema.refine((a) => a.years * 12 + a.months >= 62 * 12 && a.years * 12 + a.months <= 70 * 12, {
-    message: 'Claiming age must be between 62 and 70',
-  }),
+  claimAge: AgeYearsMonthsSchema.refine(
+    (a) => a.years * 12 + a.months >= 62 * 12 && a.years * 12 + a.months <= 70 * 12,
+    {
+      message: 'Claiming age must be between 62 and 70',
+    },
+  ),
 });
 export type SocialSecurityInput = z.infer<typeof SocialSecurityInputSchema>;
 
@@ -246,7 +249,10 @@ export const AccountSchema = z.discriminatedUnion('type', [
     planType: z.enum(['401k', '403b', '457b']),
     unvestedEmployerBalance: NonNegativeCentsSchema.default(ZERO_CENTS),
   }),
-  AccountBase.extend({ type: z.literal('traditionalIra'), contribution: ContributionScheduleSchema.nullable().default(null) }),
+  AccountBase.extend({
+    type: z.literal('traditionalIra'),
+    contribution: ContributionScheduleSchema.nullable().default(null),
+  }),
   AccountBase.extend({
     type: z.literal('rothIra'),
     contribution: ContributionScheduleSchema.nullable().default(null),
@@ -421,20 +427,19 @@ export const AssumptionsSchema = z.object({
   stateTaxRate: FractionSchema.default(0),
   /** Annual tax drag on taxable-account growth (labeled, default 0). */
   taxableAccountTaxDrag: z.number().min(0).max(0.05).default(0),
-  rules: z
-    .object({
-      /** Latest tax year whose published values are used; later years are projected. */
-      anchorYear: CalendarYearSchema,
-      /** Indexing rate for `indexed` values beyond published years. */
-      indexing: z
-        .discriminatedUnion('mode', [
-          z.object({ mode: z.literal('inflation') }),
-          z.object({ mode: z.literal('rate'), rate: NominalRateSchema }),
-        ])
-        .default({ mode: 'inflation' }),
-      /** Treatment of provisions after their sunset year (labeled assumption). */
-      postSunsetLaw: z.enum(['asWritten']).default('asWritten'),
-    }),
+  rules: z.object({
+    /** Latest tax year whose published values are used; later years are projected. */
+    anchorYear: CalendarYearSchema,
+    /** Indexing rate for `indexed` values beyond published years. */
+    indexing: z
+      .discriminatedUnion('mode', [
+        z.object({ mode: z.literal('inflation') }),
+        z.object({ mode: z.literal('rate'), rate: NominalRateSchema }),
+      ])
+      .default({ mode: 'inflation' }),
+    /** Treatment of provisions after their sunset year (labeled assumption). */
+    postSunsetLaw: z.enum(['asWritten']).default('asWritten'),
+  }),
   socialSecurity: z
     .object({
       cola: z
@@ -521,14 +526,23 @@ export const HouseholdSchema = z
     const personIds = new Set(h.people.map((p) => p.id as string));
     const accountsById = new Map(h.accounts.map((a) => [a.id as string, a]));
     h.accounts.forEach((a, i) => {
-      if (!personIds.has(a.ownerId)) ctx.addIssue({ code: 'custom', path: ['accounts', i, 'ownerId'], message: 'Unknown owner' });
+      if (!personIds.has(a.ownerId))
+        ctx.addIssue({ code: 'custom', path: ['accounts', i, 'ownerId'], message: 'Unknown owner' });
       if (a.type === 'rothIra' && a.contributionBasis > a.balance) {
-        ctx.addIssue({ code: 'custom', path: ['accounts', i, 'contributionBasis'], message: 'Basis cannot exceed balance' });
+        ctx.addIssue({
+          code: 'custom',
+          path: ['accounts', i, 'contributionBasis'],
+          message: 'Basis cannot exceed balance',
+        });
       }
     });
     h.people.forEach((p, pi) => {
       if (p.retirementAge > p.planningAge) {
-        ctx.addIssue({ code: 'custom', path: ['people', pi, 'retirementAge'], message: 'Retirement age is after planning age' });
+        ctx.addIssue({
+          code: 'custom',
+          path: ['people', pi, 'retirementAge'],
+          message: 'Retirement age is after planning age',
+        });
       }
       p.workplacePlans.forEach((w, wi) => {
         const trad = accountsById.get(w.traditionalAccountId);
@@ -559,9 +573,12 @@ export const HouseholdSchema = z
       });
     });
     if (h.assumptions.surplus.mode === 'account' && !accountsById.has(h.assumptions.surplus.accountId)) {
-      ctx.addIssue({ code: 'custom', path: ['assumptions', 'surplus', 'accountId'], message: 'Unknown surplus account' });
+      ctx.addIssue({
+        code: 'custom',
+        path: ['assumptions', 'surplus', 'accountId'],
+        message: 'Unknown surplus account',
+      });
     }
   });
 export type Household = z.infer<typeof HouseholdSchema>;
 export type HouseholdInput = z.input<typeof HouseholdSchema>;
-
