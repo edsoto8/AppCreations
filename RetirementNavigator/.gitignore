@@ -6,3 +6,6 @@ test-results/
 *.tsbuildinfo
 .vite/
 __pycache__/
+
+# The root Visual Studio .gitignore ignores **/[Pp]ackages/* (NuGet); re-include the workspace packages.
+!/packages/*
