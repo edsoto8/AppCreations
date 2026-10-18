@@ -130,4 +130,8 @@ No open findings.
      verified values and Pub 590-A. Hand-computed match tier cases. A test that every rule has a
      source. Owner review of `rules-verification.md` before the tag.
 - **Frozen contracts:** `packages/engine/src/domain/*`, `packages/engine/src/api.ts` (1.1.0).
-- **Open risks:** rule sourcing (blocked), agent discovery (R3).
+- **Tags:** the session's git proxy refused to push tags (HTTP 403), though branch pushes work. The
+  milestone tag `m1-foundation` is local only. It points at the commit titled "fix(RetirementNavigator):
+  resolve M1 review findings; start M2 rules data". To publish it from a clone:
+  `git tag -a m1-foundation <that commit> -m "M1 Foundation" && git push origin m1-foundation`.
+- **Open risks:** rule sourcing (blocked), agent discovery (R3), tag publishing (above).
