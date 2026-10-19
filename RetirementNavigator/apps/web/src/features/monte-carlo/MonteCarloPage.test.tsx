@@ -3,6 +3,7 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import {
   HouseholdSchema,
+  impliedArithmeticMeans,
   RULES,
   runMonteCarloChunk,
   sequenceRiskIllustration,
@@ -253,6 +254,7 @@ describe('MonteCarloPage', () => {
     await setPaths(user, '1000');
     await user.click(screen.getByRole('button', { name: 'Run simulation' }));
     await waitFor(() => expect(useMonteCarloStore.getState().status).toBe('done'), { timeout: 10_000 });
+    // The arithmetic mean beside each return equals the engine's, for the run and for the form values.
     const means = useMonteCarloStore.getState().full!.result.impliedArithmeticMeans;
     expect(screen.getByText(formatPercent(means.stocks, 2))).toBeInTheDocument();
     expect(screen.queryByRole('note', { name: 'Results out of date' })).not.toBeInTheDocument();
@@ -271,7 +273,40 @@ describe('MonteCarloPage', () => {
       expect(cma.correlation[1]![0]).toBe(0.3);
     });
     expect(screen.getByRole('note', { name: 'Results out of date' })).toBeInTheDocument();
-    expect(screen.getAllByText(/run again to update/).length).toBeGreaterThan(0);
+  });
+
+  it('shows the implied arithmetic mean live beside each geometric return as it is edited, without a run', async () => {
+    const user = userEvent.setup();
+    const household = shortHousehold();
+    await renderWithProfile(<MonteCarloPage />, { household });
+    const meanOf = (asset: 'stocks' | 'bonds' | 'cash') =>
+      screen
+        .getByLabelText(`${{ stocks: 'Stocks', bonds: 'Bonds', cash: 'Cash' }[asset]} median return`)
+        .closest('fieldset')!;
+    const initial = impliedArithmeticMeans(household.assumptions.capitalMarket);
+    for (const asset of ['stocks', 'bonds', 'cash'] as const) {
+      expect(within(meanOf(asset)).getByText(formatPercent(initial[asset], 2))).toBeInTheDocument();
+    }
+    expect(useMonteCarloStore.getState().status).toBe('idle');
+
+    const stocks = screen.getByLabelText('Stocks median return');
+    await user.clear(stocks);
+    await user.type(stocks, '6');
+    const vol = screen.getByLabelText('Stocks volatility');
+    await user.clear(vol);
+    await user.type(vol, '20');
+    const edited = impliedArithmeticMeans({
+      ...household.assumptions.capitalMarket,
+      stocks: { geometricReturn: 0.06, volatility: 0.2 },
+    });
+    expect(within(meanOf('stocks')).getByText(formatPercent(edited.stocks, 2))).toBeInTheDocument();
+    // Bonds are unchanged.
+    expect(within(meanOf('bonds')).getByText(formatPercent(initial.bonds, 2))).toBeInTheDocument();
+
+    // An out-of-range value shows a dash instead of a number.
+    await user.clear(stocks);
+    await user.type(stocks, '80');
+    expect(within(meanOf('stocks')).getByText('—')).toBeInTheDocument();
   });
 
   it('shows the sequence-of-returns illustration with the engine’s values', async () => {

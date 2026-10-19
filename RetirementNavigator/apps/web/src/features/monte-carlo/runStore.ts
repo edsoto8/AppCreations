@@ -65,6 +65,14 @@ export function prewarmMonteCarlo(household: Household, ctx: EngineContext): voi
 /** Progress updates reach the store at most this often (the final update always does). */
 const PROGRESS_INTERVAL_MS = 100;
 
+/**
+ * A separate pool from the same factory, for runs that must not interrupt the Monte Carlo page's run
+ * (the scenario comparison). Workers start on first use; the caller disposes it.
+ */
+export function createExecutorPool(): ChunkExecutor[] {
+  return poolFactory();
+}
+
 /** Tests: replace the executor pool (e.g. in-process executors, or a fake pool). */
 export function setExecutorPoolFactory(factory: () => ChunkExecutor[]): void {
   current?.cancel();

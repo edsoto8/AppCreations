@@ -1,13 +1,24 @@
 import { useId } from 'react';
+import { Link } from 'react-router';
 import { CircleAlert, CircleCheck, CircleX } from 'lucide-react';
-import type { DashboardResult, DollarBasis, Household } from '@rn/engine';
+import {
+  monteCarloReadiness,
+  type DashboardResult,
+  type DollarBasis,
+  type Household,
+  type MonteCarloConfig,
+  type MonteCarloResult,
+} from '@rn/engine';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { InfoTip } from '@/components/InfoTip';
-import { formatCents } from '@/lib/format';
+import { formatCents, formatPercent } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { BeforeLimitsBadge, BeforeTaxesBadge } from './badges';
 import { formatOffset } from './viewModel';
+import { REQUIRED_WORDING } from '@/features/monte-carlo/ResultsPanel';
+import { inflationLabel } from '@/features/monte-carlo/sharedSettings';
+import { formatCount } from '@/features/monte-carlo/viewModel';
 
 interface StatCardProps {
   title: string;
@@ -67,18 +78,82 @@ const READINESS = {
   atRisk: { label: 'At risk', icon: CircleX, className: 'text-destructive' },
 } as const;
 
+const LINK = 'font-medium text-foreground underline underline-offset-4';
+
+/** The latest Monte Carlo run for this profile, as the dashboard sees it. */
+export type DashboardMonteCarlo =
+  | { kind: 'current'; result: MonteCarloResult; config: MonteCarloConfig }
+  /** A full result exists for this profile, but the plan changed since. */
+  | { kind: 'stale' }
+  | { kind: 'none' };
+
+/** The Monte Carlo success rate and its readiness band (engine `monteCarloReadiness`), with its assumptions. */
+function MonteCarloReadiness({ mc }: { mc: DashboardMonteCarlo }) {
+  const titleId = useId();
+  if (mc.kind !== 'current') {
+    return (
+      <section aria-labelledby={titleId} className="flex flex-col gap-1 border-t pt-2">
+        <h4 id={titleId} className="text-xs font-semibold text-foreground">
+          Monte Carlo success rate
+        </h4>
+        <p className="text-xs">
+          {mc.kind === 'stale'
+            ? 'The plan changed since the last Monte Carlo run, so its success rate is not shown.'
+            : 'No Monte Carlo result for this plan yet.'}{' '}
+          <Link to="/monte-carlo" className={LINK}>
+            Run Monte Carlo
+          </Link>
+        </p>
+      </section>
+    );
+  }
+  const band = READINESS[monteCarloReadiness(mc.result.successRate)];
+  const BandIcon = band.icon;
+  return (
+    <section aria-labelledby={titleId} className="flex flex-col gap-1 border-t pt-2">
+      <h4 id={titleId} className="text-xs font-semibold text-foreground">
+        Monte Carlo success rate
+      </h4>
+      <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
+        <span className="text-lg font-semibold tabular-nums text-foreground">
+          {formatPercent(mc.result.successRate, 0)}
+        </span>
+        <span className={cn('inline-flex items-center gap-1', band.className)}>
+          <BandIcon aria-hidden="true" className="size-4" />
+          <span className="font-medium text-foreground">{band.label}</span>
+        </span>
+      </p>
+      <p className="text-xs">
+        Assumptions: {formatCount(mc.config.paths)} paths, seed {mc.config.seed}, inflation{' '}
+        {inflationLabel(mc.config.inflation)}; lognormal annual returns from your capital-market assumptions.{' '}
+        {REQUIRED_WORDING}{' '}
+        <Link to="/monte-carlo" className={LINK}>
+          See every assumption on the Monte Carlo page
+        </Link>
+      </p>
+      <p className="text-xs">Monte Carlo bands: On track at 85% or more; Borderline 70% to 85%; At risk below 70%.</p>
+    </section>
+  );
+}
+
 export function DashboardCards({
   dashboard,
   household,
   basis,
   currentYear,
   beforeLimits,
+  monteCarlo,
 }: {
   dashboard: DashboardResult;
   household: Household;
   basis: DollarBasis;
   currentYear: number;
   beforeLimits: boolean;
+  /**
+   * The latest Monte Carlo run for this plan (the dashboard). Omitted, the Monte Carlo part of the
+   * Readiness card is not rendered (the link-free print summary).
+   */
+  monteCarlo?: DashboardMonteCarlo;
 }) {
   const { cards } = dashboard;
   const key = basis === 'todays' ? 'real' : 'nominal';
@@ -256,7 +331,9 @@ export function DashboardCards({
             <>
               A labeled heuristic from the deterministic forecasts. A run “lasts” when it never runs out and ends with
               at least your minimum ending balance. On track: baseline and pessimistic runs both last. Borderline: only
-              the baseline lasts. At risk: the baseline runs out.
+              the baseline lasts. At risk: the baseline runs out. After a Monte Carlo run of this plan, its success rate
+              is shown alongside, with its own band: On track at 85% or more, Borderline from 70% to 85%, At risk below
+              70%.
             </>
           }
           value={
@@ -273,8 +350,9 @@ export function DashboardCards({
               </p>
               <p className="text-xs">
                 On track: baseline and pessimistic runs both last; Borderline: only the baseline lasts; At risk: the
-                baseline runs out. Monte Carlo success rates arrive later (M6).
+                baseline runs out.
               </p>
+              {monteCarlo ? <MonteCarloReadiness mc={monteCarlo} /> : null}
             </div>
           }
           badges={

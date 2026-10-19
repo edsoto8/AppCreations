@@ -42,7 +42,7 @@ export function Methodology({
             </li>
             <li>
               Entered returns are geometric (median). The arithmetic mean is derived by the engine as (1 + median) ×
-              e^(σ²/2) − 1, where σ is the volatility; it is shown beside each return after a run.
+              e^(σ²/2) − 1, where σ is the volatility; it is shown beside each return and updates as you edit.
             </li>
             <li>
               An account’s volatility comes from its stock/bond/cash allocation, the asset-class volatilities and their

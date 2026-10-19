@@ -10,12 +10,13 @@ import {
 } from '@rn/engine';
 import { TEST_YEAR } from '@/test/renderWithProfile';
 import { shortHousehold } from '@/test/monteCarloFixtures';
-import { runInSubChunks, splitRange, type ChunkRequest, type PathRange } from './chunking';
-import type { WorkerRequest, WorkerResponse } from './protocol';
+import { clearPreparedCache, runInSubChunks, splitRange, type ChunkRequest, type PathRange } from './chunking';
+import { BrokenWorker, FakeWorker } from '@/test/fakeWorker';
 import {
   createInProcessExecutor,
   createWorkerExecutor,
   runMonteCarlo,
+  WORKER_START_FAILED,
   type ChunkExecutor,
   type MonteCarloProgress,
 } from './runner';
@@ -74,6 +75,40 @@ describe('runInSubChunks', () => {
     if (out.status !== 'ok') return;
     expect(out.value).toEqual(direct(household, config, 37, 290));
     expect(progress).toEqual([100, 200, 253]);
+  });
+});
+
+describe('runInSubChunks with a prepared run', () => {
+  it('prepares once and equals runMonteCarloChunk for the whole range, also when reused for a deep-equal copy', async () => {
+    clearPreparedCache();
+    const household = shortHousehold();
+    const whole = direct(household, config, 0, 450);
+    const first = await runInSubChunks({ household, ctx, config, pathStart: 0, pathEnd: 450 }, { subChunk: 64 });
+    expect(first.status).toBe('ok');
+    if (first.status !== 'ok') return;
+    expect(first.value).toEqual(whole);
+    // A structured-clone-like copy (what a worker receives) reuses the preparation; same result.
+    const copy = JSON.parse(JSON.stringify({ household, ctx, config })) as Pick<
+      ChunkRequest,
+      'household' | 'ctx' | 'config'
+    >;
+    const again = await runInSubChunks({ ...copy, pathStart: 200, pathEnd: 450 }, { subChunk: 100 });
+    expect(again.status).toBe('ok');
+    if (again.status !== 'ok') return;
+    expect(again.value).toEqual(direct(household, config, 200, 450));
+    // A different configuration prepares afresh.
+    const other = { ...config, seed: 8 };
+    const third = await runInSubChunks({ household, ctx, config: other, pathStart: 0, pathEnd: 120 }, { subChunk: 50 });
+    expect(third.status === 'ok' && third.value).toEqual(direct(household, other, 0, 120));
+  });
+
+  it('reports the engine’s invalid result once for unusable inputs, and an empty range', async () => {
+    clearPreparedCache();
+    const household = shortHousehold();
+    const bad = await runInSubChunks({ household, ctx, config: { ...config, seed: -1 }, pathStart: 0, pathEnd: 10 });
+    expect(bad.status).toBe('invalid');
+    const empty = await runInSubChunks({ household, ctx, config, pathStart: 5, pathEnd: 5 });
+    expect(empty.status).toBe('invalid');
   });
 });
 
@@ -223,33 +258,6 @@ describe('runMonteCarlo', () => {
   });
 });
 
-/** Minimal stand-in for a module Worker: runs the same sub-chunk loop and posts protocol messages. */
-class FakeWorker extends EventTarget {
-  terminated = false;
-  posted: WorkerRequest[] = [];
-  postMessage(msg: WorkerRequest) {
-    this.posted.push(msg);
-    if (msg.type !== 'run') return;
-    setTimeout(() => {
-      void runInSubChunks(msg, {
-        subChunk: 100,
-        onProgress: (pathsDone) => this.emit({ type: 'progress', runId: msg.runId, pathsDone, pathsTotal: 0 }),
-        between: () => new Promise((r) => setTimeout(() => r(!this.terminated), 0)),
-      }).then((out) => {
-        if (msg.type !== 'run') return;
-        if (out.status === 'ok') this.emit({ type: 'chunk', runId: msg.runId, chunk: out.value });
-        else if (out.status !== 'cancelled') this.emit({ type: 'error', runId: msg.runId, result: out });
-      });
-    }, 0);
-  }
-  terminate() {
-    this.terminated = true;
-  }
-  private emit(data: WorkerResponse) {
-    if (!this.terminated) this.dispatchEvent(new MessageEvent('message', { data }));
-  }
-}
-
 describe('createWorkerExecutor', () => {
   it('speaks the run/progress/chunk protocol and matches a direct run', async () => {
     const household = shortHousehold();
@@ -299,5 +307,37 @@ describe('createWorkerExecutor', () => {
     expect(workers[0]?.terminated).toBe(true);
     await executor.run({ household, ctx, config, pathStart: 0, pathEnd: 10 }, () => undefined);
     expect(workers).toHaveLength(2);
+  });
+});
+
+describe('createWorkerExecutor start-up failure', () => {
+  it('a worker that fails to load during the warm-up is dropped, and the next run fails clearly instead of hanging', async () => {
+    const household = shortHousehold();
+    const workers: (BrokenWorker | FakeWorker)[] = [];
+    let broken = true;
+    const executor = createWorkerExecutor(() => {
+      const w = broken ? new BrokenWorker() : new FakeWorker();
+      workers.push(w);
+      return w as unknown as Worker;
+    });
+    executor.warm?.({ household, ctx, config, pathStart: 0, pathEnd: 50 });
+    await new Promise((r) => setTimeout(r, 5));
+    expect(workers[0]?.terminated).toBe(true);
+    // The next run spawns a fresh worker; it fails to load too, so the range rejects with the message.
+    await expect(executor.run({ household, ctx, config, pathStart: 0, pathEnd: 100 }, () => undefined)).rejects.toThrow(
+      WORKER_START_FAILED,
+    );
+    expect(workers).toHaveLength(2);
+    // Once the worker can load again, runs work.
+    broken = false;
+    const chunk = await executor.run({ household, ctx, config, pathStart: 0, pathEnd: 100 }, () => undefined);
+    expect(chunk).toEqual(direct(household, config, 0, 100));
+  });
+
+  it('runMonteCarlo reports the start-up failure as a failed run', async () => {
+    const household = shortHousehold();
+    const executor = createWorkerExecutor(() => new BrokenWorker() as unknown as Worker);
+    const outcome = await runMonteCarlo({ household, ctx, config, pool: [executor] }).promise;
+    expect(outcome).toEqual({ status: 'failed', failure: { message: WORKER_START_FAILED } });
   });
 });

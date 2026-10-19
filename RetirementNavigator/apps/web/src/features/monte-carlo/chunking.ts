@@ -1,15 +1,21 @@
 /**
  * Shared by the Monte Carlo worker and the in-process executor: run one contiguous path range in
  * sub-chunks (so progress and cancel stay responsive) and stitch the sub-chunks into one chunk.
- * No financial logic: every number comes from `runMonteCarloChunk`; this only copies typed arrays.
+ * The run is prepared once (`prepareMonteCarlo`: validation, baseline medians, PSD check, the shared
+ * projection cache) and every sub-chunk reuses it (`runPreparedChunk`, identical to
+ * `runMonteCarloChunk` for the same range). The last preparation is kept for the next range when
+ * the household, context and configuration are deep-equal (the quick run and the rest of a run).
+ * No financial logic: every number comes from the engine; this only copies typed arrays.
  */
 import {
-  runMonteCarloChunk,
+  prepareMonteCarlo,
+  runPreparedChunk,
   type EngineContext,
   type EngineResult,
   type Household,
   type MonteCarloChunk,
   type MonteCarloConfig,
+  type PreparedMonteCarlo,
 } from '@rn/engine';
 
 /** Paths per sub-chunk: about 0.1 s of work on a 60-year plan, so progress moves ~10 times a second. */
@@ -46,6 +52,40 @@ export function splitRange(start: number, end: number, parts: number): PathRange
 export type SubChunkOutcome = EngineResult<MonteCarloChunk> | { status: 'cancelled' };
 
 /**
+ * The last successful preparation, keyed by the serialized inputs. Requests arriving from a worker
+ * message are fresh copies, so identity cannot be used; serializing the inputs costs far less than
+ * preparing (which projects the baseline).
+ */
+let lastPrepared: {
+  household: Household;
+  ctx: EngineContext;
+  config: MonteCarloConfig;
+  key: string;
+  prepared: PreparedMonteCarlo;
+} | null = null;
+
+function preparedFor(req: ChunkRequest): EngineResult<PreparedMonteCarlo> {
+  const { household, ctx, config } = req;
+  const last = lastPrepared;
+  if (last && last.household === household && last.ctx === ctx && last.config === config) {
+    return { status: 'ok', value: last.prepared, warnings: [] };
+  }
+  const key = JSON.stringify([household, ctx, config]);
+  if (last && last.key === key) {
+    lastPrepared = { ...last, household, ctx, config };
+    return { status: 'ok', value: last.prepared, warnings: [] };
+  }
+  const r = prepareMonteCarlo(household, ctx, config);
+  lastPrepared = r.status === 'ok' ? { household, ctx, config, key, prepared: r.value } : null;
+  return r;
+}
+
+/** Tests: forget the kept preparation. */
+export function clearPreparedCache(): void {
+  lastPrepared = null;
+}
+
+/**
  * Run `req`'s range in sub-chunks of `subChunk` paths. `onProgress` receives the paths done so far.
  * `between`, when given, is awaited between sub-chunks and returns false to stop (cancel); without it
  * the loop is synchronous (the worker cancels by being terminated).
@@ -60,16 +100,21 @@ export async function runInSubChunks(
 ): Promise<SubChunkOutcome> {
   const size = Math.max(1, opts.subChunk ?? SUB_CHUNK_PATHS);
   const n = req.pathEnd - req.pathStart;
+  if (n <= 0) {
+    return { status: 'invalid', issues: [{ path: ['range'], message: 'The path range is empty' }] };
+  }
+  const prepared = preparedFor(req);
+  if (prepared.status !== 'ok') return prepared;
   let merged: MonteCarloChunk | null = null;
-  let warnings: Extract<EngineResult<MonteCarloChunk>, { status: 'ok' }>['warnings'] = [];
+  let warnings: Extract<EngineResult<MonteCarloChunk>, { status: 'ok' }>['warnings'] = prepared.warnings;
   for (let start = req.pathStart; start < req.pathEnd; start += size) {
     if (opts.between && start > req.pathStart && !(await opts.between())) return { status: 'cancelled' };
     const end = Math.min(req.pathEnd, start + size);
-    const r = runMonteCarloChunk(req.household, req.ctx, req.config, { pathStart: start, pathEnd: end });
+    const r = runPreparedChunk(prepared.value, { pathStart: start, pathEnd: end });
     if (r.status !== 'ok') return r;
     const part = r.value;
     if (merged === null) {
-      warnings = r.warnings;
+      warnings = [...warnings, ...r.warnings];
       const years = part.years;
       merged = {
         pathStart: req.pathStart,

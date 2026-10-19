@@ -1,11 +1,13 @@
 /**
  * Monte Carlo worker (brief §2: heavy compute off the main thread). Runs one contiguous path range
- * in sub-chunks, posting progress after each, then transfers the merged chunk's buffers back.
+ * in sub-chunks, posting progress after each, then transfers the merged chunk's buffers back; or
+ * runs a retirement-age scan (`optimizeRetirementAge`) age by age, posting progress after each age.
  * Loaded as a same-origin module worker (`worker-src 'self'`; no blob: URLs). Protocol:
  * `features/monte-carlo/protocol.ts`.
  */
 import '../zodConfig';
 import { chunkBuffers, runInSubChunks } from '@/features/monte-carlo/chunking';
+import { optimizeByAge } from '@/features/monte-carlo/optimizeSteps';
 import type { WorkerRequest, WorkerResponse } from '@/features/monte-carlo/protocol';
 
 const scope = self as unknown as DedicatedWorkerGlobalScope;
@@ -29,6 +31,21 @@ scope.onmessage = (event: MessageEvent<WorkerRequest>) => {
         return generation === mine;
       },
     }).catch(() => undefined);
+    return;
+  }
+  if (msg.type === 'optimize') {
+    const { runId } = msg;
+    // Synchronous scan (no `between`): cancel terminates the worker.
+    optimizeByAge(msg, {
+      onProgress: (agesDone, agesTotal) => reply({ type: 'optimizeProgress', runId, agesDone, agesTotal }),
+    })
+      .then((outcome) => {
+        if (outcome.status === 'cancelled') reply({ type: 'error', runId, message: 'cancelled' });
+        else reply({ type: 'optimized', runId, result: outcome });
+      })
+      .catch((err: unknown) => {
+        reply({ type: 'error', runId, message: err instanceof Error ? err.message : String(err) });
+      });
     return;
   }
   if (msg.type !== 'run') return;

@@ -3,9 +3,9 @@
  * through the profile form (engine HouseholdSchema) and are saved with the profile. Correlations are
  * entered once per pair and written to both halves of the matrix, so it stays symmetric.
  */
-import { useController, useWatch, type UseFormReturn } from 'react-hook-form';
+import { useController, useFormState, useWatch, type UseFormReturn } from 'react-hook-form';
 import { AlertTriangle } from 'lucide-react';
-import type { Household, HouseholdInput, MonteCarloResult } from '@rn/engine';
+import { impliedArithmeticMeans, type CapitalMarket, type Household, type HouseholdInput } from '@rn/engine';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -83,28 +83,28 @@ function NoteField({ form }: { form: HouseholdForm }) {
   );
 }
 
-function ArithmeticMean({
-  asset,
-  result,
-  current,
-}: {
-  asset: AssetClassKey;
-  result: MonteCarloResult | null;
-  /** Whether the result was computed from the capital-market values on screen. */
-  current: boolean;
-}) {
-  if (!result) {
-    return (
-      <p className="text-xs text-muted-foreground">Arithmetic mean: shown after a run (computed by the engine).</p>
-    );
-  }
+/**
+ * The arithmetic mean implied by the return and volatility on screen, live as they are edited
+ * (engine `impliedArithmeticMeans`); a dash while either value is missing or out of range.
+ */
+function ArithmeticMean({ form, asset }: { form: HouseholdForm; asset: AssetClassKey }) {
+  const values = useWatch({ control: form.control, name: `assumptions.capitalMarket.${asset}` }) as
+    { geometricReturn?: unknown; volatility?: unknown } | undefined;
+  const { errors } = useFormState({ control: form.control, name: `assumptions.capitalMarket.${asset}` });
+  const invalid = errors.assumptions?.capitalMarket?.[asset] !== undefined;
+  const g = values?.geometricReturn;
+  const v = values?.volatility;
+  const usable = !invalid && typeof g === 'number' && Number.isFinite(g) && typeof v === 'number' && Number.isFinite(v);
+  // The engine reads only each asset's return and volatility; this asset's pair fills every slot so
+  // another asset's half-typed value cannot affect it.
+  const pair = usable ? { geometricReturn: g, volatility: v } : null;
+  const mean = pair
+    ? impliedArithmeticMeans({ stocks: pair, bonds: pair, cash: pair } as unknown as CapitalMarket)[asset]
+    : null;
   return (
-    <p className="text-xs text-muted-foreground">
-      Arithmetic mean{current ? '' : ' at the last run'}:{' '}
-      <span className="font-medium text-foreground tabular-nums">
-        {formatPercent(result.impliedArithmeticMeans[asset], 2)}
-      </span>
-      {current ? ' (from the engine)' : ' — run again to update'}
+    <p className="text-xs text-muted-foreground" aria-live="polite">
+      Arithmetic mean (derived by the engine from this median and volatility):{' '}
+      <span className="font-medium text-foreground tabular-nums">{mean === null ? '—' : formatPercent(mean, 2)}</span>
     </p>
   );
 }
@@ -144,13 +144,9 @@ function CorrelationMatrixTable({ form }: { form: HouseholdForm }) {
 
 export function CapitalMarketEditor({
   form,
-  result,
-  resultIsCurrent,
   psd,
 }: {
   form: HouseholdForm;
-  result: MonteCarloResult | null;
-  resultIsCurrent: boolean;
   /** Whether the 3×3 asset correlation matrix is positive semi-definite (`isPositiveSemiDefinite`). */
   psd: boolean;
 }) {
@@ -179,7 +175,7 @@ export function CapitalMarketEditor({
                 tip="Geometric (median) nominal annual return: half of simulated years compound above it and half below. The deterministic forecast uses the same value, so the Monte Carlo median reconciles with it."
                 example="−50% to 50%."
               />
-              <ArithmeticMean asset={asset} result={result} current={resultIsCurrent} />
+              <ArithmeticMean form={form} asset={asset} />
               <PercentField
                 control={control}
                 name={`assumptions.capitalMarket.${asset}.volatility`}

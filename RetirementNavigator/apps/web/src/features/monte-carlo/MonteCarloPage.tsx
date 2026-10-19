@@ -105,7 +105,6 @@ function MonteCarloBody({ household }: { household: Household }) {
         !sameConfig(run.config, watchedSettings as Partial<MonteCarloConfig> | undefined)),
     [shown, ranWith, run.config, household, watchedSettings],
   );
-  const cmaCurrent = ranWith !== null && JSON.stringify(ranWith.assumptions.capitalMarket) === JSON.stringify(cma);
 
   const notes = healthcareNotes(baseline);
 
@@ -162,12 +161,7 @@ function MonteCarloBody({ household }: { household: Household }) {
           onRun={(config) => run.start({ profileId, household, ctx, config })}
           onCancel={run.cancel}
         />
-        <CapitalMarketEditor
-          form={householdForm}
-          result={shown?.result ?? null}
-          resultIsCurrent={cmaCurrent}
-          psd={assetsPsd}
-        />
+        <CapitalMarketEditor form={householdForm} psd={assetsPsd} />
       </div>
 
       <div aria-live="polite" className="sr-only">

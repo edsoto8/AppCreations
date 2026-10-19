@@ -83,11 +83,71 @@ export function createInProcessExecutor(opts: { subChunk?: number } = {}): Chunk
 }
 
 /** A same-origin module worker (`worker-src 'self'`); Vite emits it as a separate asset. */
-function spawnWorker(): Worker {
+export function spawnWorker(): Worker {
   return new Worker(new URL('../../workers/montecarlo.worker.ts', import.meta.url), {
     type: 'module',
     name: 'monte-carlo',
   });
+}
+
+/** Message for a worker that failed before it ever replied (module load or start-up failure). */
+export const WORKER_START_FAILED = 'The simulation worker could not start';
+
+/**
+ * One worker, spawned on demand, with a persistent `error` listener attached at spawn: a worker that
+ * fails to load (even during a warm-up, when no request is waiting) is dropped, so the next request
+ * starts a fresh one, and a waiting request fails with a clear message instead of hanging.
+ */
+export function createWorkerSlot(spawn: () => Worker) {
+  let worker: Worker | null = null;
+  let heard = false;
+  let pending: { id: number; fail: (e: Error) => void } | null = null;
+
+  const drop = () => {
+    worker?.terminate();
+    worker = null;
+  };
+
+  return {
+    get(): Worker {
+      if (worker) return worker;
+      const w = spawn();
+      heard = false;
+      w.addEventListener('message', () => {
+        if (worker === w) heard = true;
+      });
+      w.addEventListener('error', (event: Event) => {
+        if (worker !== w) return;
+        const detail = (event as ErrorEvent).message;
+        const message = heard
+          ? detail || 'The simulation worker stopped unexpectedly'
+          : `${WORKER_START_FAILED}${detail ? ` (${detail})` : ''}`;
+        drop();
+        const p = pending;
+        pending = null;
+        p?.fail(new ChunkFailed({ message }));
+      });
+      worker = w;
+      return w;
+    },
+    /** The request now waiting on this worker; `fail` rejects it (and removes its listeners). */
+    wait(id: number, fail: (e: Error) => void) {
+      pending = { id, fail };
+    },
+    settle(id: number) {
+      if (pending?.id === id) pending = null;
+    },
+    busy(): boolean {
+      return pending !== null;
+    },
+    /** Terminate the worker and reject the waiting request with `RunCancelled`. */
+    stop() {
+      drop();
+      const p = pending;
+      pending = null;
+      p?.fail(new RunCancelled());
+    },
+  };
 }
 
 /**
@@ -95,30 +155,19 @@ function spawnWorker(): Worker {
  * run starts a fresh one.
  */
 export function createWorkerExecutor(spawn: () => Worker = spawnWorker): ChunkExecutor {
-  let worker: Worker | null = null;
+  const slot = createWorkerSlot(spawn);
   let runId = 0;
-  let pending: { id: number; reject: (e: Error) => void } | null = null;
-
-  const stop = () => {
-    worker?.terminate();
-    worker = null;
-    const p = pending;
-    pending = null;
-    p?.reject(new RunCancelled());
-  };
 
   return {
     kind: 'worker',
     run(req, onProgress) {
-      if (pending) stop();
-      const w = (worker ??= spawn());
+      if (slot.busy()) slot.stop();
+      const w = slot.get();
       const id = ++runId;
       return new Promise<MonteCarloChunk>((resolve, reject) => {
-        pending = { id, reject };
         const done = () => {
           w.removeEventListener('message', onMessage);
-          w.removeEventListener('error', onError);
-          if (pending?.id === id) pending = null;
+          slot.settle(id);
         };
         const onMessage = (event: MessageEvent<WorkerResponse>) => {
           const msg = event.data;
@@ -127,30 +176,26 @@ export function createWorkerExecutor(spawn: () => Worker = spawnWorker): ChunkEx
           else if (msg.type === 'chunk') {
             done();
             resolve(msg.chunk);
-          } else {
+          } else if (msg.type === 'error') {
             done();
             reject(new ChunkFailed('result' in msg ? { result: msg.result } : { message: msg.message }));
           }
         };
-        const onError = (event: ErrorEvent) => {
-          done();
-          // A worker that failed to load or crashed is replaced on the next run.
-          w.terminate();
-          if (worker === w) worker = null;
-          reject(new ChunkFailed({ message: event.message || 'The Monte Carlo worker stopped unexpectedly' }));
-        };
+        slot.wait(id, (e) => {
+          w.removeEventListener('message', onMessage);
+          reject(e);
+        });
         w.addEventListener('message', onMessage);
-        w.addEventListener('error', onError);
         const message: WorkerRequest = { type: 'run', runId: id, ...req };
         w.postMessage(message);
       });
     },
     warm(req) {
-      const w = (worker ??= spawn());
+      const w = slot.get();
       if (req) w.postMessage({ type: 'warm', ...req } satisfies WorkerRequest);
     },
-    cancel: stop,
-    dispose: stop,
+    cancel: () => slot.stop(),
+    dispose: () => slot.stop(),
   };
 }
 

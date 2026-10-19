@@ -105,7 +105,9 @@ describe('DashboardPage', () => {
     const label = { onTrack: 'On track', borderline: 'Borderline', atRisk: 'At risk' }[d.cards.readiness.status];
     const readiness = card('Readiness');
     expect(within(readiness).getByText(label)).toBeInTheDocument();
-    expect(within(readiness).getByText(/Monte Carlo success rates arrive later \(M6\)/)).toBeInTheDocument();
+    // No Monte Carlo run yet: a link to run it instead of a rate.
+    expect(within(readiness).getByText(/No Monte Carlo result for this plan yet/)).toBeInTheDocument();
+    expect(within(readiness).getByRole('link', { name: 'Run Monte Carlo' })).toHaveAttribute('href', '/monte-carlo');
     expect(
       within(readiness).getByText(
         /On track: baseline and pessimistic runs both last; Borderline: only the baseline lasts; At risk: the baseline runs out/,

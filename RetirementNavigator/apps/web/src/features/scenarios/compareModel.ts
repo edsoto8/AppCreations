@@ -4,7 +4,9 @@
  * module only picks the engine's real or nominal figure.
  */
 import { ageInYear, type DollarBasis, type Household, type ScenarioOutcome } from '@rn/engine';
+import { formatPercent } from '@/lib/format';
 import { beforeLimits, forecastNotes } from '@/features/dashboard/viewModel';
+import { formatCount } from '@/features/monte-carlo/viewModel';
 
 /** Line styles for up to five outcomes: color plus a distinct dash pattern (never color alone). */
 export const OUTCOME_STYLES = [
@@ -105,4 +107,9 @@ export function optimizerBounds(h: Household, currentYear: number): { min: numbe
   if (!first) return { min: 0, max: 0 };
   const today = Math.max(0, currentYear - first.birthYear);
   return { min: today, max: Math.max(today, first.planningAge) };
+}
+
+/** The Monte Carlo criterion in words (no formulas). */
+export function monteCarloCriterionText(minSuccessRate: number, paths: number): string {
+  return `Criterion: a Monte Carlo success rate of at least ${formatPercent(minSuccessRate, 1)}, the share of ${formatCount(paths)} simulated market paths (paths 0 to ${formatCount(paths - 1)}, the same paths for every age) in which the plan funds its modeled spending through the planning age and ends with at least the minimum ending balance.`;
 }

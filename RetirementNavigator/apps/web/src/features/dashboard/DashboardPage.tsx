@@ -1,4 +1,5 @@
 import { useDeferredValue, useMemo } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { Link } from 'react-router';
 import { AlertTriangle, Info } from 'lucide-react';
 import { computeDashboard, type DashboardResult, type Household } from '@rn/engine';
@@ -10,7 +11,9 @@ import { Alert } from '@/components/ui/alert';
 import { useEngineContext } from '@/hooks/useEngine';
 import { useProfileStore } from '@/state/profileStore';
 import { AllocationCharts } from './AllocationCharts';
-import { DashboardCards } from './DashboardCards';
+import { useMonteCarloStore } from '@/features/monte-carlo/runStore';
+import { sameHousehold } from '@/features/monte-carlo/viewModel';
+import { DashboardCards, type DashboardMonteCarlo } from './DashboardCards';
 import { ForecastChart } from './ForecastChart';
 import { ForecastDetails } from './ForecastDetails';
 import { beforeLimits, excludedFeatureLabel, forecastNotes, notModeledMessages } from './viewModel';
@@ -86,6 +89,22 @@ function DashboardBody({ household }: { household: Household }) {
   // Typing on another page commits often; deferring keeps the dashboard responsive while it recomputes.
   const deferred = useDeferredValue(household);
   const result = useMemo(() => computeDashboard(deferred, ctx), [deferred, ctx]);
+  const mcRun = useMonteCarloStore(
+    useShallow((s) => ({
+      status: s.status,
+      profileId: s.profileId,
+      household: s.household,
+      config: s.config,
+      full: s.full,
+    })),
+  );
+  // A finished full run of this plan, shown only while the plan is unchanged since the run.
+  const monteCarlo = useMemo((): DashboardMonteCarlo => {
+    const { status, profileId, household: ranWith, config, full } = mcRun;
+    if (status !== 'done' || profileId !== deferred.id || !ranWith || !config || !full) return { kind: 'none' };
+    if (!sameHousehold(ranWith, deferred)) return { kind: 'stale' };
+    return { kind: 'current', result: full.result, config };
+  }, [mcRun, deferred]);
 
   if (result.status === 'invalid') {
     return (
@@ -129,6 +148,7 @@ function DashboardBody({ household }: { household: Household }) {
         basis={basis}
         currentYear={ctx.currentYear}
         beforeLimits={limits}
+        monteCarlo={monteCarlo}
       />
       <ForecastNotes dashboard={dashboard} />
       <ForecastChart dashboard={dashboard} household={deferred} basis={basis} beforeLimits={limits} />

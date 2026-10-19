@@ -1,4 +1,4 @@
-import { useDeferredValue, useMemo } from 'react';
+import { useDeferredValue, useMemo, useState } from 'react';
 import { CartesianGrid, Line, LineChart, Tooltip, XAxis, YAxis, type TooltipContentProps } from 'recharts';
 import { AlertTriangle } from 'lucide-react';
 import {
@@ -18,6 +18,9 @@ import { BeforeLimitsBadge, BeforeTaxesBadge } from '@/features/dashboard/badges
 import { DataTableDisclosure } from '@/features/dashboard/DataTableDisclosure';
 import { AXIS_TICK } from '@/features/dashboard/chartUtils';
 import { basisName, formatCompactCents, formatOffset } from '@/features/dashboard/viewModel';
+import { configFor, useSharedMonteCarloSettings } from '@/features/monte-carlo/sharedSettings';
+import { CompareMonteCarloControls, McAssumptions, McRateCell, McRowHeader } from './CompareMonteCarlo';
+import { MC_DEFAULT_PATHS, pathsError, useCompareMonteCarlo, type McPlan } from './compareMonteCarlo';
 import {
   anyBeforeLimits,
   anyBeforeTaxes,
@@ -35,7 +38,7 @@ const CHART_STYLE = { width: '100%', height: 300 } as const;
 const MARGIN = { top: 8, right: 12, bottom: 4, left: 4 } as const;
 
 export const FUNDING_CRITERION =
-  'Funding success uses the deterministic criterion (baseline run): no depletion before the planning age and at least the minimum ending balance. A Monte Carlo success rate arrives with Monte Carlo (M6).';
+  'Funding success uses the deterministic criterion (baseline run): no depletion before the planning age and at least the minimum ending balance. Turn on “Add Monte Carlo success rates” for the share of simulated market paths in which each plan succeeds.';
 
 /** Legend in HTML (wraps at phone width); each swatch repeats the line's dash pattern. */
 function OutcomeLegend({ names }: { names: string[] }) {
@@ -163,6 +166,27 @@ export function CompareView({
   const last = points[points.length - 1]?.year ?? 0;
   const offset = formatOffset(household.assumptions.deterministicOffsets.pessimistic);
 
+  // Opt-in Monte Carlo success rates: the same configuration (seed, paths) for every plan.
+  const [mcEnabled, setMcEnabled] = useState(false);
+  const [mcPaths, setMcPaths] = useState<number | null>(MC_DEFAULT_PATHS);
+  const mcSettings = useSharedMonteCarloSettings(household.id);
+  const validPaths = pathsError(mcPaths) === null && mcPaths !== null ? mcPaths : MC_DEFAULT_PATHS;
+  const { seed: mcSeed, inflation: mcInflation } = mcSettings;
+  const mcConfig = useMemo(
+    () => configFor({ seed: mcSeed, inflation: mcInflation, source: 'defaults' }, validPaths),
+    [mcSeed, mcInflation, validPaths],
+  );
+  const mcPlans = useMemo<McPlan[]>(
+    () =>
+      outcomes.map((o, i) => ({
+        key: o.scenarioId ?? 'base',
+        name: o.name,
+        household: o.status === 'ok' ? (households[i] ?? null) : null,
+      })),
+    [outcomes, households],
+  );
+  const mc = useCompareMonteCarlo(mcPlans, ctx, mcConfig);
+
   const rows: MetricRow[] = [
     {
       label: 'First retirement year',
@@ -250,6 +274,16 @@ export function CompareView({
 
         <OutcomeNotes outcomes={outcomes} />
 
+        <CompareMonteCarloControls
+          enabled={mcEnabled}
+          onEnabledChange={setMcEnabled}
+          paths={mcPaths}
+          onPathsChange={setMcPaths}
+          settings={mcSettings}
+          state={mc}
+          runnablePlans={mcPlans.filter((p) => p.household !== null).length}
+        />
+
         <Table label="Scenario comparison">
           <TableHeader>
             <TableRow>
@@ -275,8 +309,23 @@ export function CompareView({
                 ))}
               </TableRow>
             ))}
+            {mcEnabled ? (
+              <TableRow>
+                <th scope="row" className="min-w-36 px-3 py-2 text-left align-top text-sm font-medium">
+                  <McRowHeader config={mc.run?.config ?? null} settings={mcSettings} />
+                </th>
+                {outcomes.map((o, i) => (
+                  <TableCell key={i} className="min-w-28 whitespace-normal text-right align-top">
+                    <McRateCell rate={mc.run?.rates[o.scenarioId ?? 'base']} stale={mc.stale} />
+                  </TableCell>
+                ))}
+              </TableRow>
+            ) : null}
           </TableBody>
         </Table>
+        {mcEnabled && mc.run ? (
+          <McAssumptions config={mc.run.config} settings={mcSettings} plans={mcPlans} rates={mc.run.rates} />
+        ) : null}
         <div className="flex flex-col gap-1 text-xs text-muted-foreground">
           {limits ? (
             <p>

@@ -189,7 +189,7 @@ function BandsChart({
           items={[
             { label: '10th–90th percentile band', color: 'var(--chart-1)', style: 'area' },
             { label: '25th–75th percentile band', color: 'var(--chart-7)', style: 'area' },
-            { label: 'Median path value (50th percentile)', color: 'var(--chart-1)', style: 'solid' },
+            { label: 'Median (50th percentile) each year', color: 'var(--chart-1)', style: 'solid' },
           ]}
         />
         <ComposedChart
