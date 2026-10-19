@@ -5,10 +5,14 @@ import { appUrl, onboardWithSample } from './helpers';
 
 /**
  * Browser benchmark (`pnpm --filter @rn/web bench:browser`, not part of `pnpm verify`): a
- * 10,000-path Monte Carlo run of the "Mid-career couple" sample in the production build with real
- * Web Workers. "desktop" runs unthrottled; "mobile" emulates a phone with 4× CPU throttling through
- * the DevTools protocol (labeled emulated; not a real device). The page reports its own wall time
- * ("Full run … s"), which is what is recorded. Results go to bench-results/montecarlo-browser.json.
+ * 10,000-path Monte Carlo run of the "Mid-career couple" sample in the production build.
+ * - "desktop": real Web Workers, unthrottled. The page reports its own wall time ("Full run … s").
+ * - "mobile": an emulated phone. Chromium's CPU throttling applies to pages but not to workers
+ *   ("Operation is only supported for pages, not workers"), so the run is forced onto the throttled
+ *   main thread (the app's in-process fallback when Worker is unavailable) at 4× throttling. That
+ *   single-thread time is measured; the phone figure with the app's worker count is a projection
+ *   (single-thread time ÷ workers) and is labeled as one. Not a real device.
+ * Results go to bench-results/montecarlo-browser-<project>.json.
  */
 const results: Record<string, unknown>[] = [];
 
@@ -28,6 +32,8 @@ test('@perf Monte Carlo 10,000 paths × planning horizon', async ({ page }, test
   const throttled = testInfo.project.name === 'mobile';
   await onboardWithSample(page, 1);
   if (throttled) {
+    // No Worker: the runner falls back to the in-process executor on the (throttled) main thread.
+    await page.addInitScript(() => Object.defineProperty(window, 'Worker', { value: undefined }));
     const cdp = await page.context().newCDPSession(page);
     await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
   }
@@ -36,12 +42,24 @@ test('@perf Monte Carlo 10,000 paths × planning horizon', async ({ page }, test
   const first = await runOnce(page);
   await page.getByLabel('Seed', { exact: true }).fill('7');
   const second = await runOnce(page);
+  const projected = (seconds: string) =>
+    Number.isFinite(Number(seconds)) ? Math.round((Number(seconds) / workers) * 10) / 10 : null;
   results.push({
     project: testInfo.project.name,
-    cpuThrottling: throttled ? '4× (emulated phone)' : 'none',
-    workers,
+    cpuThrottling: throttled ? '4× (emulated phone, main thread)' : 'none',
+    executor: throttled ? 'in-process on the main thread (measured, 1 thread)' : `${workers} Web Workers (measured)`,
     firstRunAfterOpeningPage: first,
     secondRun: second,
+    ...(throttled
+      ? {
+          projectedPhoneSecondsWithWorkers: {
+            workers,
+            firstRun: projected(first.full),
+            secondRun: projected(second.full),
+            note: 'Projection: measured single-thread time ÷ workers (ideal scaling). A phone may have fewer fast cores.',
+          },
+        }
+      : {}),
   });
   mkdirSync('bench-results', { recursive: true });
   writeFileSync(
