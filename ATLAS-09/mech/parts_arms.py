@@ -136,7 +136,7 @@ def _arm_armor(kit, pre, s, bn, J, Mu, Lu, Mf, Lf):
     mpa = U.frame(c, Vector((s, 0, 0)), Vector((0, 0, 1)))
     # pauldron: revolved shell over the shoulder (Solidify), plus a raised top layer
     # faceted (7 flats over 210 degrees) so it reads as bent plate, not a dome
-    prof = [(0.27, -0.22), (0.315, -0.15), (0.315, 0.12), (0.25, 0.25), (0.10, 0.30)]
+    prof = [(0.27, -0.22), (0.315, -0.15), (0.315, 0.12), (0.25, 0.25), (0.10, 0.30), (0.0, 0.305)]
     pa = P.make(f"{pre}_Pauldron", kit.coll, kit.m("armor"),
                 lambda bm: P.bm_lathe(bm, prof, segs=7, a0=math.radians(-105), a1=math.radians(105)),
                 mpa, bn["shoulder"], wn=False, smooth=20)

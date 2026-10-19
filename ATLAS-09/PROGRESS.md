@@ -40,7 +40,7 @@ How to run: `cd ATLAS-09 && /opt/bpyenv/bin/python generate_mech.py --help`
 
 - Package layout: `generate_mech.py` (entry point) → `mech/` (`utils`, `primitives`, `skeleton`, `materials`,
   `qc`, `blockout`, part modules). Every run purges the `ATLAS-09*` collections and orphan data before it rebuilds.
-- `mech/skeleton.py` holds every joint position and the bone hierarchy (32 bones: root, pelvis, spine, chest, neck,
+- `mech/skeleton.py` holds every joint position and the bone hierarchy (27 bones: root, pelvis, spine, chest, neck,
   head, sensor, shoulder/upperarm/forearm/wrist ×2, thigh/shin/foot/toe ×2, 3 gripper fingers, tool spindle).
   Hip at z=2.10, knee 1.26, ankle 0.42, shoulder 3.20, head top about 3.95, antennas about 4.2 m.
 - Blockout (`--milestone 1`): one proxy volume per bone plus joint markers, 50 objects.
@@ -124,4 +124,30 @@ QC (`renders/qc_m6.png` plus close-ups) defects → fixes:
 3. Scratches on dark steel looked like stray hairs → thinner contour lines (×120), sparser gate, steel scratch 0.6→0.35.
 4. Render cost: 800×600 at 48 samples takes about 70 s per view on 4 CPU cores. Bevel and AO nodes run at 4 and 8 samples to
    keep that bounded. Finals at 1080p will need about 96–128 samples to fit the 20-minute cap (measured in M8).
+
+### Milestone 7: rigging and demonstration poses (done)
+
+`mech/rig.py`:
+- Armature `ATLAS-09_Rig` (27 bones) from `skeleton.BONES`. Each roll is set with `align_roll(worldX × boneY)` so every
+  limb bone's local X equals world X. Hip/knee/ankle/toe/elbow/finger bends are all X rotations; shoulder pitch is the
+  shoulder bone's Y; wrist rotation, head yaw, waist twist, lidar spin and drill spin are Y rotations of their bones.
+- 1,122 tagged objects are bone-parented with world transforms preserved. Hydraulics: each cylinder/rod pair hangs
+  under two anchor empties on different bones, and each part has a Damped Track (TRACK_Y) aimed at the other anchor.
+  Coil springs use Stretch To with no volume change. Piston rod/barrel fractions were re-dimensioned
+  (`rod_frac`, `barrel_frac`) so rods neither leave the barrel nor punch through its base over the posed range.
+- 32 joint-crossing cables get 64 Hook modifiers: the far half follows the second bone, and the mid point is
+  shared 50/50.
+- Actions (fake-user, so both persist in the .blend): **Neutral** (frame 1: settled stance, arms slightly forward,
+  elbows 14°, gripper open) and **Demo** (frames 1→48: pelvis drops 16 cm with 4° pitch, waist twist, head yaw 28°,
+  lidar spin, gripper arm reaching forward with the gripper closing, drill arm braced forward with the spindle turned,
+  right foot stepping forward). Legs come from an analytic 2-bone IK in the sagittal plane, so both feet stay flat.
+  `rig.set_pose(rig, "Demo"|"Neutral"|"rest")` selects the action (and slot) and jumps to its last key.
+- QC: `renders/qc_m7_neutral.png`, `renders/qc_m7_demo.png`. The intersection test (BVH triangle overlap between
+  lower legs L/R, thighs L/R, lower arms vs torso/thighs/shins) gives 0 overlaps in both Neutral and Demo.
+  Connectivity check: 0 floating. Mesh check: 0 problems.
+
+QC defects → fixes:
+1. Demo first rendered with the gripper arm swinging *backward*: shoulder bones run along ±X, so "forward" is −Y
+   rotation on the left and +Y on the right. Fixed and commented in `pose_values`.
+2. Pauldron outer end was open (visible ring from the side) → profile closed to the axis.
 

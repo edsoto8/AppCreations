@@ -140,7 +140,7 @@ def _bvh(ob, dg):
     return BVHTree.FromPolygons(verts, polys) if polys else None
 
 
-def group_intersections(groups):
+def group_intersections(groups, pairs=None):
     """Detect unintended contact between large subsystems (e.g. left leg vs right leg).
 
     ``groups`` maps a label to a list of objects. Returns {(a, b): overlapping triangle pairs}.
@@ -152,14 +152,14 @@ def group_intersections(groups):
     for label, objs in groups.items():
         trees[label] = [t for t in (_bvh(o, dg) for o in objs if o.type == "MESH") if t]
     labels = list(groups)
+    pairs = pairs or [(labels[i], labels[j]) for i in range(len(labels)) for j in range(i + 1, len(labels))]
     out = {}
-    for i in range(len(labels)):
-        for j in range(i + 1, len(labels)):
-            n = 0
-            for ta in trees[labels[i]]:
-                for tb in trees[labels[j]]:
-                    n += len(ta.overlap(tb))
-            out[(labels[i], labels[j])] = n
+    for a, b in pairs:
+        n = 0
+        for ta in trees.get(a, []):
+            for tb in trees.get(b, []):
+                n += len(ta.overlap(tb))
+        out[(a, b)] = n
     return out
 
 
