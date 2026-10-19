@@ -37,6 +37,7 @@ import { rothQualifiedYear } from '../rmd/roth';
 import {
   Gaps,
   eventsYear,
+  isTaxDeferred,
   pensionYear,
   reinvestAccount,
   rmdFor,
@@ -676,6 +677,19 @@ export function projectWithCache(
       // Accumulation: spending comes from pay; one-time outflows are withdrawn (before taxes).
       const allocation = allocateWithdrawals(outflow, categories, caps, order);
       for (const [id, w] of allocation.byAccount) take(id, w);
+      // SIMPLIFICATION (§7.1 step 5): working-years outflows are withdrawn before taxes, so the income
+      // tax on tax-deferred money (or gains on taxable money) they draw is not modeled. Say so.
+      const taxed = household.accounts.filter(
+        (acct) =>
+          (allocation.byAccount.get(acct.id) ?? 0) > 0.005 && (isTaxDeferred(acct) || acct.type === 'taxableBrokerage'),
+      );
+      if (taxed.length > 0) {
+        warnOnce(`outflow-tax-${year}`, {
+          code: 'featureNotModeled',
+          year,
+          message: `In ${year}, one-time expenses are paid from ${taxed.map((acct) => acct.name).join(' and ')} while working; the income tax on that withdrawal is not modeled, so taxes that year are understated.`,
+        });
+      }
       spendingWithdrawals = outflow - allocation.unfunded;
       unfunded = allocation.unfunded;
       // RMD money is not spent while working: it is reinvested.

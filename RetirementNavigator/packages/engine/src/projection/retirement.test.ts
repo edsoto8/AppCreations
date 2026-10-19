@@ -709,3 +709,28 @@ describe('death year, survivor timing and leftover income', () => {
     expect(tax.ordinaryIncome + tax.capitalGains).toBe(tax.agi);
   });
 });
+
+describe('working-years one-time outflows from tax-deferred money (M8 validation A1)', () => {
+  it('says the tax on the withdrawal is not modeled', () => {
+    const h = build({
+      people: [person('p1', 50)] as never,
+      accounts: [
+        { type: 'traditionalIra', id: 'ira', name: 'IRA', ownerId: 'p1', balance: dollars(100_000), expectedReturn: 0 },
+      ] as never,
+      oneTimeEvents: [
+        {
+          id: 'roof',
+          name: 'Roof',
+          year: YEAR + 1,
+          direction: 'outflow',
+          amount: dollars(20_000),
+          amountBasis: 'nominal',
+        },
+      ] as never,
+    });
+    const notes = project(h, fixture).warnings.filter((w) => w.code === 'featureNotModeled' && w.year === YEAR + 1);
+    expect(notes.map((w) => w.message).join(' ')).toMatch(
+      /paid from IRA while working; the income tax on that withdrawal is not modeled/,
+    );
+  });
+});

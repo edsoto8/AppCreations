@@ -352,6 +352,24 @@ export function accumulationYear(
     );
     if (taxResult.status === 'unverified') access.absorb(taxResult.missing);
     else if (taxResult.status === 'ok') taxes = taxResult.value;
+  } else {
+    // Taxes stay unknown because pre-tax deferrals are unknown (an unverified limit). Still probe the
+    // tax rules so every rule the figure would need is listed as missing (§1.7); the value is discarded.
+    const probe = computeTax(
+      {
+        filingStatus: extra.filingStatus ?? household.filingStatus,
+        ages: extra.ages ?? ages,
+        wages: toCents(grossPay),
+        wagesByPerson,
+        otherOrdinaryIncome: toCents(other.taxable + extra.ordinary),
+        socialSecurityBenefits: toCents(extra.socialSecurity),
+        longTermCapitalGains: toCents(extra.gains),
+        preTaxDeductions: 0 as Cents,
+        stateTaxRate: household.assumptions.stateTaxRate as Fraction,
+      },
+      rules,
+    );
+    if (probe.status === 'unverified') access.absorb(probe.missing);
   }
 
   const contributions =

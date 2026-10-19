@@ -11,7 +11,7 @@ Two rule sets, chosen per fixture (`rules` in the fixture JSON):
     real IRS/SSA values), translated by hand below. Every value is verified, so the full M4 path runs.
     The fixture has one tax year (2026); later years are resolved with docs §2 (indexed values
     grow with the inflation assumption and use the published rounding metadata; statutory-fixed
-    values are carried; the senior deduction is absent after its 2028 sunset).
+    values are carried; the senior deduction is absent after its 2029 sunset).
 
 Scope:
   - M3 (§1, §3, §4): ages, phases, longevity; salary, raises, bonus, part-time; workplace plans
@@ -2864,7 +2864,7 @@ case(
     "verified-roth-ira-phase-out",
     "Fixture rules, single 40: MAGI = salary − 401(k) − HSA = $113,000 inside the $100k–$115k phase-out:"
     " $7,000 × 2,000/15,000 rounded up to $10 = $940, then limited by the IRA room left after a $2,000"
-    " traditional IRA; 2027 MAGI above $115k → ineligible; a 20% pay cut in 2028 brings it back to full"
+    " traditional IRA; 2027 MAGI above $112k → ineligible; a 20% pay cut in 2028 brings it back to full"
     " and makes that year infeasible (surplus < 0) (§3.7, §3.8).",
     household(
         [

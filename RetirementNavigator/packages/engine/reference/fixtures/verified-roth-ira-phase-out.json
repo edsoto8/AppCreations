@@ -1,6 +1,6 @@
 {
   "name": "verified-roth-ira-phase-out",
-  "description": "Fixture rules, single 40: MAGI = salary \u2212 401(k) \u2212 HSA = $113,000 inside the $100k\u2013$115k phase-out: $7,000 \u00d7 2,000/15,000 rounded up to $10 = $940, then limited by the IRA room left after a $2,000 traditional IRA; 2027 MAGI above $115k \u2192 ineligible; a 20% pay cut in 2028 brings it back to full and makes that year infeasible (surplus < 0) (\u00a73.7, \u00a73.8).",
+  "description": "Fixture rules, single 40: MAGI = salary \u2212 401(k) \u2212 HSA = $113,000 inside the $100k\u2013$115k phase-out: $7,000 \u00d7 2,000/15,000 rounded up to $10 = $940, then limited by the IRA room left after a $2,000 traditional IRA; 2027 MAGI above $112k \u2192 ineligible; a 20% pay cut in 2028 brings it back to full and makes that year infeasible (surplus < 0) (\u00a73.7, \u00a73.8).",
   "currentYear": 2026,
   "rules": "fixture",
   "household": {

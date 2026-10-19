@@ -151,7 +151,7 @@ and labeled**, never with a filled-in value:
 ## 2. Rules resolution [M2, final]
 - Values are `Verified<T>`, each `verified`, `unverified` (null plus `unverifiedReason`), or
   `notPublished`.
-- `resolveRules(anchorYear, targetYear, indexRate)`:
+- `resolveRules(rules, { anchorYear, targetYear, indexRate })`:
   - if `targetYear ≤ anchorYear` and the year's value is verified, use it;
   - otherwise start from the latest verified year `b ≤ anchorYear` and set
     - `indexed`: `v_target = round_rule(v_b · (1 + indexRate)^{target − b})`, using the published
@@ -308,6 +308,7 @@ and labeled**, never with a filled-in value:
 - Expected return precedence: `account.expectedReturn`, then the allocation-implied
   `Σ w_k·g_k^CMA`, then the phase assumption (pre- or post-retirement, by the **household** phase of
   that year). Then the deterministic offset is added (§9). The applied return is floored at −99%.
+  The row's `appliedReturn` is this **gross** return r, before fees and tax drag.
 - Fee drag: net rate `ρ = (1+r)(1−f) − 1`, where f is the expense ratio. The gross figure uses r, and
   `feeDrag = growthGross − growthNet`.
 - Taxable accounts: `ρ = (1+r)(1−f) − 1 − drag`, where drag is the user's tax-drag percentage points
@@ -361,8 +362,9 @@ For each retirement-phase year:
    reduction all arrive in M4 and are listed as `featureNotModeled` warnings while they are not
    modeled).
 
-Accumulation-phase years make no withdrawals: spending is funded from pay (§3.8). Their
-`grossIncome` is wages plus other income, and `netIncome = netPay` (null when taxes are unverified).
+Accumulation-phase years fund spending from pay (§3.8). Their `grossIncome` is wages plus other
+income, plus any Social Security, pension annuity and RMDs received that year (§7.1 step 5), and
+`netIncome = netPay` (null when taxes are unverified).
 
 - **Deterministic success:** no depletion year, and the real ending balance ≥
   `minimumEndingBalance` (today's dollars).
@@ -442,8 +444,11 @@ listed in `excludedFeatures`; it is never filled in. With the bundled (unverifie
 
    In the **accumulation phase**, spending is funded from pay (§3.8). Social Security, pension
    annuities and RMDs received while someone still works count as income for net pay, surplus and
-   the infeasible check (their tax is in the year's tax). RMD money is reinvested (step 6). One-time
-   outflows are withdrawn from the portfolio by the same strategy, before taxes (simplification).
+   the infeasible check (their tax is in the year's tax). The whole RMD is reinvested (step 6); the
+   tax on it is part of the year's tax and so reduces net pay. One-time outflows are withdrawn from
+   the portfolio by the same strategy, **before taxes**: the income tax on tax-deferred money (and
+   gains on taxable money) they draw is **not modeled**, so that year's taxes are understated; a
+   `featureNotModeled` note says so (simplification).
 6. **Excess.** If fixed income, RMDs and HSA medical exceed the need (after tax when taxes are
    verified), the excess is **reinvested** mid-year in the first taxable brokerage account, else the
    first cash account; with neither it is spent. RMD money in excess is never left in the
@@ -498,8 +503,9 @@ listed in `excludedFeatures`; it is never filled in. With the bundled (unverifie
 - **Roth IRA** withdrawals come from contribution basis first (untaxed). Earnings are qualified, and
   untaxed, from the calendar year the owner turns 59½ **and** at least `fiveYearRuleYears` after
   `firstContributionYear` (year 1 if unknown).
-  - "Turns 59½" means `birthYear + 59` if `birthMonth ≤ 6`, else `birthYear + 60`, using
-    `qualifiedAgeMonths`.
+  - The qualifying year is the calendar year in which the owner reaches `qualifiedAgeMonths` months
+    of age: `birthYear + ⌊(birthMonth − 1 + qualifiedAgeMonths) / 12⌋` (for 59½, that is
+    `birthYear + 59` for birth months 1–6, else `birthYear + 60`).
   - Earnings withdrawn earlier are flagged with `rothEarningsWithdrawnEarly`. No tax or penalty is
     modeled (simplified).
   - With unverified rules the check is excluded (`rothQualification`) and no flag is shown.
@@ -518,15 +524,16 @@ listed in `excludedFeatures`; it is never filled in. With the bundled (unverifie
     table and factors needed, else excluded: `socialSecurityClaiming`).
   - `estimateAverage` / `estimateHistory`: an illustrative PIA (below), labeled "not an official SSA
     calculation" (`ssEstimateIllustrative`), then `f` as above.
-- **Claim factor**, with `m = FRA_months − claim_months`:
+- **Claim factor**, with `m = FRA_months − claim_months` (positive when claiming early; the API's
+  `monthsFromFra` is `claim_months − FRA_months`, the opposite sign):
   - if m > 0: `1 − (r1·min(m,36) + r2·max(0, m−36))`;
   - if m < 0: `1 + d·min(−m, months to delayedCreditMaxAge)`.
   - r1, r2, d and the max age are verified standing rules.
 - **Timing:** benefits begin in the claim year, `birthYear + claimAge.years`, prorated by the months
   of entitlement that year: `max(0, 12 − (birthMonth − 1 + claimAge.months))`. The person must be
   alive.
-- **Amount in year t:** `12 · monthly · P_t` (COLA = inflation), or `12 · monthly · Π(1 + cola)` for
-  a set COLA rate. The `benefitReduction` assumption multiplies by `(1 − reduction)` from its year
+- **Amount in year t:** `12 · monthly · P_t` (COLA = inflation), or `12 · monthly · (1 + cola)^{t−1}`
+  for a set COLA rate (year 1 has no COLA; each later projection year adds one). The `benefitReduction` assumption multiplies by `(1 − reduction)` from its year
   (labeled an assumption, not a prediction).
 - **Spousal (verified rules only, else excluded: `spousalSurvivorBenefits`):**
   - excess = `max(0, maxShareOfPia·PIA_other − PIA_own)`, reduced for claiming before one's own FRA
@@ -542,7 +549,8 @@ listed in `excludedFeatures`; it is never filled in. With the bundled (unverifie
     `max(own, maxShareOfDeceased × deceased's benefit, ribLimFloorShareOfPia × deceased PIA)` (the
     floor only when a PIA is known);
   - the deceased's benefit stops;
-  - if the deceased had not claimed before death, their benefit is `PIA × max(1, f(death age))`:
+  - if the deceased had not claimed before death, their benefit is `PIA × max(1, f(death age))`, where
+    the death age is the deceased's age in the first death year D (planning age + 1):
     never reduced for the deceased's age, with any delayed credits earned up to the death age (the
     claim range clamps the age);
   - the survivor's own early-claim survivor reduction is not modeled;
@@ -566,7 +574,9 @@ listed in `excludedFeatures`; it is never filled in. With the bundled (unverifie
 
 ### 7.6 Pensions, other income and one-time events
 - **Pension annuity:**
-  - starts in the year the owner reaches `startAge`;
+  - starts in the year the owner reaches `startAge`; if the owner dies before then, the survivor
+    fraction is paid to the surviving spouse from that same start year (the year the owner would
+    have reached `startAge`);
   - the amount is today's dollars × `P_t`, or nominal at start;
   - it then grows by its COLA (flat, inflation or a rate) from the start year;
   - a pension already in payment before year 1 (start age reached earlier) is taken at its entered
@@ -671,8 +681,8 @@ confidence intervals. Everything else (contributions, spending, inflation) is un
     `durationYears` (default 1): each year's return is `(1+severity)^{1/n} − 1`. It is deterministic
     and reproducible (tested).
   - E Delayed retirement: every retirement age +`years` (3–5, default 3), capped at the planning age.
-  - F Reduced spending: retirement spending and spending steps −`cut` (default 10%), rounded half to
-    even to the cent (§1.3). Current (working-years) spending is unchanged.
+  - F Reduced spending: retirement spending and spending steps −`cut` (default 10%); each resulting
+    amount `amount × (1 − cut)` is rounded half to even to the cent (§1.3). Current (working-years) spending is unchanged.
   - G Roth strategy: all workplace deferrals (salary and bonus) moved to Roth where the plan offers
     Roth with a Roth account.
 - **Drift** (`presetDrift`): presets B, C, E, F and G store the values computed on the base at

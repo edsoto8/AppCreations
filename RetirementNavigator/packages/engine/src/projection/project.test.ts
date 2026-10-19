@@ -908,3 +908,45 @@ describe('samples, dashboard and warnings', () => {
     expect(project(strict).summary.deterministicSuccess).toBe(false);
   });
 });
+
+describe('excludedFeatures is complete when limits are unverified (M8 validation D1)', () => {
+  it('lists the tax and payroll rules a worker with a 401(k) needs, as for a worker without one', () => {
+    const base = minimalHouseholdInput(2026);
+    const person = {
+      ...base.people[0]!,
+      birthYear: 1986,
+      employment: { baseSalary: dollars(100_000), raise: { mode: 'nominal', rate: 0 } },
+    };
+    const without = HouseholdSchema.parse({ ...base, people: [person] });
+    const withPlan = HouseholdSchema.parse({
+      ...base,
+      people: [
+        {
+          ...person,
+          workplacePlans: [
+            {
+              id: 'plan-1',
+              planType: '401k',
+              traditionalAccountId: 'k',
+              traditionalPctOfSalary: 0.1,
+              match: { tiers: [] },
+            },
+          ],
+        },
+      ],
+      accounts: [
+        ...(base.accounts ?? []),
+        { type: 'workplaceTraditional', planType: '401k', id: 'k', name: '401(k)', ownerId: person.id, balance: 0 },
+      ],
+    });
+    const ctx = { currentYear: 2026, rules: RULES };
+    const a = projectHousehold(without, ctx);
+    const b = projectHousehold(withPlan, ctx);
+    if (a.status !== 'ok' || b.status !== 'ok') throw new Error('projection');
+    for (const feature of a.value.excludedFeatures) expect(b.value.excludedFeatures).toContain(feature);
+    expect(b.value.excludedFeatures).toContain('payrollTax');
+    const keys = new Set(b.value.unverified.map((u) => u.key));
+    for (const u of a.value.unverified) expect(keys).toContain(u.key);
+    expect(b.value.excludedFeatures).toContain('workplaceLimits');
+  });
+});

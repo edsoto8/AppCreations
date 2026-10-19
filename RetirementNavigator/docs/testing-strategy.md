@@ -37,7 +37,7 @@ examples (Pub 590-A phase-out, Pub 915) are added against the real data.
 ## Projection validation (M3)
 - **Golden fixtures:** `packages/engine/reference/ref.py` is an independent Python 3 (stdlib)
   reference, written from this document by a QA pass that did not read the engine source.
-  - 16 fixtures in `reference/fixtures/` cover zero/high/negative inflation, negative returns and
+  - 43 fixtures in `reference/fixtures/` (28 on the bundled rules, 15 on the synthetic verified path) cover zero/high/negative inflation, negative returns and
     shocks, couples with first death, already-retired and retire-at-planning-age households,
     depletion, zero balances, bonus edge cases, raise overrides, tiered match with escalation and a
     cap, cliff and graded vesting, all five withdrawal strategies, monthly and start-of-year timing,
@@ -46,7 +46,7 @@ examples (Pub 590-A phase-out, Pub 915) are added against the real data.
     every figure exactly.
   - `pnpm reference` (`ref.py --check`, part of `pnpm verify`) recomputes the fixtures and fails on
     any change.
-  - 19 fixtures, including part-time pay and owned income stopping at death, a salary stop age after
+  - Added since M3: part-time pay and owned income stopping at death, a salary stop age after
     the retirement age, and graded-vesting forfeiture with start-of-year timing.
   - **Not covered by the reference** (engine unit tests against the synthetic fixture rules only):
     - the verified-rules path (limits applied, taxes, net pay, surplus routing, the tax-based
