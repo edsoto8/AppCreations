@@ -33,9 +33,14 @@ RetirementNavigator/
 1. A form (React Hook Form + Zod resolver using the engine schemas) updates the profile in the
    Zustand store.
 2. The store is persisted to IndexedDB (debounced ~150 ms).
-3. A derived selector builds the projection input and calls `projectHousehold(household, { currentYear, rules })`.
-   It runs on the main thread when a run takes under ~30 ms, and otherwise in `forecast.worker.ts`.
-   Recalculation is debounced.
+3. A derived selector builds the projection input and calls `computeDashboard(household, { currentYear, rules })`
+   (the baseline `projectHousehold` plus the optimistic and pessimistic reruns).
+   - Measured in M3 (`pnpm bench`, 4-core Xeon 2.1 GHz): median 5–31 ms, p95 ≤ 47 ms per full
+     dashboard recalculation for the sample profiles.
+   - That is under the 100 ms target, so it runs on the main thread inside `useMemo`, with
+     `useDeferredValue` to keep typing responsive.
+   - `forecast.worker.ts` is deferred until a profile measures slower; it is re-checked in the M8
+     performance pass, including emulated phone throttling.
 4. View models convert between today's and nominal dollars (`real = nominal / deflator`) for cards,
    charts, tables and exports.
 5. Monte Carlo always runs in `montecarlo.worker.ts`. The worker runs a quick 1,000-path chunk, then
@@ -50,8 +55,12 @@ RetirementNavigator/
 ## Error handling
 - Engine calls return `EngineResult<T>` (`ok` | `unverified` | `invalid`). User data never makes the
   engine throw.
-- The projection returns `ok` with `excludedFeatures`/`unverified` when rules are null. The UI shows
-  "Unverified rule" instead of any number that depends on an excluded feature.
+- The projection returns `ok` with `excludedFeatures`/`unverified` when rules are null.
+  - Following the owner's decision of 2026-10-19 (`financial-model.md` §1.7), the forecast leaves the
+    unverified steps out and labels them: contributions "as elected, before plan limits", income
+    "before taxes".
+  - A figure that would need a null rule directly (taxes, net pay, surplus) is null and is never shown
+    as a number.
 - The UI shows Zod messages per field, has an error boundary per page, and surfaces engine warnings
   inline.
 
@@ -99,3 +108,20 @@ RetirementNavigator/
 
 ## MCP servers
 None are added. No concrete advantage for this project has been identified.
+
+## Projection (M3)
+- `packages/engine/src/projection/`:
+  - `accounts.ts`: the per-account update `E = g_S·S + g_C·C − g_W·W` for every timing mode,
+    withdrawal caps, withdrawal orders and tax-treatment groups.
+  - `project.ts`: `projectHousehold`, the year loop.
+  - `dashboard.ts`: `computeDashboard`, the cards and readiness.
+- The year loop reuses the M2 Income & Savings slice (`income/preview.ts` → `accumulationYear`), so
+  the 10-year preview and the forecast share one implementation of pay, elections, limits, match,
+  scheduled contributions and net pay.
+- Float64 balances carry forward unrounded. Each row converts to cents once (`growthNet` is the
+  reconciling item), and every result is checked against the frozen `ProjectionResultSchema` in
+  tests.
+- Validation: an independent Python reference (`packages/engine/reference/ref.py`, written from
+  `financial-model.md`, not from the engine) produces golden fixtures. Vitest compares them within
+  1 cent per year. fast-check property tests cover reconciliation, non-negative balances, the timing
+  ordering and monotonic contributions.

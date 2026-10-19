@@ -60,7 +60,7 @@ export default tseslint.config(
     },
   },
   {
-    files: ['packages/engine/src/**/*.test.ts', 'packages/engine/vitest.config.ts'],
+    files: ['packages/engine/src/**/*.test.ts', 'packages/engine/vitest.config.ts', 'packages/engine/bench/**/*.ts'],
     languageOptions: { globals: { ...globals.node } },
   },
   {

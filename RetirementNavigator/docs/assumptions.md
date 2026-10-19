@@ -59,6 +59,16 @@ Stochastic inflation (optional): median 2.5%, volatility 1.5%, correlations with
 - State tax = flat rate × federal AGI.
 - The vesting fraction applies to the whole employer sub-ledger at separation.
 - An infeasible savings plan is flagged but still modeled as carried out.
+- Forecast while rules are unverified (owner decision 2026-10-19): contributions are as elected,
+  before plan limits, and retirement income is before taxes. Both are labeled in the UI.
+- Retirement phase in M3:
+  - spending is funded by withdrawals in the chosen order, before taxes;
+  - Social Security, pensions, one-time events, RMDs, spending steps, the glide, healthcare and the
+    survivor reduction are added in M4, and the app lists them as not yet modeled;
+  - extra cash income in retirement is assumed spent;
+  - retirement-year contributions come only from income left after spending.
+- The household phase (not each person's) picks the pre- or post-retirement fallback return.
+- Taxable basis falls pro rata to the share of the year's available balance withdrawn.
 
 ## Data and privacy
 Everything stays on this device in IndexedDB, **unencrypted**. Nothing is sent over the network: no

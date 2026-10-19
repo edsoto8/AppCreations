@@ -17,7 +17,8 @@
     "format:check": "prettier --check .",
     "test": "pnpm -r test",
     "e2e": "pnpm --filter @rn/web e2e",
-    "verify": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm test && pnpm build && pnpm e2e"
+    "verify": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm test && pnpm build && pnpm e2e",
+    "bench": "pnpm --filter @rn/engine bench"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
