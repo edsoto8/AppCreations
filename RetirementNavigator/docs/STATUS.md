@@ -88,6 +88,16 @@ Next: **M8** (independent validation report, final review sweep, docs, final STA
 | Malformed JSON rejected with clear messages | Empty, broken JSON, non-object, wrong format, bad/newer schemaVersion, oversized, field errors with paths, dangling scenario base profile, duplicate profiles; UI shows each problem and changes nothing (RTL, E2E) | pass |
 | + Delete-all | IndexedDB stores and the app's localStorage key cleared, stores reset, back to onboarding (RTL, E2E) | pass |
 
+## Review findings (M7a, M7b)
+| # | Finding | Severity | Resolution |
+|---|---|---|---|
+| B1 | The Social Security claiming insight misstated results: an amount entered at the claiming age was only delayed (lifetime −$36,000), a person already claiming was back-dated, months were dropped | blocking | Only unclaimed, PIA-based, in-forecast benefits move; +12 months, up to 70; tests for each case |
+| B2 | The full-match insight summed tier bands (missed bonus-eligible pay, caps, the compensation limit; overshot or undershot) | blocking | Gated on the engine readout's `unclaimed`; smallest 0.01% salary rate whose readout leaves nothing unclaimed; minimality tested |
+| S3 | "Savings needed" was a flat nominal amount labeled today's dollars | should fix | Today's dollars rising with inflation; over-pay years mentioned |
+| S4 | JSON import accepted duplicate scenario ids and mismatched inner ids | should fix | Rejected with messages; tests |
+| — | Retire-later no-op card; shock years not shifted; delete-all E2E depth; theme rewritten at start-up after delete-all | optional | Fixed (the theme is stored only when chosen; E2E checks IndexedDB and localStorage after a reload) |
+| — | Export leaves out stored documents that failed validation, and "Replace all data" then removes them; couple prefill pairs household totals with one person's ages | optional | Recorded here; the import preview counts what the file holds |
+
 ## M5 gate evidence
 | Gate | Evidence | Result |
 |---|---|---|
