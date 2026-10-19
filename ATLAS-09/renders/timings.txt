@@ -1,0 +1,1 @@
+2026-10-19 21:38:40 mode=final samples=64 {'cam_hero': 907.0}

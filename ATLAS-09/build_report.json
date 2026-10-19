@@ -1,37 +1,11 @@
 {
- "milestone": 7,
+ "milestone": 9,
  "blender": "5.2.2 LTS",
- "mesh_checked": 593,
- "mesh_problems": 0,
- "floating": [],
- "objects_robot": 1126,
- "intersections": {
-  "Neutral": {
-   "LegL_lower~LegR_lower": 0,
-   "ThighL~ThighR": 0,
-   "ArmL_lower~Torso": 0,
-   "ArmR_lower~Torso": 0,
-   "ArmL_lower~ThighL": 0,
-   "ArmR_lower~ThighR": 0,
-   "ArmL_lower~LegL_lower": 0,
-   "ArmR_lower~LegR_lower": 0
-  },
-  "Demo": {
-   "LegL_lower~LegR_lower": 0,
-   "ThighL~ThighR": 0,
-   "ArmL_lower~Torso": 0,
-   "ArmR_lower~Torso": 0,
-   "ArmL_lower~ThighL": 0,
-   "ArmR_lower~ThighR": 0,
-   "ArmL_lower~LegL_lower": 0,
-   "ArmR_lower~LegR_lower": 0
-  }
- },
  "counts": {
   "Torso": {
-   "parts": 143,
-   "fasteners": 124,
-   "total": 267
+   "parts": 145,
+   "fasteners": 128,
+   "total": 273
   },
   "Rig": {
    "parts": 0,
@@ -63,21 +37,21 @@
    "fasteners": 64,
    "total": 146
   },
-  "QC": {
-   "parts": 0,
+  "Scene": {
+   "parts": 44,
    "fasteners": 0,
-   "total": 0
+   "total": 44
   }
  },
  "log": [
   {
    "kind": "RIG",
-   "msg": "27 bones, 1122 objects bone-parented, 64 cable hooks",
+   "msg": "27 bones, 1128 objects bone-parented, 64 cable hooks",
    "obj": null
   },
   {
    "kind": "INFO",
-   "msg": "build to milestone 7 took 3.6s",
+   "msg": "build to milestone 9 took 3.9s",
    "obj": null
   }
  ]

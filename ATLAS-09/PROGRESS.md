@@ -151,3 +151,32 @@ QC defects → fixes:
    rotation on the left and +Y on the right. Fixed and commented in `pose_values`.
 2. Pauldron outer end was open (visible ring from the side) → profile closed to the axis.
 
+### Milestone 8: presentation scene and final renders (done; finals rendered after the M9 fixes below)
+
+`mech/scene.py`:
+- Octagonal concrete display platform (r 3.1 m, 0.25 m high, feet at z=0) with a hazard band, steel nosing,
+  painted rings, chevrons, "BAY 09" / "MAX LOAD 42 t" stencils, tie-down rings and four hazard bollards.
+- Hangar: concrete floor with walkway lines, hazard zone and a drain grate; ribbed back wall with columns, amber wall
+  lights and a roof girder truss; a side wall (backdrop for the side reference view); three crates for depth.
+- Lights: warm key area light, low cool fill, **strong cool-left / warm-right rim area lights**, soft top light, two
+  spot "shaft" lights behind the stage, and a low kicker. Contact shadows come from the area lights (shadows are on).
+- Atmosphere: a 28×24×11 m box with Principled Volume (density 0.0025, anisotropy 0.35), volume bounces 0, step
+  rate 4. It is hidden for the orthographic reference cameras so they stay crisp.
+- Cameras (all named as required): `cam_hero` (30 mm, low angle, f/5.6, Demo pose), `cam_three_quarter`
+  (42 mm, f/6.3, Neutral), `cam_torso_head` (55 mm, f/2.8, Neutral), `cam_leg_hydraulics` (42 mm, f/3.5, Demo),
+  `cam_front` and `cam_side` (orthographic, 8.6 m, Neutral, no DOF). Each camera stores its pose and output
+  filename; `scene.render_all` sets the action per camera, so both actions are verified in the finals.
+
+QC (`renders/preview/*.png` at 640×360) defects → fixes:
+1. First previews were blown out to white: haze density 0.012 + 30 kW shaft spots lit the whole volume →
+   density 0.0025, shafts 5 kW / 3.5 kW, key/fill/top reduced, rims increased, darker world and concrete.
+2. Ortho front/side looked through 24 m of fog → haze hidden for orthographic cameras.
+3. Side reference view had a black void behind it → added a side wall.
+4. Hazard band on the platform went solid yellow on some octagon faces (stripes depended only on rotated X/Y)
+   → stripes now driven by dot(position, (1,1,1)), diagonal on every face orientation.
+5. "BAY 09" stencil too faint at grazing angles → larger, brighter paint.
+6. Render cost: the first 1080p hero at 64 samples took **907 s**. Profiling at 480×270 (32 samples): base 30.4 s, no volume
+   26.4 s, AO 8→1 sample 21.3 s, Bevel 4→1 18.2 s. Kept the volume, set AO to 2 samples. Bevel stays at 4: at 2
+   samples the bevel-normal noise made the ×14 edge mask fire everywhere and every painted surface rendered as
+   bare worn metal (beige). Finals use **96 samples** (about 15–18 min per frame) to stay within the about 20-minute cap.
+

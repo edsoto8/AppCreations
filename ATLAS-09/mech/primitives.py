@@ -753,3 +753,173 @@ def coilover(kit, prefix, p_base, p_end, bone_base, bone_end, r_spring=0.055, co
     sp["piston"] = prefix
     pis["spring"] = sp
     return pis
+
+
+# --------------------------------------------------------------------------- geometry nodes
+
+def _gn_group(name, build):
+    ng = bpy.data.node_groups.get(name)
+    if ng is not None:
+        return ng
+    ng = bpy.data.node_groups.new(name, "GeometryNodeTree")
+    ng.interface.new_socket(name="Geometry", in_out="INPUT", socket_type="NodeSocketGeometry")
+    ng.interface.new_socket(name="Geometry", in_out="OUTPUT", socket_type="NodeSocketGeometry")
+    build(ng)
+    return ng
+
+
+def _gn_rivet_row(ng):
+    """Geometry + rivets instanced on a straight row (Mesh Line -> Instance on Points)."""
+    it = ng.interface
+    for nm, kind in (("Start", "NodeSocketVector"), ("End", "NodeSocketVector"), ("Count", "NodeSocketInt"),
+                     ("Size", "NodeSocketFloat"), ("Rotation", "NodeSocketVector"), ("Rivet", "NodeSocketObject")):
+        it.new_socket(name=nm, in_out="INPUT", socket_type=kind)
+    N = ng.nodes
+    gi, go = N.new("NodeGroupInput"), N.new("NodeGroupOutput")
+    line = N.new("GeometryNodeMeshLine")
+    line.mode = "END_POINTS"
+    oi = N.new("GeometryNodeObjectInfo")
+    oi.transform_space = "ORIGINAL"
+    inst = N.new("GeometryNodeInstanceOnPoints")
+    rot = N.new("FunctionNodeEulerToRotation") if hasattr(bpy.types, "FunctionNodeEulerToRotation") else None
+    join = N.new("GeometryNodeJoinGeometry")
+    L = ng.links.new
+    L(gi.outputs["Count"], line.inputs["Count"])
+    L(gi.outputs["Start"], line.inputs["Start Location"])
+    L(gi.outputs["End"], line.inputs["Offset"])
+    L(gi.outputs["Rivet"], oi.inputs["Object"])
+    L(line.outputs["Mesh"], inst.inputs["Points"])
+    L(oi.outputs["Geometry"], inst.inputs["Instance"])
+    L(gi.outputs["Size"], inst.inputs["Scale"])
+    if rot is not None:
+        L(gi.outputs["Rotation"], rot.inputs["Euler"])
+        L(rot.outputs["Rotation"], inst.inputs["Rotation"])
+    else:
+        L(gi.outputs["Rotation"], inst.inputs["Rotation"])
+    L(gi.outputs["Geometry"], join.inputs["Geometry"])
+    L(inst.outputs["Instances"], join.inputs["Geometry"])
+    L(join.outputs["Geometry"], go.inputs["Geometry"])
+
+
+def _gn_tread(ng):
+    """Anti-slip tread: a grid of points on the plate top, alternating +-45 degree lozenges."""
+    it = ng.interface
+    for nm, kind in (("Size X", "NodeSocketFloat"), ("Size Y", "NodeSocketFloat"), ("Pitch", "NodeSocketFloat"),
+                     ("Height", "NodeSocketFloat"), ("Lozenge", "NodeSocketObject")):
+        it.new_socket(name=nm, in_out="INPUT", socket_type=kind)
+    N = ng.nodes
+    L = ng.links.new
+    gi, go = N.new("NodeGroupInput"), N.new("NodeGroupOutput")
+    grid = N.new("GeometryNodeMeshGrid")
+    # vertices = size / pitch + 1 (integer)
+    vx, vy = N.new("ShaderNodeMath"), N.new("ShaderNodeMath")
+    for v, nm in ((vx, "Size X"), (vy, "Size Y")):
+        v.operation = "DIVIDE"
+        L(gi.outputs[nm], v.inputs[0])
+        L(gi.outputs["Pitch"], v.inputs[1])
+    L(gi.outputs["Size X"], grid.inputs["Size X"])
+    L(gi.outputs["Size Y"], grid.inputs["Size Y"])
+    L(vx.outputs[0], grid.inputs["Vertices X"])
+    L(vy.outputs[0], grid.inputs["Vertices Y"])
+    pos = N.new("GeometryNodeSetPosition")
+    off = N.new("ShaderNodeCombineXYZ")
+    L(gi.outputs["Height"], off.inputs["Z"])
+    L(grid.outputs["Mesh"], pos.inputs["Geometry"])
+    L(off.outputs["Vector"], pos.inputs["Offset"])
+    idx = N.new("GeometryNodeInputIndex")
+    mod = N.new("ShaderNodeMath")
+    mod.operation = "FLOORED_MODULO"
+    mod.inputs[1].default_value = 2.0
+    L(idx.outputs["Index"], mod.inputs[0])
+    ang = N.new("ShaderNodeMapRange")
+    ang.inputs[3].default_value = 0.785
+    ang.inputs[4].default_value = -0.785
+    L(mod.outputs[0], ang.inputs[0])
+    eul = N.new("ShaderNodeCombineXYZ")
+    L(ang.outputs[0], eul.inputs["Z"])
+    oi = N.new("GeometryNodeObjectInfo")
+    oi.transform_space = "ORIGINAL"
+    L(gi.outputs["Lozenge"], oi.inputs["Object"])
+    inst = N.new("GeometryNodeInstanceOnPoints")
+    L(pos.outputs["Geometry"], inst.inputs["Points"])
+    L(oi.outputs["Geometry"], inst.inputs["Instance"])
+    if hasattr(bpy.types, "FunctionNodeEulerToRotation"):
+        e2r = N.new("FunctionNodeEulerToRotation")
+        L(eul.outputs["Vector"], e2r.inputs["Euler"])
+        L(e2r.outputs["Rotation"], inst.inputs["Rotation"])
+    else:
+        L(eul.outputs["Vector"], inst.inputs["Rotation"])
+    join = N.new("GeometryNodeJoinGeometry")
+    L(gi.outputs["Geometry"], join.inputs["Geometry"])
+    L(inst.outputs["Instances"], join.inputs["Geometry"])
+    L(join.outputs["Geometry"], go.inputs["Geometry"])
+
+
+def _gn_source(kit, name, builder, mat):
+    """Hidden prototype object referenced by Object Info nodes (kept out of renders/counts)."""
+    ob = bpy.data.objects.get(name)
+    if ob is None:
+        bm = bmesh.new()
+        builder(bm)
+        me = U.mesh_from_bm(name, bm, 40)
+        me.materials.append(kit.M[mat])
+        ob = bpy.data.objects.new(name, me)
+        U.sub_coll("Rig").objects.link(ob)
+        ob.hide_render = True
+        ob.hide_viewport = True
+        ob["gn_source"] = True
+    return ob
+
+
+def _set_inputs(mod, ng, values):
+    """Set modifier inputs by interface name (Blender 5.x ``properties.inputs`` API, with the
+    older ``mod[identifier]`` ID-property API as fallback)."""
+    props = getattr(getattr(mod, "properties", None), "inputs", None)
+    for item in ng.interface.items_tree:
+        if getattr(item, "in_out", "") == "INPUT" and item.name in values:
+            v = values[item.name]
+            slot = getattr(props, item.identifier, None) if props is not None else None
+            if slot is not None:
+                slot.value = v
+            else:
+                mod[item.identifier] = v
+
+
+def gn_rivet_row(kit, ob, start, end, count, size=0.01, rotation=(0.0, 0.0, 0.0)):
+    """Add a Geometry Nodes rivet row to ``ob`` (positions in the object's local space)."""
+    try:
+        ng = _gn_group("ATLAS_GN_RivetRow", _gn_rivet_row)
+        src = _gn_source(kit, "GN_Proto_Rivet",
+                         lambda bm: bm_lathe(bm, [(0, 0), (1.0, 0), (0.95, 0.18), (0.7, 0.38), (0.35, 0.47),
+                                                  (0, 0.5)], segs=12), "bolt")
+        if ob.data.materials and kit.M["bolt"].name not in [m.name for m in ob.data.materials if m]:
+            ob.data.materials.append(kit.M["bolt"])
+        m = ob.modifiers.new("GN_RivetRow", "NODES")
+        m.node_group = ng
+        _set_inputs(m, ng, {"Start": Vector(start), "End": Vector(end) - Vector(start), "Count": count,
+                            "Size": size, "Rotation": Vector(rotation), "Rivet": src})
+        ob["gn_rivets"] = ob.get("gn_rivets", 0) + count
+        return m
+    except Exception as exc:
+        U.log("GN", f"rivet row failed: {exc!r}", ob.name)
+
+
+def gn_tread(kit, ob, sx, sy, pitch=0.035, height=0.0):
+    """Add a Geometry Nodes anti-slip lozenge tread on the object's local XY plane at z=height."""
+    try:
+        ng = _gn_group("ATLAS_GN_Tread", _gn_tread)
+        src = _gn_source(kit, "GN_Proto_Lozenge",
+                         lambda bm: bm_box(bm, 0.022, 0.006, 0.006, U.T(z=0.002), bevel=0.0025, segs=1), "steel_dark")
+        m = ob.modifiers.new("GN_Tread", "NODES")
+        m.node_group = ng
+        _set_inputs(m, ng, {"Size X": sx, "Size Y": sy, "Pitch": pitch, "Height": height, "Lozenge": src})
+        return m
+    except Exception as exc:
+        U.log("GN", f"tread failed: {exc!r}", ob.name)
+
+
+def add_subsurf(ob, levels=1, render=2):
+    m = ob.modifiers.new("Subdivision", "SUBSURF")
+    m.levels = levels
+    m.render_levels = render
+    return m

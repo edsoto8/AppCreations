@@ -199,7 +199,7 @@ class NB:
         return m.outputs[0]
 
     def edge(self, radius=0.008, gain=10.0):
-        bev = self.n("ShaderNodeBevel", samples=4)
+        bev = self.n("ShaderNodeBevel", samples=4)   # fewer samples -> noisy mask -> false wear everywhere
         bev.inputs["Radius"].default_value = radius
         geo = self.n("ShaderNodeNewGeometry")
         dot = self.n("ShaderNodeVectorMath", operation="DOT_PRODUCT")
@@ -209,7 +209,7 @@ class NB:
         return self.math("MULTIPLY", e, gain, clamp=True)
 
     def cavity(self, dist=0.06):
-        ao = self.n("ShaderNodeAmbientOcclusion", samples=8)
+        ao = self.n("ShaderNodeAmbientOcclusion", samples=2)
         ao.inputs["Distance"].default_value = dist
         return self.math("SUBTRACT", 1.0, ao.outputs["AO"], clamp=True)
 
@@ -285,23 +285,29 @@ def painted(name, paint, metal=(0.55, 0.55, 0.56), wear=1.0, grime=1.0, paint_ro
 
 def hazard(name):
     m = painted(name, (0.90, 0.50, 0.008), wear=1.2, grime=0.8)
-    # inject stripes: replace the per-object paint with a diagonal wave pattern
+    # Inject stripes as the paint colour. They come from dot(position, (1,1,1)), so they run
+    # diagonally on every face orientation (a pattern built from rotated X/Y alone goes solid on
+    # faces parallel to the stripes).
     nt = m.node_tree
     tc = nt.nodes.new("ShaderNodeTexCoord")
-    mp = nt.nodes.new("ShaderNodeMapping")
-    mp.inputs["Rotation"].default_value = (0.0, 0.0, 0.785)
-    nt.links.new(tc.outputs["Object"], mp.inputs["Vector"])
-    wv = nt.nodes.new("ShaderNodeTexWave")
-    wv.inputs["Scale"].default_value = 9.0
-    wv.wave_profile = "SAW"
-    nt.links.new(mp.outputs["Vector"], wv.inputs["Vector"])
+    dot = nt.nodes.new("ShaderNodeVectorMath")
+    dot.operation = "DOT_PRODUCT"
+    dot.inputs[1].default_value = (1.0, 1.0, 1.0)
+    nt.links.new(tc.outputs["Object"], dot.inputs[0])
+    freq = nt.nodes.new("ShaderNodeMath")
+    freq.operation = "MULTIPLY"
+    freq.inputs[1].default_value = 20.0
+    nt.links.new(NB.sock(dot, "Value", out=True), freq.inputs[0])
+    frac = nt.nodes.new("ShaderNodeMath")
+    frac.operation = "FRACT"
+    nt.links.new(freq.outputs[0], frac.inputs[0])
     cr = nt.nodes.new("ShaderNodeValToRGB")
     cr.color_ramp.interpolation = "CONSTANT"
     cr.color_ramp.elements[0].position = 0.0
     cr.color_ramp.elements[0].color = (0.90, 0.50, 0.008, 1)
     cr.color_ramp.elements[1].position = 0.5
     cr.color_ramp.elements[1].color = (0.012, 0.012, 0.012, 1)
-    nt.links.new(wv.outputs["Fac"], cr.inputs["Fac"])
+    nt.links.new(frac.outputs[0], cr.inputs["Fac"])
     # the first MULTIPLY-blend Mix node holds the paint colour in its A input
     for nd in nt.nodes:
         if nd.type == "MIX" and getattr(nd, "blend_type", "") == "MULTIPLY":
@@ -467,7 +473,7 @@ def metal(name, col, rough=0.35, rust=0.0, heat=False, grime=0.6):
     return b.mat
 
 
-def concrete(name="M_concrete", col=(0.30, 0.29, 0.27)):
+def concrete(name="M_concrete", col=(0.20, 0.195, 0.185)):
     b = NB(name)
     v = b.coords()
     n1 = b.noise(v, 1.2, 5.0, 0.6)
@@ -476,7 +482,7 @@ def concrete(name="M_concrete", col=(0.30, 0.29, 0.27)):
     vor.inputs["Scale"].default_value = 2.2
     b.link(v, vor.inputs["Vector"])
     crack = b.math("SUBTRACT", 1.0, b.maprange(vor.outputs["Distance"], 0.0, 0.012), clamp=True)
-    crack = b.math("MULTIPLY", crack, b.maprange(b.noise(v, 3.0, 2.0, 0.5), 0.5, 0.6))
+    crack = b.math("MULTIPLY", crack, b.maprange(b.noise(v, 3.0, 2.0, 0.5), 0.5, 0.6, 0.0, 0.55))
     c = b.mixc(n1, tuple(x * 0.75 for x in col), tuple(min(1, x * 1.2) for x in col))
     c = b.mixc(b.math("MULTIPLY", n2, 0.4), c, (0.18, 0.17, 0.16))
     c = b.mixc(crack, c, (0.05, 0.05, 0.05))
@@ -513,7 +519,7 @@ def build_pbr():
                         paint_rough=0.38, paint_metal=0.35, scratch=0.35),
         "steel_joint": P("steel_joint", (0.085, 0.088, 0.092), wear=1.2, grime=2.0, paint_rough=0.35,
                          paint_metal=0.4, grime_col=(0.02, 0.016, 0.01)),
-        "spring": P("spring", (0.55, 0.05, 0.02), wear=1.4, grime=0.8, paint_rough=0.3),
+        "spring": P("spring", (0.42, 0.025, 0.01), wear=0.8, grime=0.9, paint_rough=0.3),
         "decal_white": P("decal_white", (0.80, 0.80, 0.77), wear=0.6, grime=0.6, scratch=0.3, tint_var=0.0),
         "decal_black": P("decal_black", (0.015, 0.015, 0.015), wear=0.6, grime=0.3, scratch=0.3, tint_var=0.0),
         "hazard": hazard("M_hazard"),
@@ -537,6 +543,6 @@ def build_pbr():
         "copper": metal("M_copper", (0.80, 0.42, 0.25), rough=0.3, grime=0.4),
         "concrete": concrete(),
         "floor_paint": floor_paint(),
-        "floor_white": floor_paint("M_floor_white", (0.62, 0.62, 0.60)),
+        "floor_white": floor_paint("M_floor_white", (0.80, 0.80, 0.77)),
     }
     return mats

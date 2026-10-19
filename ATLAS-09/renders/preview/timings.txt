@@ -1,0 +1,5 @@
+2026-10-19 21:20:57 mode=preview samples=0 {'cam_hero': 49.4, 'cam_three_quarter': 48.6, 'cam_torso_head': 60.4, 'cam_leg_hydraulics': 61.4, 'cam_front': 46.9, 'cam_side': 28.6}
+2026-10-19 21:23:04 mode=preview samples=16 {'cam_hero': 27.7, 'cam_torso_head': 35.0, 'cam_front': 24.0}
+2026-10-19 21:42:21 mode=preview samples=16 {'cam_hero': 23.7, 'cam_three_quarter': 24.2, 'cam_leg_hydraulics': 28.3}
+2026-10-19 21:50:15 mode=preview samples=16 {'cam_hero': 25.3, 'cam_three_quarter': 25.0, 'cam_torso_head': 31.1, 'cam_leg_hydraulics': 30.7, 'cam_front': 20.6, 'cam_side': 5.9}
+2026-10-19 21:51:33 mode=preview samples=16 {'cam_hero': 26.0, 'cam_side': 19.8}

@@ -129,6 +129,35 @@ def build(ctx):
     if ms < 5:
         return out
     out += _torso_details(kit)
+    if ms >= 9:
+        out += _torso_m9(kit)
+    return out
+
+
+def _torso_m9(kit):
+    """Milestone-9 refinements: exposed exoskeletal frame posts and GN rivet rows."""
+    kc, kp = kit.at("chest"), kit.at("pelvis")
+    out = []
+    for s in (1, -1):
+        sd = "L" if s > 0 else "R"
+        zs = (2.68, 2.98, 3.22, 3.44)
+        pts = [Vector((s * (hull_half_width(z) + 0.025), 0.335, z)) for z in zs]
+
+        def post(bm, pts=pts):
+            for a, b in zip(pts, pts[1:]):
+                P.bm_beam(bm, a, b, 0.06, 0.06, bevel=0.008, x_hint=Vector((0, 1, 0)))
+            for p in pts:
+                P.bm_box(bm, 0.085, 0.085, 0.07, U.T(*p), bevel=0.01)
+        out.append(P.make(f"Torso_Frame_Post_{sd}", kit.coll, kit.m("steel_dark"), post, None, "chest"))
+        out += P.bolt_line(kc, f"Torso_Frame_Post_{sd}_Node", pts[1] + Vector((s * 0.0425, 0, 0)),
+                           pts[2] + Vector((s * 0.0425, 0, 0)), Vector((s, 0, 0)), 2, 0.01)
+    pack = kit.coll.objects["Torso_PowerPack"]
+    P.gn_rivet_row(kc, pack, (-0.39, 0.162, 0.33), (0.39, 0.162, 0.33), 14, 0.008, (-1.5708, 0, 0))
+    P.gn_rivet_row(kc, pack, (-0.39, 0.162, -0.33), (0.39, 0.162, -0.33), 14, 0.008, (-1.5708, 0, 0))
+    floor = kit.coll.objects["Torso_Chest_Floor"]
+    P.gn_rivet_row(kc, floor, (-0.40, -0.302, 0.0), (0.40, -0.302, 0.0), 16, 0.007, (1.5708, 0, 0))
+    core = kit.coll.objects["Torso_Pelvis_Core"]
+    P.gn_rivet_row(kp, core, (-0.22, -0.232, 0.15), (0.22, -0.232, 0.15), 9, 0.008, (1.5708, 0, 0))
     return out
 
 

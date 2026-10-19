@@ -192,7 +192,20 @@ def build(ctx, side):
     if ms < 5:
         return out
     out += _leg_details(kit, pre, s, bn, Mt, Lt, Ms, Ls, Mf, toe_y0)
+    if ms >= 9:
+        _leg_m9(kit, pre)
     return out
+
+
+def _leg_m9(kit, pre):
+    """Milestone-9 refinements: GN anti-slip tread on the instep, rounded (SubSurf) rubber,
+    GN rivet rows on the shin rails."""
+    c = kit.coll.objects
+    P.gn_tread(kit, c[f"{pre}_Foot_Armor_Instep"], 0.38, 0.18, 0.034, 0.035)
+    for nm in (f"{pre}_Foot_SolePads", f"{pre}_Foot_HeelBumper", f"{pre}_Toe_Outer_Pad", f"{pre}_Toe_Inner_Pad"):
+        P.add_subsurf(c[nm], 1, 2)
+    for nm in (f"{pre}_Shin_Rail_Outer", f"{pre}_Shin_Rail_Inner"):
+        P.gn_rivet_row(kit, c[nm], (0.0, -0.112, 0.20), (0.0, -0.112, -0.20), 6, 0.007, (1.5708, 0, 0))
 
 
 def _leg_armor(kit, pre, s, bn, Mt, Lt, Ms, Ls, Mf, toe_y0, ms):

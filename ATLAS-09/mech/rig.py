@@ -154,20 +154,20 @@ def pose_values(name):
         rot("spine", y=-14)
         rot("chest", x=6, y=-6)
         rot("neck", x=6)
-        rot("head", y=-28)
+        rot("head", y=-18)                  # looks along the drill
         rot("sensor", y=65)
         # left (gripper) arm reaches forward and up, gripper closing on a target
-        rot("shoulder.L", y=-62)            # shoulder bone Y = +X: negative = forward
-        rot("upperarm.L", z=-10)
-        rot("forearm.L", x=-48)
-        rot("wrist.L", y=-35)
+        rot("shoulder.L", y=-22)            # shoulder bone Y = +X: negative = forward
+        rot("upperarm.L", z=-14)
+        rot("forearm.L", x=-58)
+        rot("wrist.L", y=-40)
         for f in ("finger_a.L", "finger_b.L"):
             rot(f, x=22)
         rot("thumb.L", x=-22)
         # right (drill) arm braced low and forward
-        rot("shoulder.R", y=28)             # shoulder bone Y = -X: positive = forward
-        rot("upperarm.R", z=8)
-        rot("forearm.R", x=-46)
+        rot("shoulder.R", y=46)             # shoulder bone Y = -X: positive = forward
+        rot("upperarm.R", z=6)
+        rot("forearm.R", x=-38)
         rot("wrist.R", y=20)
         rot("tool.R", y=90)
     else:

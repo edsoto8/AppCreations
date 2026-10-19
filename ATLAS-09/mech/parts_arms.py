@@ -125,6 +125,9 @@ def build(ctx, side):
     if ms < 5:
         return out
     out += _arm_details(kit, pre, s, bn, Mu, Lu, Mf, Lf, Mw)
+    if ms >= 9:
+        for ob in [o for o in coll.objects if o.name.endswith("_Pads")]:
+            P.add_subsurf(ob, 1, 2)
     return out
 
 
