@@ -8,13 +8,14 @@ Pub 915 worked example need verified values; see M4 gate evidence). Tagged `m4-r
 locally. **M5 Scenarios: done** (`m5-scenarios`). **M6 Monte Carlo: done** with the laptop
 performance target **missed on this container** (see M6 gate evidence; `m6-monte-carlo`). **M7a
 Calculators: done** (`m7a-calculators`). **M7b Insights, export, print: done** (`m7b-insights-io`).
-**M8 Quality: in progress.** All tags are local only (tag pushes are refused; see Handoff).
+**M8 Quality: done** (`m8-quality`). All tags are local only (tag pushes are refused; see Handoff).
 
 **M2 is still untagged:** its gates wait on verified rule values and the owner's review of
 `docs/rules-verification.md`. irs.gov, ssa.gov and federalregister.gov remain unreachable (see
 Blockers).
 
-Next: **M8** (independent validation report, final review sweep, docs, final STATUS).
+Next: owner actions only — make the rule sources reachable and review `docs/rules-verification.md`
+(see Handoff).
 
 ## Milestone log
 | Milestone | Status | Tag | Date |
@@ -28,7 +29,29 @@ Next: **M8** (independent validation report, final review sweep, docs, final STA
 | M6 Monte Carlo | done; **laptop target missed on this hardware** (6.0 s first run / 3.3 s warm vs 3 s) | `m6-monte-carlo` (local only) | 2026-10-19 |
 | M7a Calculators | done | `m7a-calculators` (local only) | 2026-10-19 |
 | M7b Insights, export, print | done | `m7b-insights-io` (local only) | 2026-10-19 |
-| M8 Quality | in progress | | |
+| M8 Quality | done | `m8-quality` (local only) | 2026-10-19 |
+
+## M8 gate evidence
+| Gate | Evidence | Result |
+|---|---|---|
+| axe clean on all main pages | `e2e/shell.spec.ts` visits every section with axe (WCAG 2.2 AA tags); each milestone spec runs axe in light and dark, desktop and phone, with data tables open (dashboard, retirement income, scenarios, Monte Carlo after a run, calculators, insights, print, M2 pages) | pass |
+| No-outbound-requests test passes | Every E2E flow asserts zero requests outside the app origin (shell, onboarding, dashboard, retirement income, scenarios, Monte Carlo with workers, calculators, export/import/delete-all, accounts); the production CSP (`connect-src 'none'`) is checked before any script | pass |
+| Coverage targets met | Engine 99.5% lines, 91.3% branches (threshold 90% each, enforced in `pnpm verify`); web 92.1% lines, 74.4% branches (no threshold set) | pass |
+| Validation report filed | `docs/validation-report.md`: a fresh-context QA pass that read only the docs, tests, reference and public contract ran 252 black-box checks through the public API: 245 pass, 1 discrepancy, 6 ambiguities. All resolved (below). | pass |
+| + `pnpm verify` green | engine 687 tests, web 248, reference 43 fixtures, build, 48 E2E | pass |
+
+### Validation findings and resolution
+| # | Finding | Resolution |
+|---|---|---|
+| D1 | With unverified contribution limits, `excludedFeatures`/`unverified` missed the payroll and tax rules for anyone with a 401(k) or HSA (labels incomplete; no wrong number shown) | Fixed: the tax rules are probed so every missing rule is listed; regression test fails without the fix |
+| A1 | A working-years one-time expense drawn from tax-deferred money carried no income tax | Kept as a documented simplification (§7.1 step 5) and now flagged on the forecast with a `featureNotModeled` note, because taxes that year are understated |
+| A2–A6 | Survivor pension before the start age; death age for an unclaimed survivor benefit; RMD reinvestment while working; accumulation `grossIncome`; `monthsFromFra` sign | Documented as built (§4.1, §7.1, §7.5, §7.6) |
+| — | Wording: Roth qualifying-year formula, `resolveRules` signature, COLA start, `appliedReturn` gross, preset F rounding, fixture counts, stale reference descriptions | Fixed |
+| — | Coverage gaps noted: Monte Carlo variance/correlation per account, gross-up iterates on non-convergence, reference-unsupported paths, external IRS/SSA examples | Recorded; the IRS/SSA examples wait on sources (R-sourcing) |
+
+### Bundle (after route-level code splitting)
+Entry JS 317 kB (96 kB gzip), down from 1,576 kB; page chunks load on first visit (largest shared
+chunks: charts 350 kB, engine 304 kB); Monte Carlo worker 205 kB; CSS 42 kB.
 
 ## M6 gate evidence
 | Gate | Evidence | Result |
@@ -447,12 +470,17 @@ No open findings.
   assumptions, sequence illustration, methodology), Monte Carlo in scenarios, the optimizer and the
   dashboard readiness card, allocation view (c); the 15 calculators; insights; JSON/CSV export and
   import; delete all; the printable summary.
-- **Next (M8):** file the fresh-context validation report (`docs/validation-report.md`), resolve the
-  final review sweep, finish the user guide, and write the final STATUS with every shortfall.
+- **Done in M8:** full E2E across every flow (48 tests, desktop and phone), axe and no-outbound
+  checks, code splitting, the independent validation report and its fixes, the final review sweep,
+  the user guide, and this STATUS.
+- **What remains is outside the code:** (1) make irs.gov, ssa.gov and federalregister.gov reachable,
+  verify each rule value at source and add the IRS/SSA worked-example tests (Pub 590-A, 590-B, 915,
+  SSA claiming examples); (2) your review of `docs/rules-verification.md`; (3) a laptop and a real
+  phone measurement of Monte Carlo speed.
 - **Frozen contracts:** `packages/engine/src/domain/*`, `packages/engine/src/api.ts` (1.10.0).
 - **Tags:** the session's git proxy refuses tag pushes (HTTP 403); branch pushes work.
   `m1-foundation`, `m3-forecasting`, `m4-retirement-income`, `m5-scenarios`, `m6-monte-carlo`,
-  `m7a-calculators` and `m7b-insights-io` exist locally only. To publish from a
+  `m7a-calculators`, `m7b-insights-io` and `m8-quality` exist locally only. To publish from a
   clone, recreate them on the commits titled "fix(RetirementNavigator): resolve M1 review findings;
   start M2 rules data", "fix(RetirementNavigator): resolve M3 review findings" and
   "docs(RetirementNavigator): M4 status, statutory constants, fixture policy", for example
