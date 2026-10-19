@@ -195,6 +195,25 @@ export function runMonteCarloChunk(
   };
 }
 
+/** Arithmetic mean implied by each asset class's geometric (median) return: (1 + g)·e^{σ²/2} − 1 (§11). */
+export function impliedArithmeticMeans(
+  cma: Household['assumptions']['capitalMarket'],
+): MonteCarloResult['impliedArithmeticMeans'] {
+  const mean = (asset: (typeof ASSETS)[number]) =>
+    (1 + cma[asset].geometricReturn) * Math.exp((cma[asset].volatility * cma[asset].volatility) / 2) - 1;
+  return { stocks: mean('stocks'), bonds: mean('bonds'), cash: mean('cash') };
+}
+
+/**
+ * Readiness band for a Monte Carlo success rate (§8, a labeled heuristic shown beside the
+ * deterministic readiness): ≥ 85% on track, 70–85% borderline, below 70% at risk.
+ */
+export function monteCarloReadiness(successRate: number): 'onTrack' | 'borderline' | 'atRisk' {
+  if (successRate >= 0.85) return 'onTrack';
+  if (successRate >= 0.7) return 'borderline';
+  return 'atRisk';
+}
+
 /** Merge chunks into the result, with the assumptions shown beside every success rate. */
 export function summarizeMonteCarlo(
   chunks: MonteCarloChunk[],
@@ -204,8 +223,8 @@ export function summarizeMonteCarlo(
 ): MonteCarloResult {
   const a = household.assumptions;
   const cma = a.capitalMarket;
-  const arithmetic = (asset: (typeof ASSETS)[number]) =>
-    (1 + cma[asset].geometricReturn) * Math.exp((cma[asset].volatility * cma[asset].volatility) / 2) - 1;
+  const means = impliedArithmeticMeans(cma);
+  const arithmetic = (asset: (typeof ASSETS)[number]) => means[asset];
   // Display only: one decimal of a percentage.
   const pct = (x: number) => `${Math.round(x * 1000) / 10}%`;
   const assumptions = [
@@ -224,7 +243,7 @@ export function summarizeMonteCarlo(
     'Not modeled: fat tails, mean reversion, regime changes.',
   ];
   return summarize(chunks, config, firstYear, {
-    impliedArithmeticMeans: { stocks: arithmetic('stocks'), bonds: arithmetic('bonds'), cash: arithmetic('cash') },
+    impliedArithmeticMeans: means,
     assumptions,
     minimumEndingReal: a.minimumEndingBalance / 100,
   });

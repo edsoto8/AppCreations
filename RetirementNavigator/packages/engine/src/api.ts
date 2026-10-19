@@ -453,6 +453,9 @@ export { runMonteCarloChunk } from './montecarlo/run';
  */
 export { summarizeMonteCarlo } from './montecarlo/run';
 
+/** Arithmetic means implied by the geometric inputs, and the Monte Carlo readiness band (contract 1.10.0). */
+export { impliedArithmeticMeans, monteCarloReadiness } from './montecarlo/run';
+
 /** Positive semi-definite check (Cholesky with tolerance) for correlation matrices. */
 export { isPositiveSemiDefinite } from './montecarlo/random';
 

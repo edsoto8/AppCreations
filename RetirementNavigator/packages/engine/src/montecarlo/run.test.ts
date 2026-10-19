@@ -13,7 +13,7 @@ import { FIXTURE_YEAR, fixtureRules } from '../testing/fixtureRules';
 import { RULES } from '../rules/index';
 import * as api from '../api';
 import { mergeChunks } from './summary';
-import { runMonteCarloChunk, summarizeMonteCarlo } from './run';
+import { impliedArithmeticMeans, monteCarloReadiness, runMonteCarloChunk, summarizeMonteCarlo } from './run';
 
 const YEAR = FIXTURE_YEAR;
 const ctx = { currentYear: YEAR, rules: fixtureRules() };
@@ -186,5 +186,25 @@ describe('Monte Carlo error paths and stochastic summary', () => {
     expect(result.assumptions.join(' ')).toContain('Inflation: stochastic, median 3%, volatility 1%.');
     const fixed = summarizeMonteCarlo([chunk], config(), near(), YEAR as CalendarYear);
     expect(fixed.assumptions.join(' ')).toMatch(/Inflation: fixed at/);
+  });
+});
+
+describe('arithmetic means and readiness bands', () => {
+  it('derives the arithmetic mean from the geometric median and volatility', () => {
+    const cma = near().assumptions.capitalMarket;
+    const m = impliedArithmeticMeans(cma);
+    expect(m.stocks).toBeCloseTo((1 + cma.stocks.geometricReturn) * Math.exp(cma.stocks.volatility ** 2 / 2) - 1, 14);
+    expect(m.cash).toBeGreaterThanOrEqual(cma.cash.geometricReturn);
+  });
+
+  it('bands success rates at 85% and 70%', () => {
+    expect([0.9, 0.85, 0.849, 0.7, 0.699, 0].map(monteCarloReadiness)).toEqual([
+      'onTrack',
+      'onTrack',
+      'borderline',
+      'borderline',
+      'atRisk',
+      'atRisk',
+    ]);
   });
 });
