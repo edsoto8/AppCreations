@@ -47,6 +47,7 @@ const req = (r: Partial<ContributionRequest> = {}): ContributionRequest => ({
   requestedRoth: dollars(0),
   otherAggregatedDeferrals: dollars(0),
   eligibleCompForMatch: dollars(100_000),
+  compensation: r.compensation ?? r.eligibleCompForMatch ?? dollars(100_000),
   priorYearFicaWages: dollars(100_000),
   ...r,
 });
@@ -168,6 +169,44 @@ describe('capContributions', () => {
     expect(low.value.traditional + low.value.employerMatch).toBe(dollars(10_000));
   });
 
+  it('shares one catch-up limit across aggregated plans', () => {
+    // Plan A (age 55) used 20,000 base + 7,000 catch-up; plan B has no room left.
+    const b = ok(
+      capContributions(
+        req({ age: 55, requestedTraditional: dollars(27_000), otherAggregatedDeferrals: dollars(27_000) }),
+        R,
+      ),
+    );
+    expect(b.value.traditional + b.value.roth).toBe(0);
+    // Plan A used 20,000 + 3,000 of catch-up; plan B gets the remaining 4,000 catch-up.
+    const c = ok(
+      capContributions(
+        req({ age: 55, requestedTraditional: dollars(10_000), otherAggregatedDeferrals: dollars(23_000) }),
+        R,
+      ),
+    );
+    expect(c.value).toMatchObject({ traditional: dollars(4_000), catchUp: dollars(4_000) });
+  });
+
+  it('caps employee deferrals that alone exceed 100% of compensation (415(c))', () => {
+    // Compensation 10,000 but the plan's match base is smaller; deferrals of 12,000 are impossible.
+    const r = ok(
+      capContributions(
+        req({
+          requestedTraditional: dollars(12_000),
+          eligibleCompForMatch: dollars(8_000),
+          compensation: dollars(10_000),
+        }),
+        R,
+      ),
+    );
+    expect(r.value.traditional).toBe(dollars(10_000));
+    expect(r.value.employerMatch + r.value.employerFlat).toBe(0);
+    expect(
+      r.warnings.some((w) => w.code === 'annualAdditionsCapped' && /Employee deferrals exceed/.test(w.message)),
+    ).toBe(true);
+  });
+
   it('aggregates deferrals across 401(k)/403(b) plans', () => {
     const r = ok(
       capContributions(req({ requestedTraditional: dollars(10_000), otherAggregatedDeferrals: dollars(15_000) }), R),
@@ -257,6 +296,17 @@ describe('rothIraEligibility (phase-out start, midpoint, end; both statuses)', (
     expect(capped.value.allowed).toBe(dollars(3_000));
     expect(capped.warnings.map((w) => w.code)).toContain('iraEarnedIncomeCap');
     expect(ok(elig(50_000, 'single', { otherIraContributions: dollars(2_000) })).value.allowed).toBe(dollars(5_000));
+  });
+
+  it('follows the worksheet order: phase out the compensation-capped base, then cap at base − other IRA contributions', () => {
+    // Midpoint single with a 2,000 traditional IRA: reduced 3,500; base − other = 5,000 → 3,500.
+    expect(ok(elig(107_500, 'single', { otherIraContributions: dollars(2_000) })).value.allowed).toBe(dollars(3_500));
+    // MFJ midpoint, earned income 4,000: base 4,000 → reduced 2,000.
+    expect(ok(elig(205_000, 'marriedFilingJointly', { earnedIncome: dollars(4_000) })).value.allowed).toBe(
+      dollars(2_000),
+    );
+    // Full range with a large traditional IRA contribution: base − other.
+    expect(ok(elig(50_000, 'single', { otherIraContributions: dollars(6_500) })).value.allowed).toBe(dollars(500));
   });
 
   it('notes backdoor Roth (not modeled) when ineligible', () => {

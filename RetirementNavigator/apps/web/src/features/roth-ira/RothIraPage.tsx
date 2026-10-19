@@ -1,7 +1,7 @@
 import { useId, useMemo, useState } from 'react';
 import { Link } from 'react-router';
 import { Pencil, Plus } from 'lucide-react';
-import type { AccumulationPreview, Household, Person, ResolvedYearRules } from '@rn/engine';
+import type { AccumulationPreview, Household, Person, RothIraYear } from '@rn/engine';
 import { PageHeader } from '@/components/PageHeader';
 import { RequireProfile } from '@/components/RequireProfile';
 import { UnverifiedNotice, UnverifiedValue } from '@/components/UnverifiedNotice';
@@ -14,19 +14,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Switch } from '@/components/ui/switch';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useEngineContext, useResolvedRules } from '@/hooks/useEngine';
+import { useEngineContext } from '@/hooks/useEngine';
 import { formatCents } from '@/lib/format';
 import { AccountDialog } from '@/features/accounts/AccountDialog';
 import { describeContribution } from '@/features/accounts/accountModel';
 import { previewYearOne, type RothIraAccount } from '@/features/accounts/thisYear';
 import { useCommitHousehold } from '@/features/accounts/useCommitHousehold';
-import {
-  householdMagiEstimate,
-  rothAccountsOf,
-  rothReadout,
-  type MagiEstimate,
-  type RothReadout,
-} from './rothEligibility';
+import { rothAccountsOf, rothReadout, type RothReadout } from './rothEligibility';
 
 export function RothIraPage() {
   return (
@@ -43,18 +37,14 @@ export function RothIraPage() {
 interface Shared {
   household: Household;
   preview: AccumulationPreview | null;
-  magi: MagiEstimate;
-  rules: ResolvedYearRules;
   year: number;
 }
 
 function RothBody({ household }: { household: Household }) {
   const ctx = useEngineContext();
-  const rules = useResolvedRules(household);
   const year = ctx.currentYear;
   const preview = useMemo(() => previewYearOne(household, ctx), [household, ctx]);
-  const magi = householdMagiEstimate(household, preview, year, rules);
-  const shared: Shared = { household, preview, magi, rules, year };
+  const shared: Shared = { household, preview, year };
   const [first] = household.people;
 
   return (
@@ -83,9 +73,10 @@ function RothBody({ household }: { household: Household }) {
 }
 
 function PersonRoth(props: Shared & { person: Person }) {
-  const { household, person, preview, magi, rules, year } = props;
+  const { household, person, preview, year } = props;
   const accounts = rothAccountsOf(household, person.id);
-  const readout = rothReadout(household, person, preview, magi, year, rules);
+  const readout = rothReadout(household, person.id, preview);
+  const joint = household.filingStatus === 'marriedFilingJointly';
   const [dialog, setDialog] = useState<{ account?: RothIraAccount } | null>(null);
 
   return (
@@ -154,9 +145,20 @@ function PersonRoth(props: Shared & { person: Person }) {
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-5">
-          <MagiBreakdown magi={magi} />
-          <MagiOverride household={household} person={person} accounts={accounts} estimate={magi.estimate} />
-          <Readout readout={readout} />
+          {readout.year ? (
+            <MagiBreakdown year={readout.year} joint={joint} />
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              Add a Roth IRA for {person.name} to see the MAGI estimate and this year’s allowed contribution.
+            </p>
+          )}
+          <MagiOverride
+            household={household}
+            person={person}
+            accounts={accounts}
+            startValue={readout.year ? overrideStart(readout.year) : 0}
+          />
+          {readout.year ? <Readout readout={readout} /> : null}
         </CardContent>
       </Card>
 
@@ -175,29 +177,30 @@ function PersonRoth(props: Shared & { person: Person }) {
   );
 }
 
-function MagiBreakdown({ magi }: { magi: MagiEstimate }) {
-  const rows: { label: string; value: number; sign: '' | '+' | '−' }[] = [
-    { label: magi.joint ? 'Base salaries (both people)' : 'Base salary', value: magi.salary, sign: '' },
-    { label: 'Bonus', value: magi.bonus, sign: '+' },
+/** Starting value when the override is switched on: the estimate, or gross pay if it is unavailable. */
+function overrideStart(year: RothIraYear): number {
+  if (year.magiSource === 'estimate' && year.magi !== null) return year.magi;
+  const c = year.magiComponents;
+  return c.salary + c.bonus + c.partTimeIncome;
+}
+
+function MagiBreakdown({ year, joint }: { year: RothIraYear; joint: boolean }) {
+  const c = year.magiComponents;
+  const rows: { label: string; value: number | null; sign: '' | '+' | '−' }[] = [
+    { label: joint ? 'Base salaries (both people)' : 'Base salary', value: c.salary, sign: '' },
+    { label: 'Bonus', value: c.bonus, sign: '+' },
   ];
-  if (magi.partTimeIncome > 0) rows.push({ label: 'Part-time income', value: magi.partTimeIncome, sign: '+' });
+  if (c.partTimeIncome > 0) rows.push({ label: 'Part-time income', value: c.partTimeIncome, sign: '+' });
   rows.push(
-    {
-      label: `Traditional workplace deferrals${magi.deferralsBeforeLimits ? ' (requested, before unverified limits)' : ''}`,
-      value: magi.traditionalDeferrals,
-      sign: '−',
-    },
-    {
-      label: `HSA contributions${magi.hsaBeforeLimit ? ' (requested, before the unverified limit)' : ''}`,
-      value: magi.hsaContributions,
-      sign: '−',
-    },
+    { label: 'Traditional workplace deferrals (after limits)', value: c.traditionalDeferrals, sign: '−' },
+    { label: 'HSA contributions (after limits)', value: c.hsaContributions, sign: '−' },
   );
+  const estimate = year.magiSource === 'estimate' ? year.magi : null;
   const headingId = useId();
   return (
     <section aria-labelledby={headingId} className="flex flex-col gap-2">
       <h3 id={headingId} className="text-sm font-semibold">
-        Estimated MAGI{magi.joint ? ' (married filing jointly, both people combined)' : ''}
+        Estimated MAGI{joint ? ' (married filing jointly, both people combined)' : ''}
       </h3>
       <dl className="flex flex-col gap-1 text-sm">
         {rows.map((r) => (
@@ -209,7 +212,7 @@ function MagiBreakdown({ magi }: { magi: MagiEstimate }) {
               {r.sign === '−' ? <span className="sr-only">minus </span> : null}
               {r.label}
             </dt>
-            <dd className="tabular-nums">{formatCents(r.value)}</dd>
+            <dd className="tabular-nums">{r.value === null ? <UnverifiedValue /> : formatCents(r.value)}</dd>
           </div>
         ))}
         <div className="flex justify-between gap-3 py-1 font-semibold">
@@ -219,14 +222,24 @@ function MagiBreakdown({ magi }: { magi: MagiEstimate }) {
             </span>
             Estimated MAGI
           </dt>
-          <dd className="tabular-nums">{formatCents(magi.estimate)}</dd>
+          <dd className="tabular-nums">
+            {year.magiSource === 'override' ? (
+              <span className="font-normal text-muted-foreground">Not used (override on)</span>
+            ) : estimate === null ? (
+              <UnverifiedValue />
+            ) : (
+              formatCents(estimate)
+            )}
+          </dd>
         </div>
       </dl>
       <p className="text-xs text-muted-foreground">
         Simplification: MAGI is estimated as salary + bonus − traditional workplace deferrals − HSA contributions (plus
         part-time pay). Actual MAGI also includes items such as investment income, so it can differ; an override can be
         entered below.
-        {magi.hsaMaxExcluded ? ' An HSA set to “maximum allowed” is left out because the HSA limit is unverified.' : ''}
+        {estimate === null && year.magiSource === 'estimate'
+          ? ' Deferrals and HSA contributions after limits need rule values that are unverified, so the estimate is not available; an override can still be entered.'
+          : ''}
       </p>
     </section>
   );
@@ -236,12 +249,12 @@ function MagiOverride({
   household,
   person,
   accounts,
-  estimate,
+  startValue,
 }: {
   household: Household;
   person: Person;
   accounts: RothIraAccount[];
-  estimate: number;
+  startValue: number;
 }) {
   const commit = useCommitHousehold();
   const [error, setError] = useState<string | undefined>();
@@ -263,7 +276,7 @@ function MagiOverride({
     <div className="flex flex-col gap-3">
       <Field
         label="Enter MAGI yourself"
-        tip="Modified adjusted gross income from your tax return or tax software. When on, it replaces the estimate above for this person’s Roth IRA check."
+        tip="Modified adjusted gross income from your tax return or tax software. When on, it replaces the estimate above for this person’s Roth IRA check. It starts from the estimate, or from gross pay when the estimate is not available."
         example={disabled ? `Available once ${person.name} has a Roth IRA` : 'Off uses the estimate above'}
       >
         {(a) => (
@@ -272,7 +285,7 @@ function MagiOverride({
             aria-describedby={a['aria-describedby']}
             disabled={disabled}
             checked={current !== null}
-            onCheckedChange={(on) => save(on ? estimate : null)}
+            onCheckedChange={(on) => save(on ? startValue : null)}
           />
         )}
       </Field>
@@ -298,63 +311,45 @@ const STATUS_LABELS = {
 } as const;
 
 function Readout({ readout }: { readout: RothReadout }) {
-  const { result, planned } = readout;
-  const source = readout.magiSource === 'override' ? 'your MAGI override' : 'the MAGI estimate';
-  if (result.status === 'unverified') {
+  const { year, requested, contributed, missing, warnings } = readout;
+  const eligibility = year?.eligibility ?? null;
+  const source = year?.magiSource === 'override' ? 'your MAGI override' : 'the MAGI estimate';
+  if (eligibility === null || contributed === null) {
     return (
       <div className="flex flex-col gap-3" aria-live="polite">
         <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-base">
           <span>Roth IRA this year:</span>
-          <strong className="tabular-nums">{planned === 'max' ? 'the maximum' : formatCents(planned)}</strong>
+          <strong className="tabular-nums">{requested === 'max' ? 'the maximum' : formatCents(requested)}</strong>
           <span>of</span>
           <UnverifiedValue />
           <span>allowed</span>
         </p>
-        <UnverifiedNotice missing={result.missing} feature="Roth IRA eligibility" />
+        <UnverifiedNotice missing={missing} feature="Roth IRA eligibility" />
       </div>
     );
   }
-  if (result.status === 'invalid') {
-    return (
-      <Alert variant="destructive" role="alert">
-        <ul className="list-disc pl-4">
-          {result.issues.map((i) => (
-            <li key={`${i.path.join('.')}-${i.message}`}>{i.message}</li>
-          ))}
-        </ul>
-      </Alert>
-    );
-  }
-  const value = result.value;
-  const plannedCents = planned === 'max' ? value.allowed : planned;
   return (
     <div className="flex flex-col gap-3" aria-live="polite">
       <p className="text-base">
-        Roth IRA this year:{' '}
-        <strong className="tabular-nums">{formatCents(Math.min(plannedCents, value.allowed))}</strong> of{' '}
-        <strong className="tabular-nums">{formatCents(value.allowed)}</strong> allowed
+        Roth IRA this year: <strong className="tabular-nums">{formatCents(contributed)}</strong> of{' '}
+        <strong className="tabular-nums">{formatCents(eligibility.allowed)}</strong> allowed
       </p>
       <div className="flex flex-wrap items-center gap-2">
-        <Badge variant={value.status === 'full' ? 'secondary' : 'attention'}>{STATUS_LABELS[value.status]}</Badge>
+        <Badge variant={eligibility.status === 'full' ? 'secondary' : 'attention'}>
+          {STATUS_LABELS[eligibility.status]}
+        </Badge>
         <span className="text-xs text-muted-foreground">Based on {source}.</span>
       </div>
-      <p className="text-sm text-muted-foreground">{value.calculation}</p>
-      {plannedCents > value.allowed ? (
-        <Alert variant="attention">
-          <p>
-            The schedule asks for {formatCents(plannedCents)}; the forecast caps it at the allowed{' '}
-            {formatCents(value.allowed)}.
-          </p>
-        </Alert>
-      ) : null}
-      {result.warnings.map((w) => (
+      <p className="text-sm text-muted-foreground">{eligibility.calculation}</p>
+      {warnings.map((w) => (
         <Alert key={`${w.code}-${w.message}`} variant="attention">
           <p>{w.message}</p>
         </Alert>
       ))}
-      {readout.traditionalMaxNotCounted ? (
+      {year && year.otherIraContributions !== null && year.otherIraContributions > 0 ? (
         <p className="text-xs text-muted-foreground">
-          A traditional IRA set to “maximum allowed” shares this limit and is not subtracted here.
+          Traditional IRA contributions of {formatCents(year.otherIraContributions)} share this limit and are
+          subtracted.
         </p>
       ) : null}
     </div>

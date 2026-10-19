@@ -1,6 +1,6 @@
 import { Plus, Trash2 } from 'lucide-react';
 import type { Control, UseFormReturn } from 'react-hook-form';
-import type { Household, HouseholdInput } from '@rn/engine';
+import { impliedRaise, type Household, type HouseholdInput } from '@rn/engine';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { NativeSelect } from '@/components/ui/native-select';
@@ -61,8 +61,7 @@ export function IncomeSection({
   }
 
   const raise = employment.raise;
-  const impliedNominal = raise.mode === 'nominal' ? raise.rate : (1 + inflation) * (1 + raise.realRate) - 1;
-  const impliedReal = (1 + impliedNominal) / (1 + inflation) - 1;
+  const { nominal: impliedNominal, real: impliedReal } = impliedRaise(raise, inflation);
   const overrides = employment.raiseOverrides;
 
   return (

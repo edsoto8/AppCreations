@@ -121,7 +121,13 @@ export const useProfileStore = create<ProfileState>((set, get) => {
     },
 
     createProfile: async (household, opts = {}) => {
-      const doc = toDoc(HouseholdSchema.parse(household));
+      const parsed = HouseholdSchema.parse(household);
+      // A household id that is already taken (for example a second copy of a sample) gets a suffix,
+      // so creating a profile never overwrites an existing one.
+      const taken = get().profiles;
+      let id: string = parsed.id;
+      for (let n = 2; taken[id]; n++) id = `${parsed.id.slice(0, 56)}-${n}`;
+      const doc = toDoc({ ...parsed, id: id as typeof parsed.id });
       set((s) => ({
         profiles: { ...s.profiles, [doc.id]: doc },
         activeId: opts.activate === false ? s.activeId : doc.id,

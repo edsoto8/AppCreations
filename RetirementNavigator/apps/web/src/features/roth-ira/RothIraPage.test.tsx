@@ -47,15 +47,20 @@ describe('RothIraPage', () => {
     expect(readout.textContent?.match(/\$/g)).toHaveLength(1);
   });
 
-  it('shows the MAGI estimate formula, labeled a simplification', async () => {
+  it('shows the MAGI estimate inputs from the engine and never fills in figures that need unverified rules', async () => {
+    const user = userEvent.setup();
     await renderWithProfile(<RothIraPage />);
-    // Salaries 118,000 + 84,000; bonus 8% of 118,000 = 9,440; traditional deferrals
-    // 8% of (118,000 + 9,440) + 6% of 84,000 = 10,195.20 + 5,040 = 15,235.20; HSA 5,000.
-    // 211,440 − 15,235.20 − 5,000 = 191,204.80.
+    await user.click(screen.getByRole('tab', { name: 'Jordan' }));
+    // Salaries 118,000 + 84,000 and bonus 8% of 118,000 = 9,440 need no rules.
     expect(screen.getByText('Base salaries (both people)').closest('div')).toHaveTextContent('$202,000');
-    expect(screen.getByText(/^Traditional workplace deferrals/).closest('div')).toHaveTextContent('$15,235');
-    expect(screen.getByText(/^HSA contributions/).closest('div')).toHaveTextContent('$5,000');
-    expect(screen.getByText('Estimated MAGI', { selector: 'dt' }).closest('div')).toHaveTextContent('$191,205');
+    expect(screen.getByText('Bonus').closest('div')).toHaveTextContent('$9,440');
+    // Deferrals and HSA contributions after limits need the (unverified) limits, so no number is shown.
+    for (const label of [/^Traditional workplace deferrals/, /^HSA contributions/]) {
+      const row = screen.getByText(label).closest('div');
+      expect(row).toHaveTextContent('Unverified rule');
+      expect(row?.textContent).not.toMatch(/\$/);
+    }
+    expect(screen.getByText('Estimated MAGI', { selector: 'dt' }).closest('div')).toHaveTextContent('Unverified rule');
     expect(screen.getByText(/^Simplification: MAGI is estimated as salary \+ bonus/)).toBeInTheDocument();
     expect(screen.getByText(/married filing jointly, both people combined/)).toBeInTheDocument();
   });
@@ -65,7 +70,11 @@ describe('RothIraPage', () => {
     await renderWithProfile(<RothIraPage />);
     await user.click(screen.getByRole('tab', { name: 'Jordan' }));
     await user.click(screen.getByRole('switch', { name: 'Enter MAGI yourself' }));
-    expect(rothOf('jordan-roth')?.magiOverride).toBe(19_120_480);
+    // The estimate is unavailable (unverified limits), so the override starts from gross pay: 202,000 + 9,440.
+    expect(rothOf('jordan-roth')?.magiOverride).toBe(21_144_000);
+    expect(screen.getByText('Estimated MAGI', { selector: 'dt' }).closest('div')).toHaveTextContent(
+      'Not used (override on)',
+    );
     const input = screen.getByLabelText('MAGI override');
     await user.clear(input);
     await user.type(input, '150000');
@@ -78,6 +87,7 @@ describe('RothIraPage', () => {
     const user = userEvent.setup();
     await renderWithProfile(<RothIraPage />);
     expect(screen.getByText('Sam has no Roth IRA in this plan.')).toBeInTheDocument();
+    expect(screen.getByText(/Add a Roth IRA for Sam to see the MAGI estimate/)).toBeInTheDocument();
     expect(screen.getByRole('switch', { name: 'Enter MAGI yourself' })).toBeDisabled();
     await user.click(screen.getByRole('button', { name: 'Add a Roth IRA' }));
     const dialog = screen.getByRole('dialog');

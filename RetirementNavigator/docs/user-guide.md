@@ -42,7 +42,8 @@ estimates, not guarantees, tax advice, or investment recommendations. Taxes are 
   - Build the employer match from tiers ("100% of the first 3%, then 50% of the next 2%"), and set
     any flat employer contribution, an annual cap and vesting.
 - The **match readout** shows the contribution that captures the full match, what you capture
-  now, and what is left unclaimed.
+  now, and what is left unclaimed. While plan limits are unverified it is labeled "before plan
+  limits"; once they are verified it also shows the match the forecast counts after limits.
 - The **10-year preview** and the **take-home pay check** update as you type. Use **Today's / Future
   dollars** to switch the basis.
 
@@ -51,7 +52,11 @@ estimates, not guarantees, tax advice, or investment recommendations. Taxes are 
   Workplace-plan contributions are set on Income & Savings.
 - An account can't be deleted while a plan or a setting still points to it.
 - **Roth IRA** shows the estimated MAGI (you can override it) and this year's allowed contribution.
-- **HSA** needs high-deductible health plan coverage before contributions are allowed.
+  The figures are the same ones the forecast uses. The estimate subtracts deferrals and HSA
+  contributions after plan limits, so it shows **Unverified rule** until those limits are verified;
+  you can still enter your own MAGI.
+- **HSA** needs high-deductible health plan coverage before contributions are allowed. Each person
+  has one HSA limit, shared by all of that person's HSAs.
 
 ## Rules & Sources and "Unverified rule"
 - Every contribution limit, tax bracket and Social Security parameter comes from an official

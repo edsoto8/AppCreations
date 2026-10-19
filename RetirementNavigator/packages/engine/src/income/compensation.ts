@@ -3,7 +3,7 @@
  * before the 401(a)(17) limit, which `capContributions` applies.
  */
 import type { CalendarYear } from '../domain/primitives';
-import type { Household, Person } from '../domain/household';
+import type { Household, Person, Raise as EmploymentRaise } from '../domain/household';
 import type { EngineResult } from '../domain/results';
 import type { CompensationYear, EngineContext } from '../api';
 import { toCents } from '../money';
@@ -12,6 +12,12 @@ import { priceIndex } from '../time';
 /** The person's last age with salary (exclusive bound): stopAge if set, else the retirement age. */
 export function salaryStopAge(person: Person): number {
   return person.employment?.stopAge ?? person.retirementAge;
+}
+
+/** The nominal raise implied by a raise setting, and the real raise after inflation. */
+export function impliedRaise(raise: EmploymentRaise, inflation: number): { nominal: number; real: number } {
+  const nominal = raise.mode === 'nominal' ? raise.rate : (1 + inflation) * (1 + raise.realRate) - 1;
+  return { nominal, real: (1 + nominal) / (1 + inflation) - 1 };
 }
 
 /** Float64 path; exported for the projection, which converts to cents per row. */
@@ -47,11 +53,7 @@ export function compensationPathFloat(
     let nominalRaise = 0;
     if (employment && t > 1) {
       const override = overrides.get(year);
-      nominalRaise =
-        override ??
-        (employment.raise.mode === 'nominal'
-          ? employment.raise.rate
-          : (1 + inflation) * (1 + employment.raise.realRate) - 1);
+      nominalRaise = override ?? impliedRaise(employment.raise, inflation).nominal;
       base *= 1 + nominalRaise;
       if (employment.bonus.kind === 'fixed') {
         const bonusGrowth =

@@ -81,6 +81,12 @@ describe('computeTax', () => {
     expect(t.federalOrdinaryTax).toBe(dollars(11_580));
   });
 
+  it('phases out the senior deduction separately for each eligible filer', () => {
+    // MFJ, both 66, AGI 190,000: each 5,000 − 6% × 50,000 = 2,000 → 4,000 total.
+    const t = tax({ filingStatus: 'marriedFilingJointly', ages: [66, 66], otherOrdinaryIncome: dollars(190_000) });
+    expect(t.deductions).toBe(dollars(30_000 + 2 * 1_500 + 4_000));
+  });
+
   it('drops the senior deduction after its sunset year (law as written)', () => {
     const after = resolveRules(fixtureRules(), {
       anchorYear: FIXTURE_YEAR,

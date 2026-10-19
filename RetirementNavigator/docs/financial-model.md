@@ -144,15 +144,22 @@ Deterministic forecast only. `ρ_m = (1+ρ)^{1/12} − 1`. Each month, the balan
     `catchUp50` for ages ≥ 50 otherwise, and 0 below 50.
   - 401(k) and 403(b) deferrals are aggregated per person. A 457(b) has its own equal limit.
   - Requested deferrals fill the base room `max(0, L^402g − other aggregated deferrals)` first; the
-    excess, up to `catchUp(age)`, is the catch-up portion.
+    excess, up to the catch-up room, is the catch-up portion. The catch-up room is shared across the
+    person's aggregated plans: `max(0, catchUp(age) − max(0, other aggregated deferrals − L^402g))`.
   - If requested > allowed, both buckets are scaled pro rata to fit, with a `deferralCapped` warning.
 - Roth catch-up: if it is in force for `Y_t` and the prior-year FICA wages exceed the threshold
   (projected wages are used for t ≥ 2; the user input is used for year 1), the catch-up portion is
   Roth. If the plan offers no Roth, the catch-up is disallowed and a warning is shown. If the year-1
   input is unknown, the catch-up stays as elected and a warning is shown.
 - 415(c): (employee excluding catch-up) + employer ≤ `min(L^415, 100% of compensation)`, where
-  compensation is the eligible pay for the match (simplification). Employer money is reduced, the
-  match before the flat contribution (simplification; real plans correct by refund), with a warning.
+  compensation is the person's total compensation for the year (`ContributionRequest.compensation`;
+  simplification: salary + bonus from this employer, not the plan's own 415 definition).
+  - If the employee portion alone exceeds the cap, the deferrals are reduced pro rata to fit and no
+    employer money is allowed (warning).
+  - Otherwise employer money is reduced, the match before the flat contribution (simplification;
+    real plans correct by refund), with a warning.
+- A bonus that does not count for deferrals gets no deferral; if the elections imply one, a
+  `bonusDeferralIgnored` warning says so.
 
 ### 3.5 Employer match (single `EmployerMatchRule`)
 - The deferral rate is `δ = (d^T + d^R)/E^match`. Tier k covers the band
@@ -164,8 +171,10 @@ Deterministic forecast only. `ρ_m = (1+ρ)^{1/12} − 1`. Each month, the balan
     inside tier k, `δ* = a_k + (cap − match before tier k)/(rate_k·E^match)`; dollars `δ*·E^match`;
   - possible match `= min(Σ rate_k β_k E^match, cap)`;
   - unclaimed `= possible − match`.
-  - The readout is labeled "before plan limits" while the limits are unverified. The after-limit
-    match (with 401(a)(17) and 415(c)) is in the preview rows when the limits are verified.
+  - The readout is labeled "before plan limits" while the limits are unverified. Once they are
+    verified, the readout adds the after-limit match the forecast counts (with 402(g), 401(a)(17) and
+    415(c), from `PersonPreviewRow.contributions.employerMatch`, summed over the person's plans), or
+    says that the limits do not reduce it.
 - **Vesting:** employer dollars are tracked in an `unvested` sub-ledger that grows at the account's
   return. At separation (retirement), the forfeiture is
   `unvested·(1 − v(years of service at separation))`, and it is shown as `forfeited`.
@@ -179,28 +188,39 @@ Deterministic forecast only. `ρ_m = (1+ρ)^{1/12} − 1`. Each month, the balan
   accounts (no limit) it contributes nothing. Percent-of-salary schedules apply to base salary.
   Dollar schedules grow from year 1. Monthly amounts are ×12. A schedule is active from its start
   year (default year 1) through its stop year (default the owner's last working year).
-- HSA schedules are processed before IRAs, so this year's HSA contributions reduce the MAGI used
-  for Roth IRA eligibility.
+- Order each year (`income/scheduled.ts`): HSAs → traditional IRAs → Roth IRA eligibility per owner
+  → Roth IRA schedules → taxable, cash and other accounts. HSAs come first, so this year's HSA
+  contributions reduce the MAGI used for Roth IRA eligibility.
+- The result per account (`CashFlowPreviewRow.scheduled`) is the requested amount (null for
+  "maximum allowed") and the allowed amount after limits (null when a limit it needs is unverified).
+  The Roth IRA and HSA pages show these engine figures; the UI does no limit arithmetic of its own.
 - IRA:
   - annual limit plus catch-up (50+), shared by traditional and Roth IRAs (filled in account order);
   - capped at the person's own earned income (spousal IRA unsupported);
   - the Roth IRA amount is further reduced by the phase-out (§3.7).
 - HSA:
   - self-only or family limit, plus catch-up (55+);
+  - one limit per person, shared by all of that person's HSAs (filled in account order; the coverage
+    of the person's first HSA sets the limit);
   - blocked without HDHP attestation.
 
 ### 3.7 Roth IRA eligibility
 - MAGI defaults to `salary + bonus − traditional deferrals − HSA contributions + part-time income`,
   summed over both people for married filing jointly, a documented simplification the user can
-  override (`magiOverride` on the Roth IRA account).
-- Over the phase-out range `[A, B]`:
-  - `allowed = L` for MAGI ≤ A, and 0 for MAGI ≥ B;
-  - otherwise `allowed = L·(B − MAGI)/(B − A)`, rounded up to a multiple of the worksheet increment
-    with a minimum when above 0. Both the increment and the minimum are rule values
-    (`standing:roth.reducedContributionRounding`, Pub 590-A worksheet). They are currently
-    unverified, so the reduced-contribution path returns `unverified`. The full and ineligible paths
-    don't need them.
-  - Then `allowed = min(allowed, earned income) − other IRA contributions this year` (floored at 0).
+  override (`magiOverride` on the Roth IRA account). Deferrals and HSA contributions are the amounts
+  after limits, so the estimate is null (never a guess) while those limits are unverified; an
+  override still works.
+- The engine reports each Roth IRA owner's figures in `CashFlowPreviewRow.rothIra`: MAGI source and
+  components, MAGI, other IRA contributions and the eligibility result.
+- Worksheet order (Pub 590-A reduced Roth IRA contribution worksheet; pending verification at
+  source):
+  - base `= min(L, earned income)`, where L is the IRA limit plus catch-up;
+  - over the phase-out range `[A, B]`: `phased = base` for MAGI ≤ A, 0 for MAGI ≥ B, otherwise
+    `base·(B − MAGI)/(B − A)` rounded up to a multiple of the worksheet increment, with a minimum
+    when above 0. Both the increment and the minimum are rule values
+    (`standing:roth.reducedContributionRounding`). They are currently unverified, so the
+    reduced-contribution path returns `unverified`. The full and ineligible paths don't need them;
+  - `allowed = max(0, min(phased, base − other IRA contributions this year))`.
 
 ### 3.8 Accumulation-phase cash flow
 - `netPay = wages + bonus + partTime + other income − federalTax − FICA − stateTax` (taxes per §6;
@@ -241,8 +261,9 @@ Deterministic forecast only. `ρ_m = (1+ρ)^{1/12} − 1`. Each month, the balan
 - Ordinary income = wages − pre-tax deductions + traditional withdrawals + taxable pensions + taxable
   other income + taxable SS + HSA non-medical withdrawals.
 - Deduction = standard deduction(status) + additional 65+ amounts per eligible filer (the married
-  amount for MFJ, the unmarried amount for single) + the senior deduction (per eligible filer,
-  phased out at `rate × (MAGI − start)`, MAGI = AGI as a simplification). The senior deduction is
+  amount for MFJ, the unmarried amount for single) + the senior deduction: for each eligible filer,
+  `max(0, amount − rate × max(0, MAGI − start))`, with the household MAGI (MAGI = AGI as a
+  simplification). The senior deduction is
   absent after its verified sunset year (law as written); while its amount is unverified it counts as
   in force, so 65+ tax results are `unverified`.
 - Taxable ordinary = `max(0, ordinary − deduction)`. Tax = Σ over brackets.
@@ -449,8 +470,13 @@ descriptive language ("In this model, …"), with its assumptions disclosed.
 - Glide paths; fat tails.
 - Early-withdrawal penalties (flag only).
 - Plan-specific match true-ups (annual model assumes a true-up).
-- HSA: when both spouses have family-coverage HSAs, the family limit is applied to each account
-  separately rather than shared (simplification).
-- Roth IRA page: a traditional IRA set to "maximum allowed" is not subtracted in the page's readout
-  (stated on the page); the engine preview does account for it.
-- 457(b) and 401(k)/403(b) catch-ups are not coordinated across plans.
+- HSA: when both spouses have family-coverage HSAs, each spouse's family limit is applied to that
+  spouse's HSAs separately rather than split between them (simplification). One person's own HSAs
+  share one limit.
+- 457(b) and 401(k)/403(b) catch-ups are not coordinated across plans (a 457(b) has its own limit and
+  catch-up).
+- 415(c) compensation is this employer's salary + bonus, not the plan's own definition.
+- Retirement spending starts at the retirement age, even when a person's salary stops earlier
+  (`employment.stopAge`).
+- Statutory ages (catch-up at 50 and 60–63, HSA catch-up at 55, the additional deduction at 65) are
+  constants in the engine, not rule values; moving them into the rules data is planned with M4.

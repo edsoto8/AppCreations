@@ -87,6 +87,9 @@ export function SavingsPreview({
                   </TableCell>
                   <TableCell className="text-right">
                     {money(employer, t)}
+                    {!c && r.compensation.working ? (
+                      <span className="sr-only"> (before limits, unverified)</span>
+                    ) : null}
                     {!c && r.compensation.working ? <span aria-hidden="true">*</span> : null}
                   </TableCell>
                   <TableCell className="text-right">

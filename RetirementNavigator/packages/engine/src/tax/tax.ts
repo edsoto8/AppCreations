@@ -163,7 +163,8 @@ export function computeTax(input: TaxInput, rules: ResolvedYearRules): EngineRes
   // SIMPLIFICATION: MAGI for the senior-deduction phase-out = AGI.
   const seniorDeduction =
     seniors > 0
-      ? Math.max(0, (seniorPerPerson / 100) * seniors - seniorRate * Math.max(0, agi - seniorStart / 100))
+      ? // Each eligible filer's amount is phased out separately.
+        seniors * Math.max(0, seniorPerPerson / 100 - seniorRate * Math.max(0, agi - seniorStart / 100))
       : 0;
   const deductions = D + additional65 / 100 + seniorDeduction;
 

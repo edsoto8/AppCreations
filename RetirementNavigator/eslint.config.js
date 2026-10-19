@@ -80,6 +80,17 @@ export default tseslint.config(
     },
   },
   {
+    // The synthetic fixture rules are for tests only; the app must never use them.
+    files: ['apps/web/src/**/*.{ts,tsx}'],
+    ignores: ['apps/web/src/**/*.test.{ts,tsx}', 'apps/web/src/test/**'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        { paths: [{ name: '@rn/engine/testing', message: 'Synthetic fixture rules are for tests only.' }] },
+      ],
+    },
+  },
+  {
     // Tests index into arrays under noUncheckedIndexedAccess; a failed `!` fails the test, which is the point.
     files: ['**/*.test.{ts,tsx}', 'apps/web/e2e/**/*.ts'],
     rules: { '@typescript-eslint/no-non-null-assertion': 'off' },

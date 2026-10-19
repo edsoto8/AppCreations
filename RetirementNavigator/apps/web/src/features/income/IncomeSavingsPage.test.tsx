@@ -19,6 +19,9 @@ describe('IncomeSavingsPage', () => {
     expect(within(table).getAllByRole('row')).toHaveLength(11);
     // $96,000 salary in year 1.
     expect(within(table).getAllByText('$96,000').length).toBeGreaterThan(0);
+    // The "*" on before-limit figures has a text equivalent for screen readers in both columns.
+    const firstRow = within(table).getAllByRole('row')[1]!;
+    expect(within(firstRow).getAllByText('(before limits, unverified)')).toHaveLength(2);
     expect(screen.getByText(/to capture\s+the full match/)).toBeInTheDocument();
     expect(screen.getByText(/Not available yet: contribution limits/)).toBeInTheDocument();
     expect(screen.getByText(/Not available yet: the take-home pay check/)).toBeInTheDocument();

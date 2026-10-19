@@ -20,7 +20,10 @@
 Real rule values are all unverified right now, so engine mechanics (limits, phase-outs, tax,
 preview) are tested against `packages/engine/src/testing/fixtureRules.ts`. That file holds
 round-number values that are clearly labeled synthetic and are never used by the app. Tests
-against the real `RULES` assert the `unverified` path. Once values are verified, the IRS worked
+against the real `RULES` assert the `unverified` path. A few web tests
+(`*.verified.test.tsx`) mock the engine context with the fixture (test-only subpath
+`@rn/engine/testing`, which ESLint bans in app code) to check that pages render the engine's own
+after-limit figures. Once values are verified, the IRS worked
 examples (Pub 590-A phase-out, Pub 915) are added against the real data.
 
 ## Rules in tests

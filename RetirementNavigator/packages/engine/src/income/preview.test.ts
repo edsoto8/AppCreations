@@ -6,7 +6,8 @@ import { HouseholdSchema, type Household } from '../domain/household';
 import { minimalHouseholdInput } from '../samples/minimal';
 import { dollars } from '../money';
 import { RULES } from '../rules/index';
-import { FIXTURE_YEAR, fixtureRules } from '../testing/fixtureRules';
+import { FIXTURE_YEAR, fixtureRules, fixtureStanding, fixtureYear } from '../testing/fixtureRules';
+import { unverifiedRule } from '../rules/helpers';
 import { previewAccumulation } from './preview';
 
 const YEAR = FIXTURE_YEAR;
@@ -395,5 +396,67 @@ describe('previewAccumulation scheduled contributions', () => {
   it('marks allowed amounts null when limits are unverified', () => {
     const p = preview(build({ accounts: [HSA] }), 1, realCtx);
     expect(p.cashFlow[0]!.scheduled).toEqual([{ accountId: 'hsa', requested: dollars(5_000), allowed: null }]);
+  });
+});
+
+describe('previewAccumulation never turns unknown inputs into numbers', () => {
+  const withRules = (mutate: (y: ReturnType<typeof fixtureYear>) => void) => {
+    const y = fixtureYear();
+    mutate(y);
+    return { currentYear: YEAR, rules: { standing: fixtureStanding(), years: { [String(YEAR)]: y } } };
+  };
+
+  it('leaves MAGI and Roth eligibility null when workplace deferrals are unknown', () => {
+    const ctx = withRules((y) => {
+      y.workplace.electiveDeferral = unverifiedRule('test');
+    });
+    const p = previewAccumulation(build({ accounts: [ROTH_IRA] }), ctx, 1);
+    if (p.status !== 'ok') throw new Error('ok');
+    const roth = p.value.cashFlow[0]!.rothIra[0]!;
+    expect(roth).toMatchObject({ magi: null, eligibility: null });
+    expect(roth.magiComponents.traditionalDeferrals).toBeNull();
+    expect(p.value.cashFlow[0]!.scheduled).toEqual([{ accountId: 'roth', requested: null, allowed: null }]);
+  });
+
+  it('leaves taxes and MAGI null when an HSA limit is unknown', () => {
+    const ctx = withRules((y) => {
+      y.hsa.selfOnly = unverifiedRule('test');
+    });
+    const p = previewAccumulation(build({ accounts: [HSA, ROTH_IRA] }), ctx, 1);
+    if (p.status !== 'ok') throw new Error('ok');
+    expect(p.value.cashFlow[0]).toMatchObject({ taxes: null, netPay: null, surplus: null });
+    expect(p.value.cashFlow[0]!.rothIra[0]!.magi).toBeNull();
+    // A MAGI override makes eligibility computable again.
+    const overridden = previewAccumulation(
+      build({ accounts: [HSA, { ...ROTH_IRA, magiOverride: dollars(50_000) }] }),
+      ctx,
+      1,
+    );
+    if (overridden.status !== 'ok') throw new Error('ok');
+    expect(overridden.value.cashFlow[0]!.rothIra[0]).toMatchObject({ magiSource: 'override', magi: dollars(50_000) });
+    expect(overridden.value.cashFlow[0]!.rothIra[0]!.eligibility?.allowed).toBe(dollars(7_000));
+  });
+
+  it('shares one HSA limit across a person’s HSA accounts', () => {
+    const second = { ...HSA, id: 'hsa2', name: 'HSA 2', contribution: { amount: { kind: 'maxAllowed' } } };
+    const p = preview(build({ accounts: [HSA, second] }));
+    expect(p.cashFlow[0]!.scheduled).toEqual([
+      { accountId: 'hsa', requested: dollars(5_000), allowed: dollars(4_000) },
+      { accountId: 'hsa2', requested: null, allowed: 0 },
+    ]);
+  });
+
+  it('exposes each Roth IRA owner’s eligibility and MAGI components', () => {
+    const p = preview(build({ accounts: [ROTH_IRA, HSA] }));
+    const roth = p.cashFlow[0]!.rothIra[0]!;
+    expect(roth.magiComponents).toEqual({
+      salary: dollars(100_000),
+      bonus: 0,
+      partTimeIncome: 0,
+      traditionalDeferrals: dollars(6_000),
+      hsaContributions: dollars(4_000),
+    });
+    expect(roth).toMatchObject({ magiSource: 'estimate', magi: dollars(90_000), otherIraContributions: 0 });
+    expect(roth.eligibility).toMatchObject({ status: 'full', allowed: dollars(7_000) });
   });
 });

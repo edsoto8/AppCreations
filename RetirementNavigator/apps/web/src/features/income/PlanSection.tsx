@@ -23,9 +23,11 @@ const PLAN_LABEL: Record<Plan['planType'], string> = { '401k': '401(k)', '403b':
 
 function MatchReadout({
   preview,
+  previewRow,
   limitsVerified,
 }: {
   preview: PersonPreviewRow['plans'][number] | undefined;
+  previewRow: PersonPreviewRow | undefined;
   limitsVerified: boolean;
 }) {
   if (!preview) return null;
@@ -48,8 +50,28 @@ function MatchReadout({
           <UnverifiedValue label="Before plan limits" /> The deferral, compensation and annual-additions limits are
           unverified, so capping is not applied to this readout.
         </p>
-      ) : null}
+      ) : (
+        <AfterLimits previewRow={previewRow} />
+      )}
     </div>
+  );
+}
+
+/** With verified limits: the employer match the forecast actually counts after plan limits. */
+function AfterLimits({ previewRow }: { previewRow: PersonPreviewRow | undefined }) {
+  const after = previewRow?.contributions;
+  if (!previewRow || !after) return null;
+  const before = previewRow.matchBeforeLimits.match;
+  const scope = previewRow.plans.length > 1 ? ' (all of this person’s plans together)' : '';
+  if (after.employerMatch >= before) {
+    return <p className="mt-2 text-xs text-muted-foreground">Plan limits do not reduce this match{scope}.</p>;
+  }
+  return (
+    <p className="mt-2 text-xs font-medium">
+      After plan limits, the forecast counts {formatCents(after.employerMatch)} of employer match this year
+      {scope}: {formatCents(before - after.employerMatch)} less than the figures above, because the deferral or
+      annual-additions limits cap the contributions.
+    </p>
   );
 }
 
@@ -546,7 +568,7 @@ export function PlanSection({
                 ) : null}
               </div>
               <VestingEditor plan={plan} basePath={basePath} set={set} control={control} />
-              <MatchReadout preview={planPreview} limitsVerified={limitsVerified} />
+              <MatchReadout preview={planPreview} previewRow={previewRow} limitsVerified={limitsVerified} />
             </CardContent>
           </Card>
         );

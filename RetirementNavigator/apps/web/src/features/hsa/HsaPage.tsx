@@ -16,11 +16,11 @@ import { formatCents } from '@/lib/format';
 import { AccountDialog } from '@/features/accounts/AccountDialog';
 import { describeContribution, upsertAccount } from '@/features/accounts/accountModel';
 import {
+  ageThisYear,
   hsaThisYear,
-  personYearOne,
   previewYearOne,
   type HsaAccount,
-  type PersonYearOne,
+  type HsaThisYear,
 } from '@/features/accounts/thisYear';
 import { useCommitHousehold } from '@/features/accounts/useCommitHousehold';
 
@@ -79,7 +79,7 @@ function HsaBody({ household }: { household: Household }) {
                 household={household}
                 account={account}
                 owner={owner}
-                ownerYear={personYearOne(preview, owner, year)}
+                ownerAge={ageThisYear(preview, owner, year)}
                 preview={preview}
                 rules={rules}
                 onEdit={() => setDialog({ account })}
@@ -123,7 +123,7 @@ function HsaCard({
   household,
   account,
   owner,
-  ownerYear,
+  ownerAge,
   preview,
   rules,
   onEdit,
@@ -132,13 +132,13 @@ function HsaCard({
   account: HsaAccount;
   preview: AccumulationPreview | null;
   owner: Person;
-  ownerYear: PersonYearOne;
+  ownerAge: number;
   rules: ResolvedYearRules;
   onEdit: () => void;
 }) {
   const commit = useCommitHousehold();
   const [error, setError] = useState<string | undefined>();
-  const hsa = hsaThisYear(account, ownerYear, preview, rules);
+  const hsa = hsaThisYear(account, ownerAge, preview, rules);
 
   const save = (patch: Partial<Pick<HsaAccount, 'coverage' | 'hdhpAttested'>>) => {
     const result = commit(upsertAccount(household, { ...account, ...patch }));
@@ -207,9 +207,9 @@ function HsaCard({
   );
 }
 
-function HsaReadout({ hsa }: { hsa: ReturnType<typeof hsaThisYear> }) {
-  const { limit, requested } = hsa;
-  if (limit.status === 'unverified') {
+function HsaReadout({ hsa }: { hsa: HsaThisYear }) {
+  const { limit, requested, allowed } = hsa;
+  if (limit.status === 'unverified' || allowed === null) {
     return (
       <div className="flex flex-col gap-3" aria-live="polite">
         <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-base">
@@ -219,7 +219,9 @@ function HsaReadout({ hsa }: { hsa: ReturnType<typeof hsaThisYear> }) {
           <UnverifiedValue />
           <span>allowed</span>
         </p>
-        <UnverifiedNotice missing={limit.missing} feature="the HSA contribution limit" />
+        {limit.status === 'unverified' ? (
+          <UnverifiedNotice missing={limit.missing} feature="the HSA contribution limit" />
+        ) : null}
       </div>
     );
   }
@@ -234,18 +236,17 @@ function HsaReadout({ hsa }: { hsa: ReturnType<typeof hsaThisYear> }) {
       </Alert>
     );
   }
-  const planned = hsa.planned ?? 0;
   return (
     <div className="flex flex-col gap-3" aria-live="polite">
       <p className="text-base">
-        HSA this year: <strong className="tabular-nums">{formatCents(planned)}</strong> of{' '}
+        HSA this year: <strong className="tabular-nums">{formatCents(allowed)}</strong> of{' '}
         <strong className="tabular-nums">{formatCents(limit.value)}</strong> allowed
       </p>
-      {requested !== 'max' && requested > limit.value ? (
+      {requested !== 'max' && requested > allowed ? (
         <Alert variant="attention">
           <p>
-            The schedule asks for {formatCents(requested)}; the forecast caps it at the {formatCents(limit.value)}{' '}
-            limit.
+            The schedule asks for {formatCents(requested)}; the forecast contributes {formatCents(allowed)}. The limit
+            is per person and shared by all of the owner’s HSAs.
           </p>
         </Alert>
       ) : null}

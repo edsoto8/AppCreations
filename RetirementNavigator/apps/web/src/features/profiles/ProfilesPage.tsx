@@ -113,9 +113,7 @@ export function ProfilesPage() {
             onClick={() => {
               const sample = SAMPLE_PROFILES.find((s) => s.id === sampleId);
               if (!sample) return;
-              const h = sample.build(CURRENT_YEAR);
-              // Each sample copy gets its own id so several copies can coexist.
-              void createProfile({ ...h, id: `${h.id}-${Date.now().toString(36)}` as typeof h.id });
+              void createProfile(sample.build(CURRENT_YEAR));
             }}
           >
             <Plus aria-hidden="true" /> Add sample

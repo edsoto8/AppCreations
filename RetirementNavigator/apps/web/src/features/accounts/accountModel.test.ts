@@ -76,14 +76,15 @@ describe('accountModel', () => {
 
   it('reads this year’s scheduled request from the engine preview', async () => {
     const { previewAccumulation, RULES } = await import('@rn/engine');
-    const { scheduledRequest } = await import('./thisYear');
+    const { scheduledThisYear } = await import('./thisYear');
     const h = sample('midCareerCouple');
     const p = previewAccumulation(h, { currentYear: TEST_YEAR, rules: RULES }, 1);
     if (p.status !== 'ok') throw new Error('preview');
     // Jordan's Roth IRA: $250 a month.
-    expect(scheduledRequest(p.value, 'jordan-roth')).toBe(300_000);
-    expect(scheduledRequest(p.value, 'missing')).toBe(0);
-    expect(scheduledRequest(null, 'jordan-roth')).toBe(0);
+    // The allowed amount needs the (unverified) Roth IRA rules, so it is null, never a guess.
+    expect(scheduledThisYear(p.value, 'jordan-roth')).toEqual({ requested: 300_000, allowed: null });
+    expect(scheduledThisYear(p.value, 'missing')).toEqual({ requested: 0, allowed: 0 });
+    expect(scheduledThisYear(null, 'jordan-roth')).toEqual({ requested: 0, allowed: 0 });
   });
 
   it('describes contribution schedules', () => {

@@ -6,6 +6,7 @@ import type { RuleKey } from './rules';
 
 export type WarningCode =
   | 'deferralCapped'
+  | 'bonusDeferralIgnored'
   | 'catchUpApplied'
   | 'rothCatchUpRequired'
   | 'annualAdditionsCapped'

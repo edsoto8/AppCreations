@@ -79,7 +79,30 @@ review of `docs/rules-verification.md`. Both wait on reaching irs.gov, ssa.gov a
   (throttled) runs.
 
 ## Review findings (M2)
-_Pending the code-reviewer pass._
+The code-reviewer pass ran as a general-purpose agent following `.claude/agents/code-reviewer.md`
+(range `54ef5e2..7f951c2`). It confirmed the first three findings with probe tests against the
+synthetic fixture.
+
+| # | Finding | Severity | Resolution |
+|---|---|---|---|
+| 1 | The catch-up was counted again for each aggregated 401(k)/403(b) plan | blocking | Fixed: the catch-up room is shared (`catchUp − catch-up already used`), with a two-plan test |
+| 2 | The senior-deduction phase-out was applied once to the total instead of per filer | blocking | Fixed: `seniors · max(0, amount − rate·max(0, MAGI − start))`, with an MFJ test |
+| 3 | The reduced Roth IRA limit did not follow the Pub 590-A worksheet order | blocking | Fixed: base `= min(L, earned income)`, phase-out on the base, then `min(reduced, base − other IRA)`; tests for both probe cases. Still pending verification at source (the publication is blocked). |
+| 4 | Unknown inputs became numbers in the preview (deferrals or HSA as 0 in MAGI; taxes without pre-tax HSA) | blocking | Fixed: MAGI is null when deferrals or HSA amounts are unknown; taxes are null unless deferrals and HSA amounts are known. Tests assert nulls, never guesses. |
+| 5 | The 1.2.0 contract bump was not recorded, and was not purely additive | blocking | Fixed: the 1.2.0 row now states the breaking parts; the review fixes are recorded as 1.3.0 |
+| 6 | Onboarding samples overwrote an existing profile with the same id | blocking | Fixed: `createProfile` never overwrites; a taken id gets `-2`, `-3`, … (the ProfilesPage workaround is removed), with a store test |
+| 7 | The match readout showed pre-limit numbers unlabeled once limits are verified | should fix | Fixed: with verified limits the readout shows the after-limit match the forecast counts, or says limits do not reduce it. RTL test with the synthetic fixture rules. |
+| 8 | Two HSAs of one person each got the full limit | should fix | Fixed: one HSA room per person, shared across that person's HSAs, with engine and page tests |
+| 9 | The Roth IRA page rebuilt MAGI and limits in the UI and could disagree with the engine | should fix | Fixed: the engine reports `CashFlowPreviewRow.rothIra` and per-account `scheduled` allowed amounts; the Roth IRA and HSA pages render those, with no limit arithmetic in the UI. RTL tests with the synthetic fixture rules. |
+| 10 | Duplicated formulas in the UI (implied raise, price index, HSA cap) | should fix | Fixed: `impliedRaise` and `priceIndex` are exported by the engine and used by the UI; the HSA cap comes from the engine (#9) |
+| 11 | 415(c) used match-eligible pay and missed employee-only excess | should fix | Fixed: the cap is `min(limit, compensation)` with compensation passed in; employee excess is reduced first, with its own warning |
+| 12 | The Employer column's `*` had no screen-reader text | should fix | Fixed: sr-only "(before limits, unverified)", asserted in RTL |
+| — | `deferralCapped` reused for ignored bonus deferrals | optional | Fixed: new `bonusDeferralIgnored` warning code |
+| — | Statutory ages (50, 60–63, 55, 65) are hard-coded | optional | Kept: they are fixed by statute and stated in `financial-model.md`; moving them into the rules data is tracked for M4 with the other statutory constants |
+| — | Spending and feasibility use `retirementAge`, while salary uses `stopAge` | optional | Kept as a documented simplification: retirement spending starts at the retirement age even if salary stops earlier |
+| — | Removing a workplace plan leaves its account | optional | Kept: the account keeps its balance (it may be a rollover); it can be deleted on Accounts |
+
+No open blocking or should-fix findings.
 
 ## Review findings (M1)
 The code-reviewer pass ran as a general-purpose agent following `.claude/agents/code-reviewer.md`.
@@ -107,7 +130,8 @@ No open findings.
 |---|---|---|
 | 1.0.0 | 2026-10-18 | Initial frozen contract (approved). `migrate` implemented in `io/migrate.ts` and re-exported from `api.ts` (no signature change). |
 | 1.1.0 | 2026-10-18 | From the M1 review: stricter household validation (cross-references and invariants), `InflationRateSchema` bound (−50%, 50%], factory defaults, `SettingsDoc.theme` removed (the theme lives in localStorage for pre-paint), offset timestamps accepted. No stored documents existed, so no migration is needed. `resolveRules` implemented (M2, signature unchanged). |
-| 1.2.0 | 2026-10-19 | Additive for M2: `TaxInput.wagesByPerson` (per-person wage base); `CompensationYear.age/working`; `previewAccumulation` and its row types (per-plan rows, cash-flow warnings, per-account `scheduled` amounts); standing rules `capitalGainsRates` and `roth.reducedContributionRounding` (sourced rule values instead of literals). M2 functions implemented and re-exported from `api.ts` with unchanged signatures. |
+| 1.2.0 | 2026-10-19 | M2 additions, **not purely additive**: `TaxInput.wagesByPerson` is a new required input (per-person wage base; breaks existing callers); `StandingRulesSchema` gains two required keys, `capitalGainsRates` and `roth.reducedContributionRounding` (sourced rule values instead of literals). Additive: `CompensationYear.age/working`; `previewAccumulation` and its row types (per-plan rows, cash-flow warnings, per-account `scheduled` amounts). M2 functions implemented and re-exported from `api.ts` with unchanged signatures. No stored documents carry these types, so no migration is needed. |
+| 1.3.0 | 2026-10-19 | From the M2 review, **not purely additive**: `ContributionRequest.compensation` is a new required input (415(c) 100%-of-compensation test). Additive: `CashFlowPreviewRow.rothIra` with the new `RothIraYear` type; warning code `bonusDeferralIgnored`; `impliedRaise`, `priceIndex` and `ageInYear` exported. Test-only subpath `@rn/engine/testing` (synthetic fixture rules; ESLint bans it in app code). No stored documents change. |
 
 ## Traceability (BRIEF §5 → milestone)
 | Feature | Milestone |
@@ -151,7 +175,7 @@ No open findings.
   - Python reference script and golden fixtures.
   - Dashboard cards with formula docs; forecast chart with offsets and markers; allocation views
     (a) and (b); real/nominal toggle.
-- **Frozen contracts:** `packages/engine/src/domain/*`, `packages/engine/src/api.ts` (1.2.0).
+- **Frozen contracts:** `packages/engine/src/domain/*`, `packages/engine/src/api.ts` (1.3.0).
 - **Tags:** the session's git proxy refused to push tags (HTTP 403), though branch pushes work.
   `m1-foundation` is local only, pointing at the commit titled "fix(RetirementNavigator): resolve M1
   review findings; start M2 rules data". To publish it from a clone:

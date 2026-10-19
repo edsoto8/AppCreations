@@ -14,3 +14,5 @@ export { minimalHouseholdInput } from './samples/minimal';
 export { RULES, RULES_2026, RULES_2027, STANDING_RULES } from './rules/index';
 export { BLOCKED_REASON } from './rules/helpers';
 export { SAMPLE_PROFILES, type SampleProfile, type SampleProfileId } from './samples/profiles';
+export { impliedRaise } from './income/compensation';
+export { priceIndex, ageInYear } from './time';

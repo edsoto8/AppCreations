@@ -18,7 +18,7 @@ import type { Insight } from './domain/insight';
 import type { ExportBundle } from './domain/documents';
 import type { ValidationIssue } from './domain/results';
 
-export const CONTRACT_VERSION = '1.2.0';
+export const CONTRACT_VERSION = '1.3.0';
 
 export class NotImplementedError extends Error {
   constructor(fn: string) {
@@ -107,6 +107,8 @@ export interface ContributionRequest {
   /** Other 402(g)-aggregated deferrals this year (another 401(k)/403(b)). */
   otherAggregatedDeferrals: Cents;
   eligibleCompForMatch: Cents;
+  /** Total compensation this year (salary + bonus), for the 415(c) 100%-of-compensation test (contract 1.3.0). */
+  compensation: Cents;
   priorYearFicaWages: Cents | null;
 }
 
@@ -192,6 +194,27 @@ export interface CashFlowPreviewRow {
    * (`requested`; null means "maximum allowed") and what is allowed after limits (null if unverified).
    */
   scheduled: { accountId: string; requested: Cents | null; allowed: Cents | null }[];
+  /** Roth IRA eligibility for each person who owns a Roth IRA (null parts when unverified/unknown). */
+  rothIra: RothIraYear[];
+}
+
+/** One person's Roth IRA eligibility in one year, with the MAGI it was computed from. */
+export interface RothIraYear {
+  personId: string;
+  /** 'override' when the person entered MAGI; otherwise the documented household estimate. */
+  magiSource: 'override' | 'estimate';
+  /** Household estimate inputs (summed over both people for married filing jointly). Null = unknown. */
+  magiComponents: {
+    salary: Cents;
+    bonus: Cents;
+    partTimeIncome: Cents;
+    traditionalDeferrals: Cents | null;
+    hsaContributions: Cents | null;
+  };
+  magi: Cents | null;
+  /** Traditional IRA contributions this year that share the limit; null when unknown. */
+  otherIraContributions: Cents | null;
+  eligibility: RothIraEligibility | null;
 }
 
 export interface AccumulationPreview {

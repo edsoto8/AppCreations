@@ -5,7 +5,7 @@
  * rules are listed in `unverified`.
  */
 import type { Cents, Fraction } from '../domain/primitives';
-import type { Account, ContributionSchedule, Household, Person, WorkplacePlan } from '../domain/household';
+import type { Household, Person, WorkplacePlan } from '../domain/household';
 import type { EngineResult, EngineWarning, UnverifiedDetail } from '../domain/results';
 import type {
   AccumulationPreview,
@@ -16,11 +16,10 @@ import type {
   ResolvedYearRules,
   TaxBreakdown,
 } from '../api';
-import { compensationPathFloat, salaryStopAge, type CompensationFloat } from './compensation';
+import { compensationPathFloat, type CompensationFloat } from './compensation';
 import { computeMatch, vestedFraction } from '../match/match';
 import { capContributions } from '../limits/workplace';
-import { estimateMagi, iraContributionLimit, rothIraEligibility } from '../limits/ira';
-import { hsaLimit } from '../limits/hsa';
+import { scheduledContributions, type PersonYearInput } from './scheduled';
 import { computeTax } from '../tax/tax';
 import { resolveRules } from '../rules/resolve';
 import { RuleAccess } from '../rules/access';
@@ -57,27 +56,10 @@ function escalated(start: number, plan: WorkplacePlan, bucket: 'traditional' | '
   return Math.min(esc.capPct, start + esc.stepPct * (t - 1));
 }
 
-function growthFactor(schedule: ContributionSchedule, inflation: number, t: number): number {
-  switch (schedule.growth.mode) {
-    case 'flat':
-      return 1;
-    case 'inflation':
-      return priceIndex(inflation, t);
-    case 'rate':
-      return Math.pow(1 + schedule.growth.rate, t - 1);
-  }
-}
-
 /** Indexing rate for projecting `indexed` rule values beyond published years. */
 export function indexRateFor(household: Household): NominalRate {
   const indexing = household.assumptions.rules.indexing;
   return indexing.mode === 'inflation' ? household.assumptions.inflation : indexing.rate;
-}
-
-interface PersonYearState {
-  person: Person;
-  comp: CompensationFloat;
-  contributions: CappedContributions | null;
 }
 
 function workplaceYear(
@@ -157,6 +139,7 @@ function workplaceYear(
         requestedRoth: toCents(roth),
         otherAggregatedDeferrals: asCents(plan.planType === '457b' ? 0 : aggregated),
         eligibleCompForMatch: toCents(matchPay),
+        compensation: toCents(comp.baseSalary + comp.bonus),
         priorYearFicaWages,
       },
       rules,
@@ -182,184 +165,6 @@ function workplaceYear(
       ? vestedFraction(firstPlan.match.vesting, firstPlan.match.yearsOfServiceAtStart + t)
       : 1,
   };
-}
-
-/** Last year (inclusive) a non-workplace schedule contributes: its stop year, else the owner's last working year. */
-function scheduleActive(schedule: ContributionSchedule, owner: Person, year: number, firstYear: number): boolean {
-  const start = schedule.startYear ?? firstYear;
-  const stop = schedule.stopYear ?? owner.birthYear + salaryStopAge(owner) - 1;
-  return year >= start && year <= stop;
-}
-
-interface ScheduledResult {
-  /** Total scheduled contributions this year, or null if a needed limit is unverified. */
-  total: number | null;
-  hsaPreTax: number;
-  byAccount: CashFlowPreviewRow['scheduled'];
-}
-
-function scheduledContributions(
-  household: Household,
-  t: number,
-  year: number,
-  firstYear: number,
-  people: Map<string, PersonYearState>,
-  rules: ResolvedYearRules,
-  access: RuleAccess,
-  warnings: EngineWarning[],
-): ScheduledResult {
-  const inflation = household.assumptions.inflation;
-  let total = 0;
-  let hsaPreTax = 0;
-  let unknown = false;
-  const byAccount: CashFlowPreviewRow['scheduled'] = [];
-  const hsaByOwner = new Map<string, number>();
-  const iraRoom = new Map<string, { initial: number; remaining: number } | null>();
-
-  const householdMagi = (): number => {
-    let magi = 0;
-    for (const s of people.values()) {
-      magi += estimateMagi({
-        salary: toCents(s.comp.baseSalary),
-        bonus: toCents(s.comp.bonus),
-        traditionalDeferrals: s.contributions?.traditional ?? (0 as Cents),
-        hsaContributions: toCents(hsaByOwner.get(s.person.id) ?? 0),
-        otherIncome: toCents(s.comp.partTimeIncome),
-      });
-    }
-    return magi;
-  };
-
-  // HSAs first: their contributions reduce the MAGI used for Roth IRA eligibility.
-  const ordered = [...household.accounts].sort((a, b) => Number(b.type === 'hsa') - Number(a.type === 'hsa'));
-  for (const account of ordered) {
-    if (account.type === 'workplaceTraditional' || account.type === 'workplaceRoth') continue;
-    const schedule = account.contribution;
-    const state = people.get(account.ownerId);
-    if (!schedule || !state || !scheduleActive(schedule, state.person, year, firstYear)) continue;
-    const comp = state.comp;
-    const earned = comp.baseSalary + comp.bonus + comp.partTimeIncome;
-
-    let wanted: number | 'max';
-    if (schedule.amount.kind === 'dollars') {
-      wanted =
-        (schedule.amount.amount / 100) *
-        (schedule.amount.frequency === 'monthly' ? 12 : 1) *
-        growthFactor(schedule, inflation, t);
-    } else if (schedule.amount.kind === 'percentOfSalary') {
-      wanted = schedule.amount.pct * comp.baseSalary;
-    } else {
-      wanted = 'max';
-    }
-
-    const amount = limitAccount(
-      account,
-      wanted,
-      comp.age,
-      earned,
-      household,
-      rules,
-      access,
-      warnings,
-      iraRoom,
-      householdMagi,
-      year,
-    );
-    byAccount.push({
-      accountId: account.id,
-      requested: wanted === 'max' ? null : toCents(wanted),
-      allowed: amount === null ? null : toCents(amount),
-    });
-    if (amount === null) {
-      unknown = true;
-      continue;
-    }
-    total += amount;
-    if (account.type === 'hsa') {
-      hsaPreTax += amount;
-      hsaByOwner.set(account.ownerId, (hsaByOwner.get(account.ownerId) ?? 0) + amount);
-    }
-  }
-  return { total: unknown ? null : total, hsaPreTax, byAccount };
-}
-
-function limitAccount(
-  account: Exclude<Account, { type: 'workplaceTraditional' | 'workplaceRoth' }>,
-  wanted: number | 'max',
-  age: number,
-  earned: number,
-  household: Household,
-  rules: ResolvedYearRules,
-  access: RuleAccess,
-  warnings: EngineWarning[],
-  iraRoom: Map<string, { initial: number; remaining: number } | null>,
-  householdMagi: () => number,
-  year: number,
-): number | null {
-  const owner = account.ownerId;
-  if (account.type === 'traditionalIra' || account.type === 'rothIra') {
-    // Traditional and Roth IRAs share one annual limit per person, capped at earned income.
-    if (!iraRoom.has(owner)) {
-      const limit = iraContributionLimit(age, rules, access);
-      const initial = limit === null ? null : Math.min(limit / 100, earned);
-      iraRoom.set(owner, initial === null ? null : { initial, remaining: initial });
-    }
-    const roomState = iraRoom.get(owner) ?? null;
-    if (roomState === null) return null;
-    const room = roomState.remaining;
-    let cap = room;
-    if (account.type === 'rothIra') {
-      const magi = account.magiOverride ?? (householdMagi() as Cents);
-      const roth = rothIraEligibility(
-        {
-          magi: magi as Cents,
-          filingStatus: household.filingStatus,
-          age,
-          earnedIncome: toCents(earned),
-          // Earlier IRA contributions this year share the limit (the reduced Roth limit is net of them).
-          otherIraContributions: toCents(roomState.initial - roomState.remaining),
-        },
-        rules,
-      );
-      if (roth.status !== 'ok') {
-        if (roth.status === 'unverified') access.absorb(roth.missing);
-        return null;
-      }
-      cap = Math.min(room, roth.value.allowed / 100);
-      for (const w of roth.warnings) warnings.push({ ...w, accountId: account.id });
-    }
-    const amount = wanted === 'max' ? cap : Math.min(wanted, cap);
-    if (wanted !== 'max' && wanted > cap + 0.005) {
-      warnings.push({
-        code: 'iraCapped',
-        year,
-        accountId: account.id,
-        message: `${account.name}: contribution capped at the allowed $${Math.round(cap).toLocaleString('en-US')}.`,
-      });
-    }
-    roomState.remaining = room - amount;
-    return amount;
-  }
-  if (account.type === 'hsa') {
-    const limit = hsaLimit({ coverage: account.coverage, age, hdhpAttested: account.hdhpAttested }, rules);
-    if (limit.status !== 'ok') {
-      if (limit.status === 'unverified') access.absorb(limit.missing);
-      return null;
-    }
-    for (const w of limit.warnings) warnings.push({ ...w, accountId: account.id });
-    const cap = limit.value / 100;
-    if (wanted !== 'max' && wanted > cap + 0.005) {
-      warnings.push({
-        code: 'hsaCapped',
-        year,
-        accountId: account.id,
-        message: `${account.name}: contribution capped at the $${Math.round(cap).toLocaleString('en-US')} HSA limit.`,
-      });
-    }
-    return wanted === 'max' ? cap : Math.min(wanted, cap);
-  }
-  // Taxable, cash and other accounts have no contribution limit; "max" has no meaning there.
-  return wanted === 'max' ? 0 : wanted;
 }
 
 function otherIncomeFor(household: Household, year: number, t: number): { gross: number; taxable: number } {
@@ -402,7 +207,7 @@ export function previewAccumulation(
       targetYear: year,
       indexRate: indexRateFor(household),
     });
-    const states = new Map<string, PersonYearState>();
+    const states = new Map<string, PersonYearInput>();
     const yearWarnings: EngineWarning[] = [];
 
     for (const person of household.people) {
@@ -447,6 +252,8 @@ export function previewAccumulation(
 
     // Household cash flow.
     const scheduled = scheduledContributions(household, t, year, firstYear, states, rules, access, yearWarnings);
+    // Pre-tax HSA dollars must be known to estimate income tax.
+    const hsaPreTax = scheduled.hsaPreTax;
     const other = otherIncomeFor(household, year, t);
     let grossPay = 0;
     let workplaceEmployee: number | null = 0;
@@ -472,7 +279,7 @@ export function previewAccumulation(
     const spending = (spendingToday / 100) * priceIndex(inflation, t);
 
     let taxes: TaxBreakdown | null = null;
-    if (workplaceEmployee !== null) {
+    if (workplaceEmployee !== null && hsaPreTax !== null) {
       const taxResult = computeTax(
         {
           filingStatus: household.filingStatus,
@@ -483,7 +290,7 @@ export function previewAccumulation(
           socialSecurityBenefits: 0 as Cents,
           longTermCapitalGains: 0 as Cents,
           // SIMPLIFICATION: HSA contributions are treated as pre-tax for income tax (FICA on gross wages).
-          preTaxDeductions: toCents(preTax + scheduled.hsaPreTax),
+          preTaxDeductions: toCents(preTax + hsaPreTax),
           stateTaxRate: household.assumptions.stateTaxRate as Fraction,
         },
         rules,
@@ -515,6 +322,7 @@ export function previewAccumulation(
       infeasible,
       warnings: yearWarnings,
       scheduled: scheduled.byAccount,
+      rothIra: scheduled.rothIra,
     });
   }
 

@@ -60,13 +60,25 @@ export function rothIraEligibility(
   const { start, end } = range;
   const magi = input.magi;
 
+  // Worksheet order (Pub 590-A, pending verification at source): the base is the annual limit capped
+  // at compensation; the phase-out reduces the base; the result is also capped at the base minus
+  // other IRA contributions this year.
+  const base = Math.min(limit, input.earnedIncome);
+  if (input.earnedIncome < limit) {
+    warnings.push({
+      code: 'iraEarnedIncomeCap',
+      year,
+      message: `IRA contributions cannot exceed earned income (${usd(input.earnedIncome)}). Spousal IRA contributions are not supported.`,
+    });
+  }
+
   let phased: number;
   let status: RothIraEligibility['status'];
   let calculation: string;
   if (magi <= start) {
     status = 'full';
-    phased = limit;
-    calculation = `MAGI ${usd(magi)} is at or below ${usd(start)}: the full ${usd(limit)} limit applies.`;
+    phased = base;
+    calculation = `MAGI ${usd(magi)} is at or below ${usd(start)}: the full ${usd(base)} limit applies.`;
   } else if (magi >= end) {
     status = 'ineligible';
     phased = 0;
@@ -85,12 +97,12 @@ export function rothIraEligibility(
     );
     if (rounding === null) return unverified(standing.missing);
     status = 'reduced';
-    const raw = (limit * (end - magi)) / (end - start);
+    const raw = (base * (end - magi)) / (end - start);
     const step = rounding.roundUpToDollars * 100;
     const minimum = rounding.minimumDollars * 100;
     const rounded = Math.ceil(raw / step - 1e-9) * step;
-    phased = Math.min(limit, rounded > 0 ? Math.max(rounded, minimum) : 0);
-    calculation = `${usd(limit)} × (${usd(end)} − ${usd(magi)}) ÷ (${usd(end)} − ${usd(start)}) = ${usd(raw)}, rounded up to a multiple of $${rounding.roundUpToDollars} (minimum $${rounding.minimumDollars}) = ${usd(phased)}.`;
+    phased = Math.min(base, rounded > 0 ? Math.max(rounded, minimum) : 0);
+    calculation = `${usd(base)} × (${usd(end)} − ${usd(magi)}) ÷ (${usd(end)} − ${usd(start)}) = ${usd(raw)}, rounded up to a multiple of $${rounding.roundUpToDollars} (minimum $${rounding.minimumDollars}) = ${usd(phased)}.`;
     warnings.push({
       code: 'rothIraPhaseOutReduced',
       year,
@@ -98,15 +110,7 @@ export function rothIraEligibility(
     });
   }
 
-  let allowed = Math.min(phased, input.earnedIncome);
-  if (input.earnedIncome < phased) {
-    warnings.push({
-      code: 'iraEarnedIncomeCap',
-      year,
-      message: `IRA contributions cannot exceed earned income (${usd(input.earnedIncome)}). Spousal IRA contributions are not supported.`,
-    });
-  }
-  allowed = Math.max(0, allowed - input.otherIraContributions);
+  const allowed = Math.max(0, Math.min(phased, base - input.otherIraContributions));
 
   return {
     status: 'ok',
@@ -115,7 +119,7 @@ export function rothIraEligibility(
       magi,
       phaseOutStart: start,
       phaseOutEnd: end,
-      baseLimit: Math.min(limit, input.earnedIncome) as Cents,
+      baseLimit: base as Cents,
       allowed: allowed as Cents,
       calculation,
     },

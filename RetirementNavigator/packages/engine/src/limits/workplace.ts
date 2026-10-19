@@ -40,9 +40,13 @@ export function capContributions(
   const requested = req.requestedTraditional + req.requestedRoth;
 
   // 402(g) (aggregated across the person's 401(k)/403(b) plans by the caller) plus catch-up.
+  // Earlier aggregated plans used the base room first; anything they deferred above the 402(g)
+  // limit was their catch-up, which shares the same per-person catch-up limit.
   const baseRoom = Math.max(0, deferralLimit - req.otherAggregatedDeferrals);
+  const catchUpUsed = Math.max(0, req.otherAggregatedDeferrals - deferralLimit);
+  const catchUpRoom = Math.max(0, catchUp - catchUpUsed);
   const basePortion = Math.min(requested, baseRoom);
-  let catchUpPortion = Math.min(requested - basePortion, catchUp);
+  let catchUpPortion = Math.min(requested - basePortion, catchUpRoom);
   const allowed = basePortion + catchUpPortion;
   let traditional: number = req.requestedTraditional;
   let roth: number = req.requestedRoth;
@@ -54,7 +58,7 @@ export function capContributions(
     warnings.push({
       code: 'deferralCapped',
       year,
-      message: `Employee deferrals of ${usd(requested)} exceed the ${year} limit of ${usd(baseRoom + catchUp)}; capped at ${usd(allowed)}.`,
+      message: `Employee deferrals of ${usd(requested)} exceed the room left under the ${year} limit (${usd(baseRoom + catchUpRoom)}); capped at ${usd(allowed)}.`,
     });
   }
   if (catchUpPortion > 0) {
@@ -119,8 +123,23 @@ export function capContributions(
   let employerFlat = toCents(m.flat) as number;
 
   // 415(c): employee (excluding catch-up) + employer ≤ min(limit, 100% of compensation).
-  const additionsCap = Math.min(additionsLimit, req.eligibleCompForMatch);
-  const additions = employeeTotal - catchUpPortion + employerMatch + employerFlat;
+  const additionsCap = Math.min(additionsLimit, req.compensation);
+  const employeeBase = traditional + roth - catchUpPortion;
+  if (employeeBase > additionsCap) {
+    // Employee deferrals alone exceed the cap: reduce them (pro rata) and allow no employer money.
+    const employeeReduction = employeeBase - additionsCap;
+    const total = traditional + roth;
+    const tradCut = total > 0 ? Math.round((employeeReduction * traditional) / total) : 0;
+    traditional -= tradCut;
+    roth -= employeeReduction - tradCut;
+    warnings.push({
+      code: 'annualAdditionsCapped',
+      year,
+      message: `Employee deferrals exceed the ${usd(additionsCap)} annual additions limit (the smaller of the dollar limit and 100% of pay); deferrals reduced by ${usd(employeeReduction)}.`,
+    });
+  }
+  const employeeAfter = traditional + roth;
+  const additions = employeeAfter - catchUpPortion + employerMatch + employerFlat;
   let employerReduction = 0;
   if (additions > additionsCap) {
     // SIMPLIFICATION: the employer amount is reduced (match first); real plans correct by refund.
@@ -144,7 +163,7 @@ export function capContributions(
       catchUpIsRoth,
       employerMatch: employerMatch as Cents,
       employerFlat: employerFlat as Cents,
-      cappedAmount: (requested - employeeTotal + employerReduction) as Cents,
+      cappedAmount: (requested - employeeAfter + employerReduction) as Cents,
     },
     warnings,
   };

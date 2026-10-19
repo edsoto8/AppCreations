@@ -37,6 +37,20 @@ describe('profile store', () => {
     expect((await repo.list('profile')).length).toBe(1);
   });
 
+  it('never overwrites an existing profile with the same household id', async () => {
+    await setupProfile();
+    const store = useProfileStore.getState();
+    const first = store.activeId!;
+    const household = store.profiles[first]!.household;
+    const second = await store.createProfile({ ...household, name: 'Second' });
+    const third = await useProfileStore.getState().createProfile({ ...household, name: 'Third' });
+    expect([first, second, third]).toEqual([household.id, `${household.id}-2`, `${household.id}-3`]);
+    const profiles = useProfileStore.getState().profiles;
+    expect(profiles[first]!.household.name).toBe('Mid-career couple (sample)');
+    expect(profiles[second]!.household).toMatchObject({ id: second, name: 'Second' });
+    expect(profiles[third]!.household).toMatchObject({ id: third, name: 'Third' });
+  });
+
   it('ignores renames to blank names and unknown ids', async () => {
     await setupProfile();
     const store = useProfileStore.getState();
