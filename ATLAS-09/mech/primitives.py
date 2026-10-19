@@ -496,7 +496,7 @@ def hinge(kit, prefix, matrix, gap, r_pin, plate_h, plate_d, plate_t=0.03, mat="
     return [lg, pn]
 
 
-def joint_drum(kit, prefix, matrix, r, w, mat="steel_dark", gear_mat="titanium", teeth=28, grease=True):
+def joint_drum(kit, prefix, matrix, r, w, mat="steel_joint", gear_mat="gear", teeth=28, grease=True):
     """Actuator drum around a joint axis (local X): housing + exposed ring gear + end caps."""
     def drum(bm):
         bm_cyl(bm, r, w, U.R(90, "Y"), segs=40, bevel=0.012)

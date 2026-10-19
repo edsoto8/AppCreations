@@ -1,6 +1,10 @@
 {
- "milestone": 5,
+ "milestone": 6,
  "blender": "5.2.2 LTS",
+ "mesh_checked": 593,
+ "mesh_problems": 0,
+ "floating": [],
+ "objects_robot": 1126,
  "counts": {
   "Torso": {
    "parts": 143,
@@ -46,7 +50,7 @@
  "log": [
   {
    "kind": "INFO",
-   "msg": "build to milestone 5 took 2.6s",
+   "msg": "build to milestone 6 took 3.1s",
    "obj": null
   }
  ]

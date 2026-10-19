@@ -101,3 +101,27 @@ and EXACT produced an empty result. Fixed by moving the bore into a separate sim
 Counts at M5: 641 parts + 473 fasteners = 1,114 visible robot objects (Torso 267, Head 105, Leg_L/R 223 each,
 Arm_L 150, Arm_R 146).
 
+### Milestone 6: materials and procedural textures (done)
+
+`mech/materials.py` now holds both the flat blockout set (M1–M5) and the procedural PBR set, built by a small node-graph
+builder (`NB`). The recipes:
+- `painted()` (weathered yellow armor, dark armor, painted industrial steel, greasy joint steel, spring paint, stencil
+  paint): per-object tint from Object Info > Random; large-scale fading; **edge wear** from a Bevel-node normal vs true
+  normal mask, broken up by noise, revealing bare metal; **scratches** from contour lines of 90×-stretched noise, gated by a
+  second noise; **AO cavity grime/grease**; roughness noise; bump that sinks the chipped areas.
+- `hazard()`: painted recipe with a diagonal saw-wave stripe pattern injected as the paint colour.
+- `brushed_titanium()` (anisotropic, stretched-noise brushing), `chrome()` (smudges + oil film for piston rods),
+  `rubber()`/`plastic()` (dust, cavity dirt, micro bump), `carbon()` (checker + band weave under a clear coat),
+  `emissive()` (blue core / amber optics / red and green LEDs with slight noise flicker), `glass()` (transmission),
+  `lens_inner()` (coated optics with thin-film iridescence), `grease()`, `metal()` (bolts with rust spots, gears with
+  heavy grime, welds with heat-tint banding, copper), `concrete()` (voronoi cracks, stains), `floor_paint()`.
+- Reproducibility: every Mapping-node offset comes from `utils.rng(material name)` (seed 9009). Object Info Random
+  hashes object names, so it is deterministic too.
+
+QC (`renders/qc_m6.png` plus close-ups) defects → fixes:
+1. Yellow read pale/buttery under AgX Medium-High Contrast → base paint pushed to (0.90, 0.47, 0.008).
+2. Edge wear barely visible → Bevel mask gain 9→14 and threshold lowered; still deliberately subtle.
+3. Scratches on dark steel looked like stray hairs → thinner contour lines (×120), sparser gate, steel scratch 0.6→0.35.
+4. Render cost: 800×600 at 48 samples takes about 70 s per view on 4 CPU cores. Bevel and AO nodes run at 4 and 8 samples to
+   keep that bounded. Finals at 1080p will need about 96–128 samples to fit the 20-minute cap (measured in M8).
+
