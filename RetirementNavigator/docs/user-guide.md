@@ -79,6 +79,31 @@ estimates, not guarantees, tax advice, or investment recommendations. Taxes are 
   - While tax rules are unverified, income is shown **before taxes**.
   - Required minimum distributions are left out and labeled until their rules are verified.
 
+## Scenarios
+- A scenario is a what-if version of your plan. It stores only the changes you choose, so later
+  edits to your plan flow into every scenario.
+- **New scenario:** start from a preset or build a custom one.
+  - A Baseline (no changes); B Early retirement (up to 5 years earlier, never before today's age);
+    C Aggressive savings (higher workplace deferrals; IRAs to the maximum only if you tick it);
+    D Market downturn (a drop of a chosen size spread over 1–10 years, from a year you choose);
+    E Delayed retirement (3–5 years later); F Reduced spending (retirement spending and steps);
+    G Roth strategy (workplace deferrals moved to Roth where the plan offers it).
+  - Someone already retired is left as they are by B and E.
+  - A custom scenario lists each change (for example "Sam: retirement age → 60"). Editing a preset's
+    changes turns it into a custom scenario.
+- **Out-of-date presets:** presets save the values they computed (for example the reduced spending
+  amount). If your plan changes, the page says the preset no longer matches and offers to rebuild it.
+- **Changes not applied:** a change to something you later deleted (an account or a person) is shown
+  as not applied.
+- **Compare:** up to four scenarios beside the base plan: first retirement year, savings at
+  retirement, monthly income, ending balance, how long the money lasts, funding success, readiness
+  and an after-tax ending balance (shown only once tax rules are verified). Each plan's notes (for
+  example healthcare before Medicare) are listed above the table. Figures that depend on
+  contributions before plan limits are marked.
+- **Earliest retirement age:** scans each age in a range and reports the earliest one where the plan
+  meets the funding criterion (no depletion before the planning age and at least your minimum
+  ending balance). A partner who is not retired moves by the same number of years.
+
 ## Profiles
 - The header switcher changes the active profile.
 - **Profiles** (under Tools) creates, renames, duplicates and deletes profiles, and adds sample
