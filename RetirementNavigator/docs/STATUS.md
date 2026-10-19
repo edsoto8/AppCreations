@@ -5,14 +5,16 @@ Statuses: `done` · `simplified` (with limitation) · `unverified rule` · `not 
 ## Current phase
 **M4 Retirement income: done** with two gates blocked on sources (the IRS RMD table example and the
 Pub 915 worked example need verified values; see M4 gate evidence). Tagged `m4-retirement-income`
-locally. **M5 Scenarios: done**, tagged `m5-scenarios` locally. M3 is tagged `m3-forecasting` locally (tag pushes
-are refused; see Handoff).
+locally. **M5 Scenarios: done** (`m5-scenarios`). **M6 Monte Carlo: done** with the laptop
+performance target **missed on this container** (see M6 gate evidence; `m6-monte-carlo`). **M7a
+Calculators: done** (`m7a-calculators`). **M7b Insights, export, print: done** (`m7b-insights-io`).
+**M8 Quality: in progress.** All tags are local only (tag pushes are refused; see Handoff).
 
 **M2 is still untagged:** its gates wait on verified rule values and the owner's review of
 `docs/rules-verification.md`. irs.gov, ssa.gov and federalregister.gov remain unreachable (see
 Blockers).
 
-Next: **M6 Monte Carlo**.
+Next: **M8** (independent validation report, final review sweep, docs, final STATUS).
 
 ## Milestone log
 | Milestone | Status | Tag | Date |
@@ -23,7 +25,68 @@ Next: **M6 Monte Carlo**.
 | M3 Forecasting | done | `m3-forecasting` (local only) | 2026-10-19 |
 | M4 Retirement income | done (RMD and Pub 915 worked-example gates **blocked on sources**) | `m4-retirement-income` (local only) | 2026-10-19 |
 | M5 Scenarios | done | `m5-scenarios` (local only) | 2026-10-19 |
-| M6–M8 | not started | | |
+| M6 Monte Carlo | done; **laptop target missed on this hardware** (6.0 s first run / 3.3 s warm vs 3 s) | `m6-monte-carlo` (local only) | 2026-10-19 |
+| M7a Calculators | done | `m7a-calculators` (local only) | 2026-10-19 |
+| M7b Insights, export, print | done | `m7b-insights-io` (local only) | 2026-10-19 |
+| M8 Quality | in progress | | |
+
+## M6 gate evidence
+| Gate | Evidence | Result |
+|---|---|---|
+| Seed determinism and quick-run equality | Same seed and inputs → identical chunks; another seed differs; chunks split three ways and merged equal one chunk; a 1,000-path run is the prefix of a 2,000-path run (`montecarlo/run.test.ts`). Web: the quick-run chunk is reused by the full run and both summaries equal direct engine summaries; a pool of 3 executors equals one (`runner.test.ts`). | pass |
+| Median reconciles with the deterministic baseline under zero volatility | Every path equals the baseline within a cent with taxes and withdrawals (fixture rules), with fixed inflation and with stochastic inflation at the plan's own rate (nominal and real); p50 ending = baseline ending; success rate = deterministic success. Independently: each cached path equals an uncached projection of independently rebuilt draws **bit for bit** for all 4 samples × both rule sets with stochastic inflation. | pass |
+| PSD validation tested | Non-PSD 4×4 correlation (stochastic inflation) → `invalid` with a clear message; the optimizer reports it once; the UI blocks the run for 3×3 and 4×4 cases (`random.test.ts`, `run.test.ts`, `MonteCarloPage.test.tsx`). | pass |
+| Performance targets measured and recorded | See below. Laptop target (10,000 paths × 60 years < 3 s) **missed on this container**; phone target (< 10 s, emulated) met only as a projection. | **partial** |
+| + MC option in scenarios and the optimizer; MC readiness | Compare view success rates equal direct engine summaries per applied scenario; optimizer MC result equals `optimizeRetirementAge` with the same config (worker, per-age progress, cancel); readiness band equals `monteCarloReadiness`. | pass |
+
+### Performance (measured 2026-10-19, 4-core Intel Xeon @ 2.1 GHz cloud container)
+| Measurement | Result | Source |
+|---|---|---|
+| Node, one thread, 10,000 paths × 60 years, bundled rules (before taxes) | 8.2 s (0.82 ms/path); projected 2.2 s over 4 workers | `packages/engine/bench/results/montecarlo.json` |
+| Node, one thread, same with the synthetic verified rules (taxes and gross-up) | 12.6 s (1.26 ms/path); projected 3.3 s over 4 workers | same |
+| Browser, headless Chromium, 4 Web Workers, Mid-career couple (before taxes) | **6.0 s** on the first run after opening the page; **3.3 s** on the next run (quick run 1.5 s / 1.0 s) | `apps/web/bench-results/montecarlo-browser-desktop.json` |
+| Phone, emulated: 4× CPU throttling on the main thread, one thread (measured) | 34 s; **projected 8.5 s over 4 workers** | `apps/web/bench-results/montecarlo-browser-mobile.json` |
+
+- **Target status:** the laptop target (3 s) is **not met on this container** (a 2.1 GHz server core in
+  headless Chromium); a typical laptop core is faster, but no laptop was measured, so no laptop claim
+  is made. The phone target is met only as a projection: Chromium cannot throttle Web Workers
+  ("Operation is only supported for pages, not workers"), so the phone run is the throttled main thread
+  and the 4-worker figure divides it (ideal scaling; a phone may have fewer fast cores).
+- **Optimized first (results unchanged, tested):** locale formatting removed from message text, rule
+  resolution cached, return-independent work shared across paths, a run prepared once per worker
+  range, workers spawned and warmed when the page opens; about 4–10× faster per projection than at the
+  start of M6. The remaining cost is mostly the gross-up solver's tax evaluations (with verified rules)
+  and building each year's row.
+- **First-run gap:** the first run in fresh workers is slower (V8 warm-up); the page warms its workers
+  on open, but a run started immediately still sees it.
+- The Monte Carlo optimizer scans ages in one worker (about 21 s for 33 ages × 1,000 paths); progress
+  and cancel keep the page responsive. Spreading ages over the pool is a follow-up.
+
+## Review findings (M6)
+| # | Finding | Severity | Resolution |
+|---|---|---|---|
+| B1 | Phone target not measured; page CPU throttling does not reach workers | blocking | Phone run moved to the throttled main thread (measured) with a labeled projection; laptop measured with real workers; shortfall recorded above |
+| S2 | §11 said stochastic inflation drives all spending; working-years spending uses the assumption | should fix | Docs and code comment corrected |
+| S3 | The optimizer hid a Monte Carlo failure as "no age qualifies" | should fix | `invalid` with issues; `monteCarloPaths` reported; UI lists issues |
+| S4 | A worker that fails to load hung the run at 0% | should fix | Persistent error listener; the range fails with "The simulation worker could not start" (tested) |
+| S5 | Missing regression tests (cache = uncached; zero volatility with stochastic inflation) | should fix | Added (bit-for-bit and within a cent) |
+| — | Per-sub-chunk re-preparation; histogram when nearly all paths deplete; unused field; legend wording; assumptions text | optional | All fixed |
+
+## M7a gate evidence
+| Gate | Evidence | Result |
+|---|---|---|
+| Each calculator has a closed-form or engine-parity test | 133 engine tests (closed forms FV, growing annuity, payment, withdrawal exhaustion, coast number, inflation conversions, SS proration and break-even; parity with `computeMatch`, `compareScenarios`, brute-force retirement age, `ssBenefitAtClaim`); web `parity.test.tsx`: all 15 through the UI equal the engine | pass |
+| No duplicated formulas | `noDuplicatedFormulas.test.ts` fails on `Math.pow`, `**`, `Math.exp*`, `Math.log*` in calculator sources (and tests itself); the UI calls only engine functions (review) | pass |
+| + Roth-vs-traditional link wired | Roth IRA page and Income & Savings link to the prefilled calculator (RTL and E2E) | pass |
+
+## M7b gate evidence
+| Gate | Evidence | Result |
+|---|---|---|
+| Every insight re-runs the engine | A spy on `projectHousehold` counts ≥ 1 + insights runs; re-applying each insight's own ops reproduces its figure exactly (`insights.test.ts`) | pass |
+| CSV injection test | `=`, `+`, `-`, `@`, tab and CR cells escaped; plain numbers kept; a formula in an account name is escaped (`io.test.ts`); download content equals `toCsv` (RTL, E2E) | pass |
+| Migration fixtures from every prior version | Schema version 1 is the only version; a fixture exists for every version up to the current one and the test enforces it (`io/fixtures/v1-export.json`) | pass |
+| Malformed JSON rejected with clear messages | Empty, broken JSON, non-object, wrong format, bad/newer schemaVersion, oversized, field errors with paths, dangling scenario base profile, duplicate profiles; UI shows each problem and changes nothing (RTL, E2E) | pass |
+| + Delete-all | IndexedDB stores and the app's localStorage key cleared, stores reset, back to onboarding (RTL, E2E) | pass |
 
 ## M5 gate evidence
 | Gate | Evidence | Result |
@@ -165,11 +228,14 @@ of benefits as ½ instead of reading the rule; it now reads `tier1` (§6).
 | Retirement taxes, gross-up solver, gross-to-net view, filing after a death | done / **unverified rule** | Gross-to-net shows "Unverified rule" or "Before taxes", never estimated |
 | HSA qualified medical and Roth-basis withdrawals, early-withdrawal flags | done / **unverified rule** | Penalties are flagged, not modeled |
 | Retirement Income page (SS, pensions, events, spending plan, gross-to-net, claiming-age comparison) | done | |
-| Scenarios: create, save, duplicate, rename, delete, compare (up to 4 + base), presets A–G, custom overrides, drift rebuild | done | Funding success is deterministic; Monte Carlo rates arrive with the M6 UI |
-| Retirement-age optimizer (deterministic; Monte Carlo criterion in the engine) | done | The Monte Carlo option in the UI arrives with M6 |
-| Monte Carlo engine (paths, PSD check, stochastic inflation, summary), sequence illustration, allocation by asset class | done (engine) | UI in progress (M6) |
-| CSV export, JSON export/import with migration and validation | done (engine) | UI in M7b |
-| Calculators, insights, print, delete-all, M8 quality | not started | Placeholders show no figures |
+| Scenarios: create, save, duplicate, rename, delete, compare (up to 4 + base), presets A–G, custom overrides, drift rebuild | done | Opt-in Monte Carlo success rates per plan |
+| Retirement-age optimizer (deterministic or Monte Carlo criterion) | done | |
+| Monte Carlo: worker pool, quick run then full run, progress, cancel, settings, capital-market editor, success rate with assumptions, bands, histogram, depletion ages, sequence illustration, methodology | done | Laptop performance target missed on this container (see M6) |
+| Allocation view (c) by asset class | done | Sample profiles set no allocation, so they show "no allocation" |
+| Monte Carlo in scenario comparison, optimizer and dashboard readiness | done | The optimizer's MC scan uses one worker |
+| Calculators (15) and the Roth-vs-traditional link | done / **unverified rule** where rules are needed | Unverified results show "Not available yet"; most figures are before taxes and limits |
+| Insights (8 what-ifs) | done | Re-run through the engine |
+| JSON export/import, CSV export, delete all, printable summary | done | |
 
 ## Blockers and risks
 - **Rules sources unreachable.** irs.gov, ssa.gov and federalregister.gov are blocked by this
@@ -312,6 +378,7 @@ No open findings.
 | 1.5.0 | 2026-10-19 | From the M3 review: `DashboardCards.longevity` (depletes) gains a required `personId`; the `summary.depletionAge` and `retirementYear` comments are corrected to their definitions. No stored documents are affected. |
 | 1.6.0 | 2026-10-19 | M4, **not purely additive**: new SS source kind `atClaimAge`; new required flows `rmd`, `hsaMedical`, `reinvested`; warning code `oneTimeInflowSpent`; M4 functions implemented and re-exported. Stored profiles gain no required field (the new source kind is optional input). |
 | 1.7.0 | 2026-10-19 | M4 validation: lump-sum and inflow destination types are checked, duplicate earnings years rejected (stricter; a stored profile violating these fails validation with a clear message). |
+| 1.10.0 | 2026-10-19 | Additive: the 15 calculators and their schemas/result types, `CALCULATORS`, `runCalculator`; `prepareMonteCarlo`, `runPreparedChunk`, `PreparedMonteCarlo`; `impliedArithmeticMeans`, `monteCarloReadiness`; `computeInsights` implemented. `OptimizerResult` gains a required `monteCarloPaths` (callers that build it must set it; the app only reads it). No stored documents change. |
 | 1.9.0 | 2026-10-19 | From the M5 review and M6/M7b engine work. **Stricter:** scenario paths reject prototype keys, and a `set` on a field that does not exist is an orphaned `invalidPath` op (stored scenarios with such ops now show them as not applied). **Changed signature:** `summarizeMonteCarlo(chunks, config, household, firstYear)` (it needs the capital-market assumptions; it was a stub). Additive: `presetDrift`, `marketShockTotal`, `runMonteCarloChunk`, `isPositiveSemiDefinite`, `allocationByAssetClass`, `sequenceRiskIllustration`, `toCsv` options for display names and `csvCell`, `exportJson`, `importJson`, `MAX_IMPORT_CHARS`; presets record `currentYear` in `presetParams`; the optimizer's Monte Carlo criterion. No stored documents change shape. |
 | 1.8.0 | 2026-10-19 | M5 `compareScenarios` (dashboards per scenario plus an after-tax ending balance that stays null while taxes are unverified). From the M4 review: warning codes `oneTimeOutflowUnfunded`, `excessIncomeSpent`; shared destination helpers `canReceiveTaxableMoney` and `canReceiveLumpSum`, and an "other" account must be taxed as taxable to receive surplus, inflows or a non-rollover lump sum (stricter). |
 
@@ -334,9 +401,9 @@ No open findings.
 | Spending plan, SS (entered / illustrative / spousal / survivor / reduction), pensions, one-time events, taxable basis and drag | M4 ✅ (SSA rules unverified) |
 | Withdrawal ordering, RMDs, tax model, gross-up solver, survivor modeling, gross-to-net, HSA and Roth withdrawals | M4 ✅ (tax and RMD rules unverified) |
 | Scenarios CRUD, diff, presets A–G, compare, deterministic optimizer | M5 ✅ |
-| Monte Carlo (all of §5.7), allocation (c), MC option in scenarios and the optimizer | M6 |
-| 15 calculators | M7a |
-| Insights; CSV/JSON export/import; migrations; print summary; delete-all | M7b |
+| Monte Carlo (all of §5.7), allocation (c), MC option in scenarios and the optimizer | M6 ✅ (laptop target missed here) |
+| 15 calculators | M7a ✅ |
+| Insights; CSV/JSON export/import; migrations; print summary; delete-all | M7b ✅ |
 | Full E2E, axe audit, performance, independent validation, user guide | M8 |
 
 ## Handoff
@@ -366,15 +433,16 @@ No open findings.
      RMD table, Pub 915).
   3. Owner spot-checks the top 15 values.
   4. Tag.
-- **Next (M6 Monte Carlo):** split the projection into a return-independent plan and a per-path
-  account loop; `runMonteCarloChunk` / `summarizeMonteCarlo` wired to the API; worker with quick run,
-  progress and cancel; stochastic inflation through the per-path deflator (finishing
-  `inflationOverride`); UI (bands, success rate with its assumptions, histogram, sequence-risk
-  illustration, methodology panel, allocation view (c)); MC option in scenarios and the optimizer;
-  `pnpm bench` for 10,000 paths × 60 years.
-- **Frozen contracts:** `packages/engine/src/domain/*`, `packages/engine/src/api.ts` (1.9.0).
+- **Done in M6–M7b:** the Monte Carlo engine and page (workers, quick run, bands, success rate with
+  assumptions, sequence illustration, methodology), Monte Carlo in scenarios, the optimizer and the
+  dashboard readiness card, allocation view (c); the 15 calculators; insights; JSON/CSV export and
+  import; delete all; the printable summary.
+- **Next (M8):** file the fresh-context validation report (`docs/validation-report.md`), resolve the
+  final review sweep, finish the user guide, and write the final STATUS with every shortfall.
+- **Frozen contracts:** `packages/engine/src/domain/*`, `packages/engine/src/api.ts` (1.10.0).
 - **Tags:** the session's git proxy refuses tag pushes (HTTP 403); branch pushes work.
-  `m1-foundation`, `m3-forecasting` and `m4-retirement-income` exist locally only. To publish from a
+  `m1-foundation`, `m3-forecasting`, `m4-retirement-income`, `m5-scenarios`, `m6-monte-carlo`,
+  `m7a-calculators` and `m7b-insights-io` exist locally only. To publish from a
   clone, recreate them on the commits titled "fix(RetirementNavigator): resolve M1 review findings;
   start M2 rules data", "fix(RetirementNavigator): resolve M3 review findings" and
   "docs(RetirementNavigator): M4 status, statutory constants, fixture policy", for example
