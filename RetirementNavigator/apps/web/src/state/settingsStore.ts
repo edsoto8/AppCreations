@@ -16,10 +16,15 @@ function prefersDark(): boolean {
   return typeof window.matchMedia === 'function' && window.matchMedia('(prefers-color-scheme: dark)').matches;
 }
 
-/** Apply a theme preference to <html>. Mirrored in localStorage so public/theme-init.js avoids a flash. */
-export function applyTheme(theme: ThemePreference): void {
+/**
+ * Apply a theme preference to <html>. A choice the person makes (`persist`) is mirrored in
+ * localStorage so public/theme-init.js avoids a flash; applying the stored or default theme at
+ * start-up or on an OS change writes nothing (so "delete all my data" stays deleted).
+ */
+export function applyTheme(theme: ThemePreference, persist = false): void {
   const dark = theme === 'dark' || (theme === 'system' && prefersDark());
   document.documentElement.classList.toggle('dark', dark);
+  if (!persist) return;
   try {
     window.localStorage.setItem(THEME_STORAGE_KEY, theme);
   } catch {
@@ -46,7 +51,7 @@ export function followSystemTheme(getTheme: () => ThemePreference): () => void {
 export const useSettingsStore = create<SettingsState>((set) => ({
   theme: readStoredTheme(),
   setTheme: (theme) => {
-    applyTheme(theme);
+    applyTheme(theme, true);
     set({ theme });
   },
 }));

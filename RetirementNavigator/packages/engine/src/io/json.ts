@@ -96,7 +96,25 @@ export function importJson(text: string): EngineResult<ExportBundle> {
     if (seen.has(p.id)) issues.push({ path: ['profiles', i, 'id'], message: `Profile id ${p.id} appears twice` });
     seen.add(p.id);
   });
+  bundle.profiles.forEach((p, i) => {
+    if (p.household.id !== p.id) {
+      issues.push({
+        path: ['profiles', i, 'household', 'id'],
+        message: `Profile ${p.id} holds a plan with a different id (${p.household.id})`,
+      });
+    }
+  });
+  const scenarioIds = new Set<string>();
   bundle.scenarios.forEach((s, i) => {
+    if (scenarioIds.has(s.id))
+      issues.push({ path: ['scenarios', i, 'id'], message: `Scenario id ${s.id} appears twice` });
+    scenarioIds.add(s.id);
+    if (s.scenario.id !== s.id) {
+      issues.push({
+        path: ['scenarios', i, 'scenario', 'id'],
+        message: `Scenario ${s.id} holds a scenario with a different id (${s.scenario.id})`,
+      });
+    }
     if (!profileIds.has(s.scenario.baseProfileId)) {
       issues.push({
         path: ['scenarios', i, 'scenario', 'baseProfileId'],

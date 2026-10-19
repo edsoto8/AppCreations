@@ -35,6 +35,29 @@ test.describe('M7b data, insights and print', () => {
     await dialog.getByLabel('Type DELETE to confirm').fill('DELETE');
     await dialog.getByRole('button', { name: 'Delete everything' }).click();
     await expect(page).toHaveURL(/#\/welcome/);
+    // Everything the app stored is gone, also after a reload.
+    await page.reload();
+    await expect(page).toHaveURL(/#\/welcome/);
+    const stored = await page.evaluate(async () => {
+      const db = await new Promise<IDBDatabase>((resolve, reject) => {
+        const req = indexedDB.open('retirement-navigator');
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+      });
+      const counts: number[] = [];
+      for (const name of Array.from(db.objectStoreNames)) {
+        counts.push(
+          await new Promise<number>((resolve) => {
+            const req = db.transaction(name).objectStore(name).count();
+            req.onsuccess = () => resolve(req.result);
+          }),
+        );
+      }
+      db.close();
+      return { counts, theme: localStorage.getItem('rn-theme') };
+    });
+    expect(stored.counts.every((n) => n === 0)).toBe(true);
+    expect(stored.theme).toBeNull();
 
     await page.goto(appUrl('/data'));
     await expect(page.getByRole('heading', { level: 1, name: 'Data & Privacy' })).toBeVisible({ timeout: 15_000 });

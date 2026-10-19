@@ -142,6 +142,23 @@ describe('JSON export and import', () => {
     expect(twice.status === 'invalid' && twice.issues[0]!.message).toMatch(/appears twice/);
   });
 
+  it('rejects duplicate scenario ids and documents whose inner ids differ from their own', () => {
+    const base = v1();
+    const scenario = base.scenarios[0]!;
+    const message = (bundle: unknown) => {
+      const r = importJson(JSON.stringify(bundle));
+      return r.status === 'invalid' ? r.issues.map((i) => i.message).join(' ') : 'ok';
+    };
+    expect(message({ ...base, scenarios: [scenario, scenario] })).toMatch(/Scenario id .* appears twice/);
+    expect(message({ ...base, scenarios: [{ ...scenario, scenario: { ...scenario.scenario, id: 'other' } }] })).toMatch(
+      /holds a scenario with a different id/,
+    );
+    const profile = base.profiles[0]!;
+    expect(
+      message({ ...base, profiles: [{ ...profile, household: { ...profile.household, id: 'other-plan' } }] }),
+    ).toMatch(/holds a plan with a different id/);
+  });
+
   it('refuses to export an invalid bundle (so every export can be imported)', () => {
     expect(() => exportJson({ ...v1(), format: 'x' } as never)).toThrow();
   });

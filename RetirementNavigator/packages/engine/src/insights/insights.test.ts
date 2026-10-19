@@ -8,6 +8,7 @@ import { HouseholdSchema, type Household } from '../domain/household';
 import { ScenarioSchema } from '../domain/scenario';
 import { SAMPLE_PROFILES } from '../samples/profiles';
 import { RULES } from '../rules/index';
+import { dollars } from '../money';
 import { FIXTURE_YEAR, fixtureRules } from '../testing/fixtureRules';
 import * as api from '../api';
 import type * as ProjectModule from '../projection/project';
@@ -19,6 +20,7 @@ vi.mock('../projection/project', async (importOriginal) => {
 const project = await import('../projection/project');
 const { applyScenario } = await import('../scenario/scenario');
 const { computeInsights } = await import('./insights');
+const { previewAccumulation } = await import('../income/preview');
 
 const YEAR = 2026;
 const ctx = { currentYear: YEAR, rules: RULES };
@@ -145,5 +147,95 @@ describe('computeInsights', () => {
 
   it('returns invalid for an invalid household', () => {
     expect(computeInsights({ ...sample('earlyCareer'), people: [] } as never, ctx).status).toBe('invalid');
+  });
+});
+
+describe('M7 review: claiming and match insights say what they do', () => {
+  const fx = { currentYear: FIXTURE_YEAR, rules: fixtureRules() };
+  const kinds = (h: Household, context = fx) => {
+    const r = computeInsights(h, context);
+    if (r.status !== 'ok') throw new Error('insights');
+    return r.value;
+  };
+
+  it('moves an unclaimed PIA-based claim 12 months later (months kept); skips entered amounts and people already claiming', () => {
+    const base = sample('nearRetirement');
+    const p = base.people[0]!;
+    const months = HouseholdSchema.parse({
+      ...base,
+      people: [
+        { ...p, socialSecurity: { ...p.socialSecurity, claimAge: { years: 66, months: 8 } } },
+        ...base.people.slice(1),
+      ],
+    });
+    const ss = kinds(months).find((i) => i.kind === 'ssClaimingAge');
+    expect(ss?.whatIfOps[0]).toMatchObject({ path: ['socialSecurity', 'claimAge'], value: { years: 67, months: 8 } });
+    const entered = HouseholdSchema.parse({
+      ...base,
+      people: [
+        {
+          ...p,
+          socialSecurity: {
+            source: { kind: 'atClaimAge', monthlyAtClaim: dollars(3_000) },
+            claimAge: { years: 67, months: 0 },
+          },
+        },
+        ...base.people.slice(1),
+      ],
+    });
+    expect(kinds(entered).map((i) => i.kind)).not.toContain('ssClaimingAge');
+    const claiming = HouseholdSchema.parse({
+      ...base,
+      people: [
+        {
+          ...p,
+          birthYear: FIXTURE_YEAR - 68,
+          socialSecurity: { ...p.socialSecurity, claimAge: { years: 62, months: 0 } },
+        },
+        ...base.people.slice(1),
+      ],
+    });
+    expect(kinds(claiming).map((i) => i.kind)).not.toContain('ssClaimingAge');
+  });
+
+  it('raises deferrals only as far as the engine readout needs to leave no match unclaimed', () => {
+    for (const id of ['earlyCareer', 'highEarner', 'midCareerCouple']) {
+      const base = sample(id);
+      const insight = kinds(base, fx).find((i) => i.kind === 'fullMatchValue');
+      const before = previewAccumulation(base, fx, 1);
+      if (before.status !== 'ok') throw new Error('preview');
+      const leftBefore = before.value.people.flatMap((p) => p.rows[0]!.plans.map((x) => x.matchBeforeLimits.unclaimed));
+      if (!insight) {
+        expect(leftBefore.every((u) => u <= 0)).toBe(true);
+        continue;
+      }
+      const applied = applyScenario(
+        base,
+        ScenarioSchema.parse({ id: 'x', name: 'x', baseProfileId: base.id, ops: insight.whatIfOps }),
+      );
+      const after = previewAccumulation(applied.household!, fx, 1);
+      if (after.status !== 'ok') throw new Error('preview');
+      for (const p of after.value.people)
+        for (const plan of p.rows[0]!.plans) expect(plan.matchBeforeLimits.unclaimed).toBeLessThanOrEqual(0);
+      // Minimal: 0.01 point less leaves some match unclaimed for each changed plan.
+      for (const op of insight.whatIfOps) {
+        if (op.op !== 'set') continue;
+        const less = applyScenario(
+          base,
+          ScenarioSchema.parse({
+            id: 'y',
+            name: 'y',
+            baseProfileId: base.id,
+            ops: [{ ...op, value: (op.value as number) - 0.0001 }],
+          }),
+        );
+        const r = previewAccumulation(less.household!, fx, 1);
+        if (r.status !== 'ok') throw new Error('preview');
+        const left = r.value.people.flatMap((p) =>
+          p.rows[0]!.plans.filter((x) => x.planId === op.id).map((x) => x.matchBeforeLimits.unclaimed),
+        );
+        expect(left.some((u) => u > 0)).toBe(true);
+      }
+    }
   });
 });

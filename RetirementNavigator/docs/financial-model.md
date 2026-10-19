@@ -1039,14 +1039,14 @@ unverified. An insight that does not apply is left out.
 
 | Insight | What-if | Figure |
 |---|---|---|
-| Retiring two years later | every person not yet retired: retirement age + 2 (capped at the planning age) | real ending balance; longevity |
-| Capturing the full match | each plan's salary deferral raised to the sum of its match tiers' bands (only when below it) | savings at retirement (real end of the year before the first retirement year) |
+| Retiring two years later | every person not yet retired (and not already at the planning age): retirement age + 2 (capped at the planning age) | real ending balance; longevity |
+| Capturing the full match | only plans whose year-1 match readout (`previewAccumulation` … `matchBeforeLimits.unclaimed`) is above 0: the salary deferral rises to the smallest rate, to 0.01%, whose readout leaves nothing unclaimed (bisection over the readout; bonus, caps and the compensation limit are the engine's) | savings at retirement (real end of the year before the first retirement year) |
 | Lifetime cost of fees | every expense ratio set to 0 (only when some are above 0) | real ending balance |
 | Inflation one point higher | `inflation + 0.01` | real ending balance |
 | Retirement spending 10% lower | preset F's ops with a 10% cut | real ending balance; longevity |
-| Returns one point lower | every return source (phase returns, capital-market geometric returns, account expected returns) − 0.01 | real ending balance; longevity (tone "attention" when either run depletes) |
-| Claiming Social Security one year later | each claiming age + 1 year (whole years, up to 70) when the plan has Social Security income | lifetime Social Security income, Σ flows.socialSecurity / P_t |
-| Savings needed for the goal | only when the deterministic criterion fails: a new cash account with an annual contribution X; bisection on X in [0, $500,000] to the nearest $100 | the smallest X found that meets the criterion (or "not within $500,000") |
+| Returns one point lower | every return source (phase returns, capital-market geometric returns, account expected returns, market-shock returns) − 0.01 | real ending balance; longevity (tone "attention" when either run depletes) |
+| Claiming Social Security one year later | each person who has not reached the claiming year, whose benefit is computed from a PIA (statement or estimate; an amount entered at the claiming age is not moved) and is in the forecast: claiming age + 12 months (up to 70y0m) | lifetime Social Security income, Σ flows.socialSecurity / P_t |
+| Savings needed for the goal | only when the deterministic criterion fails: a new cash account with an annual contribution X in today's dollars rising with inflation; bisection on X in [0, $500,000] to the nearest $100; working years where it exceeds take-home pay are mentioned | the smallest X found that meets the criterion (or "not within $500,000") |
 
 Tests: a spy confirms the projection runs once for the baseline and at least once per insight, and
 re-applying each insight's own ops reproduces its figure exactly.
