@@ -121,8 +121,22 @@ describe('RothIraPage', () => {
     ).toBeInTheDocument();
     expect(screen.getByText(/Backdoor Roth contributions/)).toBeInTheDocument();
     expect(screen.getByText(/5-year rule/)).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Compare Roth vs traditional' })).toHaveAttribute('href', '/calculators');
-    expect(screen.getByText('Coming in a later milestone (M7a)')).toBeInTheDocument();
+    const person = sample('earlyCareer').people[0];
+    expect(screen.getByRole('link', { name: 'Compare Roth vs traditional' })).toHaveAttribute(
+      'href',
+      `/calculators?c=rothVsTraditional&prefill=plan&person=${person?.id ?? ''}`,
+    );
     expect(screen.queryByText(/married filing jointly/)).not.toBeInTheDocument();
+  });
+
+  it('links each person of a couple to the Roth vs traditional calculator, prefilled', async () => {
+    await renderWithProfile(<RothIraPage />);
+    const people = activeHousehold().people;
+    for (const person of people) {
+      expect(screen.getByRole('link', { name: `Compare Roth vs traditional for ${person.name}` })).toHaveAttribute(
+        'href',
+        `/calculators?c=rothVsTraditional&prefill=plan&person=${person.id}`,
+      );
+    }
   });
 });

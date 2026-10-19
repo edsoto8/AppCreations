@@ -94,4 +94,13 @@ describe('IncomeSavingsPage', () => {
     await user.click(screen.getAllByRole('radio', { name: 'Future dollars' })[0]!);
     expect(useProfileStore.getState().dollarBasis).toBe('nominal');
   });
+
+  it('links the plan to the Roth vs traditional calculator, filled from the person’s plan', async () => {
+    await renderWithProfile(<IncomeSavingsPage />, { household: sample('nearRetirement') });
+    const person = active().people[0]!;
+    expect(screen.getAllByRole('link', { name: 'Compare Roth vs traditional' })[0]).toHaveAttribute(
+      'href',
+      `/calculators?c=rothVsTraditional&prefill=plan&person=${person.id}`,
+    );
+  });
 });

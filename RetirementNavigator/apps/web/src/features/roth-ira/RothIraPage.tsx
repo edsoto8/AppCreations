@@ -20,6 +20,7 @@ import { AccountDialog } from '@/features/accounts/AccountDialog';
 import { describeContribution } from '@/features/accounts/accountModel';
 import { previewYearOne, type RothIraAccount } from '@/features/accounts/thisYear';
 import { useCommitHousehold } from '@/features/accounts/useCommitHousehold';
+import { calculatorHref } from '@/features/calculators/registry';
 import { rothAccountsOf, rothReadout, type RothReadout } from './rothEligibility';
 
 export function RothIraPage() {
@@ -67,7 +68,7 @@ function RothBody({ household }: { household: Household }) {
       ) : first ? (
         <PersonRoth {...shared} person={first} />
       ) : null}
-      <NotModeledCard />
+      <NotModeledCard household={household} />
     </>
   );
 }
@@ -356,7 +357,8 @@ function Readout({ readout }: { readout: RothReadout }) {
   );
 }
 
-function NotModeledCard() {
+function NotModeledCard({ household }: { household: Household }) {
+  const single = household.people.length === 1;
   return (
     <Card>
       <CardHeader>
@@ -376,12 +378,24 @@ function NotModeledCard() {
           </li>
           <li>Roth conversions are on the roadmap and not modeled.</li>
         </ul>
-        <p className="flex flex-wrap items-center gap-2">
-          <Link to="/calculators" className="font-medium underline underline-offset-4">
-            Compare Roth vs traditional
-          </Link>
-          <Badge variant="outline">Coming in a later milestone (M7a)</Badge>
-        </p>
+        <div className="flex flex-col gap-1.5">
+          <p className="text-muted-foreground">
+            The Roth vs traditional calculator compares the same workplace deferral made pre-tax or as Roth, filled from
+            the plan.
+          </p>
+          <ul className="flex flex-wrap gap-x-4 gap-y-1.5">
+            {household.people.map((person) => (
+              <li key={person.id}>
+                <Link
+                  to={calculatorHref('rothVsTraditional', { personId: person.id })}
+                  className="font-medium underline underline-offset-4"
+                >
+                  {single ? 'Compare Roth vs traditional' : `Compare Roth vs traditional for ${person.name}`}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </div>
       </CardContent>
     </Card>
   );

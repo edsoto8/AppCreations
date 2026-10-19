@@ -23,10 +23,14 @@ describe('AppShell', () => {
     expect(screen.getByText(DISCLAIMER_TEXT)).toBeInTheDocument();
   });
 
-  it('shows honest placeholders for unbuilt pages, with no figures', () => {
+  it('builds every section: no placeholder remains (the calculators were the last, M7a)', () => {
     renderAt('/calculators');
     expect(screen.getByRole('heading', { level: 1, name: 'Calculators' })).toBeInTheDocument();
-    expect(screen.getByText('Planned for M7a')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Roth vs traditional/ })).toHaveAttribute(
+      'href',
+      '/calculators?c=rothVsTraditional',
+    );
+    expect(screen.queryByText(/Planned for/)).not.toBeInTheDocument();
   });
 
   it('renders the dashboard at the root route', () => {

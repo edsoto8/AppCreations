@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router';
 import { Plus, Trash2 } from 'lucide-react';
 import type { Control, UseFormReturn } from 'react-hook-form';
 import type { Household, HouseholdInput, PersonPreviewRow } from '@rn/engine';
@@ -14,6 +15,7 @@ import { InfoTip } from '@/components/InfoTip';
 import { UnverifiedValue } from '@/components/UnverifiedNotice';
 import { formatCents, formatPercent } from '@/lib/format';
 import { newId } from '@/lib/ids';
+import { calculatorHref } from '@/features/calculators/registry';
 
 type Form = UseFormReturn<HouseholdInput, unknown, Household>;
 type Person = Household['people'][number];
@@ -486,6 +488,19 @@ export function PlanSection({
                   </NativeSelect>
                 </div>
               </div>
+
+              {planIndex === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  The same deferral made pre-tax or as Roth:{' '}
+                  <Link
+                    to={calculatorHref('rothVsTraditional', { personId: person.id })}
+                    className="font-medium text-foreground underline underline-offset-4"
+                  >
+                    Compare Roth vs traditional
+                  </Link>{' '}
+                  (calculator, filled from {person.name}’s plan).
+                </p>
+              ) : null}
 
               <fieldset className="flex flex-col gap-3">
                 <legend className="mb-1 flex items-center gap-2 text-sm font-medium">

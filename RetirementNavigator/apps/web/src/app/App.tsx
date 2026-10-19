@@ -16,6 +16,7 @@ import { RetirementIncomePage } from '@/features/retirement-income/RetirementInc
 import { ScenariosPage } from '@/features/scenarios/ScenariosPage';
 import { MonteCarloPage } from '@/features/monte-carlo/MonteCarloPage';
 import { InsightsPage } from '@/features/insights/InsightsPage';
+import { CalculatorsPage } from '@/features/calculators/CalculatorsPage';
 import { PrintSummaryPage } from '@/features/print/PrintSummary';
 import { RulesPage } from '@/features/rules/RulesPage';
 import { ProfilesPage } from '@/features/profiles/ProfilesPage';
@@ -34,6 +35,7 @@ const PAGES: Record<string, () => React.ReactElement> = {
   '/scenarios': () => <ScenariosPage />,
   '/monte-carlo': () => <MonteCarloPage />,
   '/insights': () => <InsightsPage />,
+  '/calculators': () => <CalculatorsPage />,
   '/rules': () => <RulesPage />,
   '/profiles': () => <ProfilesPage />,
   '/data': () => <DataPage />,
