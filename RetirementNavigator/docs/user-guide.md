@@ -15,6 +15,38 @@ estimates, not guarantees, tax advice, or investment recommendations. Taxes are 
 
    Either way you then see **Income & Savings**; choose **Finish setup** when done.
 
+## Dashboard
+- The **Dashboard** (the home page) shows ten cards. Each card states its dollars (today's or future,
+  set with **Today's / Future dollars**), whether taxes are included, and the year it refers to. The
+  ⓘ button explains the formula.
+- **Readiness** is a heuristic, not a probability:
+  - *On track*: the baseline and the pessimistic run both last through the planning age;
+  - *Borderline*: only the baseline lasts;
+  - *At risk*: the baseline runs out.
+- The **Forecast** chart shows the portfolio each year. The optimistic and pessimistic lines are
+  fixed return offsets (±2 points by default), not confidence intervals. Lines mark retirement, the
+  first death (couples) and the year the money runs out. **Annual flows** shows contributions,
+  growth and withdrawals.
+- **Where the money is** stacks balances by account type and by tax treatment.
+- **Forecast details** lists every year.
+- Every chart has a **Show … data table** button with the same figures.
+- **While rule values are unverified**, the forecast leaves those steps out and says so in a banner
+  and on each affected card:
+  - contributions are as you elected them, **before plan limits**;
+  - retirement income is **before taxes**;
+  - take-home pay is not shown.
+- **Not in the forecast yet:** Social Security, pensions, one-time events, required minimum
+  distributions and taxes in retirement arrive in a later milestone (M4). The banner lists the ones
+  that apply to you. Until then, retirement spending is drawn from your accounts in the order you
+  choose.
+- **Forecast settings** (on the Profile page):
+  - withdrawal timing (mid-year, or start of year as a conservative choice);
+  - annual or monthly calculation;
+  - the withdrawal order;
+  - where leftover pay goes while working;
+  - the optimistic and pessimistic offsets;
+  - a minimum ending balance in today's dollars.
+
 ## Profiles
 - The header switcher changes the active profile.
 - **Profiles** (under Tools) creates, renames, duplicates and deletes profiles, and adds sample
