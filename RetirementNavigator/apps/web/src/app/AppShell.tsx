@@ -6,6 +6,7 @@ import { Sheet, SheetContent, SheetDescription, SheetTitle, SheetTrigger } from 
 import { Disclaimer } from '@/components/Disclaimer';
 import { SidebarNav } from './SidebarNav';
 import { ThemeToggle } from './ThemeToggle';
+import { ProfileSwitcher } from './ProfileSwitcher';
 import { NAV_ITEMS } from './navigation';
 
 function Brand() {
@@ -23,7 +24,7 @@ export function AppShell() {
   const [menuOpen, setMenuOpen] = useState(false);
   const location = useLocation();
   const current = NAV_ITEMS.find((item) => item.path === location.pathname);
-  const pageLabel = current?.label ?? 'Page not found';
+  const pageLabel = current?.label ?? (location.pathname === '/welcome' ? 'Welcome' : 'Page not found');
   const firstRender = useRef(true);
 
   // Per-route title (WCAG 2.4.2) and focus to the new content after client-side navigation.
@@ -78,7 +79,8 @@ export function AppShell() {
           <p className="truncate text-sm font-medium text-muted-foreground">
             {current?.label ?? 'Retirement Navigator'}
           </p>
-          <div className="ml-auto">
+          <div className="ml-auto flex items-center gap-2">
+            <ProfileSwitcher />
             <ThemeToggle />
           </div>
         </header>

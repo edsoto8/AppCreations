@@ -11,6 +11,7 @@ import {
   LayoutDashboard,
   PiggyBank,
   User,
+  Users,
   Wallet,
   type LucideIcon,
 } from 'lucide-react';
@@ -121,6 +122,14 @@ export const NAV_ITEMS: readonly NavItem[] = [
     milestone: 'M2',
     group: 'Tools',
     description: 'Every regulatory value used, its official source, retrieval date and verification status.',
+  },
+  {
+    path: '/profiles',
+    label: 'Profiles',
+    icon: Users,
+    milestone: 'M2',
+    group: 'Tools',
+    description: 'Create, switch, rename, duplicate and delete profiles.',
   },
   {
     path: '/data',
