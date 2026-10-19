@@ -102,10 +102,9 @@ export function pensionYear(c: YearContext, deflatorAt: (year: number) => number
         : pension.annualAmount / 100;
     if (pension.payout.kind === 'lumpSum') {
       if (year !== startYear || !c.alive(owner)) continue;
-      const amount =
-        pension.amountBasis === 'todaysDollars'
-          ? (pension.payout.amount / 100) * deflatorAt(startYear)
-          : pension.payout.amount / 100;
+      // The lump sum is stated in nominal dollars at the start age (schema); amountBasis applies to
+      // the annuity amount only.
+      const amount = pension.payout.amount / 100;
       const dest = accounts.get(pension.payout.destinationAccountId);
       const deferred = dest ? isTaxDeferred(dest) : false;
       out.lumpSums.push({
@@ -123,7 +122,9 @@ export function pensionYear(c: YearContext, deflatorAt: (year: number) => number
     }
     out.annuity += amount;
     out.taxable += amount * pension.taxableFraction;
-    out.byPerson.set(owner.id, (out.byPerson.get(owner.id) ?? 0) + amount);
+    // A continuing survivor pension is reported on the survivor's row.
+    const recipient = c.alive(owner) ? owner : (h.people.find((p) => p.id !== owner.id && c.alive(p)) ?? owner);
+    out.byPerson.set(recipient.id, (out.byPerson.get(recipient.id) ?? 0) + amount);
   }
   return out;
 }

@@ -799,7 +799,7 @@ export function projectHousehold(
       real: {
         // Real values divide the unrounded float by the deflator, then round once (§1.3).
         portfolioEnd: toCents(portfolioEndFloat / deflator),
-        spendingNeed: toCents(spendingNeed / deflator),
+        spendingNeed: toCents((spendingNeed + outflow) / deflator),
         grossIncome: toCents(grossIncome / deflator),
         netIncome: netIncome === null ? null : toCents(netIncome / 100 / deflator),
       },

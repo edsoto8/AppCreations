@@ -2,6 +2,7 @@
   "name": "retirement-income-exceeds-need",
   "description": "Retired at 66 (retirement age = current age) with part-time income above the need: scheduled taxable and Roth IRA contributions are scaled down to the income left after spending; no withdrawals.",
   "currentYear": 2026,
+  "rules": "bundled",
   "household": {
     "id": "household-1",
     "name": "Fixture",
@@ -128,8 +129,11 @@
             "eligibleCompForMatch": 0,
             "employeeTraditional": 0,
             "employeeRoth": 0,
+            "catchUp": 0,
             "employerMatch": 0,
-            "employerFlat": 0
+            "employerFlat": 0,
+            "socialSecurity": 0,
+            "pension": 0
           }
         ],
         "accounts": [
@@ -141,6 +145,7 @@
             "feeDrag": 0,
             "growthNet": 268521,
             "withdrawals": 0,
+            "rmd": 0,
             "forfeited": 0,
             "end": 6018521,
             "basisEnd": 4750000
@@ -153,6 +158,7 @@
             "feeDrag": 0,
             "growthNet": 156174,
             "withdrawals": 0,
+            "rmd": 0,
             "forfeited": 0,
             "end": 3406174,
             "basisEnd": 1250000
@@ -163,11 +169,24 @@
           "employerContributions": 0,
           "feeDrag": 0,
           "withdrawals": 0,
+          "rmd": 0,
+          "hsaMedical": 0,
+          "reinvested": 0,
           "forfeited": 0,
+          "surplusRouted": 0,
+          "socialSecurity": 0,
+          "pensions": 0,
+          "otherIncome": 0,
+          "oneTimeInflows": 0,
+          "oneTimeOutflows": 0,
           "spendingNeed": 2000000,
           "spendingFunded": 2000000,
           "shortfall": 0
         },
+        "cashFlow": {
+          "infeasible": null
+        },
+        "tax": null,
         "totals": {
           "portfolioStart": 8000000,
           "portfolioEnd": 9424695,
@@ -180,9 +199,11 @@
         "real": {
           "portfolioEnd": 9424695,
           "spendingNeed": 2000000,
-          "grossIncome": 3000000
+          "grossIncome": 3000000,
+          "netIncome": null
         },
         "grossIncome": 3000000,
+        "netIncome": null,
         "depleted": false,
         "markers": ["retirement"]
       },
@@ -203,22 +224,26 @@
             "eligibleCompForMatch": 0,
             "employeeTraditional": 0,
             "employeeRoth": 0,
+            "catchUp": 0,
             "employerMatch": 0,
-            "employerFlat": 0
+            "employerFlat": 0,
+            "socialSecurity": 0,
+            "pension": 0
           }
         ],
         "accounts": [
           {
             "accountId": "taxable",
             "start": 6018521,
-            "contributions": 766749,
+            "contributions": 766750,
             "employerContributions": 0,
             "feeDrag": 0,
             "growthNet": 319861,
             "withdrawals": 0,
+            "rmd": 0,
             "forfeited": 0,
-            "end": 7105131,
-            "basisEnd": 5516749
+            "end": 7105132,
+            "basisEnd": 5516750
           },
           {
             "accountId": "roth",
@@ -228,36 +253,52 @@
             "feeDrag": 0,
             "growthNet": 176809,
             "withdrawals": 0,
+            "rmd": 0,
             "forfeited": 0,
             "end": 3846233,
             "basisEnd": 1513250
           }
         ],
         "flows": {
-          "contributions": 1029999,
+          "contributions": 1030000,
           "employerContributions": 0,
           "feeDrag": 0,
           "withdrawals": 0,
+          "rmd": 0,
+          "hsaMedical": 0,
+          "reinvested": 1,
           "forfeited": 0,
+          "surplusRouted": 0,
+          "socialSecurity": 0,
+          "pensions": 0,
+          "otherIncome": 0,
+          "oneTimeInflows": 0,
+          "oneTimeOutflows": 0,
           "spendingNeed": 2060000,
           "spendingFunded": 2060000,
           "shortfall": 0
         },
+        "cashFlow": {
+          "infeasible": null
+        },
+        "tax": null,
         "totals": {
           "portfolioStart": 9424695,
-          "portfolioEnd": 10951364,
+          "portfolioEnd": 10951365,
           "byTaxTreatment": {
             "taxDeferred": 0,
             "taxFree": 3846233,
-            "taxable": 7105131
+            "taxable": 7105132
           }
         },
         "real": {
-          "portfolioEnd": 10632393,
+          "portfolioEnd": 10632394,
           "spendingNeed": 2000000,
-          "grossIncome": 3000000
+          "grossIncome": 3000000,
+          "netIncome": null
         },
         "grossIncome": 3090000,
+        "netIncome": null,
         "depleted": false,
         "markers": []
       },
@@ -278,22 +319,26 @@
             "eligibleCompForMatch": 0,
             "employeeTraditional": 0,
             "employeeRoth": 0,
+            "catchUp": 0,
             "employerMatch": 0,
-            "employerFlat": 0
+            "employerFlat": 0,
+            "socialSecurity": 0,
+            "pension": 0
           }
         ],
         "accounts": [
           {
             "accountId": "taxable",
-            "start": 7105131,
-            "contributions": 783742,
+            "start": 7105132,
+            "contributions": 783743,
             "employerContributions": 0,
             "feeDrag": 0,
-            "growthNet": 374611,
+            "growthNet": 374612,
             "withdrawals": 0,
+            "rmd": 0,
             "forfeited": 0,
-            "end": 8263484,
-            "basisEnd": 6300491
+            "end": 8263487,
+            "basisEnd": 6300493
           },
           {
             "accountId": "roth",
@@ -303,36 +348,52 @@
             "feeDrag": 0,
             "growthNet": 199157,
             "withdrawals": 0,
+            "rmd": 0,
             "forfeited": 0,
             "end": 4322547,
             "basisEnd": 1790407
           }
         ],
         "flows": {
-          "contributions": 1060899,
+          "contributions": 1060900,
           "employerContributions": 0,
           "feeDrag": 0,
           "withdrawals": 0,
+          "rmd": 0,
+          "hsaMedical": 0,
+          "reinvested": 1,
           "forfeited": 0,
+          "surplusRouted": 0,
+          "socialSecurity": 0,
+          "pensions": 0,
+          "otherIncome": 0,
+          "oneTimeInflows": 0,
+          "oneTimeOutflows": 0,
           "spendingNeed": 2121800,
           "spendingFunded": 2121800,
           "shortfall": 0
         },
+        "cashFlow": {
+          "infeasible": null
+        },
+        "tax": null,
         "totals": {
-          "portfolioStart": 10951364,
-          "portfolioEnd": 12586031,
+          "portfolioStart": 10951365,
+          "portfolioEnd": 12586034,
           "byTaxTreatment": {
             "taxDeferred": 0,
             "taxFree": 4322547,
-            "taxable": 8263484
+            "taxable": 8263487
           }
         },
         "real": {
-          "portfolioEnd": 11863541,
+          "portfolioEnd": 11863543,
           "spendingNeed": 2000000,
-          "grossIncome": 3000000
+          "grossIncome": 3000000,
+          "netIncome": null
         },
         "grossIncome": 3182700,
+        "netIncome": null,
         "depleted": false,
         "markers": []
       },
@@ -353,22 +414,26 @@
             "eligibleCompForMatch": 0,
             "employeeTraditional": 0,
             "employeeRoth": 0,
+            "catchUp": 0,
             "employerMatch": 0,
-            "employerFlat": 0
+            "employerFlat": 0,
+            "socialSecurity": 0,
+            "pension": 0
           }
         ],
         "accounts": [
           {
             "accountId": "taxable",
-            "start": 8263484,
-            "contributions": 800977,
+            "start": 8263487,
+            "contributions": 800978,
             "employerContributions": 0,
             "feeDrag": 0,
-            "growthNet": 432955,
+            "growthNet": 432954,
             "withdrawals": 0,
+            "rmd": 0,
             "forfeited": 0,
-            "end": 9497416,
-            "basisEnd": 7101468
+            "end": 9497419,
+            "basisEnd": 7101471
           },
           {
             "accountId": "roth",
@@ -378,36 +443,52 @@
             "feeDrag": 0,
             "growthNet": 223332,
             "withdrawals": 0,
+            "rmd": 0,
             "forfeited": 0,
             "end": 4837628,
             "basisEnd": 2082156
           }
         ],
         "flows": {
-          "contributions": 1092726,
+          "contributions": 1092727,
           "employerContributions": 0,
           "feeDrag": 0,
           "withdrawals": 0,
+          "rmd": 0,
+          "hsaMedical": 0,
+          "reinvested": 1,
           "forfeited": 0,
+          "surplusRouted": 0,
+          "socialSecurity": 0,
+          "pensions": 0,
+          "otherIncome": 0,
+          "oneTimeInflows": 0,
+          "oneTimeOutflows": 0,
           "spendingNeed": 2185454,
           "spendingFunded": 2185454,
           "shortfall": 0
         },
+        "cashFlow": {
+          "infeasible": null
+        },
+        "tax": null,
         "totals": {
-          "portfolioStart": 12586031,
-          "portfolioEnd": 14335044,
+          "portfolioStart": 12586034,
+          "portfolioEnd": 14335047,
           "byTaxTreatment": {
             "taxDeferred": 0,
             "taxFree": 4837628,
-            "taxable": 9497416
+            "taxable": 9497419
           }
         },
         "real": {
-          "portfolioEnd": 13118595,
+          "portfolioEnd": 13118598,
           "spendingNeed": 2000000,
-          "grossIncome": 3000000
+          "grossIncome": 3000000,
+          "netIncome": null
         },
         "grossIncome": 3278181,
+        "netIncome": null,
         "depleted": false,
         "markers": []
       },
@@ -428,22 +509,26 @@
             "eligibleCompForMatch": 0,
             "employeeTraditional": 0,
             "employeeRoth": 0,
+            "catchUp": 0,
             "employerMatch": 0,
-            "employerFlat": 0
+            "employerFlat": 0,
+            "socialSecurity": 0,
+            "pension": 0
           }
         ],
         "accounts": [
           {
             "accountId": "taxable",
-            "start": 9497416,
+            "start": 9497419,
             "contributions": 0,
             "employerContributions": 0,
             "feeDrag": 0,
             "growthNet": 419282,
             "withdrawals": 2251018,
+            "rmd": 0,
             "forfeited": 0,
-            "end": 7665680,
-            "basisEnd": 5458887
+            "end": 7665683,
+            "basisEnd": 5458889
           },
           {
             "accountId": "roth",
@@ -453,6 +538,7 @@
             "feeDrag": 0,
             "growthNet": 241881,
             "withdrawals": 0,
+            "rmd": 0,
             "forfeited": 0,
             "end": 5079509,
             "basisEnd": 2082156
@@ -463,26 +549,41 @@
           "employerContributions": 0,
           "feeDrag": 0,
           "withdrawals": 2251018,
+          "rmd": 0,
+          "hsaMedical": 0,
+          "reinvested": 0,
           "forfeited": 0,
+          "surplusRouted": 0,
+          "socialSecurity": 0,
+          "pensions": 0,
+          "otherIncome": 0,
+          "oneTimeInflows": 0,
+          "oneTimeOutflows": 0,
           "spendingNeed": 2251018,
           "spendingFunded": 2251018,
           "shortfall": 0
         },
+        "cashFlow": {
+          "infeasible": null
+        },
+        "tax": null,
         "totals": {
-          "portfolioStart": 14335044,
-          "portfolioEnd": 12745189,
+          "portfolioStart": 14335047,
+          "portfolioEnd": 12745192,
           "byTaxTreatment": {
             "taxDeferred": 0,
             "taxFree": 5079509,
-            "taxable": 7665680
+            "taxable": 7665683
           }
         },
         "real": {
-          "portfolioEnd": 11323935,
+          "portfolioEnd": 11323938,
           "spendingNeed": 2000000,
-          "grossIncome": 2000000
+          "grossIncome": 2000000,
+          "netIncome": null
         },
         "grossIncome": 2251018,
+        "netIncome": null,
         "depleted": false,
         "markers": []
       },
@@ -503,22 +604,26 @@
             "eligibleCompForMatch": 0,
             "employeeTraditional": 0,
             "employeeRoth": 0,
+            "catchUp": 0,
             "employerMatch": 0,
-            "employerFlat": 0
+            "employerFlat": 0,
+            "socialSecurity": 0,
+            "pension": 0
           }
         ],
         "accounts": [
           {
             "accountId": "taxable",
-            "start": 7665680,
+            "start": 7665683,
             "contributions": 0,
             "employerContributions": 0,
             "feeDrag": 0,
-            "growthNet": 326027,
+            "growthNet": 326028,
             "withdrawals": 2318548,
+            "rmd": 0,
             "forfeited": 0,
-            "end": 5673159,
-            "basisEnd": 3847592
+            "end": 5673163,
+            "basisEnd": 3847595
           },
           {
             "accountId": "roth",
@@ -528,6 +633,7 @@
             "feeDrag": 0,
             "growthNet": 253975,
             "withdrawals": 0,
+            "rmd": 0,
             "forfeited": 0,
             "end": 5333484,
             "basisEnd": 2082156
@@ -538,26 +644,41 @@
           "employerContributions": 0,
           "feeDrag": 0,
           "withdrawals": 2318548,
+          "rmd": 0,
+          "hsaMedical": 0,
+          "reinvested": 0,
           "forfeited": 0,
+          "surplusRouted": 0,
+          "socialSecurity": 0,
+          "pensions": 0,
+          "otherIncome": 0,
+          "oneTimeInflows": 0,
+          "oneTimeOutflows": 0,
           "spendingNeed": 2318548,
           "spendingFunded": 2318548,
           "shortfall": 0
         },
+        "cashFlow": {
+          "infeasible": null
+        },
+        "tax": null,
         "totals": {
-          "portfolioStart": 12745189,
-          "portfolioEnd": 11006643,
+          "portfolioStart": 12745192,
+          "portfolioEnd": 11006647,
           "byTaxTreatment": {
             "taxDeferred": 0,
             "taxFree": 5333484,
-            "taxable": 5673159
+            "taxable": 5673163
           }
         },
         "real": {
-          "portfolioEnd": 9494427,
+          "portfolioEnd": 9494430,
           "spendingNeed": 2000000,
-          "grossIncome": 2000000
+          "grossIncome": 2000000,
+          "netIncome": null
         },
         "grossIncome": 2318548,
+        "netIncome": null,
         "depleted": false,
         "markers": []
       },
@@ -578,22 +699,26 @@
             "eligibleCompForMatch": 0,
             "employeeTraditional": 0,
             "employeeRoth": 0,
+            "catchUp": 0,
             "employerMatch": 0,
-            "employerFlat": 0
+            "employerFlat": 0,
+            "socialSecurity": 0,
+            "pension": 0
           }
         ],
         "accounts": [
           {
             "accountId": "taxable",
-            "start": 5673159,
+            "start": 5673163,
             "contributions": 0,
             "employerContributions": 0,
             "feeDrag": 0,
             "growthNet": 224684,
             "withdrawals": 2388105,
+            "rmd": 0,
             "forfeited": 0,
-            "end": 3509738,
-            "basisEnd": 2266989
+            "end": 3509742,
+            "basisEnd": 2266992
           },
           {
             "accountId": "roth",
@@ -603,6 +728,7 @@
             "feeDrag": 0,
             "growthNet": 266675,
             "withdrawals": 0,
+            "rmd": 0,
             "forfeited": 0,
             "end": 5600159,
             "basisEnd": 2082156
@@ -613,26 +739,41 @@
           "employerContributions": 0,
           "feeDrag": 0,
           "withdrawals": 2388105,
+          "rmd": 0,
+          "hsaMedical": 0,
+          "reinvested": 0,
           "forfeited": 0,
+          "surplusRouted": 0,
+          "socialSecurity": 0,
+          "pensions": 0,
+          "otherIncome": 0,
+          "oneTimeInflows": 0,
+          "oneTimeOutflows": 0,
           "spendingNeed": 2388105,
           "spendingFunded": 2388105,
           "shortfall": 0
         },
+        "cashFlow": {
+          "infeasible": null
+        },
+        "tax": null,
         "totals": {
-          "portfolioStart": 11006643,
-          "portfolioEnd": 9109897,
+          "portfolioStart": 11006647,
+          "portfolioEnd": 9109901,
           "byTaxTreatment": {
             "taxDeferred": 0,
             "taxFree": 5600159,
-            "taxable": 3509738
+            "taxable": 3509742
           }
         },
         "real": {
-          "portfolioEnd": 7629395,
+          "portfolioEnd": 7629398,
           "spendingNeed": 2000000,
-          "grossIncome": 2000000
+          "grossIncome": 2000000,
+          "netIncome": null
         },
         "grossIncome": 2388105,
+        "netIncome": null,
         "depleted": false,
         "markers": []
       }
@@ -644,11 +785,12 @@
       "firstDeathYear": null,
       "depletionYear": null,
       "depletionAge": null,
-      "endingBalance": 9109897,
-      "endingBalanceReal": 7629395,
+      "endingBalance": 9109901,
+      "endingBalanceReal": 7629398,
       "infeasibleYears": [],
       "deterministicSuccess": true
     },
-    "warnings": ["retirementContributionsReduced"]
+    "warnings": ["retirementContributionsReduced"],
+    "excludedFeatures": ["federalIncomeTax", "iraLimits"]
   }
 }

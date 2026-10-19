@@ -51,6 +51,8 @@ the current salary are year-1 nominal, which is the same as today's dollars.
   pay and total deferral in cents), the flat employer contribution, each scheduled amount (including
   the retirement-phase scale-down), and a routed surplus. They are rounded once, when determined.
   Balances, growth and withdrawals stay float64.
+- The tax step works in cents: `TaxInput` and `TaxBreakdown` are cents at the API, so tax inputs
+  and each tax component are rounded to cents, the total is their sum, and net = gross − total.
 - Real values divide the **unrounded** float by the deflator, then round once (for example
   `real.portfolioEnd = round(Σ float balances / P_t)`). Accumulation-year `real.netIncome` divides
   the net pay cents, because net pay is itself a cents output of the tax step.
@@ -104,7 +106,10 @@ the current salary are year-1 nominal, which is the same as today's dollars.
   `ρ/(12ρ_m)` is 1 when ρ = 0. For monthly modes a non-negative year-end balance implies every
   month-end balance is non-negative (a negative balance stays negative under a net outflow), so the
   year-end condition is the cap. Gross growth uses the same factors with the gross rate r.
-- If every annual **net** rate ρ (after fees and drag) is ≥ 0, then `E_conservative ≤ E_default`
+- If every annual **net** rate ρ (after fees and drag) is ≥ 0 **and the run does not deplete**,
+  then `E_conservative ≤ E_default`. (With M4 mid-year deposits, a depleting start-of-year run cannot
+  reach money deposited later in the year, so it can end higher.)
+- Same condition as a formula: `E_conservative ≤ E_default`
   (because `(1+ρ) ≥ (1+ρ)^½`). A 0% gross return with an expense ratio has ρ < 0, which reverses the
   ordering. In years with a negative net rate the ordering is not guaranteed, and the tests do not
   assert it.
@@ -442,7 +447,7 @@ listed in `excludedFeatures`; it is never filled in. With the bundled (unverifie
 7. **Taxes** (verified rules only), on:
    - wages (part-time);
    - ordinary income: traditional withdrawals including RMDs, the taxable share of pensions and
-     other income, HSA non-medical withdrawals at 65+, one-time `ordinaryIncome` inflows;
+     other income, HSA non-medical withdrawals (at any age; §7.4), one-time `ordinaryIncome` inflows;
    - Social Security benefits (taxable share per Pub 915, §6);
    - long-term gains: the gain part of taxable-brokerage withdrawals, `W·(1 − basis/cap)`, plus
      `gainFraction` of one-time `capitalGain` inflows;
@@ -460,7 +465,9 @@ listed in `excludedFeatures`; it is never filled in. With the bundled (unverifie
   - stop when `|W_{k+1} − W_k| ≤ tolerance`.
   The map is a contraction because the combined marginal rate (federal, SS inclusion and state) is
   below 1.
-- If W exceeds the total cap, W is capped and the rest is `unfunded` (depletion, §4.1).
+- If W exceeds the total cap, W is capped and the rest is `unfunded` (depletion, §4.1). A solve
+  that converges within the tolerance while accounts still have money is fully funded, even if net
+  income is a few cents under the need.
 - Non-convergence returns the last iterate with `solver.converged = false` and a
   `grossUpNotConverged` warning. The tests cover convergence, non-convergence and depletion.
 - Output per year: `grossIncome`, `tax` (detail with solver iterations), `netIncome = grossIncome −
@@ -550,8 +557,10 @@ listed in `excludedFeatures`; it is never filled in. With the bundled (unverifie
   - `taxableFraction` of it is ordinary income.
   - After the owner's death, `survivorFraction` continues to a surviving spouse; for a single owner it
     stops.
-- **Lump sum:** paid in the start year into `destinationAccountId` (a rollover; untaxed when the
-  destination is tax-deferred, otherwise taxed per `taxableFraction` as ordinary income).
+- **Lump sum:** the stated amount is **nominal** (`amountBasis` applies to the annuity amount only).
+  It is paid in the start year into `destinationAccountId` (a rollover; untaxed when the destination
+  is tax-deferred, otherwise taxed per `taxableFraction` as ordinary income).
+- A continuing survivor pension is reported on the survivor's person row.
 - **Other income:** as in §3.8. Owned income stops after the owner's death (§1.4).
 - **Flows:** `flows.pensions` is annuity income only. Lump sums and one-time inflows are counted
   in `flows.oneTimeInflows` (deposits). `flows.spendingNeed` includes one-time outflows, which are

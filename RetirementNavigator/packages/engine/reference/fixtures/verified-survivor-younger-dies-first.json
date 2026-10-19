@@ -1,0 +1,2240 @@
+{
+  "name": "verified-survivor-younger-dies-first",
+  "description": "Fixture rules, MFJ: the younger spouse (67, higher PIA) dies first in 2032; the older survivor (claimed at 70) steps up to the deceased's benefit; the deceased's future pension (start 70, 2% COLA) continues in full; RMDs on both IRAs follow the survivor's age; traditionalFirst (\u00a77.5-\u00a77.7).",
+  "currentYear": 2026,
+  "rules": "fixture",
+  "household": {
+    "id": "household-1",
+    "name": "Fixture",
+    "filingStatus": "marriedFilingJointly",
+    "people": [
+      {
+        "id": "person-1",
+        "name": "Person 1",
+        "birthYear": 1956,
+        "retirementAge": 65,
+        "planningAge": 84,
+        "socialSecurity": {
+          "source": {
+            "kind": "statement",
+            "piaMonthly": 150000
+          },
+          "claimAge": {
+            "years": 70,
+            "months": 0
+          }
+        }
+      },
+      {
+        "id": "person-2",
+        "name": "Person 2",
+        "birthYear": 1959,
+        "retirementAge": 65,
+        "planningAge": 72,
+        "socialSecurity": {
+          "source": {
+            "kind": "statement",
+            "piaMonthly": 240000
+          },
+          "claimAge": {
+            "years": 67,
+            "months": 0
+          }
+        }
+      }
+    ],
+    "accounts": [
+      {
+        "type": "traditionalIra",
+        "id": "ira-1",
+        "name": "IRA-1",
+        "ownerId": "person-1",
+        "balance": 30000000,
+        "expectedReturn": 0.04
+      },
+      {
+        "type": "traditionalIra",
+        "id": "ira-2",
+        "name": "IRA-2",
+        "ownerId": "person-2",
+        "balance": 35000000,
+        "expectedReturn": 0.05
+      },
+      {
+        "type": "cash",
+        "id": "cash",
+        "name": "CASH",
+        "ownerId": "person-1",
+        "balance": 3000000,
+        "expectedReturn": 0.02
+      }
+    ],
+    "spending": {
+      "currentAnnualSpending": 0,
+      "retirementAnnualSpending": 7500000
+    },
+    "assumptions": {
+      "inflation": 0.0,
+      "returnPreRetirement": 0.06,
+      "returnPostRetirement": 0.05,
+      "capitalMarket": {
+        "stocks": {
+          "geometricReturn": 0.07,
+          "volatility": 0.16
+        },
+        "bonds": {
+          "geometricReturn": 0.045,
+          "volatility": 0.06
+        },
+        "cash": {
+          "geometricReturn": 0.03,
+          "volatility": 0.01
+        },
+        "correlation": [
+          [1, 0.1, 0],
+          [0.1, 1, 0.2],
+          [0, 0.2, 1]
+        ],
+        "blendedVolatility": 0.12,
+        "note": "Illustrative round-number assumptions chosen by the app authors; not a forecast."
+      },
+      "rules": {
+        "anchorYear": 2026
+      },
+      "withdrawalStrategy": "traditionalFirst"
+    },
+    "pensions": [
+      {
+        "id": "pension",
+        "name": "Pension",
+        "ownerId": "person-2",
+        "startAge": 70,
+        "annualAmount": 1800000,
+        "amountBasis": "nominalAtStart",
+        "payout": {
+          "kind": "annuity"
+        },
+        "cola": {
+          "mode": "rate",
+          "rate": 0.02
+        },
+        "survivorFraction": 1
+      }
+    ]
+  },
+  "expected": {
+    "rows": [
+      {
+        "year": 2026,
+        "phase": "retirement",
+        "deflator": 1.0,
+        "people": [
+          {
+            "personId": "person-1",
+            "age": 70,
+            "alive": true,
+            "retired": true,
+            "baseSalary": 0,
+            "bonus": 0,
+            "partTimeIncome": 0,
+            "eligibleCompForDeferrals": 0,
+            "eligibleCompForMatch": 0,
+            "employeeTraditional": 0,
+            "employeeRoth": 0,
+            "catchUp": 0,
+            "employerMatch": 0,
+            "employerFlat": 0,
+            "socialSecurity": 2188800,
+            "pension": 0
+          },
+          {
+            "personId": "person-2",
+            "age": 67,
+            "alive": true,
+            "retired": true,
+            "baseSalary": 0,
+            "bonus": 0,
+            "partTimeIncome": 0,
+            "eligibleCompForDeferrals": 0,
+            "eligibleCompForMatch": 0,
+            "employeeTraditional": 0,
+            "employeeRoth": 0,
+            "catchUp": 0,
+            "employerMatch": 0,
+            "employerFlat": 0,
+            "socialSecurity": 2880000,
+            "pension": 0
+          }
+        ],
+        "accounts": [
+          {
+            "accountId": "ira-1",
+            "start": 30000000,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 1177836,
+            "withdrawals": 1119202,
+            "rmd": 0,
+            "forfeited": 0,
+            "end": 30058634,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "ira-2",
+            "start": 35000000,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 1717600,
+            "withdrawals": 1311998,
+            "rmd": 0,
+            "forfeited": 0,
+            "end": 35405602,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "cash",
+            "start": 3000000,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 60000,
+            "withdrawals": 0,
+            "rmd": 0,
+            "forfeited": 0,
+            "end": 3060000,
+            "basisEnd": 0
+          }
+        ],
+        "flows": {
+          "contributions": 0,
+          "employerContributions": 0,
+          "feeDrag": 0,
+          "withdrawals": 2431200,
+          "rmd": 0,
+          "hsaMedical": 0,
+          "reinvested": 0,
+          "forfeited": 0,
+          "surplusRouted": 0,
+          "socialSecurity": 5068800,
+          "pensions": 0,
+          "otherIncome": 0,
+          "oneTimeInflows": 0,
+          "oneTimeOutflows": 0,
+          "spendingNeed": 7500000,
+          "spendingFunded": 7500000,
+          "shortfall": 0
+        },
+        "cashFlow": {
+          "infeasible": null
+        },
+        "tax": {
+          "filingStatus": "marriedFilingJointly",
+          "wages": 0,
+          "taxableSocialSecurity": 1080760,
+          "agi": 3511960,
+          "deductions": 4300000,
+          "federalOrdinaryTax": 0,
+          "capitalGainsTax": 0,
+          "ficaSocialSecurity": 0,
+          "ficaMedicare": 0,
+          "stateTax": 0,
+          "totalTax": 0,
+          "solver": {
+            "converged": true
+          }
+        },
+        "totals": {
+          "portfolioStart": 68000000,
+          "portfolioEnd": 68524236,
+          "byTaxTreatment": {
+            "taxDeferred": 65464236,
+            "taxFree": 0,
+            "taxable": 3060000
+          }
+        },
+        "real": {
+          "portfolioEnd": 68524236,
+          "spendingNeed": 7500000,
+          "grossIncome": 7500000,
+          "netIncome": 7500000
+        },
+        "grossIncome": 7500000,
+        "netIncome": 7500000,
+        "depleted": false,
+        "markers": ["retirement"]
+      },
+      {
+        "year": 2027,
+        "phase": "retirement",
+        "deflator": 1.0,
+        "people": [
+          {
+            "personId": "person-1",
+            "age": 71,
+            "alive": true,
+            "retired": true,
+            "baseSalary": 0,
+            "bonus": 0,
+            "partTimeIncome": 0,
+            "eligibleCompForDeferrals": 0,
+            "eligibleCompForMatch": 0,
+            "employeeTraditional": 0,
+            "employeeRoth": 0,
+            "catchUp": 0,
+            "employerMatch": 0,
+            "employerFlat": 0,
+            "socialSecurity": 2188800,
+            "pension": 0
+          },
+          {
+            "personId": "person-2",
+            "age": 68,
+            "alive": true,
+            "retired": true,
+            "baseSalary": 0,
+            "bonus": 0,
+            "partTimeIncome": 0,
+            "eligibleCompForDeferrals": 0,
+            "eligibleCompForMatch": 0,
+            "employeeTraditional": 0,
+            "employeeRoth": 0,
+            "catchUp": 0,
+            "employerMatch": 0,
+            "employerFlat": 0,
+            "socialSecurity": 2880000,
+            "pension": 0
+          }
+        ],
+        "accounts": [
+          {
+            "accountId": "ira-1",
+            "start": 30058634,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 1180294,
+            "withdrawals": 1113424,
+            "rmd": 0,
+            "forfeited": 0,
+            "end": 30125504,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "ira-2",
+            "start": 35405602,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 1737738,
+            "withdrawals": 1317776,
+            "rmd": 0,
+            "forfeited": 0,
+            "end": 35825564,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "cash",
+            "start": 3060000,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 61200,
+            "withdrawals": 0,
+            "rmd": 0,
+            "forfeited": 0,
+            "end": 3121200,
+            "basisEnd": 0
+          }
+        ],
+        "flows": {
+          "contributions": 0,
+          "employerContributions": 0,
+          "feeDrag": 0,
+          "withdrawals": 2431200,
+          "rmd": 0,
+          "hsaMedical": 0,
+          "reinvested": 0,
+          "forfeited": 0,
+          "surplusRouted": 0,
+          "socialSecurity": 5068800,
+          "pensions": 0,
+          "otherIncome": 0,
+          "oneTimeInflows": 0,
+          "oneTimeOutflows": 0,
+          "spendingNeed": 7500000,
+          "spendingFunded": 7500000,
+          "shortfall": 0
+        },
+        "cashFlow": {
+          "infeasible": null
+        },
+        "tax": {
+          "filingStatus": "marriedFilingJointly",
+          "wages": 0,
+          "taxableSocialSecurity": 1080760,
+          "agi": 3511960,
+          "deductions": 4300000,
+          "federalOrdinaryTax": 0,
+          "capitalGainsTax": 0,
+          "ficaSocialSecurity": 0,
+          "ficaMedicare": 0,
+          "stateTax": 0,
+          "totalTax": 0,
+          "solver": {
+            "converged": true
+          }
+        },
+        "totals": {
+          "portfolioStart": 68524236,
+          "portfolioEnd": 69072268,
+          "byTaxTreatment": {
+            "taxDeferred": 65951068,
+            "taxFree": 0,
+            "taxable": 3121200
+          }
+        },
+        "real": {
+          "portfolioEnd": 69072268,
+          "spendingNeed": 7500000,
+          "grossIncome": 7500000,
+          "netIncome": 7500000
+        },
+        "grossIncome": 7500000,
+        "netIncome": 7500000,
+        "depleted": false,
+        "markers": []
+      },
+      {
+        "year": 2028,
+        "phase": "retirement",
+        "deflator": 1.0,
+        "people": [
+          {
+            "personId": "person-1",
+            "age": 72,
+            "alive": true,
+            "retired": true,
+            "baseSalary": 0,
+            "bonus": 0,
+            "partTimeIncome": 0,
+            "eligibleCompForDeferrals": 0,
+            "eligibleCompForMatch": 0,
+            "employeeTraditional": 0,
+            "employeeRoth": 0,
+            "catchUp": 0,
+            "employerMatch": 0,
+            "employerFlat": 0,
+            "socialSecurity": 2188800,
+            "pension": 0
+          },
+          {
+            "personId": "person-2",
+            "age": 69,
+            "alive": true,
+            "retired": true,
+            "baseSalary": 0,
+            "bonus": 0,
+            "partTimeIncome": 0,
+            "eligibleCompForDeferrals": 0,
+            "eligibleCompForMatch": 0,
+            "employeeTraditional": 0,
+            "employeeRoth": 0,
+            "catchUp": 0,
+            "employerMatch": 0,
+            "employerFlat": 0,
+            "socialSecurity": 2880000,
+            "pension": 0
+          }
+        ],
+        "accounts": [
+          {
+            "accountId": "ira-1",
+            "start": 30125504,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 1183085,
+            "withdrawals": 1107652,
+            "rmd": 0,
+            "forfeited": 0,
+            "end": 30200937,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "ira-2",
+            "start": 35825564,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 1758593,
+            "withdrawals": 1323548,
+            "rmd": 0,
+            "forfeited": 0,
+            "end": 36260609,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "cash",
+            "start": 3121200,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 62424,
+            "withdrawals": 0,
+            "rmd": 0,
+            "forfeited": 0,
+            "end": 3183624,
+            "basisEnd": 0
+          }
+        ],
+        "flows": {
+          "contributions": 0,
+          "employerContributions": 0,
+          "feeDrag": 0,
+          "withdrawals": 2431200,
+          "rmd": 0,
+          "hsaMedical": 0,
+          "reinvested": 0,
+          "forfeited": 0,
+          "surplusRouted": 0,
+          "socialSecurity": 5068800,
+          "pensions": 0,
+          "otherIncome": 0,
+          "oneTimeInflows": 0,
+          "oneTimeOutflows": 0,
+          "spendingNeed": 7500000,
+          "spendingFunded": 7500000,
+          "shortfall": 0
+        },
+        "cashFlow": {
+          "infeasible": null
+        },
+        "tax": {
+          "filingStatus": "marriedFilingJointly",
+          "wages": 0,
+          "taxableSocialSecurity": 1080760,
+          "agi": 3511960,
+          "deductions": 4300000,
+          "federalOrdinaryTax": 0,
+          "capitalGainsTax": 0,
+          "ficaSocialSecurity": 0,
+          "ficaMedicare": 0,
+          "stateTax": 0,
+          "totalTax": 0,
+          "solver": {
+            "converged": true
+          }
+        },
+        "totals": {
+          "portfolioStart": 69072268,
+          "portfolioEnd": 69645170,
+          "byTaxTreatment": {
+            "taxDeferred": 66461546,
+            "taxFree": 0,
+            "taxable": 3183624
+          }
+        },
+        "real": {
+          "portfolioEnd": 69645170,
+          "spendingNeed": 7500000,
+          "grossIncome": 7500000,
+          "netIncome": 7500000
+        },
+        "grossIncome": 7500000,
+        "netIncome": 7500000,
+        "depleted": false,
+        "markers": []
+      },
+      {
+        "year": 2029,
+        "phase": "retirement",
+        "deflator": 1.0,
+        "people": [
+          {
+            "personId": "person-1",
+            "age": 73,
+            "alive": true,
+            "retired": true,
+            "baseSalary": 0,
+            "bonus": 0,
+            "partTimeIncome": 0,
+            "eligibleCompForDeferrals": 0,
+            "eligibleCompForMatch": 0,
+            "employeeTraditional": 0,
+            "employeeRoth": 0,
+            "catchUp": 0,
+            "employerMatch": 0,
+            "employerFlat": 0,
+            "socialSecurity": 2188800,
+            "pension": 0
+          },
+          {
+            "personId": "person-2",
+            "age": 70,
+            "alive": true,
+            "retired": true,
+            "baseSalary": 0,
+            "bonus": 0,
+            "partTimeIncome": 0,
+            "eligibleCompForDeferrals": 0,
+            "eligibleCompForMatch": 0,
+            "employeeTraditional": 0,
+            "employeeRoth": 0,
+            "catchUp": 0,
+            "employerMatch": 0,
+            "employerFlat": 0,
+            "socialSecurity": 2880000,
+            "pension": 1800000
+          }
+        ],
+        "accounts": [
+          {
+            "accountId": "ira-1",
+            "start": 30200937,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 1187052,
+            "withdrawals": 1059682,
+            "rmd": 1059682,
+            "forfeited": 0,
+            "end": 30328307,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "ira-2",
+            "start": 36260609,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 1813030,
+            "withdrawals": 0,
+            "rmd": 0,
+            "forfeited": 0,
+            "end": 38073639,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "cash",
+            "start": 3183624,
+            "contributions": 328017,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 66936,
+            "withdrawals": 0,
+            "rmd": 0,
+            "forfeited": 0,
+            "end": 3578577,
+            "basisEnd": 0
+          }
+        ],
+        "flows": {
+          "contributions": 328017,
+          "employerContributions": 0,
+          "feeDrag": 0,
+          "withdrawals": 1059682,
+          "rmd": 1059682,
+          "hsaMedical": 0,
+          "reinvested": 328017,
+          "forfeited": 0,
+          "surplusRouted": 0,
+          "socialSecurity": 5068800,
+          "pensions": 1800000,
+          "otherIncome": 0,
+          "oneTimeInflows": 0,
+          "oneTimeOutflows": 0,
+          "spendingNeed": 7500000,
+          "spendingFunded": 7500000,
+          "shortfall": 0
+        },
+        "cashFlow": {
+          "infeasible": null
+        },
+        "tax": {
+          "filingStatus": "marriedFilingJointly",
+          "wages": 0,
+          "taxableSocialSecurity": 1444970,
+          "agi": 4304652,
+          "deductions": 3300000,
+          "federalOrdinaryTax": 100465,
+          "capitalGainsTax": 0,
+          "ficaSocialSecurity": 0,
+          "ficaMedicare": 0,
+          "stateTax": 0,
+          "totalTax": 100465,
+          "solver": {
+            "converged": true
+          }
+        },
+        "totals": {
+          "portfolioStart": 69645170,
+          "portfolioEnd": 71980523,
+          "byTaxTreatment": {
+            "taxDeferred": 68401946,
+            "taxFree": 0,
+            "taxable": 3578577
+          }
+        },
+        "real": {
+          "portfolioEnd": 71980523,
+          "spendingNeed": 7500000,
+          "grossIncome": 7928482,
+          "netIncome": 7828017
+        },
+        "grossIncome": 7928482,
+        "netIncome": 7828017,
+        "depleted": false,
+        "markers": []
+      },
+      {
+        "year": 2030,
+        "phase": "retirement",
+        "deflator": 1.0,
+        "people": [
+          {
+            "personId": "person-1",
+            "age": 74,
+            "alive": true,
+            "retired": true,
+            "baseSalary": 0,
+            "bonus": 0,
+            "partTimeIncome": 0,
+            "eligibleCompForDeferrals": 0,
+            "eligibleCompForMatch": 0,
+            "employeeTraditional": 0,
+            "employeeRoth": 0,
+            "catchUp": 0,
+            "employerMatch": 0,
+            "employerFlat": 0,
+            "socialSecurity": 2188800,
+            "pension": 0
+          },
+          {
+            "personId": "person-2",
+            "age": 71,
+            "alive": true,
+            "retired": true,
+            "baseSalary": 0,
+            "bonus": 0,
+            "partTimeIncome": 0,
+            "eligibleCompForDeferrals": 0,
+            "eligibleCompForMatch": 0,
+            "employeeTraditional": 0,
+            "employeeRoth": 0,
+            "catchUp": 0,
+            "employerMatch": 0,
+            "employerFlat": 0,
+            "socialSecurity": 2880000,
+            "pension": 1836000
+          }
+        ],
+        "accounts": [
+          {
+            "accountId": "ira-1",
+            "start": 30328307,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 1191682,
+            "withdrawals": 1083154,
+            "rmd": 1083154,
+            "forfeited": 0,
+            "end": 30436835,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "ira-2",
+            "start": 38073639,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 1903682,
+            "withdrawals": 0,
+            "rmd": 0,
+            "forfeited": 0,
+            "end": 39977321,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "cash",
+            "start": 3578577,
+            "contributions": 376486,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 75318,
+            "withdrawals": 0,
+            "rmd": 0,
+            "forfeited": 0,
+            "end": 4030381,
+            "basisEnd": 0
+          }
+        ],
+        "flows": {
+          "contributions": 376486,
+          "employerContributions": 0,
+          "feeDrag": 0,
+          "withdrawals": 1083154,
+          "rmd": 1083154,
+          "hsaMedical": 0,
+          "reinvested": 376486,
+          "forfeited": 0,
+          "surplusRouted": 0,
+          "socialSecurity": 5068800,
+          "pensions": 1836000,
+          "otherIncome": 0,
+          "oneTimeInflows": 0,
+          "oneTimeOutflows": 0,
+          "spendingNeed": 7500000,
+          "spendingFunded": 7500000,
+          "shortfall": 0
+        },
+        "cashFlow": {
+          "infeasible": null
+        },
+        "tax": {
+          "filingStatus": "marriedFilingJointly",
+          "wages": 0,
+          "taxableSocialSecurity": 1495521,
+          "agi": 4414675,
+          "deductions": 3300000,
+          "federalOrdinaryTax": 111468,
+          "capitalGainsTax": 0,
+          "ficaSocialSecurity": 0,
+          "ficaMedicare": 0,
+          "stateTax": 0,
+          "totalTax": 111468,
+          "solver": {
+            "converged": true
+          }
+        },
+        "totals": {
+          "portfolioStart": 71980523,
+          "portfolioEnd": 74444537,
+          "byTaxTreatment": {
+            "taxDeferred": 70414156,
+            "taxFree": 0,
+            "taxable": 4030381
+          }
+        },
+        "real": {
+          "portfolioEnd": 74444537,
+          "spendingNeed": 7500000,
+          "grossIncome": 7987954,
+          "netIncome": 7876486
+        },
+        "grossIncome": 7987954,
+        "netIncome": 7876486,
+        "depleted": false,
+        "markers": []
+      },
+      {
+        "year": 2031,
+        "phase": "retirement",
+        "deflator": 1.0,
+        "people": [
+          {
+            "personId": "person-1",
+            "age": 75,
+            "alive": true,
+            "retired": true,
+            "baseSalary": 0,
+            "bonus": 0,
+            "partTimeIncome": 0,
+            "eligibleCompForDeferrals": 0,
+            "eligibleCompForMatch": 0,
+            "employeeTraditional": 0,
+            "employeeRoth": 0,
+            "catchUp": 0,
+            "employerMatch": 0,
+            "employerFlat": 0,
+            "socialSecurity": 2188800,
+            "pension": 0
+          },
+          {
+            "personId": "person-2",
+            "age": 72,
+            "alive": true,
+            "retired": true,
+            "baseSalary": 0,
+            "bonus": 0,
+            "partTimeIncome": 0,
+            "eligibleCompForDeferrals": 0,
+            "eligibleCompForMatch": 0,
+            "employeeTraditional": 0,
+            "employeeRoth": 0,
+            "catchUp": 0,
+            "employerMatch": 0,
+            "employerFlat": 0,
+            "socialSecurity": 2880000,
+            "pension": 1872720
+          }
+        ],
+        "accounts": [
+          {
+            "accountId": "ira-1",
+            "start": 30436835,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 1195554,
+            "withdrawals": 1106794,
+            "rmd": 1106794,
+            "forfeited": 0,
+            "end": 30525595,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "ira-2",
+            "start": 39977321,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 1998866,
+            "withdrawals": 0,
+            "rmd": 0,
+            "forfeited": 0,
+            "end": 41976187,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "cash",
+            "start": 4030381,
+            "contributions": 425680,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 84844,
+            "withdrawals": 0,
+            "rmd": 0,
+            "forfeited": 0,
+            "end": 4540905,
+            "basisEnd": 0
+          }
+        ],
+        "flows": {
+          "contributions": 425680,
+          "employerContributions": 0,
+          "feeDrag": 0,
+          "withdrawals": 1106794,
+          "rmd": 1106794,
+          "hsaMedical": 0,
+          "reinvested": 425680,
+          "forfeited": 0,
+          "surplusRouted": 0,
+          "socialSecurity": 5068800,
+          "pensions": 1872720,
+          "otherIncome": 0,
+          "oneTimeInflows": 0,
+          "oneTimeOutflows": 0,
+          "spendingNeed": 7500000,
+          "spendingFunded": 7500000,
+          "shortfall": 0
+        },
+        "cashFlow": {
+          "infeasible": null
+        },
+        "tax": {
+          "filingStatus": "marriedFilingJointly",
+          "wages": 0,
+          "taxableSocialSecurity": 1546827,
+          "agi": 4526341,
+          "deductions": 3300000,
+          "federalOrdinaryTax": 122634,
+          "capitalGainsTax": 0,
+          "ficaSocialSecurity": 0,
+          "ficaMedicare": 0,
+          "stateTax": 0,
+          "totalTax": 122634,
+          "solver": {
+            "converged": true
+          }
+        },
+        "totals": {
+          "portfolioStart": 74444537,
+          "portfolioEnd": 77042687,
+          "byTaxTreatment": {
+            "taxDeferred": 72501782,
+            "taxFree": 0,
+            "taxable": 4540905
+          }
+        },
+        "real": {
+          "portfolioEnd": 77042687,
+          "spendingNeed": 7500000,
+          "grossIncome": 8048314,
+          "netIncome": 7925680
+        },
+        "grossIncome": 8048314,
+        "netIncome": 7925680,
+        "depleted": false,
+        "markers": []
+      },
+      {
+        "year": 2032,
+        "phase": "retirement",
+        "deflator": 1.0,
+        "people": [
+          {
+            "personId": "person-1",
+            "age": 76,
+            "alive": true,
+            "retired": true,
+            "baseSalary": 0,
+            "bonus": 0,
+            "partTimeIncome": 0,
+            "eligibleCompForDeferrals": 0,
+            "eligibleCompForMatch": 0,
+            "employeeTraditional": 0,
+            "employeeRoth": 0,
+            "catchUp": 0,
+            "employerMatch": 0,
+            "employerFlat": 0,
+            "socialSecurity": 2880000
+          },
+          {
+            "personId": "person-2",
+            "age": 73,
+            "alive": false,
+            "retired": true,
+            "baseSalary": 0,
+            "bonus": 0,
+            "partTimeIncome": 0,
+            "eligibleCompForDeferrals": 0,
+            "eligibleCompForMatch": 0,
+            "employeeTraditional": 0,
+            "employeeRoth": 0,
+            "catchUp": 0,
+            "employerMatch": 0,
+            "employerFlat": 0,
+            "socialSecurity": 0
+          }
+        ],
+        "accounts": [
+          {
+            "accountId": "ira-1",
+            "start": 30525595,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 1198634,
+            "withdrawals": 1130578,
+            "rmd": 1130578,
+            "forfeited": 0,
+            "end": 30593651,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "ira-2",
+            "start": 41976187,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 2060417,
+            "withdrawals": 1554674,
+            "rmd": 1554674,
+            "forfeited": 0,
+            "end": 42481930,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "cash",
+            "start": 4540905,
+            "contributions": 988318,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 100652,
+            "withdrawals": 0,
+            "rmd": 0,
+            "forfeited": 0,
+            "end": 5629875,
+            "basisEnd": 0
+          }
+        ],
+        "flows": {
+          "contributions": 988318,
+          "employerContributions": 0,
+          "feeDrag": 0,
+          "withdrawals": 2685252,
+          "rmd": 2685252,
+          "hsaMedical": 0,
+          "reinvested": 988318,
+          "forfeited": 0,
+          "surplusRouted": 0,
+          "socialSecurity": 2880000,
+          "pensions": 1910174,
+          "otherIncome": 0,
+          "oneTimeInflows": 0,
+          "oneTimeOutflows": 0,
+          "spendingNeed": 6000000,
+          "spendingFunded": 6000000,
+          "shortfall": 0
+        },
+        "cashFlow": {
+          "infeasible": null
+        },
+        "tax": {
+          "filingStatus": "marriedFilingJointly",
+          "wages": 0,
+          "taxableSocialSecurity": 1990112,
+          "agi": 6585538,
+          "deductions": 3150000,
+          "federalOrdinaryTax": 487108,
+          "capitalGainsTax": 0,
+          "ficaSocialSecurity": 0,
+          "ficaMedicare": 0,
+          "stateTax": 0,
+          "totalTax": 487108,
+          "solver": {
+            "converged": true
+          }
+        },
+        "totals": {
+          "portfolioStart": 77042687,
+          "portfolioEnd": 78705456,
+          "byTaxTreatment": {
+            "taxDeferred": 73075581,
+            "taxFree": 0,
+            "taxable": 5629875
+          }
+        },
+        "real": {
+          "portfolioEnd": 78705456,
+          "spendingNeed": 6000000,
+          "grossIncome": 7475426,
+          "netIncome": 6988318
+        },
+        "grossIncome": 7475426,
+        "netIncome": 6988318,
+        "depleted": false,
+        "markers": ["firstDeath"]
+      },
+      {
+        "year": 2033,
+        "phase": "retirement",
+        "deflator": 1.0,
+        "people": [
+          {
+            "personId": "person-1",
+            "age": 77,
+            "alive": true,
+            "retired": true,
+            "baseSalary": 0,
+            "bonus": 0,
+            "partTimeIncome": 0,
+            "eligibleCompForDeferrals": 0,
+            "eligibleCompForMatch": 0,
+            "employeeTraditional": 0,
+            "employeeRoth": 0,
+            "catchUp": 0,
+            "employerMatch": 0,
+            "employerFlat": 0,
+            "socialSecurity": 2880000
+          },
+          {
+            "personId": "person-2",
+            "age": 74,
+            "alive": false,
+            "retired": true,
+            "baseSalary": 0,
+            "bonus": 0,
+            "partTimeIncome": 0,
+            "eligibleCompForDeferrals": 0,
+            "eligibleCompForMatch": 0,
+            "employeeTraditional": 0,
+            "employeeRoth": 0,
+            "catchUp": 0,
+            "employerMatch": 0,
+            "employerFlat": 0,
+            "socialSecurity": 0
+          }
+        ],
+        "accounts": [
+          {
+            "accountId": "ira-1",
+            "start": 30593651,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 1200883,
+            "withdrawals": 1154477,
+            "rmd": 1154477,
+            "forfeited": 0,
+            "end": 30640057,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "ira-2",
+            "start": 42481930,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 2084508,
+            "withdrawals": 1603092,
+            "rmd": 1603092,
+            "forfeited": 0,
+            "end": 42963346,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "cash",
+            "start": 5629875,
+            "contributions": 549763,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 118068,
+            "withdrawals": 0,
+            "rmd": 0,
+            "forfeited": 0,
+            "end": 6297706,
+            "basisEnd": 0
+          }
+        ],
+        "flows": {
+          "contributions": 549763,
+          "employerContributions": 0,
+          "feeDrag": 0,
+          "withdrawals": 2757569,
+          "rmd": 2757569,
+          "hsaMedical": 0,
+          "reinvested": 549763,
+          "forfeited": 0,
+          "surplusRouted": 0,
+          "socialSecurity": 2880000,
+          "pensions": 1948378,
+          "otherIncome": 0,
+          "oneTimeInflows": 0,
+          "oneTimeOutflows": 0,
+          "spendingNeed": 6000000,
+          "spendingFunded": 6000000,
+          "shortfall": 0
+        },
+        "cashFlow": {
+          "infeasible": null
+        },
+        "tax": {
+          "filingStatus": "single",
+          "wages": 0,
+          "taxableSocialSecurity": 2448000,
+          "agi": 7153947,
+          "deductions": 1700000,
+          "federalOrdinaryTax": 1036184,
+          "capitalGainsTax": 0,
+          "ficaSocialSecurity": 0,
+          "ficaMedicare": 0,
+          "stateTax": 0,
+          "totalTax": 1036184,
+          "solver": {
+            "converged": true
+          }
+        },
+        "totals": {
+          "portfolioStart": 78705456,
+          "portfolioEnd": 79901109,
+          "byTaxTreatment": {
+            "taxDeferred": 73603403,
+            "taxFree": 0,
+            "taxable": 6297706
+          }
+        },
+        "real": {
+          "portfolioEnd": 79901109,
+          "spendingNeed": 6000000,
+          "grossIncome": 7585947,
+          "netIncome": 6549763
+        },
+        "grossIncome": 7585947,
+        "netIncome": 6549763,
+        "depleted": false,
+        "markers": []
+      },
+      {
+        "year": 2034,
+        "phase": "retirement",
+        "deflator": 1.0,
+        "people": [
+          {
+            "personId": "person-1",
+            "age": 78,
+            "alive": true,
+            "retired": true,
+            "baseSalary": 0,
+            "bonus": 0,
+            "partTimeIncome": 0,
+            "eligibleCompForDeferrals": 0,
+            "eligibleCompForMatch": 0,
+            "employeeTraditional": 0,
+            "employeeRoth": 0,
+            "catchUp": 0,
+            "employerMatch": 0,
+            "employerFlat": 0,
+            "socialSecurity": 2880000
+          },
+          {
+            "personId": "person-2",
+            "age": 75,
+            "alive": false,
+            "retired": true,
+            "baseSalary": 0,
+            "bonus": 0,
+            "partTimeIncome": 0,
+            "eligibleCompForDeferrals": 0,
+            "eligibleCompForMatch": 0,
+            "employeeTraditional": 0,
+            "employeeRoth": 0,
+            "catchUp": 0,
+            "employerMatch": 0,
+            "employerFlat": 0,
+            "socialSecurity": 0
+          }
+        ],
+        "accounts": [
+          {
+            "accountId": "ira-1",
+            "start": 30640057,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 1202264,
+            "withdrawals": 1178464,
+            "rmd": 1178464,
+            "forfeited": 0,
+            "end": 30663857,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "ira-2",
+            "start": 42963346,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 2107360,
+            "withdrawals": 1652436,
+            "rmd": 1652436,
+            "forfeited": 0,
+            "end": 43418270,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "cash",
+            "start": 6297706,
+            "contributions": 628372,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 132207,
+            "withdrawals": 0,
+            "rmd": 0,
+            "forfeited": 0,
+            "end": 7058285,
+            "basisEnd": 0
+          }
+        ],
+        "flows": {
+          "contributions": 628372,
+          "employerContributions": 0,
+          "feeDrag": 0,
+          "withdrawals": 2830900,
+          "rmd": 2830900,
+          "hsaMedical": 0,
+          "reinvested": 628372,
+          "forfeited": 0,
+          "surplusRouted": 0,
+          "socialSecurity": 2880000,
+          "pensions": 1987345,
+          "otherIncome": 0,
+          "oneTimeInflows": 0,
+          "oneTimeOutflows": 0,
+          "spendingNeed": 6000000,
+          "spendingFunded": 6000000,
+          "shortfall": 0
+        },
+        "cashFlow": {
+          "infeasible": null
+        },
+        "tax": {
+          "filingStatus": "single",
+          "wages": 0,
+          "taxableSocialSecurity": 2448000,
+          "agi": 7266246,
+          "deductions": 1700000,
+          "federalOrdinaryTax": 1069874,
+          "capitalGainsTax": 0,
+          "ficaSocialSecurity": 0,
+          "ficaMedicare": 0,
+          "stateTax": 0,
+          "totalTax": 1069874,
+          "solver": {
+            "converged": true
+          }
+        },
+        "totals": {
+          "portfolioStart": 79901109,
+          "portfolioEnd": 81140412,
+          "byTaxTreatment": {
+            "taxDeferred": 74082127,
+            "taxFree": 0,
+            "taxable": 7058285
+          }
+        },
+        "real": {
+          "portfolioEnd": 81140412,
+          "spendingNeed": 6000000,
+          "grossIncome": 7698246,
+          "netIncome": 6628372
+        },
+        "grossIncome": 7698246,
+        "netIncome": 6628372,
+        "depleted": false,
+        "markers": []
+      },
+      {
+        "year": 2035,
+        "phase": "retirement",
+        "deflator": 1.0,
+        "people": [
+          {
+            "personId": "person-1",
+            "age": 79,
+            "alive": true,
+            "retired": true,
+            "baseSalary": 0,
+            "bonus": 0,
+            "partTimeIncome": 0,
+            "eligibleCompForDeferrals": 0,
+            "eligibleCompForMatch": 0,
+            "employeeTraditional": 0,
+            "employeeRoth": 0,
+            "catchUp": 0,
+            "employerMatch": 0,
+            "employerFlat": 0,
+            "socialSecurity": 2880000
+          },
+          {
+            "personId": "person-2",
+            "age": 76,
+            "alive": false,
+            "retired": true,
+            "baseSalary": 0,
+            "bonus": 0,
+            "partTimeIncome": 0,
+            "eligibleCompForDeferrals": 0,
+            "eligibleCompForMatch": 0,
+            "employeeTraditional": 0,
+            "employeeRoth": 0,
+            "catchUp": 0,
+            "employerMatch": 0,
+            "employerFlat": 0,
+            "socialSecurity": 0
+          }
+        ],
+        "accounts": [
+          {
+            "accountId": "ira-1",
+            "start": 30663857,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 1202740,
+            "withdrawals": 1202504,
+            "rmd": 1202504,
+            "forfeited": 0,
+            "end": 30664093,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "ira-2",
+            "start": 43418270,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 2128866,
+            "withdrawals": 1702677,
+            "rmd": 1702677,
+            "forfeited": 0,
+            "end": 43844459,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "cash",
+            "start": 7058285,
+            "contributions": 708192,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 148212,
+            "withdrawals": 0,
+            "rmd": 0,
+            "forfeited": 0,
+            "end": 7914689,
+            "basisEnd": 0
+          }
+        ],
+        "flows": {
+          "contributions": 708192,
+          "employerContributions": 0,
+          "feeDrag": 0,
+          "withdrawals": 2905181,
+          "rmd": 2905181,
+          "hsaMedical": 0,
+          "reinvested": 708192,
+          "forfeited": 0,
+          "surplusRouted": 0,
+          "socialSecurity": 2880000,
+          "pensions": 2027092,
+          "otherIncome": 0,
+          "oneTimeInflows": 0,
+          "oneTimeOutflows": 0,
+          "spendingNeed": 6000000,
+          "spendingFunded": 6000000,
+          "shortfall": 0
+        },
+        "cashFlow": {
+          "infeasible": null
+        },
+        "tax": {
+          "filingStatus": "single",
+          "wages": 0,
+          "taxableSocialSecurity": 2448000,
+          "agi": 7380274,
+          "deductions": 1700000,
+          "federalOrdinaryTax": 1104082,
+          "capitalGainsTax": 0,
+          "ficaSocialSecurity": 0,
+          "ficaMedicare": 0,
+          "stateTax": 0,
+          "totalTax": 1104082,
+          "solver": {
+            "converged": true
+          }
+        },
+        "totals": {
+          "portfolioStart": 81140412,
+          "portfolioEnd": 82423241,
+          "byTaxTreatment": {
+            "taxDeferred": 74508552,
+            "taxFree": 0,
+            "taxable": 7914689
+          }
+        },
+        "real": {
+          "portfolioEnd": 82423241,
+          "spendingNeed": 6000000,
+          "grossIncome": 7812274,
+          "netIncome": 6708192
+        },
+        "grossIncome": 7812274,
+        "netIncome": 6708192,
+        "depleted": false,
+        "markers": []
+      },
+      {
+        "year": 2036,
+        "phase": "retirement",
+        "deflator": 1.0,
+        "people": [
+          {
+            "personId": "person-1",
+            "age": 80,
+            "alive": true,
+            "retired": true,
+            "baseSalary": 0,
+            "bonus": 0,
+            "partTimeIncome": 0,
+            "eligibleCompForDeferrals": 0,
+            "eligibleCompForMatch": 0,
+            "employeeTraditional": 0,
+            "employeeRoth": 0,
+            "catchUp": 0,
+            "employerMatch": 0,
+            "employerFlat": 0,
+            "socialSecurity": 2880000
+          },
+          {
+            "personId": "person-2",
+            "age": 77,
+            "alive": false,
+            "retired": true,
+            "baseSalary": 0,
+            "bonus": 0,
+            "partTimeIncome": 0,
+            "eligibleCompForDeferrals": 0,
+            "eligibleCompForMatch": 0,
+            "employeeTraditional": 0,
+            "employeeRoth": 0,
+            "catchUp": 0,
+            "employerMatch": 0,
+            "employerFlat": 0,
+            "socialSecurity": 0
+          }
+        ],
+        "accounts": [
+          {
+            "accountId": "ira-1",
+            "start": 30664093,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 1202273,
+            "withdrawals": 1226564,
+            "rmd": 1226564,
+            "forfeited": 0,
+            "end": 30639802,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "ira-2",
+            "start": 43844459,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 2148913,
+            "withdrawals": 1753778,
+            "rmd": 1753778,
+            "forfeited": 0,
+            "end": 44239594,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "cash",
+            "start": 7914689,
+            "contributions": 789183,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 166147,
+            "withdrawals": 0,
+            "rmd": 0,
+            "forfeited": 0,
+            "end": 8870019,
+            "basisEnd": 0
+          }
+        ],
+        "flows": {
+          "contributions": 789183,
+          "employerContributions": 0,
+          "feeDrag": 0,
+          "withdrawals": 2980342,
+          "rmd": 2980342,
+          "hsaMedical": 0,
+          "reinvested": 789183,
+          "forfeited": 0,
+          "surplusRouted": 0,
+          "socialSecurity": 2880000,
+          "pensions": 2067634,
+          "otherIncome": 0,
+          "oneTimeInflows": 0,
+          "oneTimeOutflows": 0,
+          "spendingNeed": 6000000,
+          "spendingFunded": 6000000,
+          "shortfall": 0
+        },
+        "cashFlow": {
+          "infeasible": null
+        },
+        "tax": {
+          "filingStatus": "single",
+          "wages": 0,
+          "taxableSocialSecurity": 2448000,
+          "agi": 7495976,
+          "deductions": 1700000,
+          "federalOrdinaryTax": 1138793,
+          "capitalGainsTax": 0,
+          "ficaSocialSecurity": 0,
+          "ficaMedicare": 0,
+          "stateTax": 0,
+          "totalTax": 1138793,
+          "solver": {
+            "converged": true
+          }
+        },
+        "totals": {
+          "portfolioStart": 82423241,
+          "portfolioEnd": 83749415,
+          "byTaxTreatment": {
+            "taxDeferred": 74879396,
+            "taxFree": 0,
+            "taxable": 8870019
+          }
+        },
+        "real": {
+          "portfolioEnd": 83749415,
+          "spendingNeed": 6000000,
+          "grossIncome": 7927976,
+          "netIncome": 6789183
+        },
+        "grossIncome": 7927976,
+        "netIncome": 6789183,
+        "depleted": false,
+        "markers": []
+      },
+      {
+        "year": 2037,
+        "phase": "retirement",
+        "deflator": 1.0,
+        "people": [
+          {
+            "personId": "person-1",
+            "age": 81,
+            "alive": true,
+            "retired": true,
+            "baseSalary": 0,
+            "bonus": 0,
+            "partTimeIncome": 0,
+            "eligibleCompForDeferrals": 0,
+            "eligibleCompForMatch": 0,
+            "employeeTraditional": 0,
+            "employeeRoth": 0,
+            "catchUp": 0,
+            "employerMatch": 0,
+            "employerFlat": 0,
+            "socialSecurity": 2880000
+          },
+          {
+            "personId": "person-2",
+            "age": 78,
+            "alive": false,
+            "retired": true,
+            "baseSalary": 0,
+            "bonus": 0,
+            "partTimeIncome": 0,
+            "eligibleCompForDeferrals": 0,
+            "eligibleCompForMatch": 0,
+            "employeeTraditional": 0,
+            "employeeRoth": 0,
+            "catchUp": 0,
+            "employerMatch": 0,
+            "employerFlat": 0,
+            "socialSecurity": 0
+          }
+        ],
+        "accounts": [
+          {
+            "accountId": "ira-1",
+            "start": 30639802,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 1200825,
+            "withdrawals": 1250604,
+            "rmd": 1250604,
+            "forfeited": 0,
+            "end": 30590023,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "ira-2",
+            "start": 44239594,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 2167388,
+            "withdrawals": 1805698,
+            "rmd": 1805698,
+            "forfeited": 0,
+            "end": 44601284,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "cash",
+            "start": 8870019,
+            "contributions": 871302,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 186070,
+            "withdrawals": 0,
+            "rmd": 0,
+            "forfeited": 0,
+            "end": 9927391,
+            "basisEnd": 0
+          }
+        ],
+        "flows": {
+          "contributions": 871302,
+          "employerContributions": 0,
+          "feeDrag": 0,
+          "withdrawals": 3056302,
+          "rmd": 3056302,
+          "hsaMedical": 0,
+          "reinvested": 871302,
+          "forfeited": 0,
+          "surplusRouted": 0,
+          "socialSecurity": 2880000,
+          "pensions": 2108987,
+          "otherIncome": 0,
+          "oneTimeInflows": 0,
+          "oneTimeOutflows": 0,
+          "spendingNeed": 6000000,
+          "spendingFunded": 6000000,
+          "shortfall": 0
+        },
+        "cashFlow": {
+          "infeasible": null
+        },
+        "tax": {
+          "filingStatus": "single",
+          "wages": 0,
+          "taxableSocialSecurity": 2448000,
+          "agi": 7613289,
+          "deductions": 1700000,
+          "federalOrdinaryTax": 1173987,
+          "capitalGainsTax": 0,
+          "ficaSocialSecurity": 0,
+          "ficaMedicare": 0,
+          "stateTax": 0,
+          "totalTax": 1173987,
+          "solver": {
+            "converged": true
+          }
+        },
+        "totals": {
+          "portfolioStart": 83749415,
+          "portfolioEnd": 85118698,
+          "byTaxTreatment": {
+            "taxDeferred": 75191307,
+            "taxFree": 0,
+            "taxable": 9927391
+          }
+        },
+        "real": {
+          "portfolioEnd": 85118698,
+          "spendingNeed": 6000000,
+          "grossIncome": 8045289,
+          "netIncome": 6871302
+        },
+        "grossIncome": 8045289,
+        "netIncome": 6871302,
+        "depleted": false,
+        "markers": []
+      },
+      {
+        "year": 2038,
+        "phase": "retirement",
+        "deflator": 1.0,
+        "people": [
+          {
+            "personId": "person-1",
+            "age": 82,
+            "alive": true,
+            "retired": true,
+            "baseSalary": 0,
+            "bonus": 0,
+            "partTimeIncome": 0,
+            "eligibleCompForDeferrals": 0,
+            "eligibleCompForMatch": 0,
+            "employeeTraditional": 0,
+            "employeeRoth": 0,
+            "catchUp": 0,
+            "employerMatch": 0,
+            "employerFlat": 0,
+            "socialSecurity": 2880000
+          },
+          {
+            "personId": "person-2",
+            "age": 79,
+            "alive": false,
+            "retired": true,
+            "baseSalary": 0,
+            "bonus": 0,
+            "partTimeIncome": 0,
+            "eligibleCompForDeferrals": 0,
+            "eligibleCompForMatch": 0,
+            "employeeTraditional": 0,
+            "employeeRoth": 0,
+            "catchUp": 0,
+            "employerMatch": 0,
+            "employerFlat": 0,
+            "socialSecurity": 0
+          }
+        ],
+        "accounts": [
+          {
+            "accountId": "ira-1",
+            "start": 30590023,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 1198359,
+            "withdrawals": 1274584,
+            "rmd": 1274584,
+            "forfeited": 0,
+            "end": 30513798,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "ira-2",
+            "start": 44601284,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 2184171,
+            "withdrawals": 1858387,
+            "rmd": 1858387,
+            "forfeited": 0,
+            "end": 44927068,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "cash",
+            "start": 9927391,
+            "contributions": 954497,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 208045,
+            "withdrawals": 0,
+            "rmd": 0,
+            "forfeited": 0,
+            "end": 11089933,
+            "basisEnd": 0
+          }
+        ],
+        "flows": {
+          "contributions": 954497,
+          "employerContributions": 0,
+          "feeDrag": 0,
+          "withdrawals": 3132971,
+          "rmd": 3132971,
+          "hsaMedical": 0,
+          "reinvested": 954497,
+          "forfeited": 0,
+          "surplusRouted": 0,
+          "socialSecurity": 2880000,
+          "pensions": 2151167,
+          "otherIncome": 0,
+          "oneTimeInflows": 0,
+          "oneTimeOutflows": 0,
+          "spendingNeed": 6000000,
+          "spendingFunded": 6000000,
+          "shortfall": 0
+        },
+        "cashFlow": {
+          "infeasible": null
+        },
+        "tax": {
+          "filingStatus": "single",
+          "wages": 0,
+          "taxableSocialSecurity": 2448000,
+          "agi": 7732138,
+          "deductions": 1700000,
+          "federalOrdinaryTax": 1209641,
+          "capitalGainsTax": 0,
+          "ficaSocialSecurity": 0,
+          "ficaMedicare": 0,
+          "stateTax": 0,
+          "totalTax": 1209641,
+          "solver": {
+            "converged": true
+          }
+        },
+        "totals": {
+          "portfolioStart": 85118698,
+          "portfolioEnd": 86530799,
+          "byTaxTreatment": {
+            "taxDeferred": 75440866,
+            "taxFree": 0,
+            "taxable": 11089933
+          }
+        },
+        "real": {
+          "portfolioEnd": 86530800,
+          "spendingNeed": 6000000,
+          "grossIncome": 8164138,
+          "netIncome": 6954497
+        },
+        "grossIncome": 8164138,
+        "netIncome": 6954497,
+        "depleted": false,
+        "markers": []
+      },
+      {
+        "year": 2039,
+        "phase": "retirement",
+        "deflator": 1.0,
+        "people": [
+          {
+            "personId": "person-1",
+            "age": 83,
+            "alive": true,
+            "retired": true,
+            "baseSalary": 0,
+            "bonus": 0,
+            "partTimeIncome": 0,
+            "eligibleCompForDeferrals": 0,
+            "eligibleCompForMatch": 0,
+            "employeeTraditional": 0,
+            "employeeRoth": 0,
+            "catchUp": 0,
+            "employerMatch": 0,
+            "employerFlat": 0,
+            "socialSecurity": 2880000
+          },
+          {
+            "personId": "person-2",
+            "age": 80,
+            "alive": false,
+            "retired": true,
+            "baseSalary": 0,
+            "bonus": 0,
+            "partTimeIncome": 0,
+            "eligibleCompForDeferrals": 0,
+            "eligibleCompForMatch": 0,
+            "employeeTraditional": 0,
+            "employeeRoth": 0,
+            "catchUp": 0,
+            "employerMatch": 0,
+            "employerFlat": 0,
+            "socialSecurity": 0
+          }
+        ],
+        "accounts": [
+          {
+            "accountId": "ira-1",
+            "start": 30513798,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 1194838,
+            "withdrawals": 1298460,
+            "rmd": 1298460,
+            "forfeited": 0,
+            "end": 30410176,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "ira-2",
+            "start": 44927068,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 2199142,
+            "withdrawals": 1911790,
+            "rmd": 1911790,
+            "forfeited": 0,
+            "end": 45214420,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "cash",
+            "start": 11089933,
+            "contributions": 1038708,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 232135,
+            "withdrawals": 0,
+            "rmd": 0,
+            "forfeited": 0,
+            "end": 12360776,
+            "basisEnd": 0
+          }
+        ],
+        "flows": {
+          "contributions": 1038708,
+          "employerContributions": 0,
+          "feeDrag": 0,
+          "withdrawals": 3210250,
+          "rmd": 3210250,
+          "hsaMedical": 0,
+          "reinvested": 1038708,
+          "forfeited": 0,
+          "surplusRouted": 0,
+          "socialSecurity": 2880000,
+          "pensions": 2194190,
+          "otherIncome": 0,
+          "oneTimeInflows": 0,
+          "oneTimeOutflows": 0,
+          "spendingNeed": 6000000,
+          "spendingFunded": 6000000,
+          "shortfall": 0
+        },
+        "cashFlow": {
+          "infeasible": null
+        },
+        "tax": {
+          "filingStatus": "single",
+          "wages": 0,
+          "taxableSocialSecurity": 2448000,
+          "agi": 7852440,
+          "deductions": 1700000,
+          "federalOrdinaryTax": 1245732,
+          "capitalGainsTax": 0,
+          "ficaSocialSecurity": 0,
+          "ficaMedicare": 0,
+          "stateTax": 0,
+          "totalTax": 1245732,
+          "solver": {
+            "converged": true
+          }
+        },
+        "totals": {
+          "portfolioStart": 86530799,
+          "portfolioEnd": 87985372,
+          "byTaxTreatment": {
+            "taxDeferred": 75624596,
+            "taxFree": 0,
+            "taxable": 12360776
+          }
+        },
+        "real": {
+          "portfolioEnd": 87985371,
+          "spendingNeed": 6000000,
+          "grossIncome": 8284440,
+          "netIncome": 7038708
+        },
+        "grossIncome": 8284440,
+        "netIncome": 7038708,
+        "depleted": false,
+        "markers": []
+      },
+      {
+        "year": 2040,
+        "phase": "retirement",
+        "deflator": 1.0,
+        "people": [
+          {
+            "personId": "person-1",
+            "age": 84,
+            "alive": true,
+            "retired": true,
+            "baseSalary": 0,
+            "bonus": 0,
+            "partTimeIncome": 0,
+            "eligibleCompForDeferrals": 0,
+            "eligibleCompForMatch": 0,
+            "employeeTraditional": 0,
+            "employeeRoth": 0,
+            "catchUp": 0,
+            "employerMatch": 0,
+            "employerFlat": 0,
+            "socialSecurity": 2880000
+          },
+          {
+            "personId": "person-2",
+            "age": 81,
+            "alive": false,
+            "retired": true,
+            "baseSalary": 0,
+            "bonus": 0,
+            "partTimeIncome": 0,
+            "eligibleCompForDeferrals": 0,
+            "eligibleCompForMatch": 0,
+            "employeeTraditional": 0,
+            "employeeRoth": 0,
+            "catchUp": 0,
+            "employerMatch": 0,
+            "employerFlat": 0,
+            "socialSecurity": 0
+          }
+        ],
+        "accounts": [
+          {
+            "accountId": "ira-1",
+            "start": 30410176,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 1190223,
+            "withdrawals": 1322182,
+            "rmd": 1322182,
+            "forfeited": 0,
+            "end": 30278217,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "ira-2",
+            "start": 45214420,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 2212173,
+            "withdrawals": 1965844,
+            "rmd": 1965844,
+            "forfeited": 0,
+            "end": 45460749,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "cash",
+            "start": 12360776,
+            "contributions": 1123870,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 258398,
+            "withdrawals": 0,
+            "rmd": 0,
+            "forfeited": 0,
+            "end": 13743044,
+            "basisEnd": 0
+          }
+        ],
+        "flows": {
+          "contributions": 1123870,
+          "employerContributions": 0,
+          "feeDrag": 0,
+          "withdrawals": 3288026,
+          "rmd": 3288026,
+          "hsaMedical": 0,
+          "reinvested": 1123870,
+          "forfeited": 0,
+          "surplusRouted": 0,
+          "socialSecurity": 2880000,
+          "pensions": 2238074,
+          "otherIncome": 0,
+          "oneTimeInflows": 0,
+          "oneTimeOutflows": 0,
+          "spendingNeed": 6000000,
+          "spendingFunded": 6000000,
+          "shortfall": 0
+        },
+        "cashFlow": {
+          "infeasible": null
+        },
+        "tax": {
+          "filingStatus": "single",
+          "wages": 0,
+          "taxableSocialSecurity": 2448000,
+          "agi": 7974100,
+          "deductions": 1700000,
+          "federalOrdinaryTax": 1282230,
+          "capitalGainsTax": 0,
+          "ficaSocialSecurity": 0,
+          "ficaMedicare": 0,
+          "stateTax": 0,
+          "totalTax": 1282230,
+          "solver": {
+            "converged": true
+          }
+        },
+        "totals": {
+          "portfolioStart": 87985372,
+          "portfolioEnd": 89482010,
+          "byTaxTreatment": {
+            "taxDeferred": 75738966,
+            "taxFree": 0,
+            "taxable": 13743044
+          }
+        },
+        "real": {
+          "portfolioEnd": 89482011,
+          "spendingNeed": 6000000,
+          "grossIncome": 8406100,
+          "netIncome": 7123870
+        },
+        "grossIncome": 8406100,
+        "netIncome": 7123870,
+        "depleted": false,
+        "markers": []
+      }
+    ],
+    "summary": {
+      "firstYear": 2026,
+      "lastYear": 2040,
+      "retirementYear": 2026,
+      "firstDeathYear": 2032,
+      "depletionYear": null,
+      "depletionAge": null,
+      "endingBalance": 89482010,
+      "endingBalanceReal": 89482011,
+      "infeasibleYears": [],
+      "deterministicSuccess": true
+    },
+    "warnings": [],
+    "excludedFeatures": []
+  }
+}

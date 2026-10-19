@@ -1,16 +1,19 @@
 /**
- * Golden projection tests (gate M3). Expectations are independent of the engine:
+ * Golden projection tests (gates M3 and M4). Expectations are independent of the engine:
  * - `reference/fixtures/*.json` come from the Python reference `reference/ref.py`, written from
  *   docs/financial-model.md only (regenerate with `python3 packages/engine/reference/ref.py --write`);
  * - the closed forms below are computed by hand in the test and cross-checked against published
  *   annuity table values.
- * The bundled rules are all unverified, so workplace contributions run "before limits" (§1.7).
+ * Each fixture names its rule set: `bundled` (the app's rules, every value unverified, so dependent
+ * steps are left out, §1.7) or `fixture` (the PINNED SYNTHETIC values of `testing/fixtureRules.ts`,
+ * every value verified: limits, taxes, gross-up, RMDs, SSA rules).
  */
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { HouseholdSchema, RULES, minimalHouseholdInput, projectHousehold, type HouseholdInput } from '../index';
-import type { ProjectionResult } from '../index';
+import type { ProjectionResult, RulesSet } from '../index';
+import { fixtureRules } from '../testing/fixtureRules';
 
 const FIXTURE_DIR = join(new URL('.', import.meta.url).pathname, '..', '..', 'reference', 'fixtures');
 
@@ -18,8 +21,14 @@ interface Fixture {
   name: string;
   description: string;
   currentYear: number;
+  rules: 'bundled' | 'fixture';
   household: HouseholdInput;
-  expected: { rows: Record<string, unknown>[]; summary: Record<string, unknown>; warnings: string[] };
+  expected: {
+    rows: Record<string, unknown>[];
+    summary: Record<string, unknown>;
+    warnings: string[];
+    excludedFeatures: string[];
+  };
 }
 
 const fixtures: Fixture[] = readdirSync(FIXTURE_DIR)
@@ -38,10 +47,40 @@ const EXACT_INTEGERS = new Set([
   'depletionYear',
   'depletionAge',
 ]);
-const CENT_TOLERANCE = 1;
+/**
+ * Bundled-rule fixtures: every money figure within 1 cent. Fixture-rule (verified) fixtures: within
+ * 3 cents. There the tax step works in cents (TaxInput/TaxBreakdown) and the docs do not fix where
+ * each intermediate (taxable gains, taxable SS, AGI) rounds, so a 1-cent difference in one year's
+ * RMD or withdrawal can carry into later balances and taxes. A formula difference is dollars.
+ */
+const CENT_TOLERANCE = { bundled: 1, fixture: 3 } as const;
+
+/**
+ * Warning codes the reference models completely: each must be present exactly when the reference
+ * expects it. Other expected codes (for example `deferralCapped`) must be present; extra codes the
+ * reference does not model (for example `rulesProjected`) are allowed.
+ */
+const MODELED_WARNINGS = [
+  'portfolioDepleted',
+  'withdrawalStrategyFallback',
+  'retirementContributionsReduced',
+  'savingsPlanInfeasible',
+  'grossUpNotConverged',
+  'rothEarningsWithdrawnEarly',
+  'hsaNonMedicalPre65',
+  'oneTimeInflowSpent',
+  'ssClaimBeforeFraWhileWorking',
+];
 
 /** Every figure in `expected` must be present in `actual`; arrays of entities are matched by id. */
-function compare(path: string, key: string, expected: unknown, actual: unknown, out: string[]): void {
+function compare(
+  path: string,
+  key: string,
+  expected: unknown,
+  actual: unknown,
+  out: string[],
+  tolerance: number = CENT_TOLERANCE.bundled,
+): void {
   if (Array.isArray(expected)) {
     if (!Array.isArray(actual)) return void out.push(`${path}: expected an array, got ${JSON.stringify(actual)}`);
     if (key === 'markers' || key === 'infeasibleYears') {
@@ -59,14 +98,14 @@ function compare(path: string, key: string, expected: unknown, actual: unknown, 
           : actual.find(
               (x) => (x as Record<string, unknown>).accountId === id || (x as Record<string, unknown>).personId === id,
             );
-      compare(`${path}[${String(id ?? i)}]`, key, item, match, out);
+      compare(`${path}[${String(id ?? i)}]`, key, item, match, out, tolerance);
     });
     return;
   }
   if (expected !== null && typeof expected === 'object') {
-    if (actual === null || typeof actual !== 'object') return void out.push(`${path}: missing`);
+    if (actual === null || typeof actual !== 'object') return void out.push(`${path}: missing (got ${String(actual)})`);
     for (const [k, v] of Object.entries(expected)) {
-      compare(`${path}.${k}`, k, v, (actual as Record<string, unknown>)[k], out);
+      compare(`${path}.${k}`, k, v, (actual as Record<string, unknown>)[k], out, tolerance);
     }
     return;
   }
@@ -76,7 +115,7 @@ function compare(path: string, key: string, expected: unknown, actual: unknown, 
         out.push(`${path}: expected ${expected}, got ${actual}`);
     } else if (EXACT_INTEGERS.has(key) || !Number.isInteger(expected)) {
       if (expected !== actual) out.push(`${path}: expected ${expected}, got ${actual}`);
-    } else if (Math.abs(expected - actual) > CENT_TOLERANCE) {
+    } else if (Math.abs(expected - actual) > tolerance) {
       out.push(`${path}: expected ${expected}, got ${actual} (${actual - expected} cents)`);
     }
     return;
@@ -84,27 +123,58 @@ function compare(path: string, key: string, expected: unknown, actual: unknown, 
   if (expected !== actual) out.push(`${path}: expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`);
 }
 
-function run(input: HouseholdInput, currentYear: number): ProjectionResult {
-  const r = projectHousehold(HouseholdSchema.parse(input), { currentYear, rules: RULES });
+const FIXTURE_RULES = fixtureRules();
+
+function run(input: HouseholdInput, currentYear: number, rules: RulesSet = RULES): ProjectionResult {
+  const r = projectHousehold(HouseholdSchema.parse(input), { currentYear, rules });
   if (r.status !== 'ok') throw new Error(`projection ${r.status}: ${JSON.stringify(r)}`);
   return r.value;
 }
 
+/** Differences between a fixture's expectation and the engine, as readable lines. */
+function fixtureDiffs(f: Fixture): string[] {
+  const result = run(f.household, f.currentYear, f.rules === 'fixture' ? FIXTURE_RULES : RULES);
+  const diffs: string[] = [];
+  const tolerance = CENT_TOLERANCE[f.rules];
+  compare('rows', 'rows', f.expected.rows, result.rows, diffs, tolerance);
+  compare('summary', 'summary', f.expected.summary, result.summary, diffs, tolerance);
+  const codes = new Set(result.warnings.map((w) => w.code));
+  for (const code of f.expected.warnings) if (!codes.has(code)) diffs.push(`warnings: missing ${code}`);
+  for (const code of MODELED_WARNINGS) {
+    if (codes.has(code) && !f.expected.warnings.includes(code)) diffs.push(`warnings: unexpected ${code}`);
+  }
+  // Fixture rules verify every value, so the excluded list is exact. With the bundled rules the
+  // reference lists only the features it can tell are needed (a subset of what the engine labels).
+  const excluded = [...result.excludedFeatures].sort();
+  if (f.rules === 'fixture') {
+    if (JSON.stringify(excluded) !== JSON.stringify([...f.expected.excludedFeatures].sort()))
+      diffs.push(
+        `excludedFeatures: expected ${JSON.stringify(f.expected.excludedFeatures)}, got ${JSON.stringify(excluded)}`,
+      );
+  } else {
+    for (const feature of f.expected.excludedFeatures)
+      if (!excluded.includes(feature)) diffs.push(`excludedFeatures: missing ${feature}`);
+  }
+  return diffs;
+}
+
 describe('golden fixtures from the Python reference (every figure within 1 cent)', () => {
-  it('has at least 8 fixtures, each a valid household', () => {
-    expect(fixtures.length).toBeGreaterThanOrEqual(8);
-    for (const f of fixtures) expect(HouseholdSchema.safeParse(f.household).success, f.name).toBe(true);
+  it('has at least 30 fixtures, at least 12 on the verified (fixture-rule) path, each a valid household', () => {
+    expect(fixtures.length).toBeGreaterThanOrEqual(30);
+    expect(fixtures.filter((f) => f.rules === 'fixture').length).toBeGreaterThanOrEqual(12);
+    for (const f of fixtures) {
+      expect(['bundled', 'fixture'], f.name).toContain(f.rules);
+      expect(HouseholdSchema.safeParse(f.household).success, f.name).toBe(true);
+    }
   });
 
-  it.each(fixtures.map((f) => [f.name, f] as const))('%s: per-year rows and summary within 1 cent', (_name, f) => {
-    const result = run(f.household, f.currentYear);
-    const diffs: string[] = [];
-    compare('rows', 'rows', f.expected.rows, result.rows, diffs);
-    compare('summary', 'summary', f.expected.summary, result.summary, diffs);
-    const codes = new Set(result.warnings.map((w) => w.code));
-    for (const code of f.expected.warnings) if (!codes.has(code)) diffs.push(`warnings: missing ${code}`);
-    expect(diffs.slice(0, 40), `${diffs.length} difference(s); ${f.description}`).toEqual([]);
-  });
+  it.each(fixtures.map((f) => [f.name, f] as const))(
+    '%s: per-year rows and summary within 1 cent (3 cents on the verified path)',
+    (_name, f) => {
+      const diffs = fixtureDiffs(f);
+      expect(diffs.slice(0, 40).join('\n'), `${diffs.length} difference(s); ${f.description}`).toBe('');
+    },
+  );
 });
 
 // ---------------------------------------------------------------------------------------------

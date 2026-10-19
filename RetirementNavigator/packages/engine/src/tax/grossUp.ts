@@ -168,7 +168,9 @@ export function solveWithdrawals(
       tax: current.tax.value,
       iterations: Math.min(iterations, input.maxIterations),
       converged,
-      unfunded: Math.max(0, input.need - netFunded),
+      // Unfunded only when the accounts are exhausted (§7.2): a converged solve within the tolerance
+      // is fully funded even if net income lands a few cents under the need.
+      unfunded: withdrawn >= totalCap - 0.005 ? Math.max(0, input.need - netFunded) : 0,
       excess: 0,
     },
   };
