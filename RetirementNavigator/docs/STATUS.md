@@ -27,10 +27,11 @@ review of `docs/rules-verification.md`. Both wait on reaching irs.gov, ssa.gov a
 | + `pnpm verify` green | typecheck, lint, format, unit (engine + web), build, E2E | pass |
 
 ### Test results (2026-10-19, this container, `pnpm verify`)
-- Engine: 13 files, 267 tests passed. Coverage 99.0% lines, 94.0% branches, 98.1% functions
+- Engine: 13 files, 275 tests passed. Coverage 99.3% lines, 94.2% branches, 98.3% functions
   (thresholds 90%).
-- Web: 15 files, 81 tests passed (React Testing Library). Web coverage is 89.6% lines and 74.1%
-  branches; there is no threshold for the web package.
+- Web: 18 files, 88 tests passed (React Testing Library), including pages rendered with the
+  synthetic fixture rules. Web coverage is 90.4% lines and 76.5% branches; there is no threshold
+  for the web package.
 - E2E: 18 passed (desktop and mobile).
   - Covers onboarding (blank and sample), reload persistence, the income/match live readout,
     profile validation and the shell.
@@ -38,7 +39,7 @@ review of `docs/rules-verification.md`. Both wait on reaching irs.gov, ssa.gov a
   - No horizontal overflow at phone width; zero outbound requests; zero console errors after running
     Zod jitless under the CSP.
 - Visual: 36 screenshots (9 pages × desktop/mobile × light/dark) read back.
-- Bundle: JS 738 kB (228 kB gzip), CSS 34 kB (7.4 kB gzip). Code-splitting is planned for the M8
+- Bundle: JS 740 kB (228 kB gzip), CSS 34 kB (7.4 kB gzip). Code-splitting is planned for the M8
   performance pass.
 
 ## Feature status
@@ -161,7 +162,8 @@ No open findings.
   - Engine: compensation, match, workplace/IRA/HSA limits, Roth eligibility, tax model, the
     Income & Savings preview, rules data and resolver.
   - UI: profiles, onboarding, Profile, Income & Savings, Accounts, Roth IRA, HSA, Rules & Sources.
-  - Tests: 267 engine and 81 web unit tests; 18 E2E tests.
+  - Tests: 275 engine and 88 web unit tests; 18 E2E tests.
+  - The M2 code review: all blocking and should-fix findings fixed (see Review findings (M2)).
 - **To tag M2 (`m2-accumulation`):**
   1. Make irs.gov, ssa.gov and federalregister.gov reachable (environment network settings, likely
      in a new session).
@@ -181,4 +183,4 @@ No open findings.
   review findings; start M2 rules data". To publish it from a clone:
   `git tag -a m1-foundation <that commit> -m "M1 Foundation" && git push origin m1-foundation`.
 - **Open risks:** rule sourcing (blocked), agent discovery (R3), tag publishing (above), bundle size
-  (738 kB JS, to code-split in M8).
+  (740 kB JS, to code-split in M8).
