@@ -53,7 +53,6 @@ describe('InsightsPage', () => {
       if (insight.tone === 'attention') expect(within(card).getByText('Attention')).toBeInTheDocument();
       else expect(within(card).queryByText('Attention')).not.toBeInTheDocument();
     }
-    expect(screen.getByText(/model-dependent educational estimates/)).toBeInTheDocument();
   });
 
   it('shows the before-limits / before-taxes badges and the healthcare note from the baseline', async () => {

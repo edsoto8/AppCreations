@@ -155,6 +155,40 @@ estimates, not guarantees, tax advice, or investment recommendations. Taxes are 
 - The Rules & Sources page lists every value, its status, source and candidate values (shown for
   reference only, never used in calculations).
 
+## Monte Carlo
+- Runs your plan thousands of times with different return sequences (and, if you choose, different
+  inflation) to show a range of outcomes. Results are model-dependent estimates, not guarantees.
+- **Settings:** number of paths (1,000–10,000), a seed (the same seed always gives the same result),
+  and fixed or random inflation. A quick result from the first 1,000 paths appears first and is marked
+  preliminary until the full run finishes. You can cancel at any time.
+- **Market assumptions:** the median return and volatility of stocks, bonds and cash, their
+  correlations and a note on where the numbers come from. They are editable assumptions. Each median
+  is a geometric (typical-year) return; the arithmetic average it implies is shown beside it.
+  Correlations that no real market could have are rejected before a run.
+- **Results:** the probability of funding your spending through the planning age, always with its
+  assumptions listed beside it; ending balances at the 10th, 50th and 90th percentiles; year-by-year
+  percentile bands (10% of paths fall below the lower edge — these are not confidence intervals);
+  a histogram of ending balances; and the ages at which paths run out.
+- **Sequence of returns:** the same good and bad years in two orders. Losses early in retirement do
+  more lasting damage, even though the average return is the same.
+- **Methodology** explains the model and its limits (no fat tails, mean reversion or regime changes).
+- Your accounts' allocations (stocks, bonds, cash) drive the volatility; accounts without one use the
+  blended volatility. The dashboard's "by asset class" view uses the same allocations.
+- Scenarios and the earliest-retirement-age search can also use a Monte Carlo success rate.
+
+## Calculators
+- Fifteen quick calculators: compound interest, 401(k) contribution, employer match, Roth vs
+  traditional, retirement age, savings gap, inflation, withdrawal (fixed percentage or sustainable
+  rate), Social Security claiming ages, fee impact, lump sum vs recurring, spending planner, Coast
+  FIRE, Barista FIRE and FI number.
+- Each uses the same engine as the forecast. **Use my plan's values** fills in what your plan already
+  has; **Example values** resets.
+- Every figure says whether it is in today's or future dollars and whether it is before taxes or
+  limits. A calculator that needs rule values that are not verified yet shows "Not available yet"
+  instead of a number.
+- The Roth IRA and Income & Savings pages link to a Roth vs traditional comparison filled in for that
+  person.
+
 ## Insights
 - Each insight is a what-if the app actually runs: it makes one change to a copy of your plan (for
   example retiring two years later, or every return one point lower), re-runs the forecast and

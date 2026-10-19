@@ -5,7 +5,6 @@ import { computeInsights, projectHousehold, type Household, type Insight, type S
 import { PageHeader } from '@/components/PageHeader';
 import { RequireProfile } from '@/components/RequireProfile';
 import { UnverifiedNotice } from '@/components/UnverifiedNotice';
-import { Disclaimer } from '@/components/Disclaimer';
 import { Alert } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -245,7 +244,6 @@ export function InsightsPage() {
         description="Each insight changes one thing in a copy of your plan, re-runs the forecast and describes the difference in this model. They are observations, not recommendations."
       />
       <RequireProfile>{(household) => <InsightsBody key={household.id} household={household} />}</RequireProfile>
-      <Disclaimer />
     </div>
   );
 }
