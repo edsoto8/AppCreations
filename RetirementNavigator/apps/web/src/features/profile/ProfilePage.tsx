@@ -196,7 +196,7 @@ function ProfileForm({ household }: { household: Household }) {
             control={control}
             name="spending.healthcareBeforeMedicare"
             label="Healthcare before Medicare (per year)"
-            tip="A user-entered line item added to retirement spending while a retired person is under 65. Healthcare costs are not otherwise modeled."
+            tip="A user-entered line item added to spending in retirement years (everyone retired) while someone retired is under 65. Healthcare costs are not otherwise modeled."
             example="For example $12,000 for one person."
           />
         </CardContent>

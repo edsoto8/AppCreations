@@ -19,7 +19,15 @@
 ## Pinned synthetic fixture year
 Real rule values are all unverified right now, so engine mechanics (limits, phase-outs, tax,
 preview) are tested against `packages/engine/src/testing/fixtureRules.ts`. That file holds
-round-number values that are clearly labeled synthetic and are never used by the app. Tests
+round-number values that are clearly labeled synthetic and are never used by the app. Each value is
+chosen to differ from current law (for example spousal 45%, survivor 95%, PIA factors
+0.85/0.3/0.2, RMD start ages 71/74, Roth qualifying age 59y4m with a 4-year rule, FICA 6%/1.5%,
+capital-gains rates 0/10/25%, benefit-taxation shares 40%/80%), so a fixture number can never be
+mistaken for a sourced one and a formula that hard-codes a real constant instead of reading the rule
+fails the tests. Changing the fixture once caught exactly that: the provisional-income share of
+benefits was written as ½ in the engine instead of read from the rules. The fixture's FRA table
+(66 before 1950, 67 after) keeps whole-year ages for hand-computed tests; its cohort boundaries
+are not the real schedule. Tests
 against the real `RULES` assert the `unverified` path. A few web tests
 (`*.verified.test.tsx`) mock the engine context with the fixture (test-only subpath
 `@rn/engine/testing`, which ESLint bans in app code) to check that pages render the engine's own

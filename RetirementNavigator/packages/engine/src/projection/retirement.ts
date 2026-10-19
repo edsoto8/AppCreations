@@ -31,7 +31,11 @@ export interface YearContext {
   firstDeathYear: number | null;
 }
 
-/** Records rule gaps from engine sub-results; returns the value or null. */
+/**
+ * Records rule gaps from engine sub-results; returns the value or null. An `invalid` sub-result also
+ * reads as null: the household is validated before projecting, so it means an input the sub-call
+ * cannot use (no case is known with a valid household; listed as a risk in STATUS.md).
+ */
 export class Gaps {
   readonly missing: UnverifiedDetail[] = [];
   take<T>(result: EngineResult<T>): T | null {
@@ -46,7 +50,9 @@ export class Gaps {
 export function spendingNeed(c: YearContext): number {
   const { household: h, year, deflator } = c;
   const s = h.spending;
-  if (!c.retirementPhase) return (s.currentAnnualSpending / 100) * deflator;
+  const survivor =
+    h.people.length > 1 && c.firstDeathYear !== null && year >= c.firstDeathYear ? 1 - s.survivorSpendingReduction : 1;
+  if (!c.retirementPhase) return (s.currentAnnualSpending / 100) * deflator * survivor;
   const first = h.people[0];
   const age1 = first ? year - first.birthYear : 0;
   let base = s.retirementAnnualSpending;
@@ -56,10 +62,7 @@ export function spendingNeed(c: YearContext): number {
   let need = (base / 100) * Math.pow(1 + s.retirementRealGlide, glideYears) * deflator;
   const preMedicare = h.people.some((p) => c.alive(p) && c.retired(p) && year - p.birthYear < 65);
   if (preMedicare) need += (s.healthcareBeforeMedicare / 100) * deflator;
-  if (h.people.length > 1 && c.firstDeathYear !== null && year >= c.firstDeathYear) {
-    need *= 1 - s.survivorSpendingReduction;
-  }
-  return need;
+  return need * survivor;
 }
 
 // ---- Pensions (§7.6) -------------------------------------------------------------------------
@@ -207,9 +210,13 @@ export function socialSecuritySetup(h: Household, rules: RulesSet, currentYear: 
   for (const person of h.people) {
     const ss = person.socialSecurity;
     const src = ss.source;
-    if (src.kind === 'none') continue;
     const claimYear = person.birthYear + ss.claimAge.years;
     const firstYearMonths = Math.max(0, 12 - (person.birthMonth - 1 + ss.claimAge.months));
+    if (src.kind === 'none') {
+      // No benefit record of their own: PIA 0. Spousal and survivor benefits can still apply (§7.5).
+      plans.set(person.id, { person, claimYear, firstYearMonths, monthly: 0, pia: 0, fra: null });
+      continue;
+    }
     // FRA is needed for the benefit only for PIA-based inputs; for `atClaimAge` it only refines the
     // earnings-test warning, so a gap there is not recorded.
     const fraResult = fullRetirementAge(person.birthYear as CalendarYear, person.birthMonth, standing);
@@ -258,9 +265,9 @@ export function socialSecuritySetup(h: Household, rules: RulesSet, currentYear: 
         monthly = at ? at.monthly / 100 : null;
       }
     }
-    // Earnings test (unsupported): warn when claiming before FRA (or 67 when FRA is unverified) while earning.
-    const fraMonths = fra ? months(fra) : 67 * 12;
-    if (months(ss.claimAge) < fraMonths) {
+    // Earnings test (unsupported): warn when claiming before FRA while earning. With FRA unverified, any
+    // claim while still earning gets the warning (no FRA is assumed).
+    if (fra === null || months(ss.claimAge) < months(fra)) {
       const earnsAfterClaim =
         (person.employment !== null && (person.employment.stopAge ?? person.retirementAge) > ss.claimAge.years) ||
         (person.employment?.partTime !== null &&
@@ -270,7 +277,9 @@ export function socialSecuritySetup(h: Household, rules: RulesSet, currentYear: 
         warnings.push({
           code: 'ssClaimBeforeFraWhileWorking',
           personId: person.id,
-          message: `${person.name} claims Social Security before ${fra ? 'full retirement age' : 'age 67 (full retirement age is unverified)'} while still earning. The earnings test is not modeled, so benefits may be overstated.`,
+          message: fra
+            ? `${person.name} claims Social Security before full retirement age while still earning. The earnings test is not modeled, so benefits may be overstated.`
+            : `${person.name} claims Social Security while still earning. If that is before full retirement age (not verified yet), the earnings test, which is not modeled, may reduce benefits.`,
         });
       }
     }
@@ -321,6 +330,7 @@ export function socialSecurityYear(
       const ps = setup.plans.get(self.id);
       const po = setup.plans.get(other.id);
       if (!ps || !po || monthsIn(ps) === 0 || monthsIn(po) === 0) continue;
+      if (po.pia === 0 || (po.pia === null && po.monthly === 0)) continue; // the other has no benefit
       if (ps.pia === null || po.pia === null) {
         gaps.missing.push({
           key: 'standing:socialSecurity.spousal',
@@ -356,10 +366,16 @@ export function socialSecurityYear(
   if (!survivor) return paid;
   const pd = setup.plans.get(deceased.id);
   if (!pd) return paid;
+  // The survivor benefit starts no earlier than the survivor's own claim year (§7.5).
+  const survivorPlan = setup.plans.get(survivor.id);
+  const months = survivorPlan ? monthsIn(survivorPlan) : 12;
+  if (months === 0) return paid;
+  if ((pd.monthly ?? 0) === 0 && (pd.pia ?? 0) === 0) return paid; // the deceased had no benefit
   const deathAge = deceased.planningAge + 1;
   let deceasedMonthly = pd.monthly;
-  if (year - deceased.birthYear >= 0 && pd.claimYear > deceased.birthYear + deceased.planningAge && pd.pia !== null) {
-    // Not claimed before death: as if claimed at the death age (capped at 70).
+  if (pd.claimYear > deceased.birthYear + deceased.planningAge && pd.pia !== null) {
+    // Not claimed before death: no reduction for the deceased's age, delayed credits up to the death
+    // age if past FRA: PIA × max(1, factor at the death age). The claim range clamps the age.
     const claimAge = { years: Math.min(70, Math.max(62, deathAge)), months: 0 };
     const at = gaps.take(
       ssBenefitAtClaim(
@@ -372,7 +388,7 @@ export function socialSecurityYear(
         standing,
       ),
     );
-    deceasedMonthly = at ? at.monthly / 100 : null;
+    deceasedMonthly = at ? pd.pia * Math.max(1, at.adjustmentFactor) : null;
   }
   if (deceasedMonthly === null) return paid;
   const ownPlan = setup.plans.get(survivor.id);
@@ -387,7 +403,7 @@ export function socialSecurityYear(
       standing,
     ),
   );
-  if (result) paid.set(survivor.id, (result.monthly / 100) * 12 * index);
+  if (result) paid.set(survivor.id, (result.monthly / 100) * months * index);
   return paid;
 }
 

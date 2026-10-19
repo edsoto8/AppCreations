@@ -1,11 +1,13 @@
 /**
  * Profiles and settings. Every profile is a validated `ProfileDoc` persisted to IndexedDB (debounced);
- * settings (active profile, onboarding, dollar basis) live in the settings document.
+ * settings (active profile, onboarding, dollar basis) live in the settings document. Scenarios live in
+ * `scenarioStore`, which this store initializes, flushes, and prunes when a profile is deleted.
  */
 import { create } from 'zustand';
 import { HouseholdSchema, type DollarBasis, type Household, type ProfileDoc } from '@rn/engine';
 import type { DocumentRepository } from '@/storage/repository';
 import { newId } from '@/lib/ids';
+import { useScenarioStore } from './scenarioStore';
 
 const SAVE_DELAY_MS = 300;
 
@@ -97,7 +99,11 @@ export const useProfileStore = create<ProfileState>((set, get) => {
       repository = repo;
       set({ status: 'loading', error: null });
       try {
-        const [profiles, settings] = await Promise.all([repo.list('profile'), repo.get('settings', 'settings')]);
+        const [profiles, settings] = await Promise.all([
+          repo.list('profile'),
+          repo.get('settings', 'settings'),
+          useScenarioStore.getState().init(repo),
+        ]);
         const valid: Record<string, ProfileDoc> = {};
         let invalid = 0;
         for (const r of profiles) {
@@ -169,6 +175,8 @@ export const useProfileStore = create<ProfileState>((set, get) => {
       timers.delete(`profile:${id}`);
       pending.delete(`profile:${id}`);
       await repository?.delete('profile', id);
+      // A profile's scenarios are diffs over it, so they are deleted with it.
+      await useScenarioStore.getState().removeForProfile(id);
       saveSettings();
     },
 
@@ -193,7 +201,7 @@ export const useProfileStore = create<ProfileState>((set, get) => {
       for (const t of timers.values()) clearTimeout(t);
       timers.clear();
       pending.clear();
-      await Promise.all(tasks.map((task) => task()));
+      await Promise.all([...tasks.map((task) => task()), useScenarioStore.getState().flush()]);
     },
   };
 });

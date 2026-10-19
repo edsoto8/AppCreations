@@ -40,7 +40,8 @@ export function taxableSsFloat(
   inclusion: { tier1: number; tier2: number },
 ): number {
   if (benefits <= 0) return 0;
-  const provisional = otherIncome + taxExempt + 0.5 * benefits;
+  // The worksheet's share of benefits in provisional income is the tier-1 share (one rule value, §6).
+  const provisional = otherIncome + taxExempt + inclusion.tier1 * benefits;
   const { base, adjustedBase } = thresholds;
   if (provisional <= base) return 0;
   if (provisional <= adjustedBase) return Math.min(inclusion.tier1 * (provisional - base), inclusion.tier1 * benefits);

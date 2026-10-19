@@ -375,8 +375,10 @@ Accumulation-phase years make no withdrawals: spending is funded from pay (§3.8
     - `age_1` is the first listed person's age that year (calendar arithmetic, even after their death);
     - `t_R` is the first retirement-phase year (glide exponent 0 in that year);
   - plus `healthcareBeforeMedicare · P_t` while any **living retired** person is under 65 (a
-    user-entered line item; early-retirement plans carry a persistent note);
-  - times `(1 − survivorSpendingReduction)` from the first death year onward, for couples.
+    user-entered line item). Any plan in which someone retires before 65 carries the
+    `healthcarePreMedicareUserEntered` note on every forecast (shown on the dashboard).
+- For couples, spending in **both** phases is multiplied by `(1 − survivorSpendingReduction)` from
+  the first death year D (§7.7) onward: a survivor who is still working spends less too.
 - Rule-free: none of this needs a rule value.
 - One-time events (§7.6) add outflows to the year's withdrawal need and inflows to an account.
 
@@ -393,11 +395,13 @@ Accumulation-phase years make no withdrawals: spending is funded from pay (§3.8
 - LTCG are stacked on top of ordinary taxable income: the low rate up to `zeroRateMax`, the middle
   rate up to `fifteenRateMax`, and the high rate above. The three rates are rule values
   (`standing:capitalGainsRates`). Any unused deduction offsets gains first.
-- Taxable SS (Pub 915):
-  - `PI = otherIncome + taxExempt + ½·SS`.
+- Taxable SS (Pub 915), with `t1`, `t2` the inclusion shares and base/adjusted the thresholds
+  (all rule values, `standing:ssBenefitTaxation`; no share is written into the code):
+  - `PI = otherIncome + taxExempt + t1·SS` (the worksheet's share of benefits in provisional
+    income is the same rule value as the tier-1 share).
   - If PI ≤ base, taxable SS is 0.
-  - If base < PI ≤ adjusted, it is `min(½(PI − base), ½SS)`.
-  - Above adjusted, it is `min(0.85·SS, 0.85·(PI − adjusted) + min(½(adjusted − base), ½SS))`.
+  - If base < PI ≤ adjusted, it is `min(t1·(PI − base), t1·SS)`.
+  - Above adjusted, it is `min(t2·SS, t2·(PI − adjusted) + min(t1·(adjusted − base), t1·SS))`.
 - FICA: the OASDI rate on each person's wages up to the wage base, plus the Medicare rate on all
   wages (rates and wage base are rule values). Additional Medicare tax is unsupported.
 - State tax = flat rate × federal AGI (simplification).
@@ -527,25 +531,36 @@ listed in `excludedFeatures`; it is never filled in. With the bundled (unverifie
 - **Spousal (verified rules only, else excluded: `spousalSurvivorBenefits`):**
   - excess = `max(0, maxShareOfPia·PIA_other − PIA_own)`, reduced for claiming before one's own FRA
     with the spousal factors;
-  - payable from the year both have claimed.
+  - payable from the year both have claimed (months: the fewer of the two that year).
   - Needs both PIAs: `atClaimAge` inputs have no PIA, so spousal is excluded for them.
+  - A person with no benefit of their own (`none`) has PIA 0, so they receive the full spousal
+    excess (reduced for claiming before their own FRA at their entered claiming age). Nobody
+    receives a spousal amount based on a spouse whose own benefit is 0 or `none`.
 - **Survivor (simple model; verified rules only, else excluded):**
-  - from the first death year, the survivor receives `max(own, deceased's benefit including delayed
-    credits)`, floored at `ribLimFloorShareOfPia × deceased PIA` when a PIA is known;
+  - from the first death year, but no earlier than the survivor's own claim year (prorated in that
+    year like an own benefit), the survivor receives
+    `max(own, maxShareOfDeceased × deceased's benefit, ribLimFloorShareOfPia × deceased PIA)` (the
+    floor only when a PIA is known);
   - the deceased's benefit stops;
-  - if the deceased had not claimed, their benefit is computed as if claimed at the death age;
+  - if the deceased had not claimed before death, their benefit is `PIA × max(1, f(death age))`:
+    never reduced for the deceased's age, with any delayed credits earned up to the death age (the
+    claim range clamps the age);
   - the survivor's own early-claim survivor reduction is not modeled;
   - for an `atClaimAge` deceased who had not claimed yet, the entered amount stands in for the
     benefit at the death age (simplification; no PIA is known).
   - While excluded, each person keeps only their own benefit, and the survivor gets nothing extra.
 - **Earnings test:** unsupported. `ssClaimBeforeFraWhileWorking` warns when someone claims before FRA
-  (verified FRA) or before 67 (unverified FRA, labeled) while drawing salary or part-time pay.
+  while drawing salary or part-time pay. With an unverified FRA, the warning says the claim is made
+  while still earning and that, if it is before full retirement age, the earnings test may reduce
+  benefits (no age is substituted).
 - **WEP/GPO:** applied only per the verified current status. The candidate says they are repealed;
   no reduction is modeled either way.
 - **Illustrative estimator (not an official SSA calculation):**
   - from history: wage-index each year with AWI to the eligibility year − 2, take the top 35 years,
-    `AIME = Σ/420`, and `PIA = 0.9·min(AIME,b1) + 0.32·clip(AIME−b1, 0, b2−b1) + 0.15·max(0,
-    AIME−b2)` (factors from rules), truncated to the dime;
+    `AIME = Σ/420`, and `PIA = p1·min(AIME,b1) + p2·clip(AIME−b1, 0, b2−b1) + p3·max(0, AIME−b2)`
+    (factors `p1..p3` and bend points `b1, b2` from the rules), truncated to the dime. The 35 years,
+    the 420 divisor, eligibility at 62 and indexing to the eligibility year − 2 are statutory
+    constants of the method, listed for verification in `rules-verification.md`;
   - average mode: `AIME = avg·min(years,35)/35/12`, using the current year's bend points;
   - entered history is assumed already capped at each year's taxable maximum (labeled).
 
@@ -554,6 +569,8 @@ listed in `excludedFeatures`; it is never filled in. With the bundled (unverifie
   - starts in the year the owner reaches `startAge`;
   - the amount is today's dollars × `P_t`, or nominal at start;
   - it then grows by its COLA (flat, inflation or a rate) from the start year;
+  - a pension already in payment before year 1 (start age reached earlier) is taken at its entered
+    amount in year 1 and grows by its COLA from year 1 (stated on the Retirement Income page);
   - `taxableFraction` of it is ordinary income.
   - After the owner's death, `survivorFraction` continues to a surviving spouse; for a single owner it
     stops.
@@ -572,17 +589,19 @@ listed in `excludedFeatures`; it is never filled in. With the bundled (unverifie
     warning.
     - Tax: `ordinaryIncome` → ordinary income; `capitalGain` → `gainFraction` × amount as long-term
       gains; `none` → untaxed.
-    - Basis: a taxable-brokerage deposit adds basis equal to the after-gain amount (the gain is
-      realized in the event).
+    - Basis: a taxable-brokerage deposit adds basis equal to the **whole** deposit, because any gain
+      is taxed in the event itself (it is not taxed again when withdrawn).
 
 ### 7.7 Survivor modeling
 - **First death year** `D = birthYear + planningAge + 1` of the first to die (§1.4). From D:
   - the deceased's salary, part-time pay, owned other income and SS stop;
   - survivor SS (§7.5) and pension continuation (§7.6) apply;
-  - spending is reduced by `survivorSpendingReduction` (§5);
+  - spending is reduced by `survivorSpendingReduction` (§5), in working years too;
   - accounts stay in the household, and the survivor's age governs RMDs on the deceased's accounts
     (spousal rollover assumption);
-  - filing status is MFJ in D, single from D + 1.
+  - filing status is MFJ in D, single from D + 1. The joint return in D counts the deceased as a
+    filer for the age-based deductions (their 65+ additional and senior deductions) as well as the
+    survivor; from D + 1 only the survivor's age counts.
 - The tests cover both orderings (older or younger spouse dies first) and equal planning ages.
 ## 8. Dashboard cards [M3, extended M4/M6]
 | Card | Definition | Dollar basis | Tax basis | Year |

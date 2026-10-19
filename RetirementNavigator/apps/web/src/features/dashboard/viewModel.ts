@@ -51,6 +51,10 @@ const NOTE_CODES = new Set([
   'retirementContributionsReduced',
   'grossUpNotConverged',
   'savingsPlanInfeasible',
+  'healthcarePreMedicareUserEntered',
+  'oneTimeOutflowUnfunded',
+  'oneTimeInflowSpent',
+  'excessIncomeSpent',
 ]);
 
 /** Forecast notes worth surfacing on the dashboard (one per code + message). */

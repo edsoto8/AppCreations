@@ -1,8 +1,8 @@
 /**
  * Social Security against the PINNED SYNTHETIC FIXTURE (src/testing/fixtureRules.ts), not real SSA
  * values: FRA 66y0m (born before 1950) / 67y0m (1950+); early reduction 0.5%/month for 36 months then
- * 0.4%; delayed credits 0.6%/month to 70; spousal 50% with 0.6%/0.4%; survivor 100% with an 80% floor;
- * PIA factors 0.9/0.3/0.15; 2026 bend points $1,000 / $6,000; AWI(Y) = $50,000 + $1,000·(Y − 2000).
+ * 0.4%; delayed credits 0.6%/month to 70; spousal 45% with 0.6%/0.4%; survivor 95% with an 80% floor;
+ * PIA factors 0.85/0.3/0.2; 2026 bend points $1,000 / $6,000; AWI(Y) = $50,000 + $1,000·(Y − 2000).
  * Expected values are computed by hand in the comments.
  */
 import { describe, expect, it } from 'vitest';
@@ -218,28 +218,30 @@ describe('estimatePia (illustrative)', () => {
       rules,
     );
 
-  it('average mode, middle band: $60,000 × 35 / 420 = AIME $5,000 → 0.9·1000 + 0.3·4000 = $2,100.00', () => {
+  it('average mode, middle band: $60,000 × 35 / 420 = AIME $5,000 → 0.85·1000 + 0.3·4000 = $2,050.00', () => {
     const v = ok(average(60_000, 35));
     expect(v.aimeMonthly).toBe(dollars(5_000));
-    expect(v.piaMonthly).toBe(dollars(2_100));
+    expect(v.piaMonthly).toBe(dollars(2_050));
     expect(v.eligibilityYear).toBe(2026);
     expect(v.label).toContain(ILLUSTRATIVE_LABEL);
     expect(v.label).toContain('latest tax year');
   });
 
-  it('average mode, fewer than 35 years: $60,000 × 20 / 420 = 2857.14 → $2,857 → $1,457.10', () => {
+  it('average mode, fewer than 35 years: $60,000 × 20 / 420 = 2857.14 → $2,857 → $1,407.10', () => {
     const v = ok(average(60_000, 20));
     expect(v.aimeMonthly).toBe(dollars(2_857));
-    expect(v.piaMonthly).toBe(dollars(1_457.1));
+    expect(v.piaMonthly).toBe(dollars(1_407.1));
     // More than 35 years counts as 35.
-    expect(ok(average(60_000, 40)).piaMonthly).toBe(dollars(2_100));
+    expect(ok(average(60_000, 40)).piaMonthly).toBe(dollars(2_050));
     expect(ok(average(60_000, 0)).piaMonthly).toBe(0);
   });
 
-  it('truncates AIME to the dollar and PIA to the dime (top band: AIME 8333.33 → 8333 → 2749.95 → $2,749.90)', () => {
+  it('truncates AIME to the dollar and PIA to the dime (top band: AIME 8333.33 → 8333 → $2,816.60)', () => {
     const v = ok(average(100_000, 35));
     expect(v.aimeMonthly).toBe(dollars(8_333));
-    expect(v.piaMonthly).toBe(dollars(2_749.9));
+    expect(v.piaMonthly).toBe(dollars(2_816.6));
+    // First band: $6,455 × 35 / 420 = 537.92 → AIME $537 → 0.85 × 537 = 456.45 → $456.40 (to the dime).
+    expect(ok(average(6_455, 35)).piaMonthly).toBe(dollars(456.4));
     // $60,001 × 35 / 420 = 5000.083 → AIME $5,000.
     expect(ok(average(60_001, 35)).aimeMonthly).toBe(dollars(5_000));
   });
@@ -251,7 +253,7 @@ describe('estimatePia (illustrative)', () => {
 
   it('history: indexes to E − 2 = 2024 (AWI $74,000), later years nominal, fewer than 35 years', () => {
     // 2000: 25,000 × 74/50 = 37,000; 2010: 30,000 × 74/60 = 37,000; 2024: 40,000; 2025: 45,000.
-    // Σ 159,000 / 420 = 378.57 → AIME $378 → PIA 0.9 × 378 = $340.20.
+    // Σ 159,000 / 420 = 378.57 → AIME $378 → PIA 0.85 × 378 = $321.30.
     const v = ok(
       history(1964, [
         [2000, 25_000],
@@ -262,7 +264,7 @@ describe('estimatePia (illustrative)', () => {
       ]),
     );
     expect(v.aimeMonthly).toBe(dollars(378));
-    expect(v.piaMonthly).toBe(dollars(340.2));
+    expect(v.piaMonthly).toBe(dollars(321.3));
     expect(v.eligibilityYear).toBe(2026);
     expect(v.label).toContain(ILLUSTRATIVE_LABEL);
     expect(v.label).toContain('indexed to 2024');
@@ -274,23 +276,23 @@ describe('estimatePia (illustrative)', () => {
     const rows: [number, number][] = [];
     for (let yr = 1980; yr <= 1989; yr++) rows.push([yr, 1_000]);
     for (let yr = 1990; yr <= 2024; yr++) rows.push([yr, 50_000 + 1_000 * (yr - 2000)]);
-    // Σ 35 × 74,000 = 2,590,000 / 420 = 6166.67 → $6,166 → 900 + 1500 + 0.15 × 166 = $2,424.90.
+    // Σ 35 × 74,000 = 2,590,000 / 420 = 6166.67 → $6,166 → 850 + 1500 + 0.2 × 166 = $2,383.20.
     const v = ok(history(1964, rows));
     expect(v.aimeMonthly).toBe(dollars(6_166));
-    expect(v.piaMonthly).toBe(dollars(2_424.9));
+    expect(v.piaMonthly).toBe(dollars(2_383.2));
     expect(v.label).toContain('top 35 of 45');
   });
 
   it('history for a younger worker: indexes to the latest AWI year and carries the bend points (projected)', () => {
     // E = 2042; I = 2040 is past the series (ends 2025), so index to 2025 (AWI $75,000).
-    // 2000: 25,000 × 75/50 = 37,500; 2025: 42,000 nominal. Σ 79,500 / 420 = 189.29 → $189 → $170.10.
+    // 2000: 25,000 × 75/50 = 37,500; 2025: 42,000 nominal. Σ 79,500 / 420 = 189.29 → $189 → 160.65 → $160.60.
     const r = history(1980, [
       [2000, 25_000],
       [2025, 42_000],
     ]);
     const v = ok(r);
     expect(v.aimeMonthly).toBe(dollars(189));
-    expect(v.piaMonthly).toBe(dollars(170.1));
+    expect(v.piaMonthly).toBe(dollars(160.6));
     expect(v.eligibilityYear).toBe(2042);
     expect(v.label).toContain('projected');
     expect(v.label).toContain('latest AWI year');
@@ -356,9 +358,9 @@ describe('estimatePia (illustrative)', () => {
       value: { first: dollars(2_000), second: dollars(6_000) },
     } as typeof y27.socialSecurity.bendPoints;
     const rules: RulesSet = { standing: R.standing, years: { '2026': y26, '2027': y27 } };
-    // AIME 5,000: 0.9 × 2,000 + 0.3 × 3,000 = $2,700.
+    // AIME 5,000: 0.85 × 2,000 + 0.3 × 3,000 = $2,600.
     const v = ok(average(60_000, 35, 1964, rules));
-    expect(v.piaMonthly).toBe(dollars(2_700));
+    expect(v.piaMonthly).toBe(dollars(2_600));
     expect(v.label).toContain('bend points of 2027');
   });
 
@@ -412,7 +414,7 @@ describe('estimatePia (illustrative)', () => {
   });
 });
 
-describe('spousalBenefit (own PIA $800, other PIA $2,000 → excess $200; born 1960, FRA 67)', () => {
+describe('spousalBenefit (own PIA $800, other PIA $2,000 → excess 45% × 2,000 − 800 = $100; born 1960, FRA 67)', () => {
   const spousal = (claimAge: AgeYearsMonths, own = 800, other = 2_000, standing: StandingRules = S) =>
     spousalBenefit(
       { ownPiaMonthly: dollars(own), otherPiaMonthly: dollars(other), birthYear: y(1960), birthMonth: 5, claimAge },
@@ -420,20 +422,20 @@ describe('spousalBenefit (own PIA $800, other PIA $2,000 → excess $200; born 1
     );
 
   it('at and after FRA: the full excess, no delayed credits', () => {
-    expect(ok(spousal(age(67))).monthlyExcess).toBe(dollars(200));
-    expect(ok(spousal(age(70))).monthlyExcess).toBe(dollars(200));
+    expect(ok(spousal(age(67))).monthlyExcess).toBe(dollars(100));
+    expect(ok(spousal(age(70))).monthlyExcess).toBe(dollars(100));
   });
 
-  it('before FRA: 62 → 1 − (0.006·36 + 0.004·24) = 0.688 → $137.60; 64 → 0.784 → $156.80', () => {
-    expect(ok(spousal(age(62))).monthlyExcess).toBe(dollars(137.6));
-    expect(ok(spousal(age(64))).monthlyExcess).toBe(dollars(156.8));
-    // 63y11m: m = 37 → 1 − (0.216 + 0.004) = 0.78 → $156.00
-    expect(ok(spousal(age(63, 11))).monthlyExcess).toBe(dollars(156));
+  it('before FRA: 62 → 1 − (0.006·36 + 0.004·24) = 0.688 → $68.80; 64 → 0.784 → $78.40', () => {
+    expect(ok(spousal(age(62))).monthlyExcess).toBe(dollars(68.8));
+    expect(ok(spousal(age(64))).monthlyExcess).toBe(dollars(78.4));
+    // 63y11m: m = 37 → 1 − (0.216 + 0.004) = 0.78 → $78.00
+    expect(ok(spousal(age(63, 11))).monthlyExcess).toBe(dollars(78));
   });
 
-  it('zero excess when the own PIA is at or above half the other PIA (FRA not needed)', () => {
+  it('zero excess when the own PIA is at or above the spousal share of the other PIA (FRA not needed)', () => {
     expect(ok(spousal(age(62), 1_200)).monthlyExcess).toBe(0);
-    expect(ok(spousal(age(62), 1_000)).monthlyExcess).toBe(0);
+    expect(ok(spousal(age(62), 900)).monthlyExcess).toBe(0);
     const noFra = withSs({ fraByBirthYear: unverifiedRule('x') });
     expect(ok(spousal(age(62), 1_200, 2_000, noFra)).monthlyExcess).toBe(0);
     expect(keys(spousal(age(62), 800, 2_000, noFra))).toEqual(['standing:socialSecurity.fraByBirthYear']);
@@ -458,7 +460,7 @@ describe('spousalBenefit (own PIA $800, other PIA $2,000 → excess $200; born 1
   });
 });
 
-describe('survivorBenefit (100% of the deceased benefit, 80% RIB-LIM floor of the PIA)', () => {
+describe('survivorBenefit (95% of the deceased benefit, 80% RIB-LIM floor of the PIA)', () => {
   const survivor = (own: number, deceased: number, pia: number, standing: StandingRules = S) =>
     survivorBenefit(
       { survivorOwnMonthly: dollars(own), deceasedBenefitMonthly: dollars(deceased), deceasedPiaMonthly: dollars(pia) },
@@ -466,7 +468,7 @@ describe('survivorBenefit (100% of the deceased benefit, 80% RIB-LIM floor of th
     );
 
   it('takes the higher of own and the deceased’s benefit', () => {
-    expect(ok(survivor(1_000, 2_200, 2_000)).monthly).toBe(dollars(2_200));
+    expect(ok(survivor(1_000, 2_200, 2_000)).monthly).toBe(dollars(2_090)); // 95% × 2,200
     expect(ok(survivor(2_500, 2_200, 2_000)).monthly).toBe(dollars(2_500));
   });
 
@@ -477,7 +479,7 @@ describe('survivorBenefit (100% of the deceased benefit, 80% RIB-LIM floor of th
   });
 
   it('has no floor when the PIA is unknown (0)', () => {
-    expect(ok(survivor(1_000, 1_200, 0)).monthly).toBe(dollars(1_200));
+    expect(ok(survivor(1_000, 1_200, 0)).monthly).toBe(dollars(1_140));
     expect(ok(survivor(0, 0, 0)).monthly).toBe(0);
   });
 

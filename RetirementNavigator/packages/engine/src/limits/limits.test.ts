@@ -1,9 +1,9 @@
 /**
  * Limits use the PINNED SYNTHETIC FIXTURE (src/testing/fixtureRules.ts), not real IRS values:
- * deferral $20,000; catch-up 50+ $7,000; 60–63 $10,000; annual additions $60,000; compensation limit
- * $300,000; Roth catch-up wage threshold $140,000 (in force); IRA $7,000 (+$1,000 at 50+);
- * Roth phase-out single $100k–$115k, MFJ $200k–$210k; rounding up to $10 with a $200 minimum;
- * HSA $4,000 / $8,000 (+$1,000 at 55+).
+ * deferral $20,000; catch-up 50+ $7,000; 60–63 $9,000; annual additions $60,000; compensation limit
+ * $300,000; Roth catch-up wage threshold $140,000 (in force); IRA $8,500 (+$1,200 at 50+);
+ * Roth phase-out single $100k–$112k, MFJ $200k–$216k; rounding up to $10 with a $200 minimum;
+ * HSA $4,000 / $8,000 (+$1,200 at 55+).
  */
 import { describe, expect, it } from 'vitest';
 import type { NominalRate } from '../domain/primitives';
@@ -81,8 +81,8 @@ describe('capContributions', () => {
     [49, 20_000],
     [50, 27_000],
     [59, 27_000],
-    [60, 30_000],
-    [63, 30_000],
+    [60, 29_000],
+    [63, 29_000],
     [64, 27_000],
   ])('catch-up age boundary: age %d may defer up to $%d', (age, max) => {
     const r = ok(
@@ -257,12 +257,12 @@ describe('rothIraEligibility (phase-out start, midpoint, end; both statuses)', (
     );
 
   it.each([
-    ['single', 100_000, 'full', 7_000],
-    ['single', 107_500, 'reduced', 3_500],
-    ['single', 115_000, 'ineligible', 0],
-    ['marriedFilingJointly', 200_000, 'full', 7_000],
-    ['marriedFilingJointly', 205_000, 'reduced', 3_500],
-    ['marriedFilingJointly', 210_000, 'ineligible', 0],
+    ['single', 100_000, 'full', 8_500],
+    ['single', 106_000, 'reduced', 4_250],
+    ['single', 112_000, 'ineligible', 0],
+    ['marriedFilingJointly', 200_000, 'full', 8_500],
+    ['marriedFilingJointly', 208_000, 'reduced', 4_250],
+    ['marriedFilingJointly', 216_000, 'ineligible', 0],
   ] as const)('%s MAGI $%d → %s, $%d allowed', (status, magi, expected, allowed) => {
     const r = ok(elig(magi, status));
     expect(r.value.status).toBe(expected);
@@ -270,10 +270,10 @@ describe('rothIraEligibility (phase-out start, midpoint, end; both statuses)', (
   });
 
   it('rounds the reduced amount up to $10 with a $200 minimum', () => {
-    // 7,000 × (115,000 − 114,900) / 15,000 = 46.67 → 50 → minimum 200.
-    expect(ok(elig(114_900, 'single')).value.allowed).toBe(dollars(200));
-    // 7,000 × (115,000 − 101,234) / 15,000 = 6,424.13 → 6,430.
-    expect(ok(elig(101_234, 'single')).value.allowed).toBe(dollars(6_430));
+    // 8,500 × (112,000 − 111,900) / 12,000 = 70.83 → 80 → minimum 200.
+    expect(ok(elig(111_900, 'single')).value.allowed).toBe(dollars(200));
+    // 8,500 × (112,000 − 101,234) / 12,000 = 7,625.92 → 7,630.
+    expect(ok(elig(101_234, 'single')).value.allowed).toBe(dollars(7_630));
     expect(ok(elig(101_234, 'single')).value.calculation).toMatch(/rounded up to a multiple of \$10/);
   });
 
@@ -291,22 +291,22 @@ describe('rothIraEligibility (phase-out start, midpoint, end; both statuses)', (
           R,
         ),
       ).value.allowed,
-    ).toBe(dollars(8_000));
+    ).toBe(dollars(9_700));
     const capped = ok(elig(50_000, 'single', { earnedIncome: dollars(3_000) }));
     expect(capped.value.allowed).toBe(dollars(3_000));
     expect(capped.warnings.map((w) => w.code)).toContain('iraEarnedIncomeCap');
-    expect(ok(elig(50_000, 'single', { otherIraContributions: dollars(2_000) })).value.allowed).toBe(dollars(5_000));
+    expect(ok(elig(50_000, 'single', { otherIraContributions: dollars(2_000) })).value.allowed).toBe(dollars(6_500));
   });
 
   it('follows the worksheet order: phase out the compensation-capped base, then cap at base − other IRA contributions', () => {
-    // Midpoint single with a 2,000 traditional IRA: reduced 3,500; base − other = 5,000 → 3,500.
-    expect(ok(elig(107_500, 'single', { otherIraContributions: dollars(2_000) })).value.allowed).toBe(dollars(3_500));
+    // Midpoint single with a 2,000 traditional IRA: reduced 4,250; base − other = 6,500 → 4,250.
+    expect(ok(elig(106_000, 'single', { otherIraContributions: dollars(2_000) })).value.allowed).toBe(dollars(4_250));
     // MFJ midpoint, earned income 4,000: base 4,000 → reduced 2,000.
-    expect(ok(elig(205_000, 'marriedFilingJointly', { earnedIncome: dollars(4_000) })).value.allowed).toBe(
+    expect(ok(elig(208_000, 'marriedFilingJointly', { earnedIncome: dollars(4_000) })).value.allowed).toBe(
       dollars(2_000),
     );
     // Full range with a large traditional IRA contribution: base − other.
-    expect(ok(elig(50_000, 'single', { otherIraContributions: dollars(6_500) })).value.allowed).toBe(dollars(500));
+    expect(ok(elig(50_000, 'single', { otherIraContributions: dollars(8_000) })).value.allowed).toBe(dollars(500));
   });
 
   it('notes backdoor Roth (not modeled) when ineligible', () => {
@@ -382,7 +382,7 @@ describe('estimateMagi', () => {
 describe('hsaLimit', () => {
   it('returns the coverage limit plus the 55+ catch-up', () => {
     expect(ok(hsaLimit({ coverage: 'selfOnly', age: 40, hdhpAttested: true }, R)).value).toBe(dollars(4_000));
-    expect(ok(hsaLimit({ coverage: 'family', age: 55, hdhpAttested: true }, R)).value).toBe(dollars(9_000));
+    expect(ok(hsaLimit({ coverage: 'family', age: 55, hdhpAttested: true }, R)).value).toBe(dollars(9_200));
     expect(ok(hsaLimit({ coverage: 'family', age: 54, hdhpAttested: true }, R)).value).toBe(dollars(8_000));
   });
 

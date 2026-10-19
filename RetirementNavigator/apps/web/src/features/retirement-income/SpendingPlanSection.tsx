@@ -118,7 +118,7 @@ export function SpendingPlanSection({ form, values }: { form: HouseholdForm; val
             control={control}
             name="spending.healthcareBeforeMedicare"
             label="Healthcare before Medicare (per year)"
-            tip="Added to retirement spending in each year a retired person is under 65. It is the only way healthcare costs before Medicare enter the plan."
+            tip="Added to spending in each retirement year (everyone retired) while someone retired is under 65. It is the only way healthcare costs before Medicare enter the plan."
             example="For example $12,000 for one person."
           />
           {couple ? (
@@ -126,7 +126,7 @@ export function SpendingPlanSection({ form, values }: { form: HouseholdForm; val
               control={control}
               name="spending.survivorSpendingReduction"
               label="Spending reduction after a death"
-              tip="Household spending falls by this share from the year after the first death. A labeled assumption."
+              tip="Household spending falls by this share from the first year one person is no longer alive (the year after their planning age). A labeled assumption."
               example="Default 20%."
             />
           ) : null}

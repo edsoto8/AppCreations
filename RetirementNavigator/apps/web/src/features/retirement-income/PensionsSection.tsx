@@ -78,7 +78,7 @@ export function PensionsSection({ form, values }: { form: HouseholdForm; values:
                   control={control}
                   name={`${base}.startAge` as never}
                   label="Starts at age"
-                  tip="Payments start in the year the owner reaches this age."
+                  tip="Payments start in the year the owner reaches this age. A pension already being paid (an age reached before this year) counts at the amount you enter this year, and its cost-of-living increase applies from next year."
                   example={owner ? `${owner.name}’s age. For example ${owner.retirementAge}.` : 'For example 65.'}
                 />
                 <Field

@@ -31,7 +31,9 @@ export type WarningCode =
   | 'featureNotModeled'
   | 'withdrawalStrategyFallback'
   | 'retirementContributionsReduced'
-  | 'oneTimeInflowSpent';
+  | 'oneTimeInflowSpent'
+  | 'oneTimeOutflowUnfunded'
+  | 'excessIncomeSpent';
 
 export interface EngineWarning {
   code: WarningCode;

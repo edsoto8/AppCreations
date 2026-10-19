@@ -217,9 +217,7 @@ export function OnboardingPage() {
                 <CardTitle className="flex items-center gap-2">
                   <Sparkles aria-hidden="true" className="size-4" /> Estimates, not advice
                 </CardTitle>
-                <CardDescription>
-                  <Disclaimer className="text-sm" />
-                </CardDescription>
+                <Disclaimer className="text-sm" />
               </CardHeader>
             </Card>
           </div>

@@ -45,7 +45,6 @@ empty). Assumptions where the docs are silent but a choice is needed are marked 
     spending income, and raises oneTimeInflowSpent;
   - a reinvested amount is rounded to whole cents (§1.3, like a routed surplus);
   - HSA non-medical withdrawals are ordinary income at any age (§6 and §7.4; §7.1 step 7 says 65+);
-  - "ages of the living filers" (§7.1) also applies in the death year (MFJ with one living filer);
   - with the bundled rules, `excludedFeatures` lists only the features the docs make certain are
     needed (the golden test checks it as a subset); with fixture rules it is exact (empty);
   - the per-person `pension` figure is not compared in a year a survivor continuation is paid
@@ -121,55 +120,56 @@ FIXTURE_TAX_YEAR = 2026
 FIXTURE_YEAR_VALUES: dict[str, tuple[Any, str, Any, Any]] = {
     "electiveDeferral": (20_000, "indexed", ("down", 500), None),
     "catchUp50": (7_000, "indexed", ("down", 500), None),
-    "catchUp60to63": (10_000, "indexed", None, None),
+    "catchUp60to63": (9_000, "indexed", None, None),
     "annualAdditions": (60_000, "indexed", ("down", 1_000), None),
     "compensationLimit": (300_000, "indexed", ("down", 5_000), None),
     "rothCatchUpWageThreshold": (140_000, "indexed", None, None),
     "rothCatchUpInForce": (True, "statutory-fixed", None, None),
-    "iraLimit": (7_000, "indexed", ("down", 500), None),
-    "iraCatchUp50": (1_000, "indexed", None, None),
-    "rothPhaseOut.single": ((100_000, 115_000), "indexed", None, None),
-    "rothPhaseOut.marriedFilingJointly": ((200_000, 210_000), "indexed", None, None),
+    "iraLimit": (8_500, "indexed", ("down", 500), None),
+    "iraCatchUp50": (1_200, "indexed", None, None),
+    "rothPhaseOut.single": ((100_000, 112_000), "indexed", None, None),
+    "rothPhaseOut.marriedFilingJointly": ((200_000, 216_000), "indexed", None, None),
     "hsa.selfOnly": (4_000, "indexed", None, None),
     "hsa.family": (8_000, "indexed", None, None),
-    "hsa.catchUp55": (1_000, "statutory-fixed", None, None),
+    "hsa.catchUp55": (1_200, "statutory-fixed", None, None),
     "brackets.single": ([(0.1, 0), (0.2, 10_000), (0.3, 50_000)], "indexed", None, None),
     "brackets.marriedFilingJointly": ([(0.1, 0), (0.2, 20_000), (0.3, 100_000)], "indexed", None, None),
     "standardDeduction.single": (15_000, "indexed", None, None),
     "standardDeduction.marriedFilingJointly": (30_000, "indexed", None, None),
     "additional65.unmarried": (2_000, "indexed", None, None),
     "additional65.married": (1_500, "indexed", None, None),
-    "senior.amountPerPerson": (5_000, "statutory-fixed", None, 2028),
+    "senior.amountPerPerson": (5_000, "statutory-fixed", None, 2029),
     "senior.phaseOutStart.single": (70_000, "statutory-fixed", None, None),
     "senior.phaseOutStart.marriedFilingJointly": (140_000, "statutory-fixed", None, None),
-    "senior.phaseOutRate": (0.06, "statutory-fixed", None, None),
+    "senior.phaseOutRate": (0.05, "statutory-fixed", None, None),
     "ltcg.single": ((40_000, 500_000), "indexed", None, None),
     "ltcg.marriedFilingJointly": ((80_000, 600_000), "indexed", None, None),
     "ssWageBase": (150_000, "indexed", None, None),
 }
 
 # Standing rules of the fixture (not tied to a tax year; never indexed).
-ST_OASDI = 0.062
-ST_MEDICARE = 0.0145
-ST_CG_RATES = (0.0, 0.15, 0.2)
-ST_SS_THRESHOLDS = {"single": (25_000, 34_000), "marriedFilingJointly": (32_000, 44_000)}
-ST_SS_INCLUSION = (0.5, 0.85)
+ST_OASDI = 0.06
+ST_MEDICARE = 0.015
+ST_CG_RATES = (0.0, 0.1, 0.25)
+ST_SS_THRESHOLDS = {"single": (20_000, 30_000), "marriedFilingJointly": (30_000, 40_000)}
+ST_SS_INCLUSION = (0.4, 0.8)
 ST_ROTH_ROUNDING = (10, 200)  # round up to $10, minimum $200
-ST_ROTH_QUALIFIED_AGE_MONTHS = 59 * 12 + 6
-ST_ROTH_FIVE_YEARS = 5
+ST_ROTH_QUALIFIED_AGE_MONTHS = 59 * 12 + 4
+ST_ROTH_FIVE_YEARS = 4
 ST_ROTH401K_RMD = False
 ST_EARLY = (0.005, 0.004)  # per month, first 36 / beyond
 ST_DELAYED = 0.006  # per month
 ST_DELAYED_MAX_AGE = 70
-ST_SPOUSAL = (0.5, 0.006, 0.004)  # max share of the other PIA, reduction per month first 36 / beyond
-ST_SURVIVOR_FLOOR = 0.8  # RIB-LIM floor share of the deceased PIA (maxShareOfDeceased = 1)
+ST_SPOUSAL = (0.45, 0.006, 0.004)  # max share of the other PIA, reduction per month first 36 / beyond
+ST_SURVIVOR_FLOOR = 0.8  # RIB-LIM floor share of the deceased PIA
+ST_SURVIVOR_SHARE = 0.95  # maxShareOfDeceased
 
 
 def st_rmd_start_age(birth_year: int) -> int:
     if 1900 <= birth_year <= 1959:
-        return 73
+        return 71
     if birth_year >= 1960:
-        return 75
+        return 74
     raise Unsupported(f"no RMD start age for birth year {birth_year}")
 
 
@@ -646,10 +646,11 @@ def project(h: dict, current_year: int, rules: str = "bundled", return_offset: f
                 death_age = first_death - people[dk]["birthYear"]
                 if death_age < 62:
                     raise Unsupported("death before age 62 with an unclaimed benefit")
-                ben_d = di["pia"] * claim_factor(people[dk]["birthYear"], death_age * 12)
+                # Unclaimed at death: the PIA, plus any delayed credits earned (never reduced).
+                ben_d = di["pia"] * max(1.0, claim_factor(people[dk]["birthYear"], death_age * 12))
             else:
                 ben_d = di["monthly"]  # atClaimAge stands in for the benefit at the death age
-            surv = max(si["monthly"], ben_d)
+            surv = max(si["monthly"], ST_SURVIVOR_SHARE * ben_d)
             if di["pia"] is not None:
                 surv = max(surv, ST_SURVIVOR_FLOOR * di["pia"])
             survivor_monthly = (sk, surv)
@@ -744,7 +745,13 @@ def project(h: dict, current_year: int, rules: str = "bundled", return_offset: f
             retirement_t = t
         living = [k for k in range(len(people)) if prow[k]["alive"]]
         status = "marriedFilingJointly" if mfj and (first_death_year is None or year <= first_death_year) else "single"
-        ages_living = [prow[k]["age"] for k in living]
+        # Filers on the return (§7.1): the living, plus a spouse who died this year on the joint return.
+        filer_ages = [
+            prow[k]["age"]
+            for k in range(len(people))
+            if prow[k]["alive"]
+            or (status == "marriedFilingJointly" and year == people[k]["birthYear"] + people[k]["planningAge"] + 1)
+        ]
         someone_working = any(prow[k]["working"] or prow[k]["pt"] > 0 for k in living)
         if couple and first_death_year is not None and year >= first_death_year and phase == "accumulation":
             raise Unsupported("a death during the accumulation phase (survivor spending reduction scope)")
@@ -1225,7 +1232,7 @@ def project(h: dict, current_year: int, rules: str = "bundled", return_offset: f
                     i = x["id"]
                     ltcg += w * (1.0 - (basis[i] + deposit_basis[i] + sched.get(i, 0.0)) / caps[i])
             return compute_tax(
-                R, status, ages_living, wages_by_person, pre_tax, other_ord, ss_total, ltcg, state_rate
+                R, status, filer_ages, wages_by_person, pre_tax, other_ord, ss_total, ltcg, state_rate
             )
 
         def allocate(amount: float) -> tuple[dict, float]:
@@ -2561,8 +2568,8 @@ case(
 case(
     "verified-gross-up-taxableFirst",
     "Fixture rules, single 70: SS statement PIA $2,000 claimed at FRA; gross-up from cash, then taxable"
-    " (gains stacked on ordinary income, Pub 915 including gains), then IRA; RMDs from 73 (2029); the"
-    " senior deduction ends after 2028; 4% state tax (§6, §7.2).",
+    " (gains stacked on ordinary income, Pub 915 including gains), then IRA; RMDs from 71 (2027); the"
+    " senior deduction ends after 2029; 4% state tax (§6, §7.2).",
     household(
         [person("person-1", Y - 70, 65, 78, socialSecurity=ss_pia(2_000, 67))],
         [
@@ -2738,7 +2745,7 @@ case(
     "verified-survivor-equal-planning-ages",
     "Fixture rules, MFJ couple born the same year with equal planning ages: nobody dies inside the horizon,"
     " so the spousal excess (claimed 36 months early: own 0.82, spousal 0.784) continues to the end and the"
-    " filing status stays MFJ; RMDs from 73 (§7.5, §7.7).",
+    " filing status stays MFJ; RMDs from 71 (§7.5, §7.7).",
     household(
         [
             person("person-1", Y - 68, 65, 85, socialSecurity=ss_pia(3_000, 67)),
@@ -2917,7 +2924,7 @@ case(
 
 case(
     "verified-roth-hsa-early-flags",
-    "Fixture rules, retired at 50 with proportional withdrawals: Roth IRA earnings before 59½ are flagged"
+    "Fixture rules, retired at 50 with proportional withdrawals: Roth IRA earnings before the fixture's 59y4m are flagged"
     " (rothEarningsWithdrawnEarly) and HSA non-medical use before 65 is flagged (hsaNonMedicalPre65); income"
     " stays below the deduction, so no tax either way (§7.4).",
     household(
@@ -2967,7 +2974,7 @@ case(
     "verified-indexed-rules-inflation",
     "Fixture rules with 3% inflation: tax-year values after 2026 are indexed per §2 (brackets, deductions,"
     " LTCG breakpoints and wage base to the cent; statutory-fixed SS thresholds and senior deduction"
-    " carried; the senior deduction absent after 2028); RMD from 73 (2028); traditionalFirst.",
+    " carried; the senior deduction absent after 2029); RMD from 71 (2026); traditionalFirst.",
     household(
         [person("person-1", Y - 71, 65, 76, socialSecurity=ss_at(2_500, 70))],
         [

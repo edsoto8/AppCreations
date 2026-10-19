@@ -91,6 +91,13 @@ describe('spending plan (§5, rule-free)', () => {
     const r = project(h);
     expect(r.rows[4]!.flows.spendingNeed).toBe(dollars(42_000));
     expect(r.rows[5]!.flows.spendingNeed).toBe(dollars(30_000));
+    // A persistent note on every forecast that retires someone before 65 (brief §1).
+    const note = r.warnings.filter((w) => w.code === 'healthcarePreMedicareUserEntered');
+    expect(note).toHaveLength(1);
+    expect(note[0]!.message).toContain('$12,000 a year you entered');
+    expect(
+      project(build({ people: [person('p1', 60)] as never, accounts: [] })).warnings.map((w) => w.code),
+    ).not.toContain('healthcarePreMedicareUserEntered');
   });
 });
 
@@ -541,8 +548,8 @@ describe('Social Security with verified (synthetic) SSA rules', () => {
       accounts: [cash(2_000_000)] as never,
     });
     const row = project(h, fixture).rows[0]!;
-    // p2: own 1,000 + excess max(0, 50% × 3,000 − 1,000) = 500, claimed at FRA.
-    expect(row.people[1]!.socialSecurity).toBe(dollars(1_500 * 12));
+    // p2: own 1,000 + excess max(0, 45% × 3,000 − 1,000) = 350, claimed at FRA.
+    expect(row.people[1]!.socialSecurity).toBe(dollars(1_350 * 12));
     expect(row.people[0]!.socialSecurity).toBe(dollars(3_000 * 12));
   });
 
@@ -556,9 +563,9 @@ describe('Social Security with verified (synthetic) SSA rules', () => {
         ] as never,
         accounts: [cash(3_000_000)] as never,
       });
-    // Higher earner (p1) dies first: p2 steps up to 3,000 a month.
+    // Higher earner (p1) dies first: p2 steps up to 95% × 3,000 = 2,850 a month.
     const a = project(couple(70, 90), fixture);
-    expect(a.rows[4]!.people[1]!.socialSecurity).toBe(dollars(3_000 * 12));
+    expect(a.rows[4]!.people[1]!.socialSecurity).toBe(dollars(2_850 * 12));
     expect(a.rows[4]!.people[0]!.socialSecurity).toBe(0);
     // Lower earner (p2) dies first: p1 keeps 3,000 (higher of own and the deceased's).
     const b = project(couple(90, 70), fixture);
@@ -566,6 +573,139 @@ describe('Social Security with verified (synthetic) SSA rules', () => {
     expect(b.rows[4]!.people[1]!.socialSecurity).toBe(0);
     // Equal planning ages: both die after the horizon; spousal continues to the end.
     const c = project(couple(90, 90), fixture);
-    expect(c.rows.at(-1)!.people[1]!.socialSecurity).toBe(dollars(1_500 * 12));
+    expect(c.rows.at(-1)!.people[1]!.socialSecurity).toBe(dollars(1_350 * 12));
+  });
+});
+
+describe('death year, survivor timing and leftover income', () => {
+  const statement = (pia: number, claim = { years: 67, months: 0 }) => ({
+    source: { kind: 'statement', piaMonthly: dollars(pia) },
+    claimAge: claim,
+  });
+
+  it('counts a spouse who died this year on the joint return (65+ amounts), then files single', () => {
+    // Fixture MFJ: $30,000 + $1,500 per person 65+ + $5,000 senior deduction per person 65+ (to 2028).
+    const h = build({
+      filingStatus: 'marriedFilingJointly',
+      people: [person('p1', 70, { planningAge: 71 }), person('p2', 50, { retirementAge: 50 })] as never,
+      accounts: [cash(2_000_000)] as never,
+      spending: { retirementAnnualSpending: dollars(20_000) },
+    });
+    const r = project(h, fixture);
+    expect(r.rows[1]!.tax?.deductions).toBe(dollars(36_500));
+    // YEAR+2: p1 has died; the joint return still counts p1’s 65+ amounts.
+    expect(r.rows[2]!.tax?.filingStatus).toBe('marriedFilingJointly');
+    expect(r.rows[2]!.tax?.deductions).toBe(dollars(36_500));
+    expect(r.rows[3]!.tax?.filingStatus).toBe('single');
+    expect(r.rows[3]!.tax?.deductions).toBe(dollars(15_000));
+  });
+
+  it('reduces spending after the first death also while the survivor still works', () => {
+    const h = build({
+      filingStatus: 'marriedFilingJointly',
+      people: [person('p1', 50, { planningAge: 51, retirementAge: 51 }), person('p2', 50)] as never,
+      accounts: [cash(100_000)] as never,
+      spending: { survivorSpendingReduction: 0.3 },
+    });
+    const r = project(h);
+    const current = h.spending.currentAnnualSpending;
+    expect(r.rows[1]!.flows.spendingNeed).toBe(current);
+    expect(r.rows[2]!.flows.spendingNeed).toBe(dollars((current / 100) * 0.7));
+  });
+
+  it('starts a survivor benefit at the survivor’s own claiming age, not before', () => {
+    const h = build({
+      filingStatus: 'marriedFilingJointly',
+      people: [
+        person('p1', 67, { planningAge: 68, socialSecurity: statement(3_000) }),
+        person('p2', 60, { retirementAge: 60, socialSecurity: statement(1_000) }),
+      ] as never,
+      accounts: [cash(3_000_000)] as never,
+    });
+    const r = project(h, fixture);
+    expect(r.rows[2]!.people[1]!.socialSecurity).toBe(0);
+    expect(r.rows[6]!.people[1]!.socialSecurity).toBe(0);
+    // p2 reaches 67 in YEAR+7 (born in January: 12 months) and takes 95% × 3,000 = 2,850.
+    expect(r.rows[7]!.people[1]!.socialSecurity).toBe(dollars(2_850 * 12));
+  });
+
+  it('bases the survivor benefit on an unclaimed PIA: never reduced, with delayed credits earned', () => {
+    const couple = (deceasedAge: number) =>
+      build({
+        filingStatus: 'marriedFilingJointly',
+        people: [
+          person('p1', deceasedAge, {
+            planningAge: deceasedAge + 1,
+            socialSecurity: statement(2_000, { years: 70, months: 0 }),
+          }),
+          person('p2', 67, { socialSecurity: statement(500) }),
+        ] as never,
+        accounts: [cash(3_000_000)] as never,
+      });
+    // Dies at 66 (before FRA 67): the full PIA, not the reduced amount at 66 → 95% × 2,000 = 1,900.
+    expect(project(couple(64), fixture).rows[2]!.people[1]!.socialSecurity).toBe(dollars(1_900 * 12));
+    // Dies at 69 (after FRA): 24 months of delayed credits at 0.6% → 95% × 2,000 × 1.144.
+    expect(project(couple(67), fixture).rows[2]!.people[1]!.socialSecurity).toBe(dollars(0.95 * 2_000 * 1.144 * 12));
+  });
+
+  it('gives a spouse with no record of their own the spousal amount; no spousal amount off a zero benefit', () => {
+    const h = build({
+      filingStatus: 'marriedFilingJointly',
+      people: [person('p1', 67, { socialSecurity: statement(3_000) }), person('p2', 67)] as never,
+      accounts: [cash(3_000_000)] as never,
+    });
+    const row = project(h, fixture).rows[0]!;
+    // 45% × 3,000 − 0 = 1,350 a month.
+    expect(row.people[1]!.socialSecurity).toBe(dollars(1_350 * 12));
+    expect(row.people[0]!.socialSecurity).toBe(dollars(3_000 * 12));
+  });
+
+  it('a working-years one-time outflow savings cannot cover is a warning, not depletion', () => {
+    const h = build({
+      people: [person('p1', 50)] as never,
+      accounts: [cash(5_000)] as never,
+      oneTimeEvents: [
+        { id: 'car', name: 'Car', year: YEAR, direction: 'outflow', amount: dollars(20_000), amountBasis: 'nominal' },
+      ] as never,
+    });
+    const r = project(h);
+    expect(r.rows[0]!.depleted).toBe(false);
+    expect(r.summary.depletionYear).not.toBe(YEAR);
+    expect(r.warnings.map((w) => w.code)).toContain('oneTimeOutflowUnfunded');
+    expect(r.warnings.find((w) => w.code === 'portfolioDepleted')?.year).not.toBe(YEAR);
+  });
+
+  it('warns once when income beyond the need has no taxable or cash account to go to', () => {
+    const h = build({
+      people: [person('p1', 76)] as never,
+      accounts: [
+        { type: 'traditionalIra', id: 'ira', name: 'IRA', ownerId: 'p1', balance: dollars(100_000), expectedReturn: 0 },
+      ] as never,
+      spending: { retirementAnnualSpending: 0 },
+    });
+    const r = project(h, fixture);
+    expect(r.rows[0]!.flows.reinvested).toBe(0);
+    expect(r.warnings.filter((w) => w.code === 'excessIncomeSpent')).toHaveLength(1);
+  });
+
+  it('splits AGI into ordinary income and long-term gains in the tax detail', () => {
+    const h = build({
+      people: [person('p1', 70)] as never,
+      accounts: [
+        {
+          type: 'taxableBrokerage',
+          id: 'tax',
+          name: 'T',
+          ownerId: 'p1',
+          balance: dollars(500_000),
+          costBasis: dollars(100_000),
+          expectedReturn: 0,
+        },
+      ] as never,
+      spending: { retirementAnnualSpending: dollars(40_000) },
+    });
+    const tax = project(h, fixture).rows[0]!.tax!;
+    expect(tax.capitalGains).toBeGreaterThan(0);
+    expect(tax.ordinaryIncome + tax.capitalGains).toBe(tax.agi);
   });
 });

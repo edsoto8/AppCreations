@@ -1,6 +1,6 @@
 {
   "name": "verified-roth-hsa-early-flags",
-  "description": "Fixture rules, retired at 50 with proportional withdrawals: Roth IRA earnings before 59\u00bd are flagged (rothEarningsWithdrawnEarly) and HSA non-medical use before 65 is flagged (hsaNonMedicalPre65); income stays below the deduction, so no tax either way (\u00a77.4).",
+  "description": "Fixture rules, retired at 50 with proportional withdrawals: Roth IRA earnings before the fixture's 59y4m are flagged (rothEarningsWithdrawnEarly) and HSA non-medical use before 65 is flagged (hsaNonMedicalPre65); income stays below the deduction, so no tax either way (\u00a77.4).",
   "currentYear": 2026,
   "rules": "fixture",
   "household": {

@@ -6,6 +6,8 @@
  */
 import {
   NotImplementedError,
+  canReceiveLumpSum,
+  canReceiveTaxableMoney,
   estimatePia,
   fullRetirementAge,
   ssBenefitAtClaim,
@@ -127,7 +129,7 @@ export function claimingComparison(person: Person, rules: RulesSet): ClaimingCom
   const ages: { age: AgeYearsMonths; label: string }[] = [
     { age: { years: 62, months: 0 }, label: 'Earliest (62)' },
     ...(fra.status === 'ok' ? [{ age: fra.value, label: `Full retirement age (${formatAge(fra.value)})` }] : []),
-    { age: { years: 70, months: 0 }, label: 'Latest with credits (70)' },
+    { age: { years: 70, months: 0 }, label: 'Latest age the app models (70)' },
   ];
   if (!ages.some((a) => months(a.age) === months(planned))) {
     ages.push({ age: planned, label: `Your planned age (${formatAge(planned)})` });
@@ -228,28 +230,14 @@ export function retirementExclusions(result: ProjectionResult): string[] {
 // Destination accounts
 // ---------------------------------------------------------------------------------------------
 
-const TAX_DEFERRED_ROLLOVER = new Set<Account['type']>(['traditionalIra', 'workplaceTraditional']);
-const TAXABLE_DESTINATIONS = new Set<Account['type']>(['taxableBrokerage', 'cash']);
-
-/**
- * Accounts a pension lump sum may roll into: the owner's tax-deferred accounts (a rollover), or a
- * taxable brokerage or cash account. Never a Roth account or an HSA, which would bypass their limits.
- */
+/** Accounts a pension lump sum may go into (the engine's own rule: `canReceiveLumpSum`). */
 export function lumpSumDestinations(household: Pick<Household, 'accounts'>, ownerId: string): Account[] {
-  return household.accounts.filter((a) => {
-    if (TAXABLE_DESTINATIONS.has(a.type)) return true;
-    if (a.type === 'other')
-      return a.taxTreatment !== 'taxFree' && (a.taxTreatment === 'taxable' || a.ownerId === ownerId);
-    return TAX_DEFERRED_ROLLOVER.has(a.type) && a.ownerId === ownerId;
-  });
+  return household.accounts.filter((a) => canReceiveLumpSum(a, ownerId));
 }
 
-/**
- * Accounts a one-time inflow may go into: a taxable brokerage, cash or "other" account (the same
- * accounts surplus cash may use), so an inheritance never bypasses plan, IRA or HSA limits.
- */
+/** Accounts a one-time inflow may go into (the engine's own rule: `canReceiveTaxableMoney`). */
 export function inflowDestinations(household: Pick<Household, 'accounts'>): Account[] {
-  return household.accounts.filter((a) => a.type === 'taxableBrokerage' || a.type === 'cash' || a.type === 'other');
+  return household.accounts.filter((a) => canReceiveTaxableMoney(a));
 }
 
 // ---------------------------------------------------------------------------------------------

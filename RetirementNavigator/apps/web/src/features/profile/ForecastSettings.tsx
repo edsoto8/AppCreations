@@ -4,7 +4,7 @@
  * Every field is validated by the engine's HouseholdSchema through the profile form.
  */
 import { useController, useWatch, type Control } from 'react-hook-form';
-import type { Household, HouseholdInput } from '@rn/engine';
+import { canReceiveTaxableMoney, type Household, type HouseholdInput } from '@rn/engine';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { NativeSelect } from '@/components/ui/native-select';
 import { Field } from '@/components/form/Field';
@@ -13,8 +13,6 @@ import { MoneyField, PercentField, SelectField } from '@/components/form/fields'
 import { ACCOUNT_TYPE_LABELS } from '@/features/accounts/accountModel';
 
 type HouseholdControl = Control<HouseholdInput, unknown, Household>;
-
-const SURPLUS_TYPES = new Set(['taxableBrokerage', 'cash', 'other']);
 
 const STRATEGIES = [
   { value: 'taxableFirst', label: 'Taxable first (default)' },
@@ -66,11 +64,11 @@ function SurplusField({ control, accounts }: { control: HouseholdControl; accoun
   const value = field.value as HouseholdInput['assumptions']['surplus'];
   const nested = fieldState.error as { message?: string; accountId?: { message?: string } } | undefined;
   const error = nested?.message ?? nested?.accountId?.message;
-  const eligible = accounts.filter((a) => SURPLUS_TYPES.has(a.type));
+  const eligible = accounts.filter((a) => canReceiveTaxableMoney(a));
   const current = value && value.mode === 'account' ? value.accountId : null;
   const options = [
     ...eligible,
-    ...accounts.filter((a) => a.id === current && !SURPLUS_TYPES.has(a.type)), // keep an invalid choice visible
+    ...accounts.filter((a) => a.id === current && !canReceiveTaxableMoney(a)), // keep an invalid choice visible
   ];
   return (
     <Field
@@ -155,7 +153,7 @@ export function ForecastSettings({
             control={control}
             name="assumptions.bracketFillTopRate"
             label="Bracket to fill (its tax rate)"
-            tip="Tax-deferred withdrawals fill taxable income up to the top of the federal bracket with this rate (for example the 12% bracket). Enter a rate from your bracket table; it is your choice, not a rule value."
+            tip="Tax-deferred withdrawals fill taxable income up to the top of the federal bracket with this rate. Enter a rate from your bracket table; it is your choice, not a rule value."
             example="For example 12. Leave empty to use taxable first."
           />
         ) : null}

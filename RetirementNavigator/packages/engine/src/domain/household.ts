@@ -548,7 +548,33 @@ export type Assumptions = z.infer<typeof AssumptionsSchema>;
 // Household (root input entity)
 // ---------------------------------------------------------------------------------------------
 
-const SURPLUS_ACCOUNT_TYPES: ReadonlySet<AccountType> = new Set(['taxableBrokerage', 'cash', 'other']);
+/**
+ * Accounts that may receive surplus cash, reinvested income and one-time inflows: a taxable
+ * brokerage, cash, or an "other" account taxed as taxable. Never a workplace plan, IRA, HSA or a
+ * tax-advantaged "other" account, which would bypass contribution limits.
+ */
+export function canReceiveTaxableMoney(account: Pick<Account, 'type'> & { taxTreatment?: TaxTreatment }): boolean {
+  if (account.type === 'taxableBrokerage' || account.type === 'cash') return true;
+  return account.type === 'other' && account.taxTreatment === 'taxable';
+}
+
+/**
+ * Accounts a pension lump sum may go into: any account that may receive taxable money, or a rollover
+ * into the owner's own tax-deferred account (traditional IRA, workplace traditional, or a tax-deferred
+ * "other" account). Never a Roth account or an HSA.
+ */
+export function canReceiveLumpSum(
+  account: Pick<Account, 'type' | 'ownerId'> & { taxTreatment?: TaxTreatment },
+  pensionOwnerId: string,
+): boolean {
+  if (canReceiveTaxableMoney(account)) return true;
+  if (account.ownerId !== pensionOwnerId) return false;
+  return (
+    account.type === 'traditionalIra' ||
+    account.type === 'workplaceTraditional' ||
+    (account.type === 'other' && account.taxTreatment === 'taxDeferred')
+  );
+}
 
 export const HouseholdSchema = z
   .object({
@@ -676,17 +702,11 @@ export const HouseholdSchema = z
         const dest = accountsById.get(pension.payout.destinationAccountId);
         if (!dest) {
           issue(['pensions', i, 'payout', 'destinationAccountId'], 'Unknown destination account');
-        } else if (
-          !SURPLUS_ACCOUNT_TYPES.has(dest.type) &&
-          !(
-            (dest.type === 'traditionalIra' || dest.type === 'workplaceTraditional') &&
-            dest.ownerId === pension.ownerId
-          )
-        ) {
-          // A rollover goes to the owner's own tax-deferred account; otherwise taxable, cash or other.
+        } else if (!canReceiveLumpSum(dest, pension.ownerId)) {
+          // A rollover goes to the owner's own tax-deferred account; otherwise a taxable account.
           issue(
             ['pensions', i, 'payout', 'destinationAccountId'],
-            'A lump sum can go to the owner’s traditional IRA or workplace plan, or to a brokerage, cash or other account',
+            'A lump sum can go to the owner’s own tax-deferred account, or to a brokerage, cash or taxable other account',
           );
         }
       }
@@ -699,9 +719,12 @@ export const HouseholdSchema = z
       if (event.destinationAccountId !== null) {
         const dest = accountsById.get(event.destinationAccountId);
         if (!dest) issue(['oneTimeEvents', i, 'destinationAccountId'], 'Unknown destination account');
-        else if (event.direction === 'inflow' && !SURPLUS_ACCOUNT_TYPES.has(dest.type)) {
+        else if (event.direction === 'inflow' && !canReceiveTaxableMoney(dest)) {
           // Inflows must not bypass contribution limits on tax-advantaged accounts.
-          issue(['oneTimeEvents', i, 'destinationAccountId'], 'An inflow can go to a brokerage, cash or other account');
+          issue(
+            ['oneTimeEvents', i, 'destinationAccountId'],
+            'An inflow can go to a brokerage, cash or taxable other account',
+          );
         }
       }
     });
@@ -709,11 +732,11 @@ export const HouseholdSchema = z
       const surplus = accountsById.get(h.assumptions.surplus.accountId);
       if (!surplus) {
         issue(['assumptions', 'surplus', 'accountId'], 'Unknown surplus account');
-      } else if (!SURPLUS_ACCOUNT_TYPES.has(surplus.type)) {
+      } else if (!canReceiveTaxableMoney(surplus)) {
         // Surplus cash must not bypass workplace, IRA or HSA contribution limits.
         issue(
           ['assumptions', 'surplus', 'accountId'],
-          'Surplus can go only to a taxable brokerage, cash or other account',
+          'Surplus can go only to a taxable brokerage, cash or taxable other account',
         );
       }
     }

@@ -90,14 +90,14 @@ describe('previewAccumulation', () => {
     // Pre-tax: 6,000 + HSA capped at 4,000 → taxable 100,000 − 10,000 − 15,000 = 75,000 → 16,500 tax.
     expect(cf.taxes).toMatchObject({
       federalOrdinaryTax: dollars(16_500),
-      ficaSocialSecurity: dollars(6_200),
-      ficaMedicare: dollars(1_450),
+      ficaSocialSecurity: dollars(6_000),
+      ficaMedicare: dollars(1_500),
     });
-    expect(cf.netPay).toBe(dollars(75_850));
-    // Contributions: 401(k) 6,000 + Roth IRA max 7,000 (MAGI 94,000 < 100,000) + HSA 4,000.
-    expect(cf.employeeContributions).toBe(dollars(17_000));
+    expect(cf.netPay).toBe(dollars(76_000));
+    // Contributions: 401(k) 6,000 + Roth IRA max 8,500 (MAGI 90,000 < 100,000) + HSA 4,000.
+    expect(cf.employeeContributions).toBe(dollars(18_500));
     expect(cf.spending).toBe(dollars(50_000));
-    expect(cf.surplus).toBe(dollars(8_850));
+    expect(cf.surplus).toBe(dollars(7_500));
     expect(cf.infeasible).toBe(false);
     expect(p.unverified).toEqual([]);
     expect(cf.warnings.map((w) => w.code)).toContain('hsaCapped');
@@ -105,7 +105,7 @@ describe('previewAccumulation', () => {
 
   it('flags an infeasible savings plan without hiding it', () => {
     const p = preview(build({ accounts: [ROTH_IRA, HSA], spending: 80_000 }));
-    expect(p.cashFlow[0]).toMatchObject({ infeasible: true, surplus: dollars(-21_150) });
+    expect(p.cashFlow[0]).toMatchObject({ infeasible: true, surplus: dollars(-22_500) });
     expect(p.cashFlow[0]!.warnings.map((w) => w.code)).toContain('savingsPlanInfeasible');
   });
 
@@ -196,11 +196,11 @@ describe('previewAccumulation', () => {
       contribution: { amount: { kind: 'dollars', amount: dollars(3_000), frequency: 'annual' } },
     };
     const p = preview(build({ accounts: [trad, ROTH_IRA] }));
-    // 3,000 traditional + Roth max of the remaining 4,000; 401(k) 6,000 → total 13,000.
-    expect(p.cashFlow[0]!.employeeContributions).toBe(dollars(13_000));
+    // 3,000 traditional + Roth max of the remaining 5,500; 401(k) 6,000 → total 14,500.
+    expect(p.cashFlow[0]!.employeeContributions).toBe(dollars(14_500));
     const high = preview(build({ accounts: [ROTH_IRA], employment: { baseSalary: dollars(113_500) } }));
-    // MAGI = 113,500 − 6,810 = 106,690 → 7,000 × 8,310 / 15,000 = 3,878 → 3,880.
-    expect(high.cashFlow[0]!.employeeContributions).toBe(dollars(6_810 + 3_880));
+    // MAGI = 113,500 − 6,810 = 106,690 → 8,500 × 5,310 / 12,000 = 3,761.25 → 3,770.
+    expect(high.cashFlow[0]!.employeeContributions).toBe(dollars(6_810 + 3_770));
   });
 
   it('caps over-limit IRA and HSA dollar contributions with warnings', () => {
@@ -209,7 +209,7 @@ describe('previewAccumulation', () => {
       contribution: { amount: { kind: 'dollars', amount: dollars(10_000), frequency: 'annual' } },
     };
     const p = preview(build({ accounts: [bigIra, HSA] }));
-    expect(p.cashFlow[0]!.employeeContributions).toBe(dollars(6_000 + 7_000 + 4_000));
+    expect(p.cashFlow[0]!.employeeContributions).toBe(dollars(6_000 + 8_500 + 4_000));
     expect(p.cashFlow[0]!.warnings.map((w) => w.code)).toEqual(expect.arrayContaining(['iraCapped', 'hsaCapped']));
   });
 
@@ -383,12 +383,12 @@ describe('previewAccumulation scheduled contributions', () => {
   it('reports each account’s request and allowed amount, and subtracts HSA contributions from MAGI', () => {
     const roth = { ...ROTH_IRA, contribution: { amount: { kind: 'maxAllowed' } } };
     // Salary 107,000, 401(k) 6% = 6,420; HSA 4,000 (capped from 5,000).
-    // MAGI = 107,000 − 6,420 − 4,000 = 96,580 < 100,000 → full 7,000 Roth IRA.
+    // MAGI = 107,000 − 6,420 − 4,000 = 96,580 < 100,000 → full 8,500 Roth IRA.
     const p = preview(build({ accounts: [roth, HSA], employment: { baseSalary: dollars(107_000) } }));
     expect(p.cashFlow[0]!.scheduled).toEqual(
       expect.arrayContaining([
         { accountId: 'hsa', requested: dollars(5_000), allowed: dollars(4_000) },
-        { accountId: 'roth', requested: null, allowed: dollars(7_000) },
+        { accountId: 'roth', requested: null, allowed: dollars(8_500) },
       ]),
     );
   });
@@ -434,7 +434,7 @@ describe('previewAccumulation never turns unknown inputs into numbers', () => {
     );
     if (overridden.status !== 'ok') throw new Error('ok');
     expect(overridden.value.cashFlow[0]!.rothIra[0]).toMatchObject({ magiSource: 'override', magi: dollars(50_000) });
-    expect(overridden.value.cashFlow[0]!.rothIra[0]!.eligibility?.allowed).toBe(dollars(7_000));
+    expect(overridden.value.cashFlow[0]!.rothIra[0]!.eligibility?.allowed).toBe(dollars(8_500));
   });
 
   it('shares one HSA limit across a person’s HSA accounts', () => {
@@ -457,6 +457,6 @@ describe('previewAccumulation never turns unknown inputs into numbers', () => {
       hsaContributions: dollars(4_000),
     });
     expect(roth).toMatchObject({ magiSource: 'estimate', magi: dollars(90_000), otherIraContributions: 0 });
-    expect(roth.eligibility).toMatchObject({ status: 'full', allowed: dollars(7_000) });
+    expect(roth.eligibility).toMatchObject({ status: 'full', allowed: dollars(8_500) });
   });
 });

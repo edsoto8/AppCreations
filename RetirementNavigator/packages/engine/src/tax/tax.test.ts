@@ -1,9 +1,9 @@
 /**
  * Tax model against the PINNED SYNTHETIC FIXTURE (not real IRS values): single brackets 10% to $10k,
  * 20% to $50k, 30% above (MFJ doubled); standard deduction $15k / $30k; additional 65+ $2,000 /
- * $1,500; senior deduction $5,000 per person phased out at 6% above $70k / $140k (last year 2028);
- * LTCG 0% to $40k, 15% to $500k (single); wage base $150k; FICA 6.2% + 1.45%;
- * SS thresholds $25k/$34k single, $32k/$44k MFJ.
+ * $1,500; senior deduction $5,000 per person phased out at 5% above $70k / $140k (last year 2029);
+ * LTCG 0% to $40k, 10% to $500k, 25% above (single); wage base $150k; FICA 6% + 1.5%;
+ * SS thresholds $20k/$30k single, $30k/$40k MFJ; inclusion shares 40% / 80%.
  */
 import { describe, expect, it } from 'vitest';
 import fc from 'fast-check';
@@ -49,10 +49,10 @@ describe('computeTax', () => {
       deductions: dollars(15_000),
       taxableOrdinaryIncome: dollars(45_000),
       federalOrdinaryTax: dollars(8_000),
-      ficaSocialSecurity: dollars(3_720),
-      ficaMedicare: dollars(870),
+      ficaSocialSecurity: dollars(3_600),
+      ficaMedicare: dollars(900),
       stateTax: dollars(3_000),
-      totalTax: dollars(15_590),
+      totalTax: dollars(15_500),
       marginalOrdinaryRate: 0.2,
     });
   });
@@ -60,7 +60,7 @@ describe('computeTax', () => {
   it('excludes pre-tax deductions from income tax but not from FICA', () => {
     const t = tax({ wages: dollars(60_000), wagesByPerson: [dollars(60_000)], preTaxDeductions: dollars(10_000) });
     expect(t.federalOrdinaryTax).toBe(dollars(6_000));
-    expect(t.ficaSocialSecurity).toBe(dollars(3_720));
+    expect(t.ficaSocialSecurity).toBe(dollars(3_600));
   });
 
   it('applies the Social Security wage base per person', () => {
@@ -70,27 +70,27 @@ describe('computeTax', () => {
       wages: dollars(300_000),
       wagesByPerson: [dollars(200_000), dollars(100_000)],
     });
-    expect(t.ficaSocialSecurity).toBe(dollars(15_500));
-    expect(t.ficaMedicare).toBe(dollars(4_350));
+    expect(t.ficaSocialSecurity).toBe(dollars(15_000));
+    expect(t.ficaMedicare).toBe(dollars(4_500));
   });
 
   it('adds the 65+ deductions and phases out the senior deduction', () => {
     const t = tax({ ages: [66], otherOrdinaryIncome: dollars(80_000) });
-    // 15,000 + 2,000 + (5,000 − 6% × 10,000) = 21,400 → taxable 58,600 → 1,000 + 8,000 + 2,580.
-    expect(t.deductions).toBe(dollars(21_400));
-    expect(t.federalOrdinaryTax).toBe(dollars(11_580));
+    // 15,000 + 2,000 + (5,000 − 5% × 10,000) = 21,500 → taxable 58,500 → 1,000 + 8,000 + 2,550.
+    expect(t.deductions).toBe(dollars(21_500));
+    expect(t.federalOrdinaryTax).toBe(dollars(11_550));
   });
 
   it('phases out the senior deduction separately for each eligible filer', () => {
-    // MFJ, both 66, AGI 190,000: each 5,000 − 6% × 50,000 = 2,000 → 4,000 total.
+    // MFJ, both 66, AGI 190,000: each 5,000 − 5% × 50,000 = 2,500 → 5,000 total.
     const t = tax({ filingStatus: 'marriedFilingJointly', ages: [66, 66], otherOrdinaryIncome: dollars(190_000) });
-    expect(t.deductions).toBe(dollars(30_000 + 2 * 1_500 + 4_000));
+    expect(t.deductions).toBe(dollars(30_000 + 2 * 1_500 + 5_000));
   });
 
   it('drops the senior deduction after its sunset year (law as written)', () => {
     const after = resolveRules(fixtureRules(), {
       anchorYear: FIXTURE_YEAR,
-      targetYear: 2029,
+      targetYear: 2030,
       indexRate: 0 as NominalRate,
     });
     const t = tax({ ages: [66], otherOrdinaryIncome: dollars(80_000) }, after);
@@ -99,19 +99,19 @@ describe('computeTax', () => {
 
   it('stacks long-term gains on top of ordinary income', () => {
     const t = tax({ otherOrdinaryIncome: dollars(30_000), longTermCapitalGains: dollars(50_000) });
-    // Ordinary taxable 15,000 → 2,000. Gains 15k→65k: 25k at 0%, 25k at 15% = 3,750.
+    // Ordinary taxable 15,000 → 2,000. Gains 15k→65k: 25k at 0%, 25k at 10% = 2,500.
     expect(t.federalOrdinaryTax).toBe(dollars(2_000));
-    expect(t.capitalGainsTax).toBe(dollars(3_750));
-    // Gains above the 15% band are taxed at 20%.
+    expect(t.capitalGainsTax).toBe(dollars(2_500));
+    // Gains above the middle band are taxed at the high rate (25%).
     const high = tax({ otherOrdinaryIncome: dollars(0), longTermCapitalGains: dollars(600_000) });
-    // Taxable 585,000: 0–40k at 0, 40k–500k at 15% = 69,000, 500k–585k at 20% = 17,000.
-    expect(high.capitalGainsTax).toBe(dollars(86_000));
+    // Taxable 585,000: 0–40k at 0, 40k–500k at 10% = 46,000, 500k–585k at 25% = 21,250.
+    expect(high.capitalGainsTax).toBe(dollars(67_250));
   });
 
   it('includes taxable Social Security in ordinary income', () => {
     const t = tax({ socialSecurityBenefits: dollars(20_000), otherOrdinaryIncome: dollars(40_000) });
-    expect(t.taxableSocialSecurity).toBe(dollars(17_000));
-    expect(t.agi).toBe(dollars(57_000));
+    expect(t.taxableSocialSecurity).toBe(dollars(16_000));
+    expect(t.agi).toBe(dollars(56_000));
   });
 
   it('never returns negative taxes (property)', () => {
@@ -170,17 +170,18 @@ describe('taxableSocialSecurity (Pub 915 method)', () => {
   };
 
   it.each([
-    [20_000, 10_000, 0], // provisional 20,000 ≤ 25,000
-    [20_000, 20_000, 2_500], // provisional 30,000 → 50% × 5,000
-    [20_000, 40_000, 17_000], // provisional 50,000 → capped at 85% of benefits
-    // provisional 40,000 → 0.85 × (40,000 − 34,000) + min(0.5 × 9,000, 0.5 × 20,000) = 5,100 + 4,500.
-    [20_000, 30_000, 9_600],
+    // Provisional income = other + 40% of benefits.
+    [20_000, 10_000, 0], // provisional 18,000 ≤ 20,000
+    [20_000, 20_000, 3_200], // provisional 28,000 → 40% × 8,000
+    [20_000, 40_000, 16_000], // provisional 48,000 → capped at 80% of benefits
+    // provisional 38,000 → 0.8 × (38,000 − 30,000) + min(0.4 × 10,000, 0.4 × 20,000) = 6,400 + 4,000.
+    [20_000, 30_000, 10_400],
   ])('benefits $%d with other income $%d → $%d taxable', (b, o, expected) => {
     expect(tss(b, o)).toBe(dollars(expected));
   });
 
   it('uses the married-filing-jointly thresholds and returns 0 with no benefits', () => {
-    expect(tss(20_000, 30_000, 'marriedFilingJointly')).toBe(dollars(4_000)); // PI 40,000 → 50% × 8,000
+    expect(tss(20_000, 30_000, 'marriedFilingJointly')).toBe(dollars(3_200)); // PI 38,000 → 40% × 8,000
     expect(tss(0, 100_000)).toBe(0);
   });
 

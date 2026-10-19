@@ -455,11 +455,11 @@
             "contributions": 0,
             "employerContributions": 0,
             "feeDrag": 0,
-            "growthNet": 1548661,
-            "withdrawals": 4879988,
+            "growthNet": 1551302,
+            "withdrawals": 4746655,
             "rmd": 1582023,
             "forfeited": 0,
-            "end": 37801276,
+            "end": 37937250,
             "basisEnd": 0
           },
           {
@@ -480,7 +480,7 @@
           "contributions": 0,
           "employerContributions": 0,
           "feeDrag": 0,
-          "withdrawals": 4879988,
+          "withdrawals": 4746655,
           "rmd": 1582023,
           "hsaMedical": 0,
           "reinvested": 0,
@@ -502,34 +502,34 @@
           "filingStatus": "single",
           "wages": 0,
           "taxableSocialSecurity": 0,
-          "agi": 6079988,
-          "deductions": 1700000,
-          "federalOrdinaryTax": 775998,
+          "agi": 5946655,
+          "deductions": 2200000,
+          "federalOrdinaryTax": 649331,
           "capitalGainsTax": 0,
           "ficaSocialSecurity": 0,
           "ficaMedicare": 0,
-          "stateTax": 303999,
-          "totalTax": 1079997,
+          "stateTax": 297333,
+          "totalTax": 946664,
           "solver": {
             "converged": true
           }
         },
         "totals": {
           "portfolioStart": 46438643,
-          "portfolioEnd": 43213437,
+          "portfolioEnd": 43349411,
           "byTaxTreatment": {
-            "taxDeferred": 37801276,
+            "taxDeferred": 37937250,
             "taxFree": 0,
             "taxable": 5412161
           }
         },
         "real": {
-          "portfolioEnd": 43213437,
+          "portfolioEnd": 43349411,
           "spendingNeed": 5000000,
-          "grossIncome": 6079988,
+          "grossIncome": 5946655,
           "netIncome": 4999991
         },
-        "grossIncome": 6079988,
+        "grossIncome": 5946655,
         "netIncome": 4999991,
         "depleted": false,
         "markers": []
@@ -561,15 +561,15 @@
         "accounts": [
           {
             "accountId": "ira",
-            "start": 37801276,
+            "start": 37937250,
             "contributions": 0,
             "employerContributions": 0,
             "feeDrag": 0,
-            "growthNet": 1415409,
+            "growthNet": 1420847,
             "withdrawals": 4879987,
-            "rmd": 1482403,
+            "rmd": 1487735,
             "forfeited": 0,
-            "end": 34336698,
+            "end": 34478110,
             "basisEnd": 0
           },
           {
@@ -591,7 +591,7 @@
           "employerContributions": 0,
           "feeDrag": 0,
           "withdrawals": 4879987,
-          "rmd": 1482403,
+          "rmd": 1487735,
           "hsaMedical": 0,
           "reinvested": 0,
           "forfeited": 0,
@@ -625,16 +625,16 @@
           }
         },
         "totals": {
-          "portfolioStart": 43213437,
-          "portfolioEnd": 39857102,
+          "portfolioStart": 43349411,
+          "portfolioEnd": 39998514,
           "byTaxTreatment": {
-            "taxDeferred": 34336698,
+            "taxDeferred": 34478110,
             "taxFree": 0,
             "taxable": 5520404
           }
         },
         "real": {
-          "portfolioEnd": 39857102,
+          "portfolioEnd": 39998514,
           "spendingNeed": 5000000,
           "grossIncome": 6079987,
           "netIncome": 4999991
@@ -671,15 +671,15 @@
         "accounts": [
           {
             "accountId": "ira",
-            "start": 34336698,
+            "start": 34478110,
             "contributions": 0,
             "employerContributions": 0,
             "feeDrag": 0,
-            "growthNet": 1276825,
+            "growthNet": 1282482,
             "withdrawals": 4879986,
-            "rmd": 1373468,
+            "rmd": 1379124,
             "forfeited": 0,
-            "end": 30733537,
+            "end": 30880606,
             "basisEnd": 0
           },
           {
@@ -701,7 +701,7 @@
           "employerContributions": 0,
           "feeDrag": 0,
           "withdrawals": 4879986,
-          "rmd": 1373468,
+          "rmd": 1379124,
           "hsaMedical": 0,
           "reinvested": 0,
           "forfeited": 0,
@@ -735,16 +735,16 @@
           }
         },
         "totals": {
-          "portfolioStart": 39857102,
-          "portfolioEnd": 36364349,
+          "portfolioStart": 39998514,
+          "portfolioEnd": 36511418,
           "byTaxTreatment": {
-            "taxDeferred": 30733537,
+            "taxDeferred": 30880606,
             "taxFree": 0,
             "taxable": 5630812
           }
         },
         "real": {
-          "portfolioEnd": 36364349,
+          "portfolioEnd": 36511418,
           "spendingNeed": 5000000,
           "grossIncome": 6079986,
           "netIncome": 4999990
@@ -781,15 +781,15 @@
         "accounts": [
           {
             "accountId": "ira",
-            "start": 30733537,
+            "start": 30880606,
             "contributions": 0,
             "employerContributions": 0,
             "feeDrag": 0,
-            "growthNet": 1132699,
+            "growthNet": 1138581,
             "withdrawals": 4879986,
-            "rmd": 1254430,
+            "rmd": 1260433,
             "forfeited": 0,
-            "end": 26986250,
+            "end": 27139201,
             "basisEnd": 0
           },
           {
@@ -811,7 +811,7 @@
           "employerContributions": 0,
           "feeDrag": 0,
           "withdrawals": 4879986,
-          "rmd": 1254430,
+          "rmd": 1260433,
           "hsaMedical": 0,
           "reinvested": 0,
           "forfeited": 0,
@@ -845,16 +845,16 @@
           }
         },
         "totals": {
-          "portfolioStart": 36364349,
-          "portfolioEnd": 32729678,
+          "portfolioStart": 36511418,
+          "portfolioEnd": 32882629,
           "byTaxTreatment": {
-            "taxDeferred": 26986250,
+            "taxDeferred": 27139201,
             "taxFree": 0,
             "taxable": 5743428
           }
         },
         "real": {
-          "portfolioEnd": 32729678,
+          "portfolioEnd": 32882630,
           "spendingNeed": 5000000,
           "grossIncome": 6079986,
           "netIncome": 4999990
@@ -891,15 +891,15 @@
         "accounts": [
           {
             "accountId": "ira",
-            "start": 26986250,
+            "start": 27139201,
             "contributions": 0,
             "employerContributions": 0,
             "feeDrag": 0,
-            "growthNet": 982807,
+            "growthNet": 988926,
             "withdrawals": 4879986,
-            "rmd": 1124427,
+            "rmd": 1130800,
             "forfeited": 0,
-            "end": 23089071,
+            "end": 23248141,
             "basisEnd": 0
           },
           {
@@ -921,7 +921,7 @@
           "employerContributions": 0,
           "feeDrag": 0,
           "withdrawals": 4879986,
-          "rmd": 1124427,
+          "rmd": 1130800,
           "hsaMedical": 0,
           "reinvested": 0,
           "forfeited": 0,
@@ -955,16 +955,16 @@
           }
         },
         "totals": {
-          "portfolioStart": 32729678,
-          "portfolioEnd": 28947368,
+          "portfolioStart": 32882629,
+          "portfolioEnd": 29106438,
           "byTaxTreatment": {
-            "taxDeferred": 23089071,
+            "taxDeferred": 23248141,
             "taxFree": 0,
             "taxable": 5858297
           }
         },
         "real": {
-          "portfolioEnd": 28947368,
+          "portfolioEnd": 29106437,
           "spendingNeed": 5000000,
           "grossIncome": 6079986,
           "netIncome": 4999990
@@ -982,8 +982,8 @@
       "firstDeathYear": null,
       "depletionYear": null,
       "depletionAge": null,
-      "endingBalance": 28947368,
-      "endingBalanceReal": 28947368,
+      "endingBalance": 29106438,
+      "endingBalanceReal": 29106437,
       "infeasibleYears": [],
       "deterministicSuccess": true
     },

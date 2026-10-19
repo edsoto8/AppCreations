@@ -1,7 +1,7 @@
 /**
  * RMDs and Roth qualification against the PINNED SYNTHETIC FIXTURE (src/testing/fixtureRules.ts), not
- * real IRS values: start age 73 (born 1900–1959) / 75 (born 1960+); Uniform Lifetime Table for ages
- * 70–120 with period = 30 − 0.5·(age − 70); Roth qualified at 714 months (59½) and a 5-year rule.
+ * real IRS values: start age 71 (born 1900–1959) / 74 (born 1960+); Uniform Lifetime Table for ages
+ * 70–120 with period = 30 − 0.5·(age − 70); Roth qualified at 712 months (59y4m) and a 4-year rule.
  */
 import { describe, expect, it } from 'vitest';
 import type { CalendarYear, Cents } from '../domain/primitives';
@@ -33,11 +33,11 @@ describe('api wiring', () => {
 
 describe('rmdStartAge', () => {
   it('looks up each birth-year range at its boundaries', () => {
-    expect(ok(rmdStartAge(y(1900), S))).toBe(73);
-    expect(ok(rmdStartAge(y(1951), S))).toBe(73);
-    expect(ok(rmdStartAge(y(1959), S))).toBe(73);
-    expect(ok(rmdStartAge(y(1960), S))).toBe(75);
-    expect(ok(rmdStartAge(y(2000), S))).toBe(75);
+    expect(ok(rmdStartAge(y(1900), S))).toBe(71);
+    expect(ok(rmdStartAge(y(1951), S))).toBe(71);
+    expect(ok(rmdStartAge(y(1959), S))).toBe(71);
+    expect(ok(rmdStartAge(y(1960), S))).toBe(74);
+    expect(ok(rmdStartAge(y(2000), S))).toBe(74);
   });
 
   it('is unverified for a birth year no verified range covers (e.g. a reserved 1959)', () => {
@@ -50,8 +50,8 @@ describe('rmdStartAge', () => {
         startAgeByBirthYear: {
           ...table,
           value: [
-            { fromBirthYear: 1951, toBirthYear: 1958, age: 73 },
-            { fromBirthYear: 1960, toBirthYear: null, age: 75 },
+            { fromBirthYear: 1951, toBirthYear: 1958, age: 71 },
+            { fromBirthYear: 1960, toBirthYear: null, age: 74 },
           ],
         },
       },
@@ -64,7 +64,7 @@ describe('rmdStartAge', () => {
       expect(r.missing[0]?.reason).toContain('start age not published for this birth year');
       expect(r.missing[0]?.features).toEqual(['rmd']);
     }
-    expect(ok(rmdStartAge(y(1958), gap))).toBe(73);
+    expect(ok(rmdStartAge(y(1958), gap))).toBe(71);
     expect(rmdStartAge(y(1950), gap).status).toBe('unverified');
   });
 
@@ -102,18 +102,18 @@ describe('rmdAmount = prior year-end balance / period(age)', () => {
   });
 });
 
-describe('rothQualifiedYear (59½ = 714 months; five-year rule 5)', () => {
-  it('turns 59½ in birthYear + 59 for birth months 1–6 and birthYear + 60 for 7–12', () => {
+describe('rothQualifiedYear (synthetic fixture: 712 months = 59y4m; five-year rule 4)', () => {
+  it('reaches 59y4m in birthYear + 59 for birth months 1–8 and birthYear + 60 for 9–12', () => {
     expect(ok(rothQualifiedYear(y(1970), 1, y(2000), S))).toBe(2029);
-    expect(ok(rothQualifiedYear(y(1970), 6, y(2000), S))).toBe(2029);
-    expect(ok(rothQualifiedYear(y(1970), 7, y(2000), S))).toBe(2030);
+    expect(ok(rothQualifiedYear(y(1970), 8, y(2000), S))).toBe(2029);
+    expect(ok(rothQualifiedYear(y(1970), 9, y(2000), S))).toBe(2030);
     expect(ok(rothQualifiedYear(y(1970), 12, y(2000), S))).toBe(2030);
   });
 
-  it('the five-year rule binds when the first contribution is late', () => {
-    expect(ok(rothQualifiedYear(y(1970), 3, y(2024), S))).toBe(2029); // 2029 = 2024 + 5 = age year
-    expect(ok(rothQualifiedYear(y(1970), 3, y(2027), S))).toBe(2032);
-    expect(ok(rothQualifiedYear(y(1970), 9, y(2026), S))).toBe(2031);
+  it('the four-year rule binds when the first contribution is late', () => {
+    expect(ok(rothQualifiedYear(y(1970), 3, y(2025), S))).toBe(2029); // 2029 = 2025 + 4 = age year
+    expect(ok(rothQualifiedYear(y(1970), 3, y(2027), S))).toBe(2031);
+    expect(ok(rothQualifiedYear(y(1970), 10, y(2027), S))).toBe(2031);
   });
 
   it('reads the qualifying age from the rules', () => {

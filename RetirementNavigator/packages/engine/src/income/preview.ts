@@ -243,6 +243,10 @@ export interface ExtraIncome {
   ordinary: number;
   socialSecurity: number;
   gains: number;
+  /** Projection overrides after a death (§7.7): filing status, filer ages, spending factor. */
+  filingStatus?: Household['filingStatus'];
+  ages?: number[];
+  spendingFactor?: number;
 }
 
 export function accumulationYear(
@@ -327,14 +331,14 @@ export function accumulationYear(
   const spendingToday = anyWorking
     ? household.spending.currentAnnualSpending
     : household.spending.retirementAnnualSpending;
-  const spending = (spendingToday / 100) * priceIndex(inflation, t);
+  const spending = (spendingToday / 100) * priceIndex(inflation, t) * (extra.spendingFactor ?? 1);
 
   let taxes: TaxBreakdown | null = null;
   if (workplaceEmployee !== null && hsaPreTax !== null) {
     const taxResult = computeTax(
       {
-        filingStatus: household.filingStatus,
-        ages,
+        filingStatus: extra.filingStatus ?? household.filingStatus,
+        ages: extra.ages ?? ages,
         wages: toCents(grossPay),
         wagesByPerson,
         otherOrdinaryIncome: toCents(other.taxable + extra.ordinary),

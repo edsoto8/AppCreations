@@ -1,15 +1,16 @@
 /**
- * Deterministic projection (docs/financial-model.md §1, §3–4, §7 M3 subset). Year by year from the
- * injected current year through the longer-lived person's planning age.
+ * Deterministic projection (docs/financial-model.md §1, §3–7). Year by year from the injected current
+ * year through the longer-lived person's planning age.
  *
  * Accumulation years reuse the Income & Savings slice (`accumulationYear`): compensation, elections,
  * limits, match, scheduled contributions and net-pay feasibility. When a limit is unverified, the
  * step is excluded and contributions are as elected (before limits); the feature is listed in
  * `excludedFeatures`. Taxes and net pay that need a null rule are null, never filled in.
  *
- * Retirement-phase years (M3): spending need is funded by withdrawals in the strategy's order, before
- * taxes. Social Security, pensions, one-time events, RMDs, spending steps and retirement taxes are
- * modeled in M4; their presence produces `featureNotModeled` warnings.
+ * Every year first collects the income that does not depend on the phase (Social Security, pensions,
+ * one-time events, RMDs). Retirement-phase years then fund the spending need (§5) with withdrawals
+ * in the strategy's order, grossed up for taxes by the solver when the tax rules are verified, and
+ * before taxes (labeled) when they are not (§1.7, §7.1).
  */
 import type { Account, Household, Person, WorkplacePlan } from '../domain/household';
 import type { CappedContributions, EngineContext, ProjectionOptions, TaxBreakdown } from '../api';
@@ -81,14 +82,16 @@ function taxDetail(
   filingStatus: Household['filingStatus'],
   taxes: TaxBreakdown,
   wages: Cents,
+  gains: Cents,
   solver: { iterations: number; converged: boolean } = { iterations: 0, converged: true },
 ): TaxYearDetail {
   return {
     filingStatus,
     wages,
-    ordinaryIncome: taxes.agi,
+    // AGI = ordinary income (incl. taxable SS) + long-term gains.
+    ordinaryIncome: asCents(taxes.agi - gains),
     taxableSocialSecurity: taxes.taxableSocialSecurity,
-    capitalGains: 0 as Cents,
+    capitalGains: gains,
     agi: taxes.agi,
     deductions: taxes.deductions,
     taxableIncome: taxes.taxableOrdinaryIncome,
@@ -245,6 +248,22 @@ export function projectHousehold(
   const infeasibleYears: number[] = [];
   const shock = a.marketShock;
 
+  // Retiring before Medicare age (65, a statutory constant listed in rules-verification.md): the
+  // only healthcare cost before 65 is the user-entered line, so say so on every forecast (brief §1).
+  const early = household.people.filter((p) => p.retirementAge < 65 && p.planningAge >= p.retirementAge);
+  if (early.length > 0) {
+    const line = household.spending.healthcareBeforeMedicare / 100;
+    warnings.push({
+      code: 'healthcarePreMedicareUserEntered',
+      year: firstYear,
+      message:
+        `${early.map((p) => p.name).join(' and ')} ${early.length > 1 ? 'retire' : 'retires'} before 65. ` +
+        (line > 0
+          ? `Healthcare before Medicare is only the ${usd(line)} a year you entered (today’s dollars); nothing else is modeled.`
+          : 'Healthcare before Medicare is not in the plan: the pre-Medicare healthcare line is $0.'),
+    });
+  }
+
   for (let t = 1; t <= years; t++) {
     const year = firstYear + t - 1;
     if (t > 1) {
@@ -289,11 +308,28 @@ export function projectHousehold(
     const inflowOrdinary =
       events.inflows.reduce((x, e) => x + e.ordinary, 0) + pensions.lumpSums.reduce((x, l) => x + l.taxable, 0);
     const inflowGains = events.inflows.reduce((x, e) => x + e.gains, 0);
+    // Filing (§7.7): MFJ through the first death year, single after. Filers are the living plus anyone
+    // who died at the start of this year (a joint return for the year of death).
+    const filingStatus: Household['filingStatus'] =
+      household.filingStatus === 'marriedFilingJointly' && (firstDeathYear === null || year <= firstDeathYear)
+        ? 'marriedFilingJointly'
+        : 'single';
+    const filerAges = household.people
+      .filter((p) => alive(p) || year === p.birthYear + p.planningAge + 1)
+      .filter((p) => filingStatus === 'marriedFilingJointly' || alive(p))
+      .map((p) => year - p.birthYear);
+    const survivorFactor =
+      household.people.length > 1 && firstDeathYear !== null && year >= firstDeathYear
+        ? 1 - household.spending.survivorSpendingReduction
+        : 1;
     const acc = accumulationYear(household, setup, t, rules, {
       cash: ssTotal + pensions.annuity,
       ordinary: pensions.taxable + rmdTotal + inflowOrdinary,
       socialSecurity: ssTotal,
       gains: inflowGains,
+      filingStatus,
+      ages: filerAges,
+      spendingFactor: survivorFactor,
     });
     for (const w of acc.cashFlow.warnings) warnings.push(w);
 
@@ -405,10 +441,8 @@ export function projectHousehold(
 
     // Deposits at mid-year: lump-sum pensions and one-time inflows (§7.6).
     let inflowTotal = 0;
-    const deposits = new Map<string, number>();
     for (const lump of pensions.lumpSums) {
       add(contrib, lump.accountId, lump.amount);
-      add(deposits, lump.accountId, lump.amount);
       inflowTotal += lump.amount;
     }
     for (const e of events.inflows) {
@@ -422,8 +456,7 @@ export function projectHousehold(
         continue;
       }
       add(contrib, e.accountId, e.amount);
-      // A taxable deposit adds basis equal to the amount (its gain is realized in the event).
-      add(deposits, e.accountId, e.amount);
+      // A taxable deposit adds basis equal to the full amount (its gain is realized in the event).
     }
 
     // Accumulation-phase surplus routing (needs net pay, i.e. verified taxes).
@@ -514,14 +547,9 @@ export function projectHousehold(
     let unfunded: number;
     let excess: number;
     let solved: ReturnType<typeof solveWithdrawals> | null = null;
-    let yearFiling: Household['filingStatus'] = household.filingStatus;
+    let yearFiling: Household['filingStatus'] = filingStatus;
     let spendingWithdrawals: number;
     if (retirementPhase) {
-      const living = household.people.filter((p) => alive(p));
-      const filingStatus =
-        household.filingStatus === 'marriedFilingJointly' && (firstDeathYear === null || year <= firstDeathYear)
-          ? 'marriedFilingJointly'
-          : 'single';
       const solverAccounts: SolverAccount[] = household.accounts.map((acct) => {
         const state = states.get(acct.id);
         const category = withdrawalCategoryOf(acct);
@@ -545,8 +573,8 @@ export function projectHousehold(
         ordinary: acc.float.otherTaxable + pensions.taxable + rmdTaken + inflowOrdinary,
         socialSecurity: ssTotal,
         gains: inflowGains,
-        filingStatus: filingStatus as 'single' | 'marriedFilingJointly',
-        ages: living.map((p) => year - p.birthYear),
+        filingStatus,
+        ages: filerAges,
         stateTaxRate: a.stateTaxRate,
         accounts: solverAccounts,
         order,
@@ -599,7 +627,12 @@ export function projectHousehold(
     if (excess > 0.005 && target) {
       reinvested = excess;
       add(contrib, target, excess);
-      add(deposits, target, excess);
+    } else if (excess > 0.005) {
+      warnOnce('excess-spent', {
+        code: 'excessIncomeSpent',
+        year,
+        message: `From ${year}, income or required minimum distributions beyond the year’s need have no taxable or cash account to go to, so they are treated as spent.`,
+      });
     }
     // Roth IRA earnings and HSA non-medical warnings (§7.4).
     for (const acct of household.accounts) {
@@ -640,7 +673,16 @@ export function projectHousehold(
         }
       }
     }
-    const depleted = unfunded > 0.005;
+    // Depletion is a retirement-phase event (§4.1). A working-years one-time outflow that savings
+    // cannot cover is a shortfall with its own warning, not depletion.
+    const depleted = retirementPhase && unfunded > 0.005;
+    if (!retirementPhase && unfunded > 0.005) {
+      warnings.push({
+        code: 'oneTimeOutflowUnfunded',
+        year,
+        message: `In ${year}, savings cannot cover ${usd(unfunded)} of the one-time expenses.`,
+      });
+    }
     if (depleted && depletionYear === null) {
       depletionYear = year;
       markers.push('depletion');
@@ -784,6 +826,7 @@ export function projectHousehold(
             yearFiling,
             taxes,
             toCents(earned),
+            toCents(retirementTax ? retirementTax.gains : inflowGains),
             retirementTax ? { iterations: retirementTax.iterations, converged: retirementTax.converged } : undefined,
           )
         : null,
@@ -815,7 +858,8 @@ export function projectHousehold(
   if (bracketFillFellBack) {
     warnings.push({
       code: 'withdrawalStrategyFallback',
-      message: 'Bracket-fill withdrawals need verified tax brackets; this forecast uses the taxable-first order.',
+      message:
+        'Bracket-fill withdrawals need verified tax brackets and a bracket-fill rate equal to one of the bracket rates; this forecast uses the taxable-first order.',
     });
   }
   const last = rows[rows.length - 1];

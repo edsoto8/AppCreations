@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { HouseholdSchema, type HouseholdInput } from './household';
+import { HouseholdSchema, canReceiveLumpSum, canReceiveTaxableMoney, type HouseholdInput } from './household';
 import { minimalHouseholdInput } from '../samples/minimal';
 import { formatIssues, zodIssues } from '../validation';
 
@@ -243,7 +243,7 @@ describe('HouseholdSchema', () => {
     const h = withPlan();
     const toPlan = { ...h, assumptions: { ...h.assumptions, surplus: { mode: 'account', accountId: 'k-trad' } } };
     expect(messages(toPlan)).toContain(
-      'assumptions.surplus.accountId: Surplus can go only to a taxable brokerage, cash or other account',
+      'assumptions.surplus.accountId: Surplus can go only to a taxable brokerage, cash or taxable other account',
     );
   });
 
@@ -426,5 +426,18 @@ describe('M4 destination and earnings validation', () => {
     };
     const people = [{ ...base.people[0]!, socialSecurity: ss }];
     expect(HouseholdSchema.safeParse({ ...base, people }).success).toBe(false);
+  });
+
+  it('shares one destination rule: tax-advantaged "other" accounts take rollovers only from their owner', () => {
+    const other = (taxTreatment: string, ownerId = 'p1') => ({ type: 'other', ownerId, taxTreatment }) as never;
+    expect(canReceiveTaxableMoney(other('taxable'))).toBe(true);
+    expect(canReceiveTaxableMoney(other('taxDeferred'))).toBe(false);
+    expect(canReceiveTaxableMoney(other('taxFree'))).toBe(false);
+    expect(canReceiveTaxableMoney({ type: 'hsa' })).toBe(false);
+    expect(canReceiveLumpSum(other('taxDeferred'), 'p1')).toBe(true);
+    expect(canReceiveLumpSum(other('taxDeferred', 'p2'), 'p1')).toBe(false);
+    expect(canReceiveLumpSum(other('taxFree'), 'p1')).toBe(false);
+    expect(canReceiveLumpSum({ type: 'workplaceRoth', ownerId: 'p1' } as never, 'p1')).toBe(false);
+    expect(canReceiveLumpSum({ type: 'cash', ownerId: 'p2' } as never, 'p1')).toBe(true);
   });
 });

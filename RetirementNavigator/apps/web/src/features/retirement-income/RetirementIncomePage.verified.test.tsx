@@ -65,7 +65,7 @@ describe('RetirementIncomePage with verified (synthetic fixture) rules', () => {
     const rows = within(table).getAllByRole('row').slice(1);
     const early = rows.find((r) => within(r).queryByText('Earliest (62)'))!;
     const full = rows.find((r) => within(r).queryByText(/^Full retirement age/))!;
-    const late = rows.find((r) => within(r).queryByText('Latest with credits (70)'))!;
+    const late = rows.find((r) => within(r).queryByText('Latest age the app models (70)'))!;
     expect(within(early).getByText(formatCents(at({ years: 62, months: 0 })))).toBeInTheDocument();
     expect(within(full).getByText(formatCents(at(fra.value)))).toBeInTheDocument();
     expect(within(full).getByText('Full amount')).toBeInTheDocument();

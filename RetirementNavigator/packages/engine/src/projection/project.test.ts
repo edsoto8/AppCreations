@@ -563,11 +563,11 @@ describe('workplace plans: before limits (unverified) and after limits (fixture)
     expect(r.unverified.length).toBeGreaterThan(0);
   });
 
-  it('caps contributions with verified limits (synthetic fixture: $20,000 + $10,000 at 60–63)', () => {
+  it('caps contributions with verified limits (synthetic fixture: $20,000 + $9,000 at 60–63)', () => {
     const r = project(worker({ workplacePlans: [plan({ traditionalPctOfSalary: 0.4 })] }), fixtureCtx);
     expect(r.excludedFeatures).not.toContain('workplaceLimits');
-    expect(r.rows[0]!.people[0]!.employeeTraditional).toBe(dollars(30_000));
-    expect(r.rows[0]!.people[0]!.catchUp).toBe(dollars(10_000));
+    expect(r.rows[0]!.people[0]!.employeeTraditional).toBe(dollars(29_000));
+    expect(r.rows[0]!.people[0]!.catchUp).toBe(dollars(9_000));
     expect(r.rows[0]!.cashFlow.netPay).not.toBeNull();
     expect(r.rows[0]!.tax).not.toBeNull();
   });

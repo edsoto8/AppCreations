@@ -60,6 +60,17 @@ export interface SolverResult {
   unfunded: number;
   /** Net cash beyond the need when fixed income alone exceeds it (to reinvest). */
   excess: number;
+  /** Long-term gains in the final tax (fixed gains plus the gain part of taxable withdrawals). */
+  gains: number;
+}
+
+function gainsFor(input: SolverInput, byAccount: Map<string, number>): number {
+  let gains = input.gains;
+  for (const a of input.accounts) {
+    const w = byAccount.get(a.id) ?? 0;
+    if (w > 0 && a.gains && a.cap > 0) gains += Math.max(0, w * (1 - a.basis / a.cap));
+  }
+  return gains;
 }
 
 function allocate(input: SolverInput, gross: number): Map<string, number> {
@@ -135,6 +146,7 @@ export function solveWithdrawals(
         converged: true,
         unfunded: 0,
         excess: net0 - input.need,
+        gains: gainsFor(input, zero.byAccount),
       },
     };
   }
@@ -172,6 +184,7 @@ export function solveWithdrawals(
       // is fully funded even if net income lands a few cents under the need.
       unfunded: withdrawn >= totalCap - 0.005 ? Math.max(0, input.need - netFunded) : 0,
       excess: 0,
+      gains: gainsFor(input, current.byAccount),
     },
   };
 }
