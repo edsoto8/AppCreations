@@ -5,7 +5,7 @@ Statuses: `done` · `simplified` (with limitation) · `unverified rule` · `not 
 ## Current phase
 **M4 Retirement income: done** with two gates blocked on sources (the IRS RMD table example and the
 Pub 915 worked example need verified values; see M4 gate evidence). Tagged `m4-retirement-income`
-locally. **M5 Scenarios:** see the M5 section. M3 is tagged `m3-forecasting` locally (tag pushes
+locally. **M5 Scenarios: done**, tagged `m5-scenarios` locally. M3 is tagged `m3-forecasting` locally (tag pushes
 are refused; see Handoff).
 
 **M2 is still untagged:** its gates wait on verified rule values and the owner's review of
@@ -22,8 +22,34 @@ Next: **M6 Monte Carlo**.
 | M2 Accumulation engine, income, accounts | built; **tag waits on verified rules + owner review** | — | 2026-10-19 |
 | M3 Forecasting | done | `m3-forecasting` (local only) | 2026-10-19 |
 | M4 Retirement income | done (RMD and Pub 915 worked-example gates **blocked on sources**) | `m4-retirement-income` (local only) | 2026-10-19 |
-| M5 Scenarios | see M5 gate evidence | | 2026-10-19 |
+| M5 Scenarios | done | `m5-scenarios` (local only) | 2026-10-19 |
 | M6–M8 | not started | | |
+
+## M5 gate evidence
+| Gate | Evidence | Result |
+|---|---|---|
+| Diff semantics: orphaned ops reported, base edits flow through | `scenario.test.ts`: set/unset/add by entity id on a copy; ops on deleted entities and plans of a deleted person are `missingEntity` / `missingParent`; unknown fields and prototype keys are `invalidPath` (never applied); unsetting a required field gives issues and no household; a base edit to an untouched field reaches the scenario. Web: the orphan warning after deleting an account, and base edits reaching the compare table (`ScenariosPage.test.tsx`). | pass |
+| Optimizer equals brute force | Single person, and a couple with salary stop ages (partner shifted, stop ages cleared), each against a separately written scan; the Monte Carlo criterion against running each candidate's paths directly. Web: the optimizer table equals `optimizeRetirementAge`. | pass |
+| Preset D reproducible | Two builds give identical ops and identical projections; the shock replaces the return in its years; the default start is the first retirement year and never before the current year. | pass |
+| + `pnpm verify` green | typecheck, lint, format, unit (engine 535, web 150), reference (43), build, E2E (32, including the M5 spec with axe in both themes and phone width) | pass |
+
+## Review findings (M5)
+The code-reviewer pass ran as a general-purpose agent following `.claude/agents/code-reviewer.md`
+(commit `5a94b9e`), confirming the first finding with a probe test.
+
+| # | Finding | Severity | Resolution |
+|---|---|---|---|
+| B1 | A stored scenario path `['__proto__', …]` polluted `Object.prototype` and made validation throw; `set` on a misspelled field was counted as applied | blocking | Fixed: the schema rejects `__proto__`/`constructor`/`prototype`; paths walk own keys only; a missing field is `invalidPath`. Tests. |
+| B2 | No pre-Medicare healthcare note on the Scenarios page | blocking | Fixed: per-plan forecast notes above the compare table; the optimizer shows the note when a scanned age is below 65. RTL tests. (The optimizer check uses the first person's ages; a partner shifted below 65 is covered by the compare view's per-plan notes, not the optimizer note.) |
+| S3 | Presets E and B and the optimizer put retired people back to work | should fix | Fixed in the engine (skip people already retired; optimizer refuses a retired first person); UI explains. |
+| S4 | Preset D could start in the past | should fix | Fixed: never before the current year; UI range checks. |
+| S5 | Preset values go stale when the base changes | should fix | `presetDrift` + "Rebuild from base plan"; editing a preset makes it custom. |
+| S6 | The UI recomputed the shock's total drop | should fix | Engine `marketShockTotal`. |
+| S7 | Missing "before plan limits" labels on balance figures | should fix | Fixed on the compare table, chart, data table and optimizer. |
+| S8 | Test gaps | should fix | Brute force with a couple and stop ages; after-tax figure hand-computed with the synthetic fixture (= $240,000); preset D default checked independently; unset required; orphaned plan ops; preset C/G edge cases. |
+| — | Preset B on a retiree moved the age later; `Math.round` in F; real values from rounded cents; store details; raw issue paths | optional | All fixed. |
+
+No open blocking or should-fix findings.
 
 ## M4 gate evidence
 | Gate | Evidence | Result |
@@ -139,7 +165,11 @@ of benefits as ½ instead of reading the rule; it now reads `tier1` (§6).
 | Retirement taxes, gross-up solver, gross-to-net view, filing after a death | done / **unverified rule** | Gross-to-net shows "Unverified rule" or "Before taxes", never estimated |
 | HSA qualified medical and Roth-basis withdrawals, early-withdrawal flags | done / **unverified rule** | Penalties are flagged, not modeled |
 | Retirement Income page (SS, pensions, events, spending plan, gross-to-net, claiming-age comparison) | done | |
-| M6–M8 features | not started | Placeholders show no figures |
+| Scenarios: create, save, duplicate, rename, delete, compare (up to 4 + base), presets A–G, custom overrides, drift rebuild | done | Funding success is deterministic; Monte Carlo rates arrive with the M6 UI |
+| Retirement-age optimizer (deterministic; Monte Carlo criterion in the engine) | done | The Monte Carlo option in the UI arrives with M6 |
+| Monte Carlo engine (paths, PSD check, stochastic inflation, summary), sequence illustration, allocation by asset class | done (engine) | UI in progress (M6) |
+| CSV export, JSON export/import with migration and validation | done (engine) | UI in M7b |
+| Calculators, insights, print, delete-all, M8 quality | not started | Placeholders show no figures |
 
 ## Blockers and risks
 - **Rules sources unreachable.** irs.gov, ssa.gov and federalregister.gov are blocked by this
@@ -282,6 +312,7 @@ No open findings.
 | 1.5.0 | 2026-10-19 | From the M3 review: `DashboardCards.longevity` (depletes) gains a required `personId`; the `summary.depletionAge` and `retirementYear` comments are corrected to their definitions. No stored documents are affected. |
 | 1.6.0 | 2026-10-19 | M4, **not purely additive**: new SS source kind `atClaimAge`; new required flows `rmd`, `hsaMedical`, `reinvested`; warning code `oneTimeInflowSpent`; M4 functions implemented and re-exported. Stored profiles gain no required field (the new source kind is optional input). |
 | 1.7.0 | 2026-10-19 | M4 validation: lump-sum and inflow destination types are checked, duplicate earnings years rejected (stricter; a stored profile violating these fails validation with a clear message). |
+| 1.9.0 | 2026-10-19 | From the M5 review and M6/M7b engine work. **Stricter:** scenario paths reject prototype keys, and a `set` on a field that does not exist is an orphaned `invalidPath` op (stored scenarios with such ops now show them as not applied). **Changed signature:** `summarizeMonteCarlo(chunks, config, household, firstYear)` (it needs the capital-market assumptions; it was a stub). Additive: `presetDrift`, `marketShockTotal`, `runMonteCarloChunk`, `isPositiveSemiDefinite`, `allocationByAssetClass`, `sequenceRiskIllustration`, `toCsv` options for display names and `csvCell`, `exportJson`, `importJson`, `MAX_IMPORT_CHARS`; presets record `currentYear` in `presetParams`; the optimizer's Monte Carlo criterion. No stored documents change shape. |
 | 1.8.0 | 2026-10-19 | M5 `compareScenarios` (dashboards per scenario plus an after-tax ending balance that stays null while taxes are unverified). From the M4 review: warning codes `oneTimeOutflowUnfunded`, `excessIncomeSpent`; shared destination helpers `canReceiveTaxableMoney` and `canReceiveLumpSum`, and an "other" account must be taxed as taxable to receive surplus, inflows or a non-rollover lump sum (stricter). |
 
 ## Traceability (BRIEF §5 → milestone)
@@ -302,7 +333,7 @@ No open findings.
 | Part-time phase projection, surplus routing, vesting forfeiture | M3 ✅ (surplus routing needs verified taxes) |
 | Spending plan, SS (entered / illustrative / spousal / survivor / reduction), pensions, one-time events, taxable basis and drag | M4 ✅ (SSA rules unverified) |
 | Withdrawal ordering, RMDs, tax model, gross-up solver, survivor modeling, gross-to-net, HSA and Roth withdrawals | M4 ✅ (tax and RMD rules unverified) |
-| Scenarios CRUD, diff, presets A–G, compare, deterministic optimizer | M5 |
+| Scenarios CRUD, diff, presets A–G, compare, deterministic optimizer | M5 ✅ |
 | Monte Carlo (all of §5.7), allocation (c), MC option in scenarios and the optimizer | M6 |
 | 15 calculators | M7a |
 | Insights; CSV/JSON export/import; migrations; print summary; delete-all | M7b |
@@ -318,7 +349,15 @@ No open findings.
     for solver convergence; hand-computed tests on a synthetic fixture whose values differ from law.
   - UI: the Retirement Income page (Social Security with the claiming-age comparison, pensions,
     one-time events, spending plan, gross-to-net) and the dashboard notes.
-- **Done in M5:** see the M5 section (scenario engine, Scenarios page, compare view, optimizer).
+- **Done in M5:** the scenario engine (diffs, presets A–G, drift, optimizer, comparison) and the
+  Scenarios page (list, editor, compare view with chart and table, optimizer), persisted per profile.
+- **M6 so far:** the Monte Carlo engine, the optimizer's Monte Carlo criterion, the sequence
+  illustration, allocation (c) data, and `pnpm bench` results in
+  `packages/engine/bench/results/montecarlo.json` (single Node thread on this 2.1 GHz container:
+  0.87 ms per path before taxes, 1.32 ms with taxes and gross-up; 10,000 paths × 60 years projected at
+  2.3 s and 3.4 s over 4 workers — the taxed case is over the 3 s laptop target on this hardware; a
+  browser measurement with real workers follows with the M6 UI).
+- **M7b so far:** CSV export and JSON export/import in the engine.
 - **To tag M2 (`m2-accumulation`), unchanged:**
   1. Make irs.gov, ssa.gov and federalregister.gov reachable (environment network settings, likely
      in a new session).
@@ -333,7 +372,7 @@ No open findings.
   `inflationOverride`); UI (bands, success rate with its assumptions, histogram, sequence-risk
   illustration, methodology panel, allocation view (c)); MC option in scenarios and the optimizer;
   `pnpm bench` for 10,000 paths × 60 years.
-- **Frozen contracts:** `packages/engine/src/domain/*`, `packages/engine/src/api.ts` (1.8.0).
+- **Frozen contracts:** `packages/engine/src/domain/*`, `packages/engine/src/api.ts` (1.9.0).
 - **Tags:** the session's git proxy refuses tag pushes (HTTP 403); branch pushes work.
   `m1-foundation`, `m3-forecasting` and `m4-retirement-income` exist locally only. To publish from a
   clone, recreate them on the commits titled "fix(RetirementNavigator): resolve M1 review findings;
