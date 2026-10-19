@@ -155,9 +155,28 @@ estimates, not guarantees, tax advice, or investment recommendations. Taxes are 
 - The Rules & Sources page lists every value, its status, source and candidate values (shown for
   reference only, never used in calculations).
 
+## Insights
+- Each insight is a what-if the app actually runs: it makes one change to a copy of your plan (for
+  example retiring two years later, or every return one point lower), re-runs the forecast and
+  shows the before and after in today's dollars.
+- **What was changed** lists the change; **Assumptions** lists what the figure assumes. **Save as
+  scenario** turns the what-if into a custom scenario you can compare and edit.
+- Insights describe the model ("In this model, …"); they are not advice.
+
 ## Your data
-Everything you enter is stored in your browser's IndexedDB on this device, **unencrypted**. Nothing
-is sent over the network. See **Data & Privacy** in the app.
+- Everything you enter is stored in your browser's IndexedDB on this device, **unencrypted**.
+  Nothing is sent over the network.
+- **Export JSON** saves every profile, its scenarios and your settings in one file.
+- **Import JSON** checks the whole file first. A damaged file or one from a newer app version lists
+  its problems and changes nothing. A good file shows a preview; choose **Replace all data** or
+  **Add alongside** (profiles that clash get new ids).
+- **Download CSV** saves the forecast rows of the active profile, in today's or future dollars.
+  Text that a spreadsheet could run as a formula is marked as text.
+- **Delete all my data** removes every profile, scenario and setting from this device after you type
+  DELETE. It cannot be undone; export first if you may want the data back.
+- **Printable summary** (linked from Data & Privacy) shows the dashboard cards, a forecast table,
+  the key assumptions, what the forecast leaves out and the disclaimers. Use **Print** and choose a
+  printer or "Save as PDF".
 
 ## Theme
 Use the sun / moon / screen buttons in the header to choose light, dark or your system setting.
