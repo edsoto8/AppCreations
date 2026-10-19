@@ -52,3 +52,18 @@ export function asCents(value: number): Cents {
 export function dollars(amount: number): Cents {
   return toCents(amount);
 }
+
+/**
+ * "$1,234" for messages: whole dollars, halves away from zero, comma thousands separators. Written
+ * out because `toLocaleString` was most of the projection's run time (Monte Carlo runs it per path).
+ */
+export function formatWholeDollars(amount: number): string {
+  const whole = Math.round(Math.abs(amount));
+  const digits = String(whole);
+  let grouped = '';
+  for (let i = 0; i < digits.length; i++) {
+    if (i > 0 && (digits.length - i) % 3 === 0) grouped += ',';
+    grouped += digits[i];
+  }
+  return `${amount < 0 && whole !== 0 ? '-' : ''}$${grouped}`;
+}

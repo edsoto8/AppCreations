@@ -82,6 +82,7 @@ function ScenariosBody({ household, profileId }: { household: Household; profile
             <ScenarioList
               scenarios={scenarios}
               household={household}
+              currentYear={ctx.currentYear}
               compared={comparedIds}
               editingId={editing?.id ?? null}
               onToggleCompare={toggleCompare}

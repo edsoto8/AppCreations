@@ -8,7 +8,7 @@ import { Switch } from '@/components/ui/switch';
 import { Field } from '@/components/form/Field';
 import { IntegerInput, PercentInput } from '@/components/form/inputs';
 import { newId } from '@/lib/ids';
-import { buildPreset, paramError, PRESET_BY_ID, PRESETS, type PresetParams } from './scenarioModel';
+import { buildPreset, paramError, paramLimits, PRESET_BY_ID, PRESETS, type PresetParams } from './scenarioModel';
 
 type Choice = ScenarioPreset | 'custom';
 
@@ -88,13 +88,20 @@ function NewScenarioForm({
   const [submitted, setSubmitted] = useState(false);
   const meta = choice === 'custom' ? null : PRESET_BY_ID[choice];
   const shownName = name ?? nameFor(choice, params);
+  // Preset D's start year runs from this year to the last plan year (the engine never starts a shock earlier).
+  const limits = useMemo(() => paramLimits(household, currentYear), [household, currentYear]);
   const errors = useMemo(
-    () => Object.fromEntries((meta?.fields ?? []).map((f) => [f.key, paramError(f, params[f.key])])),
-    [meta, params],
+    () => Object.fromEntries((meta?.fields ?? []).map((f) => [f.key, paramError(f, params[f.key], limits)])),
+    [meta, params, limits],
   );
   const nameError =
     shownName.trim().length === 0 ? 'Enter a name' : shownName.trim().length > 80 ? 'Use 80 characters or fewer' : null;
   const valid = !nameError && Object.values(errors).every((e) => e === null);
+
+  const exampleFor = (key: string, example: string) => {
+    const l = limits[key];
+    return l?.min !== undefined && l.max !== undefined ? `${example} From ${l.min} to ${l.max}.` : example;
+  };
 
   const choose = (next: Choice) => {
     setChoice(next);
@@ -159,7 +166,13 @@ function NewScenarioForm({
         }
         const onChange = (v: number) => setParams((p) => ({ ...p, [f.key]: v }));
         return (
-          <Field key={f.key} label={f.label} tip={f.tip} example={f.example} error={error ?? undefined}>
+          <Field
+            key={f.key}
+            label={f.label}
+            tip={f.tip}
+            example={exampleFor(f.key, f.example)}
+            error={error ?? undefined}
+          >
             {(a) =>
               f.kind === 'percent' ? (
                 <PercentInput {...a} value={typeof value === 'number' ? value : null} onChange={onChange} />

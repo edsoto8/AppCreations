@@ -8,10 +8,9 @@ import type { EngineResult, EngineWarning } from '../domain/results';
 import type { CappedContributions, ContributionRequest, ResolvedYearRules } from '../api';
 import { RuleAccess, unverified } from '../rules/access';
 import { matchFloat } from '../match/match';
-import { toCents } from '../money';
+import { formatWholeDollars, toCents } from '../money';
 
-const usd = (cents: number) =>
-  `$${(cents / 100).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+const usd = (cents: number) => formatWholeDollars(cents / 100);
 
 /** Catch-up limit by age: 60–63 enhanced, otherwise 50+, otherwise none. Null when unverified. */
 function catchUpLimit(age: number, rules: ResolvedYearRules, access: RuleAccess): number | null {

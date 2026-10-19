@@ -1,11 +1,10 @@
 /**
  * Comparison and optimizer view model: shapes `compareScenarios` outcomes and `optimizeRetirementAge`
  * results for the table and charts in the selected dollar basis. Values come from the engine; this
- * module only picks the real or nominal figure and divides by each row's own deflator (as the dashboard
- * view model does).
+ * module only picks the engine's real or nominal figure.
  */
-import type { DollarBasis, Household, ScenarioOutcome } from '@rn/engine';
-import { beforeLimits, inBasis } from '@/features/dashboard/viewModel';
+import { ageInYear, type DollarBasis, type Household, type ScenarioOutcome } from '@rn/engine';
+import { beforeLimits, forecastNotes } from '@/features/dashboard/viewModel';
 
 /** Line styles for up to five outcomes: color plus a distinct dash pattern (never color alone). */
 export const OUTCOME_STYLES = [
@@ -32,7 +31,7 @@ export function portfolioSeries(outcomes: readonly ScenarioOutcome[], basis: Dol
   outcomes.forEach((o, i) => {
     for (const row of o.dashboard?.baseline.rows ?? []) {
       const point = byYear.get(row.year) ?? { year: row.year };
-      point[`o${i}`] = inBasis(row.totals.portfolioEnd, row, basis);
+      point[`o${i}`] = basis === 'nominal' ? row.totals.portfolioEnd : row.real.portfolioEnd;
       byYear.set(row.year, point);
     }
   });
@@ -48,8 +47,35 @@ export function endingBalance(o: ScenarioOutcome, basis: DollarBasis): number | 
   return basis === 'nominal' ? s.endingBalance : s.endingBalanceReal;
 }
 
+export function outcomeBeforeLimits(o: ScenarioOutcome): boolean {
+  return o.dashboard !== null && beforeLimits(o.dashboard.baseline);
+}
+
 export function anyBeforeLimits(outcomes: readonly ScenarioOutcome[]): boolean {
-  return outcomes.some((o) => o.dashboard !== null && beforeLimits(o.dashboard.baseline));
+  return outcomes.some(outcomeBeforeLimits);
+}
+
+/** The dashboard's forecast notes (for example the pre-Medicare healthcare note) for one outcome. */
+export function outcomeNotes(o: ScenarioOutcome): string[] {
+  return o.dashboard ? forecastNotes(o.dashboard.baseline) : [];
+}
+
+/** Medicare eligibility age (statutory; the engine's healthcare note uses the same constant). */
+export const MEDICARE_AGE = 65;
+
+export const OPTIMIZER_HEALTHCARE_NOTE =
+  'Some ages scanned are before 65: healthcare costs before Medicare are only the pre-Medicare healthcare amount you entered in the plan; nothing else is modeled.';
+
+/**
+ * Why the optimizer cannot scan this plan, or null: the first person is already retired this year
+ * (their retirement age is in the past, so there is no age to choose).
+ */
+export function optimizerBlockedReason(h: Household, currentYear: number): string | null {
+  const first = h.people[0];
+  if (!first) return 'The plan has no people.';
+  const age = ageInYear(first.birthYear, currentYear);
+  if (age < first.retirementAge) return null;
+  return `${first.name} is already retired (retirement age ${first.retirementAge}, age ${age} this year), so there is no retirement age left to scan for this plan.`;
 }
 
 export function anyBeforeTaxes(outcomes: readonly ScenarioOutcome[]): boolean {

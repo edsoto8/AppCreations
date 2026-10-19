@@ -1,6 +1,7 @@
 import { useId, useMemo, useState } from 'react';
-import { Copy, Pencil, SlidersHorizontal, Trash2 } from 'lucide-react';
-import { applyScenario, type Household, type Scenario } from '@rn/engine';
+import { Copy, Pencil, RefreshCw, SlidersHorizontal, Trash2 } from 'lucide-react';
+import { applyScenario, presetDrift, type Household, type Scenario } from '@rn/engine';
+import { Alert } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -14,9 +15,36 @@ import { describeOp, presetSummary } from './scenarioModel';
 
 const SHOWN_CHANGES = 6;
 
+/** A preset whose stored ops no longer match a rebuild on the current base plan (`presetDrift`). */
+function DriftNote({ scenario, onRebuild }: { scenario: Scenario; onRebuild: () => void }) {
+  return (
+    <Alert variant="attention" aria-label="Preset out of date">
+      <RefreshCw aria-hidden="true" />
+      <div className="flex flex-col gap-2">
+        <p>
+          The base plan changed since this preset was built; its stored values no longer match what the preset would set
+          on the current base plan (for example, a spending cut stores the reduced amount, not the percentage). Rebuild
+          it to apply the preset’s settings to the current base plan.
+        </p>
+        <div>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={onRebuild}
+            aria-label={`Rebuild from base plan: ${scenario.name}`}
+          >
+            <RefreshCw aria-hidden="true" /> Rebuild from base plan
+          </Button>
+        </div>
+      </div>
+    </Alert>
+  );
+}
+
 function ScenarioItem({
   scenario,
   household,
+  currentYear,
   compared,
   compareDisabled,
   editing,
@@ -27,6 +55,7 @@ function ScenarioItem({
 }: {
   scenario: Scenario;
   household: Household;
+  currentYear: number;
   compared: boolean;
   compareDisabled: boolean;
   editing: boolean;
@@ -36,7 +65,9 @@ function ScenarioItem({
   onDelete: () => void;
 }) {
   const duplicate = useScenarioStore((s) => s.duplicateScenario);
+  const rebuild = useScenarioStore((s) => s.rebuildPreset);
   const application = useMemo(() => applyScenario(household, scenario), [household, scenario]);
+  const drift = useMemo(() => presetDrift(scenario, household), [household, scenario]);
   const checkId = useId();
   const n = scenario.ops.length;
   const status =
@@ -53,7 +84,10 @@ function ScenarioItem({
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
-        <ScenarioWarnings application={application} household={household} />
+        {drift ? (
+          <DriftNote scenario={scenario} onRebuild={() => rebuild(scenario.id, household, currentYear)} />
+        ) : null}
+        <ScenarioWarnings application={application} household={household} scenario={scenario} />
         {n > 0 ? (
           <ul className="list-disc pl-5 text-sm text-muted-foreground" aria-label={`Changes in ${scenario.name}`}>
             {scenario.ops.slice(0, SHOWN_CHANGES).map((op, i) => (
@@ -106,6 +140,7 @@ function ScenarioItem({
 export function ScenarioList({
   scenarios,
   household,
+  currentYear,
   compared,
   editingId,
   onToggleCompare,
@@ -113,6 +148,7 @@ export function ScenarioList({
 }: {
   scenarios: Scenario[];
   household: Household;
+  currentYear: number;
   compared: readonly string[];
   editingId: string | null;
   onToggleCompare: (id: string, on: boolean) => void;
@@ -137,6 +173,7 @@ export function ScenarioList({
             <ScenarioItem
               scenario={s}
               household={household}
+              currentYear={currentYear}
               compared={compared.includes(s.id)}
               compareDisabled={full}
               editing={editingId === s.id}

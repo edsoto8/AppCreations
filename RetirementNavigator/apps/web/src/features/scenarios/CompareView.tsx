@@ -1,5 +1,6 @@
 import { useDeferredValue, useMemo } from 'react';
 import { CartesianGrid, Line, LineChart, Tooltip, XAxis, YAxis, type TooltipContentProps } from 'recharts';
+import { AlertTriangle } from 'lucide-react';
 import {
   applyScenario,
   compareScenarios,
@@ -9,6 +10,7 @@ import {
   type Scenario,
   type ScenarioOutcome,
 } from '@rn/engine';
+import { Alert } from '@/components/ui/alert';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { formatCents } from '@/lib/format';
@@ -21,6 +23,8 @@ import {
   anyBeforeTaxes,
   endingBalance,
   longevityText,
+  outcomeBeforeLimits,
+  outcomeNotes,
   OUTCOME_STYLES,
   portfolioSeries,
   READINESS_LABELS,
@@ -80,8 +84,46 @@ function money(v: number | null): string {
   return v === null ? '—' : formatCents(v);
 }
 
+/** Footnote marker for a figure that uses contributions as elected (docs §1.7), with its words for screen readers. */
+function LimitsMark() {
+  return (
+    <>
+      <span aria-hidden="true">*</span>
+      <span className="sr-only"> (before plan limits, unverified)</span>
+    </>
+  );
+}
+
+/**
+ * Each outcome's forecast notes (the dashboard's, for example the pre-Medicare healthcare note for an
+ * early retirement), labeled with the plan's name and always visible (brief §1).
+ */
+function OutcomeNotes({ outcomes }: { outcomes: readonly ScenarioOutcome[] }) {
+  const withNotes = outcomes.map((o) => ({ name: o.name, notes: outcomeNotes(o) })).filter((o) => o.notes.length > 0);
+  if (withNotes.length === 0) return null;
+  return (
+    <Alert variant="attention" aria-label="Forecast notes by plan">
+      <AlertTriangle aria-hidden="true" />
+      <ul className="flex flex-col gap-2">
+        {withNotes.map((o, i) => (
+          <li key={i}>
+            <p className="font-medium">{o.name}</p>
+            <ul className="list-disc pl-5" aria-label={`Forecast notes for ${o.name}`}>
+              {o.notes.map((n) => (
+                <li key={n}>{n}</li>
+              ))}
+            </ul>
+          </li>
+        ))}
+      </ul>
+    </Alert>
+  );
+}
+
 interface MetricRow {
   label: string;
+  /** Depends on balances, so on contributions (before plan limits while limits are unverified). */
+  balanceDerived: boolean;
   cell: (o: ScenarioOutcome, household: Household | null) => React.ReactNode;
 }
 
@@ -114,6 +156,8 @@ export function CompareView({
   const key = basis === 'todays' ? 'real' : 'nominal';
   const unit = basisName(basis);
   const limits = anyBeforeLimits(outcomes);
+  const limited = outcomes.map(outcomeBeforeLimits);
+  const limitedNames = outcomes.filter((_, i) => limited[i]).map((o) => o.name);
   const taxes = anyBeforeTaxes(outcomes);
   const first = points[0]?.year ?? 0;
   const last = points[points.length - 1]?.year ?? 0;
@@ -122,14 +166,17 @@ export function CompareView({
   const rows: MetricRow[] = [
     {
       label: 'First retirement year',
+      balanceDerived: false,
       cell: (o) => (o.dashboard ? String(o.dashboard.cards.firstRetirementYear) : '—'),
     },
     {
-      label: `Savings at retirement (${unit})${limits ? '*' : ''}`,
+      label: `Savings at retirement (${unit})`,
+      balanceDerived: true,
       cell: (o) => money(o.dashboard?.cards.savingsAtRetirement[key] ?? null),
     },
     {
       label: `Monthly retirement income (${unit})`,
+      balanceDerived: true,
       cell: (o) => {
         const income = o.dashboard?.cards.monthlyRetirementIncome;
         if (!income) return '—';
@@ -143,10 +190,11 @@ export function CompareView({
         );
       },
     },
-    { label: `Ending balance (${unit})`, cell: (o) => money(endingBalance(o, basis)) },
-    { label: 'Portfolio longevity', cell: (o, h) => longevityText(o, h) },
+    { label: `Ending balance (${unit})`, balanceDerived: true, cell: (o) => money(endingBalance(o, basis)) },
+    { label: 'Portfolio longevity', balanceDerived: true, cell: (o, h) => longevityText(o, h) },
     {
       label: 'Funding success (deterministic)',
+      balanceDerived: true,
       cell: (o) => {
         const s = o.dashboard?.baseline.summary;
         if (!s) return '—';
@@ -155,10 +203,12 @@ export function CompareView({
     },
     {
       label: 'Readiness (heuristic)',
+      balanceDerived: true,
       cell: (o) => (o.dashboard ? READINESS_LABELS[o.dashboard.cards.readiness.status] : '—'),
     },
     {
       label: 'After-tax ending balance (today’s dollars)',
+      balanceDerived: true,
       cell: (o) =>
         o.status !== 'ok' ? (
           '—'
@@ -198,6 +248,8 @@ export function CompareView({
           </ul>
         ) : null}
 
+        <OutcomeNotes outcomes={outcomes} />
+
         <Table label="Scenario comparison">
           <TableHeader>
             <TableRow>
@@ -214,6 +266,7 @@ export function CompareView({
               <TableRow key={r.label}>
                 <th scope="row" className="min-w-36 px-3 py-2 text-left align-top text-sm font-medium">
                   {r.label}
+                  {limits && r.balanceDerived ? <LimitsMark /> : null}
                 </th>
                 {outcomes.map((o, i) => (
                   <TableCell key={i} className="min-w-28 whitespace-normal text-right align-top">
@@ -225,7 +278,14 @@ export function CompareView({
           </TableBody>
         </Table>
         <div className="flex flex-col gap-1 text-xs text-muted-foreground">
-          {limits ? <p>* Contributions as elected, before plan limits (unverified).</p> : null}
+          {limits ? (
+            <p>
+              * Before plan limits (unverified): contributions are as elected because plan, IRA or HSA limits are
+              unverified, which can overstate savings
+              {limitedNames.length < outcomes.length ? ` (${limitedNames.join(', ')})` : ''}. Every balance-based figure
+              carries it.
+            </p>
+          ) : null}
           <p>{FUNDING_CRITERION}</p>
           <p>
             Readiness is a labeled heuristic: On track when the baseline and pessimistic runs ({offset} points, a fixed
@@ -239,8 +299,9 @@ export function CompareView({
         </div>
 
         <figure className="flex flex-col gap-2">
-          <figcaption className="text-xs font-medium text-muted-foreground">
+          <figcaption className="flex flex-wrap items-center gap-1.5 text-xs font-medium text-muted-foreground">
             Portfolio value at year end ({unit}) by year, baseline run of each plan
+            {limits ? <BeforeLimitsBadge /> : null}
           </figcaption>
           <OutcomeLegend names={names} />
           <LineChart
@@ -248,7 +309,7 @@ export function CompareView({
             style={CHART_STYLE}
             data={points}
             margin={MARGIN}
-            title={`Portfolio value at year end by scenario, ${unit}`}
+            title={`Portfolio value at year end by scenario, ${unit}${limits ? ', before plan limits (unverified)' : ''}`}
             desc={`One line per plan from ${first} to ${last}, each with its own dash pattern. A data table follows the chart.`}
           >
             <CartesianGrid stroke="var(--chart-grid)" vertical={false} />
@@ -284,13 +345,16 @@ export function CompareView({
           <p className="text-center text-xs text-muted-foreground">Year</p>
         </figure>
         <DataTableDisclosure label="comparison data table">
-          <Table label={`Portfolio value at year end by scenario, ${unit}`}>
+          <Table
+            label={`Portfolio value at year end by scenario, ${unit}${limits ? ', before plan limits (unverified)' : ''}`}
+          >
             <TableHeader>
               <TableRow>
                 <TableHead>Year</TableHead>
                 {names.map((n, i) => (
                   <TableHead key={i} className="text-right">
                     {n}
+                    {limited[i] ? <LimitsMark /> : null}
                   </TableHead>
                 ))}
               </TableRow>
@@ -308,6 +372,11 @@ export function CompareView({
               ))}
             </TableBody>
           </Table>
+          {limits ? (
+            <p className="text-xs text-muted-foreground">
+              * Contributions as elected, before plan limits (unverified).
+            </p>
+          ) : null}
         </DataTableDisclosure>
       </CardContent>
     </Card>

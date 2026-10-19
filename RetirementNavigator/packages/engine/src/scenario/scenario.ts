@@ -7,12 +7,13 @@ import { HouseholdSchema } from '../domain/household';
 import type { EngineResult, ValidationIssue } from '../domain/results';
 import type { OrphanedOp, Scenario, ScenarioOp, ScenarioPreset } from '../domain/scenario';
 import type { EngineContext, OptimizerResult, ScenarioApplication, ScenarioOutcome } from '../api';
-import type { MonteCarloConfig } from '../domain/montecarlo';
+import { MonteCarloConfigSchema, type MonteCarloConfig } from '../domain/montecarlo';
+import { runMonteCarloChunk } from '../montecarlo/run';
 import type { Cents } from '../domain/primitives';
 import { zodIssues } from '../validation';
 import { projectHousehold } from '../projection/project';
 import { computeDashboard } from '../projection/dashboard';
-import { toCents } from '../money';
+import { roundHalfEven, toCents } from '../money';
 
 type Json = Record<string, unknown>;
 type Path = (string | number)[];
@@ -42,30 +43,41 @@ function locate(
   return entity ? { list, index, entity } : null;
 }
 
-/** Set a value at a path; false when an intermediate step does not exist. */
-function setAt(target: Json, path: Path, value: unknown): boolean {
+/** The object or array at `path` (own keys only, never the prototype chain); null when missing. */
+function walk(target: Json, path: Path): object | null {
   let node: unknown = target;
-  for (const key of path.slice(0, -1)) {
-    if (node === null || typeof node !== 'object') return false;
+  for (const key of path) {
+    if (node === null || typeof node !== 'object') return null;
+    if (Array.isArray(node) ? typeof key !== 'number' || key >= node.length : !Object.hasOwn(node, key)) return null;
     node = (node as Record<string | number, unknown>)[key];
   }
+  return node !== null && typeof node === 'object' ? node : null;
+}
+
+/**
+ * Set a value at a path. False (`invalidPath`) when a step or the field does not exist, so a typo is
+ * reported instead of being silently dropped by validation. An array index may be one past the end
+ * (append).
+ */
+function setAt(target: Json, path: Path, value: unknown): boolean {
+  const node = walk(target, path.slice(0, -1));
   const last = path[path.length - 1];
-  if (node === null || typeof node !== 'object' || last === undefined) return false;
-  if (Array.isArray(node) && (typeof last !== 'number' || last > node.length)) return false;
+  if (node === null || last === undefined) return false;
+  if (Array.isArray(node)) {
+    if (typeof last !== 'number' || last > node.length) return false;
+  } else if (typeof last !== 'string' || !Object.hasOwn(node, last)) {
+    return false;
+  }
   (node as Record<string | number, unknown>)[last] = clone(value);
   return true;
 }
 
 /** Remove the key at a path so the schema default applies on re-validation. */
 function unsetAt(target: Json, path: Path): boolean {
-  let node: unknown = target;
-  for (const key of path.slice(0, -1)) {
-    if (node === null || typeof node !== 'object') return false;
-    node = (node as Record<string | number, unknown>)[key];
-  }
+  const node = walk(target, path.slice(0, -1));
   const last = path[path.length - 1];
-  if (node === null || typeof node !== 'object' || Array.isArray(node) || last === undefined) return false;
-  if (!(last in (node as object))) return false;
+  if (node === null || Array.isArray(node) || last === undefined) return false;
+  if (!Object.hasOwn(node, last)) return false;
   // Rebuild the object without the key (no dynamic delete), keeping it in place for its parent.
   const record = node as Record<string, unknown>;
   const kept = Object.entries(record).filter(([k]) => k !== String(last));
@@ -132,6 +144,15 @@ export function firstRetirementYearOf(h: Household): number {
   return Math.max(...h.people.map((p) => p.birthYear + p.retirementAge));
 }
 
+/** Already retired in `currentYear` (retirement starts January 1 of the retirement-age year). */
+const retiredBy = (p: Household['people'][number], currentYear: number) =>
+  Number.isFinite(currentYear) && currentYear - p.birthYear >= p.retirementAge;
+
+/** Total change of a return sequence: Π(1 + r) − 1 (a preset D shock's severity). */
+export function marketShockTotal(returns: readonly number[]): number {
+  return returns.reduce((acc, r) => acc * (1 + r), 1) - 1;
+}
+
 const set = (collection: Exclude<ScenarioOp, { op: 'add' }>['collection'], id: string, path: Path, value: unknown) =>
   ({ op: 'set', collection, id, path, value }) as ScenarioOp;
 
@@ -144,6 +165,7 @@ export function presetScenario(
   const ops: ScenarioOp[] = [];
   const used: Record<string, number | string | boolean> = {};
   const currentYear = num(params, 'currentYear', NaN);
+  if (Number.isFinite(currentYear)) used.currentYear = currentYear;
   switch (preset) {
     case 'A_baseline':
       break;
@@ -151,6 +173,7 @@ export function presetScenario(
       const years = num(params, 'years', 5);
       used.years = years;
       for (const p of base.people) {
+        if (retiredBy(p, currentYear)) continue; // already retired: earlier is not possible
         const current = Number.isFinite(currentYear) ? currentYear - p.birthYear : 0;
         ops.push(set('people', p.id, ['retirementAge'], Math.max(current, p.retirementAge - years, 0)));
         if (p.employment?.stopAge != null) ops.push(set('people', p.id, ['employment', 'stopAge'], null));
@@ -186,7 +209,10 @@ export function presetScenario(
     case 'D_marketDownturn': {
       const severity = num(params, 'severity', -0.3);
       const duration = Math.max(1, Math.min(10, Math.round(num(params, 'durationYears', 1))));
-      const startYear = Math.round(num(params, 'startYear', firstRetirementYearOf(base)));
+      // Default: the first retirement year, never before the current year (a retired household's
+      // first retirement year is year 1, §8). An entered year before the current year is moved up.
+      const earliest = Number.isFinite(currentYear) ? currentYear : -Infinity;
+      const startYear = Math.max(earliest, Math.round(num(params, 'startYear', firstRetirementYearOf(base))));
       used.severity = severity;
       used.durationYears = duration;
       used.startYear = startYear;
@@ -204,6 +230,7 @@ export function presetScenario(
       const years = Math.max(3, Math.min(5, Math.round(num(params, 'years', 3))));
       used.years = years;
       for (const p of base.people) {
+        if (retiredBy(p, currentYear)) continue; // already retired: a later age would restart pay
         ops.push(set('people', p.id, ['retirementAge'], Math.min(p.planningAge, p.retirementAge + years)));
       }
       break;
@@ -212,7 +239,7 @@ export function presetScenario(
       const cut = num(params, 'cut', 0.1);
       used.cut = cut;
       const s = base.spending;
-      const scale = (c: number) => Math.round(c * (1 - cut));
+      const scale = (c: number) => roundHalfEven(c * (1 - cut));
       ops.push(set('household', base.id, ['spending', 'retirementAnnualSpending'], scale(s.retirementAnnualSpending)));
       ops.push(
         set(
@@ -261,18 +288,41 @@ export function presetScenario(
   };
 }
 
+/**
+ * True when the base plan has changed in a way the preset's stored ops no longer reflect: the preset
+ * rebuilt from its parameters and the current base gives different ops (for example, F stores the
+ * cut amount, so a later change to base spending is not followed). False for custom scenarios.
+ */
+export function presetDrift(scenario: Scenario, base: Household): boolean {
+  if (scenario.preset === null) return false;
+  const rebuilt = presetScenario(scenario.preset, base, scenario.presetParams, {
+    scenarioId: scenario.id,
+    name: scenario.name,
+    baseProfileId: scenario.baseProfileId,
+  });
+  return JSON.stringify(rebuilt.ops) !== JSON.stringify(scenario.ops);
+}
+
 // ---- Optimizer (§10) ----------------------------------------------------------------------------
 
-/** The household with the first person's retirement age set to `age` and everyone else shifted by the same amount. */
-export function withRetirementAge(h: Household, age: number): Household | null {
+/**
+ * The household with the first person's retirement age set to `age`; every other person not yet
+ * retired in `currentYear` shifts by the same amount (a retired partner stays retired). Salary stop
+ * ages are cleared for the people who move.
+ */
+export function withRetirementAge(h: Household, age: number, currentYear = NaN): Household | null {
   const first = h.people[0];
   if (!first) return null;
   const delta = age - first.retirementAge;
-  const people = h.people.map((p) => ({
-    ...p,
-    retirementAge: p.retirementAge + delta,
-    employment: p.employment ? { ...p.employment, stopAge: null } : null,
-  }));
+  const people = h.people.map((p, i) =>
+    i > 0 && retiredBy(p, currentYear)
+      ? p
+      : {
+          ...p,
+          retirementAge: p.retirementAge + delta,
+          employment: p.employment ? { ...p.employment, stopAge: null } : null,
+        },
+  );
   const parsed = HouseholdSchema.safeParse({ ...h, people });
   return parsed.success ? parsed.data : null;
 }
@@ -287,25 +337,57 @@ export function optimizeRetirementAge(
   if (!Number.isInteger(range.fromAge) || !Number.isInteger(range.toAge) || range.fromAge > range.toAge) {
     issues.push({ path: ['range'], message: 'The age range must run from a lower to a higher whole age' });
   }
+  const first = household.people[0];
+  if (first && retiredBy(first, ctx.currentYear)) {
+    issues.push({ path: ['people', 0, 'retirementAge'], message: `${first.name} is already retired` });
+  } else if (first && range.fromAge < ctx.currentYear - first.birthYear) {
+    issues.push({
+      path: ['range', 'fromAge'],
+      message: `The range must start at ${first.name}’s current age or later`,
+    });
+  }
+  let mc: { config: MonteCarloConfig; paths: number; minSuccessRate: number } | null = null;
   if (criterion.kind === 'monteCarlo') {
-    issues.push({ path: ['criterion'], message: 'The Monte Carlo criterion arrives with Monte Carlo (M6)' });
+    const config = MonteCarloConfigSchema.safeParse(criterion.config);
+    if (!config.success) {
+      issues.push(...zodIssues(config.error).map((i) => ({ ...i, path: ['criterion', 'config', ...i.path] })));
+    } else if (!(criterion.minSuccessRate > 0 && criterion.minSuccessRate <= 1)) {
+      issues.push({
+        path: ['criterion', 'minSuccessRate'],
+        message: 'The target success rate must be above 0% and at most 100%',
+      });
+    } else {
+      // Each age is scored on the quick-run paths (0 … quickRunPaths − 1), so a scan stays fast; the
+      // same paths are used for every age (common random numbers).
+      mc = { config: config.data, paths: config.data.quickRunPaths, minSuccessRate: criterion.minSuccessRate };
+    }
   }
   if (issues.length > 0) return { status: 'invalid', issues };
   const evaluated: OptimizerResult['evaluated'] = [];
   for (let age = range.fromAge; age <= range.toAge; age++) {
-    const candidate = withRetirementAge(household, age);
+    const candidate = withRetirementAge(household, age, ctx.currentYear);
     if (!candidate) continue;
     const r = projectHousehold(candidate, ctx);
     if (r.status !== 'ok') continue;
+    let successRate: number | null = null;
+    if (mc) {
+      const chunk = runMonteCarloChunk(candidate, ctx, mc.config, { pathStart: 0, pathEnd: mc.paths });
+      if (chunk.status !== 'ok') continue;
+      successRate = chunk.value.success.reduce((n, v) => n + v, 0) / mc.paths;
+    }
     evaluated.push({
       age,
-      success: r.value.summary.deterministicSuccess,
+      success: mc ? (successRate ?? 0) >= mc.minSuccessRate : r.value.summary.deterministicSuccess,
       endingBalanceReal: r.value.summary.endingBalanceReal as Cents,
-      successRate: null,
+      successRate,
     });
   }
   const earliest = evaluated.find((e) => e.success)?.age ?? null;
-  return { status: 'ok', value: { earliestAge: earliest, evaluated, criterion: 'deterministic' }, warnings: [] };
+  return {
+    status: 'ok',
+    value: { earliestAge: earliest, evaluated, criterion: mc ? 'monteCarlo' : 'deterministic' },
+    warnings: [],
+  };
 }
 
 // ---- Comparison (§10) ---------------------------------------------------------------------------

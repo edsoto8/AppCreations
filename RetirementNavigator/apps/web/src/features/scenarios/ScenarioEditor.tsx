@@ -15,12 +15,18 @@ import {
   initialOverrideValue,
   marketShockValue,
   opKey,
+  overrideError,
   overrideTargets,
+  paramError,
+  paramLimits,
+  PRESET_BY_ID,
   shockParams,
   WITHDRAWAL_STRATEGY_LABELS,
   withOverride,
   withoutOp,
   type OverrideTarget,
+  type ParamField,
+  type ShockParams,
 } from './scenarioModel';
 
 const num = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null);
@@ -75,7 +81,12 @@ function OverrideInput({
   household: Household;
   currentYear: number;
 }) {
-  const chrome = { label: target.label, example: `${EXAMPLES[target.kind]} Base plan: ${baseText(target)}.`.trim() };
+  const error = overrideError(target, value) ?? undefined;
+  const chrome = {
+    label: target.label,
+    example: `${EXAMPLES[target.kind]} Base plan: ${baseText(target)}.`.trim(),
+    error,
+  };
   switch (target.kind) {
     case 'age':
       return <Field {...chrome}>{(a) => <IntegerInput {...a} value={num(value)} onChange={onChange} />}</Field>;
@@ -101,19 +112,26 @@ function OverrideInput({
       );
     case 'claimAge': {
       const v = (value ?? {}) as { years?: number; months?: number };
+      const errorId = `${target.key}-error`;
       return (
-        <fieldset className="flex flex-col gap-2">
+        <fieldset className="flex flex-col gap-2" aria-describedby={error ? errorId : undefined}>
           <legend className="mb-1 text-sm font-medium">{target.label}</legend>
           <div className="grid grid-cols-2 gap-3">
             <Field label="Years">
               {(a) => (
-                <IntegerInput {...a} value={num(v.years)} onChange={(years) => onChange({ months: 0, ...v, years })} />
+                <IntegerInput
+                  {...a}
+                  aria-invalid={!!error}
+                  value={num(v.years)}
+                  onChange={(years) => onChange({ months: 0, ...v, years })}
+                />
               )}
             </Field>
             <Field label="Months">
               {(a) => (
                 <IntegerInput
                   {...a}
+                  aria-invalid={!!error}
                   value={num(v.months)}
                   onChange={(months) => onChange({ years: 67, ...v, months })}
                 />
@@ -121,36 +139,97 @@ function OverrideInput({
             </Field>
           </div>
           <p className="text-xs text-muted-foreground">Between 62 and 70. Base plan: {baseText(target)}.</p>
+          {error ? (
+            <p id={errorId} role="alert" className="text-xs font-medium text-destructive">
+              {error}
+            </p>
+          ) : null}
         </fieldset>
       );
     }
-    case 'marketShock': {
-      const s = shockParams(value) ?? { severity: -0.3, durationYears: 1, startYear: currentYear };
-      const update = (patch: Partial<typeof s>) =>
-        onChange(marketShockValue(household, { ...s, ...patch }, currentYear));
+    case 'marketShock':
       return (
-        <fieldset className="flex flex-col gap-2">
-          <legend className="mb-1 text-sm font-medium">{target.label}</legend>
-          <div className="grid gap-3 sm:grid-cols-3">
-            <Field label="Total market drop" example="For example −30%.">
-              {(a) => <PercentInput {...a} value={s.severity} onChange={(severity) => update({ severity })} />}
-            </Field>
-            <Field label="Duration (years)" example="1 to 10.">
-              {(a) => (
-                <IntegerInput {...a} value={s.durationYears} onChange={(durationYears) => update({ durationYears })} />
-              )}
-            </Field>
-            <Field label="Start year">
-              {(a) => <IntegerInput {...a} value={s.startYear} onChange={(startYear) => update({ startYear })} />}
-            </Field>
-          </div>
-          <p className="text-xs text-muted-foreground">
-            A deterministic return shock on every account, spread evenly over its years. Base plan: {baseText(target)}.
-          </p>
-        </fieldset>
+        <MarketShockInput
+          label={target.label}
+          baseLabel={baseText(target)}
+          value={value}
+          onChange={onChange}
+          household={household}
+          currentYear={currentYear}
+        />
       );
-    }
   }
+}
+
+type ShockDraft = { [K in keyof ShockParams]: number | null };
+const SHOCK_KEYS = ['severity', 'durationYears', 'startYear'] as const;
+const shockField = (key: keyof ShockParams) =>
+  PRESET_BY_ID.D_marketDownturn.fields.find((f) => f.key === key) as ParamField;
+
+/**
+ * Market shock override with preset D's bounds: a total drop above −100% and at most 0%, 1 to 10
+ * years, starting from this year to the last plan year. The engine builds the per-year sequence. An
+ * out-of-range entry shows its error and is not saved (the engine would otherwise move it silently).
+ */
+function MarketShockInput({
+  label,
+  baseLabel,
+  value,
+  onChange,
+  household,
+  currentYear,
+}: {
+  label: string;
+  baseLabel: string;
+  value: unknown;
+  onChange: (value: unknown) => void;
+  household: Household;
+  currentYear: number;
+}) {
+  const [draft, setDraft] = useState<ShockDraft>(
+    () => shockParams(value) ?? { severity: -0.3, durationYears: 1, startYear: currentYear },
+  );
+  const limits = paramLimits(household, currentYear);
+  const errorOf = (d: ShockDraft, key: keyof ShockParams): string | null => {
+    const v = d[key];
+    return v === null ? 'Enter a value' : paramError(shockField(key), v, limits);
+  };
+  const update = (patch: Partial<ShockDraft>) => {
+    const next = { ...draft, ...patch };
+    setDraft(next);
+    const { severity, durationYears, startYear } = next;
+    if (severity === null || durationYears === null || startYear === null) return;
+    if (SHOCK_KEYS.some((key) => errorOf(next, key) !== null)) return;
+    onChange(marketShockValue(household, { severity, durationYears, startYear }, currentYear));
+  };
+  const error = (key: keyof ShockParams) => errorOf(draft, key) ?? undefined;
+  const lastYear = limits.startYear?.max ?? currentYear;
+  return (
+    <fieldset className="flex flex-col gap-2">
+      <legend className="mb-1 text-sm font-medium">{label}</legend>
+      <div className="grid gap-3 sm:grid-cols-3">
+        <Field
+          label="Total market drop"
+          example="Above −100% and at most 0%, for example −30%."
+          error={error('severity')}
+        >
+          {(a) => <PercentInput {...a} value={draft.severity} onChange={(severity) => update({ severity })} />}
+        </Field>
+        <Field label="Duration (years)" example="1 to 10." error={error('durationYears')}>
+          {(a) => (
+            <IntegerInput {...a} value={draft.durationYears} onChange={(durationYears) => update({ durationYears })} />
+          )}
+        </Field>
+        <Field label="Start year" example={`${currentYear} to ${lastYear}.`} error={error('startYear')}>
+          {(a) => <IntegerInput {...a} value={draft.startYear} onChange={(startYear) => update({ startYear })} />}
+        </Field>
+      </div>
+      <p className="text-xs text-muted-foreground">
+        A deterministic return shock on every account, spread evenly over its years. Base plan: {baseLabel}. A value out
+        of range is not saved.
+      </p>
+    </fieldset>
+  );
 }
 
 /**
@@ -180,11 +259,13 @@ export function ScenarioEditor({
   const addKey = available.some((t) => t.key === adding) ? adding : (available[0]?.key ?? '');
   const selectId = useId();
   const titleId = useId();
+  // Editing a preset's changes makes it a custom scenario, so its preset label no longer applies.
+  const edit = (ops: Scenario['ops']) => setOps(scenario.id, ops, { asCustom: true });
 
   const add = () => {
     const target = byKey.get(addKey);
     if (!target) return;
-    setOps(scenario.id, withOverride(scenario.ops, target, initialOverrideValue(target, household, currentYear)));
+    edit(withOverride(scenario.ops, target, initialOverrideValue(target, household, currentYear)));
   };
 
   return (
@@ -199,10 +280,13 @@ export function ScenarioEditor({
         <CardDescription>
           Each change overrides one value of the base plan in this scenario. Everything else follows the base plan,
           including your later edits to it. Changes save automatically.
+          {scenario.preset !== null
+            ? ' Editing a preset’s changes turns it into a custom scenario (its preset settings no longer describe it).'
+            : ''}
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-5">
-        <ScenarioWarnings application={application} household={household} />
+        <ScenarioWarnings application={application} household={household} scenario={scenario} />
 
         {scenario.ops.length === 0 ? (
           <p className="text-sm text-muted-foreground">No changes yet: this scenario matches the base plan.</p>
@@ -223,7 +307,7 @@ export function ScenarioEditor({
                         value={op.value}
                         household={household}
                         currentYear={currentYear}
-                        onChange={(value) => setOps(scenario.id, withOverride(scenario.ops, target, value))}
+                        onChange={(value) => edit(withOverride(scenario.ops, target, value))}
                       />
                     ) : (
                       <p className="text-sm">
@@ -239,7 +323,7 @@ export function ScenarioEditor({
                     variant="outline"
                     size="sm"
                     className="self-start sm:self-end"
-                    onClick={() => setOps(scenario.id, withoutOp(scenario.ops, index))}
+                    onClick={() => edit(withoutOp(scenario.ops, index))}
                     aria-label={`Remove change: ${target ? target.label : description}`}
                   >
                     <Trash2 aria-hidden="true" /> Remove

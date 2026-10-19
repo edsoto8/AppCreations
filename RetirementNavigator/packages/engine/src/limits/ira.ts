@@ -7,9 +7,9 @@ import type { Cents, FilingStatus } from '../domain/primitives';
 import type { EngineResult, EngineWarning } from '../domain/results';
 import type { ResolvedYearRules, RothIraEligibility } from '../api';
 import { RuleAccess, unverified } from '../rules/access';
+import { formatWholeDollars } from '../money';
 
-const usd = (cents: number) =>
-  `$${(cents / 100).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+const usd = (cents: number) => formatWholeDollars(cents / 100);
 
 /**
  * Default MAGI estimate (documented simplification, user-overridable):

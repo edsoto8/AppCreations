@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { presetScenario, SAMPLE_PROFILES, type Scenario } from '@rn/engine';
+import {
+  CURRENT_SCHEMA_VERSION,
+  presetDrift,
+  presetScenario,
+  SAMPLE_PROFILES,
+  type Household,
+  type Scenario,
+} from '@rn/engine';
 import { setupProfile, TEST_YEAR } from '@/test/renderWithProfile';
 import { useProfileStore } from './profileStore';
 import { scenariosOf, useScenarioStore } from './scenarioStore';
@@ -24,7 +31,7 @@ describe('scenario store', () => {
     const stored = await repo.get('scenario', id);
     expect(stored?.status).toBe('ok');
     if (stored?.status !== 'ok') throw new Error('not stored');
-    expect(stored.value).toMatchObject({ kind: 'scenario', schemaVersion: 1, id });
+    expect(stored.value).toMatchObject({ kind: 'scenario', schemaVersion: CURRENT_SCHEMA_VERSION, id });
     expect(stored.value.scenario).toEqual(scenario);
 
     // Debounced edits are written on flush and survive a reload.
@@ -36,7 +43,8 @@ describe('scenario store', () => {
     expect(reloaded.name).toBe('Early');
     expect(reloaded.ops).toEqual(scenario.ops.slice(0, 1));
     expect(reloaded.preset).toBe('B_earlyRetirement');
-    expect(reloaded.presetParams).toEqual({ years: 5 });
+    // presetScenario records the current year it was built for (contract 1.9.0).
+    expect(reloaded.presetParams).toEqual({ currentYear: TEST_YEAR, years: 5 });
   });
 
   it('duplicates, deletes and never overwrites an existing id', async () => {
@@ -74,5 +82,64 @@ describe('scenario store', () => {
     expect(Object.keys(useScenarioStore.getState().scenarios)).toEqual(['keep-1']);
     const stored = await repo.list('scenario');
     expect(stored.map((r) => (r.status === 'ok' ? r.value.id : null))).toEqual(['keep-1']);
+  });
+
+  it('init writes pending edits to the previous repository instead of dropping them', async () => {
+    const { repo } = await setupProfile();
+    const profileId = useProfileStore.getState().activeId!;
+    await useScenarioStore.getState().createScenario(custom('s-pending', profileId, 'Before'));
+    useScenarioStore.getState().renameScenario('s-pending', 'After');
+    // Re-initialize before the debounced save fires: the rename still reaches the database.
+    await useScenarioStore.getState().init(repo);
+    const stored = await repo.get('scenario', 's-pending');
+    expect(stored?.status === 'ok' ? stored.value.scenario.name : null).toBe('After');
+    expect(useScenarioStore.getState().scenarios['s-pending']!.scenario.name).toBe('After');
+  });
+
+  it('setOps with asCustom turns a preset into a custom scenario; rebuildPreset follows the current base', async () => {
+    await setupProfile();
+    const profileId = useProfileStore.getState().activeId!;
+    const base = useProfileStore.getState().profiles[profileId]!.household;
+    const ids = { scenarioId: 'scenario-f', name: 'Spend less', baseProfileId: profileId };
+    const f = presetScenario('F_reducedSpending', base, { cut: 0.2, currentYear: TEST_YEAR }, ids);
+    await useScenarioStore.getState().createScenario(f);
+
+    // The base plan's retirement spending changes: F stored the reduced amount, so it drifts.
+    const edited = {
+      ...base,
+      spending: { ...base.spending, retirementAnnualSpending: base.spending.retirementAnnualSpending + 1_000_000 },
+    } as Household;
+    expect(presetDrift(useScenarioStore.getState().scenarios['scenario-f']!.scenario, edited)).toBe(true);
+    useScenarioStore.getState().rebuildPreset('scenario-f', edited, TEST_YEAR + 1);
+    const rebuilt = useScenarioStore.getState().scenarios['scenario-f']!.scenario;
+    const expected = presetScenario('F_reducedSpending', edited, { cut: 0.2, currentYear: TEST_YEAR + 1 }, ids);
+    expect(rebuilt.ops).toEqual(expected.ops);
+    expect(rebuilt.presetParams).toEqual({ cut: 0.2, currentYear: TEST_YEAR + 1 });
+    expect(rebuilt.preset).toBe('F_reducedSpending');
+    expect(presetDrift(rebuilt, edited)).toBe(false);
+
+    useScenarioStore.getState().setOps('scenario-f', rebuilt.ops.slice(0, 1), { asCustom: true });
+    const custom = useScenarioStore.getState().scenarios['scenario-f']!.scenario;
+    expect(custom.preset).toBeNull();
+    expect(custom.presetParams).toEqual({});
+    expect(custom.ops).toEqual(rebuilt.ops.slice(0, 1));
+
+    // Rebuilding a custom scenario does nothing.
+    useScenarioStore.getState().rebuildPreset('scenario-f', base, TEST_YEAR);
+    expect(useScenarioStore.getState().scenarios['scenario-f']!.scenario).toEqual(custom);
+  });
+
+  it('deletes a profile’s scenarios before the profile itself', async () => {
+    const { repo } = await setupProfile();
+    const doomedId = await useProfileStore.getState().createProfile(SAMPLE_PROFILES[0]!.build(TEST_YEAR));
+    await useScenarioStore.getState().createScenario(custom('gone-1', doomedId));
+    const order: string[] = [];
+    const original = repo.delete.bind(repo);
+    repo.delete = (async (...args: Parameters<typeof repo.delete>) => {
+      order.push(args[0]);
+      return original(...args);
+    }) as typeof repo.delete;
+    await useProfileStore.getState().deleteProfile(doomedId);
+    expect(order).toEqual(['scenario', 'profile']);
   });
 });

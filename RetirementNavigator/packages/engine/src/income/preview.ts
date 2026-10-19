@@ -23,7 +23,7 @@ import { scheduledContributions, type PersonYearInput } from './scheduled';
 import { computeTax } from '../tax/tax';
 import { resolveRules } from '../rules/resolve';
 import { RuleAccess } from '../rules/access';
-import { asCents, toCents } from '../money';
+import { asCents, formatWholeDollars, toCents } from '../money';
 import { priceIndex } from '../time';
 import type { NominalRate } from '../domain/primitives';
 
@@ -367,13 +367,13 @@ export function accumulationYear(
     yearWarnings.push({
       code: 'savingsPlanInfeasible',
       year,
-      message: `In ${year}, pay and other income do not cover spending even before taxes and contributions (shortfall at least $${Math.round(-provenGap).toLocaleString('en-US')}).`,
+      message: `In ${year}, pay and other income do not cover spending even before taxes and contributions (shortfall at least ${formatWholeDollars(-provenGap)}).`,
     });
   } else if (infeasible) {
     yearWarnings.push({
       code: 'savingsPlanInfeasible',
       year,
-      message: `In ${year}, estimated take-home pay does not cover the planned contributions plus spending (shortfall $${Math.round(-(surplus ?? 0)).toLocaleString('en-US')}).`,
+      message: `In ${year}, estimated take-home pay does not cover the planned contributions plus spending (shortfall ${formatWholeDollars(-(surplus ?? 0))}).`,
     });
   }
   return {
@@ -397,12 +397,24 @@ export function accumulationYear(
 }
 
 /** Rules in force for projection year `year` under the household's anchor and indexing settings. */
+// resolveRules is pure, so its results are cached per rules set (Monte Carlo resolves the same
+// years on every path).
+const resolvedCache = new WeakMap<EngineContext['rules'], Map<string, ResolvedYearRules>>();
+
 export function rulesForYear(household: Household, ctx: EngineContext, year: number): ResolvedYearRules {
-  return resolveRules(ctx.rules, {
-    anchorYear: household.assumptions.rules.anchorYear,
-    targetYear: year,
-    indexRate: indexRateFor(household),
-  });
+  const anchorYear = household.assumptions.rules.anchorYear;
+  const indexRate = indexRateFor(household);
+  const key = `${anchorYear}|${year}|${indexRate}`;
+  let byKey = resolvedCache.get(ctx.rules);
+  if (!byKey) {
+    byKey = new Map();
+    resolvedCache.set(ctx.rules, byKey);
+  }
+  const hit = byKey.get(key);
+  if (hit) return hit;
+  const resolved = resolveRules(ctx.rules, { anchorYear, targetYear: year, indexRate });
+  byKey.set(key, resolved);
+  return resolved;
 }
 
 export function previewAccumulation(

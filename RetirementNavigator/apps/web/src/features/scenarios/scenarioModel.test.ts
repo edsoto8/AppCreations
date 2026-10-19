@@ -4,6 +4,11 @@ import { TEST_YEAR } from '@/test/renderWithProfile';
 import {
   buildPreset,
   describeOp,
+  issueLabel,
+  issueText,
+  lastPlanYear,
+  overrideError,
+  paramLimits,
   marketShockValue,
   orphanMessage,
   overrideTargets,
@@ -107,5 +112,69 @@ describe('scenario view model', () => {
     expect(applied.orphaned.map((o) => orphanMessage(o, base))).toEqual([
       'This scenario changes something that no longer exists in the base plan: an account (“gone”): removed in this scenario. It is not applied.',
     ]);
+  });
+
+  it('bounds preset D: severity above −100%, start year from this year to the last plan year', () => {
+    const base = couple();
+    const fields = PRESET_BY_ID.D_marketDownturn.fields;
+    const severity = fields.find((f) => f.key === 'severity')!;
+    const start = fields.find((f) => f.key === 'startYear')!;
+    const limits = paramLimits(base, TEST_YEAR);
+    expect(paramError(severity, -1)).toBe('Must be above -100%');
+    expect(paramError(severity, -0.99)).toBeNull();
+    expect(paramError(severity, 0.01)).toBe('Must be at most 0%');
+    expect(lastPlanYear(base)).toBe(TEST_YEAR - 40 + 96); // Jordan: born 40 years ago, planning age 96
+    expect(paramError(start, TEST_YEAR - 1, limits)).toBe(`Must be at least ${TEST_YEAR}`);
+    expect(paramError(start, TEST_YEAR, limits)).toBeNull();
+    expect(paramError(start, lastPlanYear(base) + 1, limits)).toBe(`Must be at most ${lastPlanYear(base)}`);
+  });
+
+  it('reads a shock’s total drop with the engine’s marketShockTotal', () => {
+    expect(shockParams({ startYear: 2030, returns: [-0.5, -0.5] })).toEqual({
+      severity: -0.75,
+      durationYears: 2,
+      startYear: 2030,
+    });
+  });
+
+  it('names invalid-scenario issue paths in words', () => {
+    const base = couple();
+    expect(issueLabel(['people', 0, 'retirementAge'], base)).toBe('Sam › Retirement age');
+    expect(issueLabel(['people', 1, 'socialSecurity', 'claimAge'], base)).toBe('Jordan › Social Security claiming age');
+    expect(issueLabel(['people', 0, 'workplacePlans', 0, 'traditionalPctOfSalary'], base)).toBe(
+      'Sam’s 401(k) plan › Traditional % of salary',
+    );
+    expect(issueLabel(['spending', 'retirementAnnualSpending'], base)).toBe('Household › Retirement spending');
+    expect(issueLabel(['accounts', 0, 'balance'], base)).toBe(`${base.accounts[0]!.name} › Balance`);
+    // A person removed by the scenario shifts the indexes.
+    const removeSam = {
+      ...ids,
+      preset: null,
+      presetParams: {},
+      ops: [{ op: 'unset', collection: 'people', id: 'sam', path: null }],
+    } as unknown as Scenario;
+    expect(issueLabel(['people', 0, 'planningAge'], base, removeSam)).toBe('Jordan › Planning age');
+    expect(issueText({ path: ['people', 0, 'planningAge'], message: 'Too big' }, base)).toBe(
+      'Sam › Planning age: Too big',
+    );
+    expect(issueText({ path: [], message: 'Whole plan' }, base)).toBe('Whole plan');
+  });
+
+  it('range-checks override values', () => {
+    const targets = overrideTargets(couple());
+    const t = (key: string) => targets.find((x) => x.key === key)!;
+    expect(overrideError(t('people:sam:retirementAge'), 121)).toBe('Must be between 0 and 120');
+    expect(overrideError(t('people:sam:retirementAge'), 60)).toBeNull();
+    expect(overrideError(t('people:sam:socialSecurity.claimAge'), { years: 61, months: 11 })).toBe(
+      'Claiming age must be between 62 and 70',
+    );
+    expect(overrideError(t('people:sam:socialSecurity.claimAge'), { years: 67, months: 12 })).toBe(
+      'Months must be from 0 to 11',
+    );
+    expect(overrideError(t('workplacePlans:sam-plan:traditionalPctOfSalary'), 1.2)).toBe('Must be between 0% and 100%');
+    const spending = targets.find((x) => x.label === 'Retirement spending (per year)')!;
+    expect(overrideError(spending, -1)).toBe('Amount cannot be negative');
+    const inflation = targets.find((x) => x.label === 'Inflation')!;
+    expect(overrideError(inflation, -0.5)).toBe('Must be above −50% and at most 50%');
   });
 });

@@ -7,15 +7,13 @@
  *
  * Purity: no Date.now(), no Math.random(), no globals. The current year and the PRNG are injected.
  */
-import type { CalendarYear, Cents, DollarBasis, FilingStatus, Fraction } from './domain/primitives';
+import type { CalendarYear, Cents, FilingStatus, Fraction } from './domain/primitives';
 import type { Household, WorkplacePlan } from './domain/household';
 import type { RulesSet, StandingRules, TaxYearRules } from './domain/rules';
 import type { EngineResult, EngineWarning, UnverifiedDetail } from './domain/results';
 import type { OrphanedOp } from './domain/scenario';
 import type { ProjectionResult } from './domain/projection';
-import type { MonteCarloChunk, MonteCarloConfig, MonteCarloResult } from './domain/montecarlo';
 import type { Insight } from './domain/insight';
-import type { ExportBundle } from './domain/documents';
 import type { ValidationIssue } from './domain/results';
 
 export { CONTRACT_VERSION } from './contractVersion';
@@ -404,6 +402,12 @@ export { applyScenario } from './scenario/scenario'; // implemented in M5
 /** Build preset scenario ops (A–G) for a base household. */
 export { presetScenario } from './scenario/scenario'; // implemented in M5
 
+/** Whether a preset's stored ops differ from a rebuild on the current base (contract 1.9.0). */
+export { presetDrift } from './scenario/scenario';
+
+/** Total change of a return sequence, Π(1 + r) − 1 (contract 1.9.0). */
+export { marketShockTotal } from './scenario/scenario';
+
 export interface OptimizerResult {
   /** Earliest retirement age (primary person, or both shifted together) meeting the criterion; null if none. */
   earliestAge: number | null;
@@ -438,37 +442,26 @@ export { compareScenarios } from './scenario/scenario';
 // Monte Carlo (module: montecarlo/)
 // =============================================================================================
 
-/** Run paths [pathStart, pathEnd). Pure; chunks from different workers merge identically. */
-export function runMonteCarloChunk(
-  household: Household,
-  ctx: EngineContext,
-  config: MonteCarloConfig,
-  range: { pathStart: number; pathEnd: number },
-): EngineResult<MonteCarloChunk> {
-  void household;
-  void ctx;
-  void config;
-  void range;
-  throw new NotImplementedError('runMonteCarloChunk');
-}
+/**
+ * Run paths [pathStart, pathEnd) (docs/financial-model.md §11). Pure; chunks from different workers
+ * merge identically, because path i's numbers depend only on (seed, i). Implemented in M6.
+ */
+export { runMonteCarloChunk } from './montecarlo/run';
 
-export function summarizeMonteCarlo(
-  chunks: MonteCarloChunk[],
-  config: MonteCarloConfig,
-  firstYear: CalendarYear,
-): MonteCarloResult {
-  void chunks;
-  void config;
-  void firstYear;
-  throw new NotImplementedError('summarizeMonteCarlo');
-}
+/**
+ * Merge chunks into a result with the assumptions shown beside the success rate. Contract 1.9.0:
+ * takes the household (for the capital-market assumptions and the minimum ending balance).
+ */
+export { summarizeMonteCarlo } from './montecarlo/run';
 
 /** Positive semi-definite check (Cholesky with tolerance) for correlation matrices. */
-export function isPositiveSemiDefinite(matrix: number[][], tolerance?: number): boolean {
-  void matrix;
-  void tolerance;
-  throw new NotImplementedError('isPositiveSemiDefinite');
-}
+export { isPositiveSemiDefinite } from './montecarlo/random';
+
+/** Allocation view (c): year-end balances by asset class from target allocations (contract 1.9.0). */
+export { allocationByAssetClass, type AssetClassYear } from './montecarlo/views';
+
+/** Sequence-of-returns illustration: the same deviations in two orders (contract 1.9.0). */
+export { sequenceRiskIllustration, SEQUENCE_DEVIATIONS, type SequenceRiskIllustration } from './montecarlo/views';
 
 // =============================================================================================
 // Calculators and insights (modules: calculators/, insights/)
@@ -502,23 +495,14 @@ export function computeInsights(household: Household, ctx: EngineContext): Engin
 // IO (module: io/)
 // =============================================================================================
 
-/** CSV of projection rows; cells starting with = + - @ are escaped against formula injection. */
-export function toCsv(result: ProjectionResult, opts: { dollarBasis: DollarBasis }): string {
-  void result;
-  void opts;
-  throw new NotImplementedError('toCsv');
-}
+/**
+ * CSV of projection rows in the chosen dollar basis; cells starting with = + - @ (that are not plain
+ * numbers) are escaped against formula injection. Optional display names (contract 1.9.0).
+ */
+export { toCsv, csvCell, type CsvOptions } from './io/csv';
 
-export function exportJson(bundle: ExportBundle): string {
-  void bundle;
-  throw new NotImplementedError('exportJson');
-}
-
-/** Parse, migrate and validate an export file. Malformed input yields `invalid` with clear messages. */
-export function importJson(text: string): EngineResult<ExportBundle> {
-  void text;
-  throw new NotImplementedError('importJson');
-}
+/** Validated JSON export; import parses, migrates and validates with clear messages (M7b). */
+export { exportJson, importJson, MAX_IMPORT_CHARS } from './io/json';
 
 // Implemented in M1.
 export { migrate } from './io/migrate';

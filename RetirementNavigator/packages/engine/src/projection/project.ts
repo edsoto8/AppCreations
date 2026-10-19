@@ -20,9 +20,16 @@ import type { Cents, Fraction } from '../domain/primitives';
 import { CONTRACT_VERSION } from '../contractVersion';
 import { HouseholdSchema } from '../domain/household';
 import { zodIssues } from '../validation';
-import { asCents, toCents } from '../money';
+import { asCents, formatWholeDollars, toCents } from '../money';
 import { vestedFraction } from '../match/match';
-import { accumulationSetup, accumulationYear, rulesForYear } from '../income/preview';
+import {
+  accumulationSetup,
+  accumulationYear,
+  rulesForYear,
+  type AccumulationSetup,
+  type AccumulationYear,
+  type ExtraIncome,
+} from '../income/preview';
 import { solveWithdrawals, type SolverAccount } from '../tax/grossUp';
 import { computeTax } from '../tax/tax';
 import { RuleAccess } from '../rules/access';
@@ -60,7 +67,7 @@ interface AccountState {
   plan: { plan: WorkplacePlan; owner: Person } | null;
 }
 
-const usd = (dollars: number) => `$${Math.round(dollars).toLocaleString('en-US')}`;
+const usd = formatWholeDollars;
 
 function baseReturn(household: Household, account: Account, retirementPhase: boolean): number {
   if (account.expectedReturn !== null) return account.expectedReturn;
@@ -148,14 +155,64 @@ function bracketRoom(
   return Math.max(0, top / 100 + base.deductions / 100 - ordinaryCounted);
 }
 
+/**
+ * Return-independent work shared by many projections of one household and context (Monte Carlo
+ * paths): the validated household, the accumulation setup and each year's accumulation result for
+ * the same inputs. Internal: not part of the frozen API.
+ */
+export interface ProjectionCache {
+  household: Household | null;
+  setup: AccumulationSetup | null;
+  years: Map<string, AccumulationYear>;
+}
+
+export function createProjectionCache(): ProjectionCache {
+  return { household: null, setup: null, years: new Map() };
+}
+
+function cachedAccumulationYear(
+  cache: ProjectionCache | null,
+  household: Household,
+  setup: AccumulationSetup,
+  t: number,
+  rules: ReturnType<typeof rulesForYear>,
+  extra: ExtraIncome,
+): AccumulationYear {
+  if (!cache) return accumulationYear(household, setup, t, rules, extra);
+  // Every input that varies by path is in the key (RMD and event income can depend on balances).
+  const key = `${t}|${extra.cash}|${extra.ordinary}|${extra.socialSecurity}|${extra.gains}|${extra.filingStatus}|${extra.ages?.join(',')}|${extra.spendingFactor}`;
+  const hit = cache.years.get(key);
+  if (hit) return hit;
+  const result = accumulationYear(household, setup, t, rules, extra);
+  // Bounded: years whose income varies by path (RMDs while working) are not worth keeping forever.
+  if (cache.years.size < 20_000) cache.years.set(key, result);
+  return result;
+}
+
 export function projectHousehold(
   input: Household,
   ctx: EngineContext,
   options: ProjectionOptions = {},
 ): EngineResult<ProjectionResult> {
-  const parsed = HouseholdSchema.safeParse(input);
-  if (!parsed.success) return { status: 'invalid', issues: zodIssues(parsed.error) };
-  const household = parsed.data;
+  return projectWithCache(input, ctx, options, null);
+}
+
+/** `projectHousehold` sharing return-independent work through `cache` (same household and ctx). */
+export function projectWithCache(
+  input: Household,
+  ctx: EngineContext,
+  options: ProjectionOptions,
+  cache: ProjectionCache | null,
+): EngineResult<ProjectionResult> {
+  let household: Household;
+  if (cache?.household) {
+    household = cache.household;
+  } else {
+    const parsed = HouseholdSchema.safeParse(input);
+    if (!parsed.success) return { status: 'invalid', issues: zodIssues(parsed.error) };
+    household = parsed.data;
+    if (cache) cache.household = household;
+  }
   const firstYear = ctx.currentYear;
   const lastYear = Math.max(...household.people.map((p) => p.birthYear + p.planningAge));
   if (lastYear < firstYear) {
@@ -167,7 +224,8 @@ export function projectHousehold(
   const years = lastYear - firstYear + 1;
   const a = household.assumptions;
   const offset = options.returnOffset ?? 0;
-  const setup = accumulationSetup(household, ctx, years);
+  const setup = cache?.setup ?? accumulationSetup(household, ctx, years);
+  if (cache) cache.setup = setup;
   const warnings: EngineWarning[] = [];
 
   // Account state (float64 dollars).
@@ -322,7 +380,7 @@ export function projectHousehold(
       household.people.length > 1 && firstDeathYear !== null && year >= firstDeathYear
         ? 1 - household.spending.survivorSpendingReduction
         : 1;
-    const acc = accumulationYear(household, setup, t, rules, {
+    const acc = cachedAccumulationYear(cache, household, setup, t, rules, {
       cash: ssTotal + pensions.annuity,
       ordinary: pensions.taxable + rmdTotal + inflowOrdinary,
       socialSecurity: ssTotal,

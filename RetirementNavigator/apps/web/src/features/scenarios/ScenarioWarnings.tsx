@@ -1,5 +1,5 @@
 import { AlertTriangle } from 'lucide-react';
-import type { Household, ScenarioApplication } from '@rn/engine';
+import type { Household, Scenario, ScenarioApplication } from '@rn/engine';
 import { Alert } from '@/components/ui/alert';
 import { issueText, orphanMessage } from './scenarioModel';
 
@@ -7,9 +7,11 @@ import { issueText, orphanMessage } from './scenarioModel';
 export function ScenarioWarnings({
   application,
   household,
+  scenario,
 }: {
   application: ScenarioApplication;
   household: Household;
+  scenario: Scenario;
 }) {
   const { orphaned, issues } = application;
   if (orphaned.length === 0 && issues.length === 0) return null;
@@ -32,7 +34,7 @@ export function ScenarioWarnings({
             <p className="font-medium">This scenario cannot run: its changes make the plan invalid.</p>
             <ul className="list-disc pl-5">
               {issues.slice(0, 6).map((issue, i) => (
-                <li key={i}>{issueText(issue)}</li>
+                <li key={i}>{issueText(issue, household, scenario)}</li>
               ))}
             </ul>
             <p className="text-muted-foreground">Edit or remove its changes to fix it.</p>

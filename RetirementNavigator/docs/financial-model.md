@@ -643,8 +643,11 @@ confidence intervals. Everything else (contributions, spending, inflation) is un
 - **Diff ops** `set | unset | add`, keyed by `(collection, id)`, are applied in order to a deep copy of
   the base (`applyScenario`). The result is re-validated with the household schema; invalid results
   return the issues and no household.
-  - `set` writes `value` at `path` inside the entity. The path's parent must exist, otherwise the op
-    is `invalidPath`.
+  - `set` writes `value` at `path` inside the entity. Every step and the field itself must already
+    exist as the entity's own keys (after schema defaults), otherwise the op is `invalidPath`: a
+    misspelled field is reported, never silently dropped. An array index may be one past the end
+    (append). Paths may not contain `__proto__`, `constructor` or `prototype` (rejected by the
+    scenario schema).
   - `unset` with a path removes that key, so the schema default applies (a required field without a
     default makes the result invalid). Without a path it removes the entity, except the household
     itself (`invalidPath`).
@@ -653,6 +656,9 @@ confidence intervals. Everything else (contributions, spending, inflation) is un
   - Because a scenario stores only ops, edits to the base flow through.
 - **Presets** (`presetScenario`; the parameters used are stored in `presetParams`):
   - A Baseline: no ops.
+  - Every preset records `currentYear` in `presetParams`. A person already retired in the current
+    year (age ≥ retirement age) is left unchanged by B and E: retiring earlier is no longer possible,
+    and a later age would restart their salary.
   - B Early retirement: every retirement age −`years` (default 5), not below today's age. Salary stop
     ages are cleared.
   - C Aggressive savings: each workplace plan's salary deferral +`deferralIncrease` (default 5
@@ -660,14 +666,20 @@ confidence intervals. Everything else (contributions, spending, inflation) is un
     schedules move to "maximum allowed" only with `irasToMax` (off by default), because "maximum
     allowed" contributes nothing while IRA limits are unverified (§1.7).
   - D Market downturn: `marketShock` starting `startYear` (default: the first year everyone is
-    retired). The total drawdown is `severity` (default −30%), spread geometrically over
+    retired; never before the current year, so for a retired household it is year 1, and an entered
+    earlier year moves up to the current year). The total drawdown is `severity` (default −30%), spread geometrically over
     `durationYears` (default 1): each year's return is `(1+severity)^{1/n} − 1`. It is deterministic
     and reproducible (tested).
   - E Delayed retirement: every retirement age +`years` (3–5, default 3), capped at the planning age.
-  - F Reduced spending: retirement spending and spending steps −`cut` (default 10%). Current
-    (working-years) spending is unchanged.
+  - F Reduced spending: retirement spending and spending steps −`cut` (default 10%), rounded half to
+    even to the cent (§1.3). Current (working-years) spending is unchanged.
   - G Roth strategy: all workplace deferrals (salary and bonus) moved to Roth where the plan offers
     Roth with a Roth account.
+- **Drift** (`presetDrift`): presets B, C, E, F and G store the values computed on the base at
+  creation (for example F stores the cut amount). When rebuilding the preset from its `presetParams`
+  on the current base gives different ops, the scenario has drifted; the UI says so and offers to
+  rebuild it. Editing a preset's ops makes it a custom scenario.
+- `marketShockTotal(returns) = Π(1 + r) − 1`, the severity of a shock sequence (shown by the UI).
 - **Comparison** (`compareScenarios`): for the base and each scenario, the dashboard
   (baseline, optimistic and pessimistic runs), orphaned ops and issues.
   - **After-tax ending balance** (for G): real ending balance minus an assumed liquidation tax on
@@ -675,14 +687,22 @@ confidence intervals. Everything else (contributions, spending, inflation) is un
     `real.portfolioEnd − (taxDeferred_end / P_T) × marginalRate_T`. The marginal rate is the
     model's own computed rate; this is the documented marginal-rate assumption.
   - The after-tax figure is null while taxes are unverified (never estimated).
-  - Funding success is the deterministic criterion (§4.1) until M6.
+  - Funding success is the deterministic criterion (§4.1); a Monte Carlo success rate is added in M6.
 - **Optimizer** (`optimizeRetirementAge`, deterministic criterion):
-  - evaluates every age in the range, setting the first person's retirement age and shifting
-    everyone else by the same number of years (salary stop ages cleared);
+  - evaluates every age in the range, setting the first person's retirement age and shifting every
+    other person not yet retired by the same number of years (salary stop ages cleared for those
+    who move; a retired partner stays retired);
+  - is `invalid` when the first person is already retired, or when the range starts below their
+    current age;
   - reports the earliest age whose baseline succeeds, or null;
   - candidates that fail validation (for example past a planning age) are skipped.
-  - Tests check the result against an independent brute-force scan. The Monte Carlo criterion arrives
-    in M6.
+  - Tests check the result against an independent brute-force scan.
+  - **Monte Carlo criterion (M6):** an age succeeds when the success rate (§11) over the quick-run
+    paths `0 … quickRunPaths − 1` is at least `minSuccessRate`. The same paths are used for every
+    age (common random numbers), so differences between ages are not sampling noise between seeds.
+    Tested against running each candidate directly.
+- **Monte Carlo in the comparison (M6):** the UI applies each scenario (`applyScenario`) and runs
+  the same Monte Carlo (same seed and paths) on each resulting household.
 
 ## 11. Monte Carlo [M6]
 - PRNG:
@@ -699,9 +719,28 @@ confidence intervals. Everything else (contributions, spending, inflation) is un
   volatility (documented). Glide paths are unsupported.
 - Stochastic inflation: `ln(1+i) ~ N(ln(1+median), σ_i²)`, correlated with the assets. Each path has
   its own deflator.
+- **Median per account and year:** the return the deterministic baseline applies to that account in
+  that year (its expected return for the phase, or a market-shock return), so `ln(1+R) ~
+  N(ln(1+g_{a,t}), σ_a²)` and with zero volatility every path equals the baseline (tested).
+- **Shocks:** each year draws one standard normal per asset class (plus one for inflation when it is
+  stochastic), correlated through the Cholesky factor; account `a`'s log-return shock is
+  `Σ_k w_{a,k} σ_k e_k`, whose variance is `wᵀΣw`. An account without an allocation moves with the
+  stock shock at `blendedVolatility` (simplification).
 - Each path reuses the projection core (withdrawals, gross-up and taxes) through
-  `ProjectionOptions.returnOverride` / `inflationOverride`. Any performance simplification will be
-  listed here.
+  `ProjectionOptions.returnOverride` / `inflationOverride`, on the annual model (monthly mode is
+  deterministic only).
+- **Stochastic inflation** drives each path's deflator, spending, Social Security COLA and
+  inflation-linked pensions. **Simplification:** salaries (inflation-based raises) and the indexing
+  of tax-year rule values use the inflation assumption, not the path's inflation.
+- **Performance (no change to results):** a run shares its return-independent work across paths
+  (validated household, rule resolution, each year's accumulation slice for identical inputs), and
+  message text is built without locale formatting. Measured in `bench/results/montecarlo.json`.
+- **Sequence-of-returns illustration** (`sequenceRiskIllustration`): from the first retirement year,
+  each account's baseline return plus the deviations −20%, −12%, −6%, +2%, +8%, +12%, +16% (sum 0,
+  so the same arithmetic average), in that order and reversed, each through the full projection.
+- **Allocation view (c)** (`allocationByAssetClass`): each account's year-end balance split by its
+  target allocation (annual rebalancing keeps it at target); accounts without an allocation are
+  shown as "no allocation".
 - Success: no depletion before planning age and ending real balance ≥ minimum.
 - Model limits: no fat tails, no mean reversion, no regime changes; returns are independent across
   years.

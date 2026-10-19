@@ -73,9 +73,21 @@ function gainsFor(input: SolverInput, byAccount: Map<string, number>): number {
   return gains;
 }
 
-function allocate(input: SolverInput, gross: number): Map<string, number> {
-  const caps = new Map(input.accounts.map((a) => [a.id, a.cap]));
-  const list = input.accounts.map((a) => ({ id: a.id, category: a.category }));
+/** Account caps and categories, built once per solve (the iteration only changes the gross amount). */
+interface AllocationInput {
+  caps: Map<string, number>;
+  list: { id: string; category: SolverInput['accounts'][number]['category'] }[];
+}
+
+function allocationInput(input: SolverInput): AllocationInput {
+  return {
+    caps: new Map(input.accounts.map((a) => [a.id, a.cap])),
+    list: input.accounts.map((a) => ({ id: a.id, category: a.category })),
+  };
+}
+
+function allocate(input: SolverInput, gross: number, prepared: AllocationInput): Map<string, number> {
+  const { caps, list } = prepared;
   if (input.traditionalFirstUpTo === null) return allocateWithdrawals(gross, list, caps, input.order).byAccount;
   // Bracket fill: traditional first up to the bracket room, then the rest in the given order.
   const first = allocateWithdrawals(Math.min(gross, input.traditionalFirstUpTo), list, caps, [['traditional']]);
@@ -126,8 +138,9 @@ export function solveWithdrawals(
   rules: ResolvedYearRules,
 ): { status: 'ok'; value: SolverResult } | { status: 'unverified'; missing: UnverifiedDetail[] } {
   const totalCap = input.accounts.reduce((s, a) => s + Math.max(0, a.cap), 0);
+  const prepared = allocationInput(input);
   const evaluate = (gross: number) => {
-    const byAccount = allocate(input, Math.min(Math.max(0, gross), totalCap));
+    const byAccount = allocate(input, Math.min(Math.max(0, gross), totalCap), prepared);
     const tax = taxFor(input, byAccount, rules);
     return { byAccount, tax };
   };

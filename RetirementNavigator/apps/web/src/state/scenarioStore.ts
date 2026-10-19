@@ -7,7 +7,15 @@
  * `removeForProfile` when a profile is deleted (a profile's scenarios go with it).
  */
 import { create } from 'zustand';
-import { ScenarioSchema, type Scenario, type ScenarioDoc, type ScenarioOp } from '@rn/engine';
+import {
+  CURRENT_SCHEMA_VERSION,
+  presetScenario,
+  ScenarioSchema,
+  type Household,
+  type Scenario,
+  type ScenarioDoc,
+  type ScenarioOp,
+} from '@rn/engine';
 import type { DocumentRepository } from '@/storage/repository';
 import { newId } from '@/lib/ids';
 
@@ -21,8 +29,16 @@ export interface ScenarioState {
   init: (repo: DocumentRepository) => Promise<void>;
   /** Validate and save a new scenario (a fresh id is assigned when the given one is taken). Returns its id. */
   createScenario: (scenario: Scenario) => Promise<string>;
-  /** Replace a scenario's ops (debounced save). */
-  setOps: (id: string, ops: ScenarioOp[]) => void;
+  /**
+   * Replace a scenario's ops (debounced save). With `asCustom`, a preset scenario becomes custom
+   * (`preset` null): its ops no longer match the preset, so its label and summary must not claim it.
+   */
+  setOps: (id: string, ops: ScenarioOp[], opts?: { asCustom?: boolean }) => void;
+  /**
+   * Rebuild a preset scenario's ops from its stored parameters on the current base plan (after the
+   * base changed, see `presetDrift`), with `currentYear` updated. No effect on a custom scenario.
+   */
+  rebuildPreset: (id: string, base: Household, currentYear: number) => void;
   renameScenario: (id: string, name: string) => void;
   duplicateScenario: (id: string) => Promise<string | null>;
   deleteScenario: (id: string) => Promise<void>;
@@ -59,7 +75,7 @@ function schedule(id: string, task: () => Promise<unknown>) {
 const now = () => new Date().toISOString();
 
 function toDoc(scenario: Scenario): ScenarioDoc {
-  return { kind: 'scenario', schemaVersion: 1, id: scenario.id, updatedAt: now(), scenario };
+  return { kind: 'scenario', schemaVersion: CURRENT_SCHEMA_VERSION, id: scenario.id, updatedAt: now(), scenario };
 }
 
 export const useScenarioStore = create<ScenarioState>((set, get) => {
@@ -83,8 +99,12 @@ export const useScenarioStore = create<ScenarioState>((set, get) => {
     invalidDocuments: 0,
 
     init: async (repo) => {
+      // Write pending edits to the repository they were made against before switching.
+      // A failed write (for example a closed database) must not block loading the new one.
+      await get()
+        .flush()
+        .catch(() => undefined);
       repository = repo;
-      for (const id of [...timers.keys()]) cancel(id);
       const results = await repo.list('scenario');
       const valid: Record<string, ScenarioDoc> = {};
       let invalid = 0;
@@ -105,7 +125,20 @@ export const useScenarioStore = create<ScenarioState>((set, get) => {
       return doc.id;
     },
 
-    setOps: (id, ops) => update(id, (s) => ({ ...s, ops })),
+    setOps: (id, ops, opts = {}) =>
+      update(id, (s) => (opts.asCustom ? { ...s, ops, preset: null, presetParams: {} } : { ...s, ops })),
+
+    rebuildPreset: (id, base, currentYear) =>
+      update(id, (s) => {
+        if (s.preset === null) return s;
+        const rebuilt = presetScenario(
+          s.preset,
+          base,
+          { ...s.presetParams, currentYear },
+          { scenarioId: s.id, name: s.name, baseProfileId: s.baseProfileId },
+        );
+        return { ...s, ops: rebuilt.ops, presetParams: rebuilt.presetParams };
+      }),
 
     renameScenario: (id, name) => {
       const trimmed = name.trim();

@@ -1,0 +1,31 @@
+{
+  "measuredOn": {
+    "cpu": "Intel(R) Xeon(R) Processor @ 2.10GHz",
+    "cores": 4,
+    "node": "v22.22.0"
+  },
+  "target": "10,000 paths × 60 years < 3 s (laptop), < 10 s (phone)",
+  "note": "Single Node thread; the app divides paths across up to 4 Web Workers (projected wall time = full ÷ 4 + summarize, not a measurement).",
+  "results": [
+    {
+      "rules": "bundled (unverified; before taxes)",
+      "years": 60,
+      "quickRun1000Ms": 1270,
+      "full10000Ms": 8658,
+      "summarizeMs": 140,
+      "msPerPath": 0.866,
+      "projectedWallMs4Workers": 2305,
+      "successRate": 0.3541
+    },
+    {
+      "rules": "synthetic fixture (verified path; taxes and gross-up)",
+      "years": 60,
+      "quickRun1000Ms": 1352,
+      "full10000Ms": 13160,
+      "summarizeMs": 124,
+      "msPerPath": 1.316,
+      "projectedWallMs4Workers": 3415,
+      "successRate": 0.2605
+    }
+  ]
+}

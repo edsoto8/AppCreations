@@ -10,10 +10,11 @@ import {
   YAxis,
   type TooltipContentProps,
 } from 'recharts';
-import { Loader2, Play } from 'lucide-react';
+import { HeartPulse, Info, Loader2, Play } from 'lucide-react';
 import {
   applyScenario,
   optimizeRetirementAge,
+  projectHousehold,
   type EngineContext,
   type Household,
   type OptimizerResult,
@@ -27,10 +28,17 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Field } from '@/components/form/Field';
 import { IntegerInput } from '@/components/form/inputs';
 import { formatCents } from '@/lib/format';
+import { BeforeLimitsBadge } from '@/features/dashboard/badges';
 import { DataTableDisclosure } from '@/features/dashboard/DataTableDisclosure';
 import { AXIS_TICK, markerLabel } from '@/features/dashboard/chartUtils';
-import { formatCompactCents } from '@/features/dashboard/viewModel';
-import { defaultOptimizerRange, optimizerBounds } from './compareModel';
+import { beforeLimits, formatCompactCents } from '@/features/dashboard/viewModel';
+import {
+  defaultOptimizerRange,
+  MEDICARE_AGE,
+  OPTIMIZER_HEALTHCARE_NOTE,
+  optimizerBlockedReason,
+  optimizerBounds,
+} from './compareModel';
 
 export const OPTIMIZER_CRITERION =
   'Criterion: no depletion before the planning age and at least the minimum ending balance, in the deterministic baseline run. A Monte Carlo option arrives with Monte Carlo (M6).';
@@ -56,6 +64,8 @@ interface Run {
   fromAge: number;
   toAge: number;
   result: ReturnType<typeof optimizeRetirementAge>;
+  /** The plan's forecast uses contributions as elected (limits unverified, docs §1.7). */
+  beforeLimits: boolean;
 }
 
 /**
@@ -82,22 +92,27 @@ export function RetirementAgeOptimizer({
   const selectId = useId();
   const first = (target ?? household).people[0];
   const multi = household.people.length > 1;
-  const rangeError =
-    range.fromAge > range.toAge
+  const blocked = target ? optimizerBlockedReason(target, ctx.currentYear) : null;
+  const rangeError = blocked
+    ? null
+    : range.fromAge > range.toAge
       ? 'The first age must not be after the last age'
       : range.fromAge < bounds.min || range.toAge > bounds.max
         ? `Ages must be between ${bounds.min} (today) and ${bounds.max} (planning age)`
         : null;
 
   const start = () => {
-    if (!target || rangeError) return;
+    if (!target || rangeError || blocked) return;
     const fromAge = range.fromAge;
     const toAge = range.toAge;
     setRunning(true);
     // Let the "Running…" state paint before the synchronous scan.
     setTimeout(() => {
       const result = optimizeRetirementAge(target, ctx, { kind: 'deterministic' }, { fromAge, toAge });
-      setRun({ household: target, fromAge, toAge, result });
+      // Which rule-dependent steps are left out depends on the plan's rules, not on the scanned age.
+      const projection = projectHousehold(target, ctx);
+      const limits = projection.status === 'ok' && beforeLimits(projection.value);
+      setRun({ household: target, fromAge, toAge, result, beforeLimits: limits });
       setRunning(false);
     }, 0);
   };
@@ -105,6 +120,12 @@ export function RetirementAgeOptimizer({
   const value = run?.result.status === 'ok' ? run.result.value : null;
   const stale = run !== null && run.household !== target;
   const skipped = value && run ? run.toAge - run.fromAge + 1 - value.evaluated.length : 0;
+  const limits = run?.beforeLimits ?? false;
+  // Brief §1: retiring before Medicare age carries the healthcare note.
+  const early =
+    value !== null &&
+    (value.evaluated.some((e) => e.age < MEDICARE_AGE) ||
+      (value.earliestAge !== null && value.earliestAge < MEDICARE_AGE));
 
   return (
     <Card aria-labelledby="optimizer-title">
@@ -118,6 +139,11 @@ export function RetirementAgeOptimizer({
           and reports the earliest one that meets the criterion.
         </CardDescription>
         <p className="text-sm text-muted-foreground">{OPTIMIZER_CRITERION}</p>
+        {limits ? (
+          <div className="flex flex-wrap gap-1.5">
+            <BeforeLimitsBadge />
+          </div>
+        ) : null}
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
         <form
@@ -151,7 +177,7 @@ export function RetirementAgeOptimizer({
               <IntegerInput {...a} value={range.toAge} onChange={(toAge) => setRange((r) => ({ ...r, toAge }))} />
             )}
           </Field>
-          <Button type="submit" disabled={running || !target || rangeError !== null}>
+          <Button type="submit" disabled={running || !target || rangeError !== null || blocked !== null}>
             {running ? <Loader2 aria-hidden="true" className="animate-spin" /> : <Play aria-hidden="true" />}
             {running ? 'Running…' : 'Find earliest age'}
           </Button>
@@ -159,10 +185,22 @@ export function RetirementAgeOptimizer({
         {scenario && !target ? (
           <p className="text-sm text-destructive">This scenario cannot run, so it cannot be scanned.</p>
         ) : null}
+        {blocked ? (
+          <Alert aria-label="Optimizer unavailable">
+            <Info aria-hidden="true" />
+            <p>{blocked} Choose another plan, or change the retirement age in the base plan.</p>
+          </Alert>
+        ) : null}
 
         <div role="status" aria-live="polite" className="flex flex-col gap-3">
           {run && run.result.status === 'invalid' ? (
-            <Alert variant="destructive">{run.result.issues.map((i) => i.message).join(' ')}</Alert>
+            <Alert variant="destructive" aria-label="The scan could not run">
+              <ul className="flex flex-col gap-1">
+                {run.result.issues.map((issue, i) => (
+                  <li key={i}>{issue.message}.</li>
+                ))}
+              </ul>
+            </Alert>
           ) : null}
           {value && run ? (
             <>
@@ -173,6 +211,12 @@ export function RetirementAgeOptimizer({
               </p>
               {stale ? (
                 <p className="text-sm text-attention">The plan changed since this scan. Run it again to update.</p>
+              ) : null}
+              {early ? (
+                <Alert variant="attention" aria-label="Healthcare before Medicare">
+                  <HeartPulse aria-hidden="true" />
+                  <p>{OPTIMIZER_HEALTHCARE_NOTE}</p>
+                </Alert>
               ) : null}
               {skipped > 0 ? (
                 <p className="text-sm text-muted-foreground">
@@ -187,9 +231,10 @@ export function RetirementAgeOptimizer({
         {value && value.evaluated.length > 0 ? (
           <>
             <figure className="flex flex-col gap-2">
-              <figcaption className="text-xs font-medium text-muted-foreground">
+              <figcaption className="flex flex-wrap items-center gap-1.5 text-xs font-medium text-muted-foreground">
                 Ending balance (today’s dollars) by retirement age. Filled bars meet the criterion; outlined bars do
                 not.
+                {limits ? <BeforeLimitsBadge /> : null}
               </figcaption>
               <ul className="flex flex-wrap gap-x-4 gap-y-1 text-xs" aria-label="Legend">
                 <li className="flex items-center gap-1.5">
@@ -209,7 +254,7 @@ export function RetirementAgeOptimizer({
                 style={CHART_STYLE}
                 data={value.evaluated}
                 margin={{ top: 20, right: 12, bottom: 4, left: 4 }}
-                title="Ending balance in today’s dollars by retirement age"
+                title={`Ending balance in today’s dollars by retirement age${limits ? ', before plan limits (unverified)' : ''}`}
                 desc="One bar per evaluated retirement age. A data table follows the chart."
               >
                 <CartesianGrid stroke="var(--chart-grid)" vertical={false} />
@@ -245,12 +290,20 @@ export function RetirementAgeOptimizer({
               <p className="text-center text-xs text-muted-foreground">Retirement age</p>
             </figure>
             <DataTableDisclosure label="retirement age data table">
-              <Table label="Retirement ages evaluated">
+              <Table label={`Retirement ages evaluated${limits ? ', before plan limits (unverified)' : ''}`}>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Retirement age</TableHead>
                     <TableHead>Meets the criterion</TableHead>
-                    <TableHead className="text-right">Ending balance (today’s dollars)</TableHead>
+                    <TableHead className="text-right">
+                      Ending balance (today’s dollars)
+                      {limits ? (
+                        <>
+                          <span aria-hidden="true">*</span>
+                          <span className="sr-only"> (before plan limits, unverified)</span>
+                        </>
+                      ) : null}
+                    </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -263,6 +316,11 @@ export function RetirementAgeOptimizer({
                   ))}
                 </TableBody>
               </Table>
+              {limits ? (
+                <p className="text-xs text-muted-foreground">
+                  * Contributions as elected, before plan limits (unverified).
+                </p>
+              ) : null}
             </DataTableDisclosure>
           </>
         ) : null}

@@ -1,0 +1,356 @@
+{
+  "format": "retirement-navigator-export",
+  "schemaVersion": 1,
+  "exportedAt": "2026-10-19T12:00:00.000Z",
+  "profiles": [
+    {
+      "kind": "profile",
+      "schemaVersion": 1,
+      "id": "sample-mid-career-couple",
+      "updatedAt": "2026-10-19T12:00:00.000Z",
+      "household": {
+        "id": "sample-mid-career-couple",
+        "name": "Mid-career couple (sample)",
+        "filingStatus": "marriedFilingJointly",
+        "stateCode": null,
+        "people": [
+          {
+            "id": "sam",
+            "name": "Sam",
+            "birthYear": 1984,
+            "birthMonth": 1,
+            "retirementAge": 65,
+            "planningAge": 92,
+            "employment": {
+              "baseSalary": 11800000,
+              "bonus": {
+                "kind": "percentOfSalary",
+                "pct": 0.08
+              },
+              "bonusGrowth": {
+                "mode": "withSalary"
+              },
+              "bonusCountsForDeferrals": true,
+              "bonusCountsForMatch": true,
+              "raise": {
+                "mode": "nominal",
+                "rate": 0.03
+              },
+              "raiseOverrides": [],
+              "stopAge": null,
+              "partTime": null,
+              "priorYearFicaWages": null
+            },
+            "workplacePlans": [
+              {
+                "id": "sam-plan",
+                "planType": "401k",
+                "traditionalAccountId": "sam-401k",
+                "rothAccountId": null,
+                "planOffersRoth": false,
+                "traditionalPctOfSalary": 0.08,
+                "rothPctOfSalary": 0,
+                "traditionalPctOfBonus": 0.08,
+                "rothPctOfBonus": 0,
+                "autoEscalation": null,
+                "match": {
+                  "tiers": [
+                    {
+                      "matchRate": 1,
+                      "bandPctOfPay": 0.03
+                    },
+                    {
+                      "matchRate": 0.5,
+                      "bandPctOfPay": 0.02
+                    }
+                  ],
+                  "flatPctOfPay": 0,
+                  "annualMatchCap": null,
+                  "vesting": {
+                    "kind": "immediate"
+                  },
+                  "yearsOfServiceAtStart": 0
+                },
+                "matchDestination": "traditional"
+              }
+            ],
+            "socialSecurity": {
+              "source": {
+                "kind": "none"
+              },
+              "claimAge": {
+                "years": 67,
+                "months": 0
+              }
+            }
+          },
+          {
+            "id": "jordan",
+            "name": "Jordan",
+            "birthYear": 1986,
+            "birthMonth": 1,
+            "retirementAge": 63,
+            "planningAge": 96,
+            "employment": {
+              "baseSalary": 8400000,
+              "bonus": {
+                "kind": "none"
+              },
+              "bonusGrowth": {
+                "mode": "withSalary"
+              },
+              "bonusCountsForDeferrals": true,
+              "bonusCountsForMatch": true,
+              "raise": {
+                "mode": "nominal",
+                "rate": 0.03
+              },
+              "raiseOverrides": [],
+              "stopAge": null,
+              "partTime": null,
+              "priorYearFicaWages": null
+            },
+            "workplacePlans": [
+              {
+                "id": "jordan-plan",
+                "planType": "403b",
+                "traditionalAccountId": "jordan-403b",
+                "rothAccountId": null,
+                "planOffersRoth": false,
+                "traditionalPctOfSalary": 0.06,
+                "rothPctOfSalary": 0,
+                "traditionalPctOfBonus": 0,
+                "rothPctOfBonus": 0,
+                "autoEscalation": null,
+                "match": {
+                  "tiers": [
+                    {
+                      "matchRate": 0.5,
+                      "bandPctOfPay": 0.06
+                    }
+                  ],
+                  "flatPctOfPay": 0,
+                  "annualMatchCap": null,
+                  "vesting": {
+                    "kind": "immediate"
+                  },
+                  "yearsOfServiceAtStart": 0
+                },
+                "matchDestination": "traditional"
+              }
+            ],
+            "socialSecurity": {
+              "source": {
+                "kind": "none"
+              },
+              "claimAge": {
+                "years": 67,
+                "months": 0
+              }
+            }
+          }
+        ],
+        "accounts": [
+          {
+            "id": "sam-401k",
+            "name": "Sam 401(k)",
+            "ownerId": "sam",
+            "balance": 18500000,
+            "expectedReturn": null,
+            "expenseRatio": 0,
+            "allocation": null,
+            "type": "workplaceTraditional",
+            "planType": "401k",
+            "unvestedEmployerBalance": 0
+          },
+          {
+            "id": "jordan-403b",
+            "name": "Jordan 403(b)",
+            "ownerId": "jordan",
+            "balance": 9600000,
+            "expectedReturn": null,
+            "expenseRatio": 0,
+            "allocation": null,
+            "type": "workplaceTraditional",
+            "planType": "403b",
+            "unvestedEmployerBalance": 0
+          },
+          {
+            "id": "jordan-roth",
+            "name": "Jordan Roth IRA",
+            "ownerId": "jordan",
+            "balance": 4100000,
+            "expectedReturn": null,
+            "expenseRatio": 0,
+            "allocation": null,
+            "type": "rothIra",
+            "contribution": {
+              "amount": {
+                "kind": "dollars",
+                "amount": 25000,
+                "frequency": "monthly"
+              },
+              "growth": {
+                "mode": "flat"
+              },
+              "startYear": null,
+              "stopYear": null
+            },
+            "contributionBasis": 3000000,
+            "firstContributionYear": null,
+            "magiOverride": null
+          },
+          {
+            "id": "joint-brokerage",
+            "name": "Joint brokerage",
+            "ownerId": "sam",
+            "balance": 5200000,
+            "expectedReturn": null,
+            "expenseRatio": 0,
+            "allocation": null,
+            "type": "taxableBrokerage",
+            "contribution": null,
+            "costBasis": 3800000
+          },
+          {
+            "id": "sam-hsa",
+            "name": "Family HSA",
+            "ownerId": "sam",
+            "balance": 1400000,
+            "expectedReturn": null,
+            "expenseRatio": 0,
+            "allocation": null,
+            "type": "hsa",
+            "contribution": {
+              "amount": {
+                "kind": "dollars",
+                "amount": 500000,
+                "frequency": "annual"
+              },
+              "growth": {
+                "mode": "flat"
+              },
+              "startYear": null,
+              "stopYear": null
+            },
+            "coverage": "family",
+            "hdhpAttested": true
+          }
+        ],
+        "otherIncome": [],
+        "pensions": [],
+        "oneTimeEvents": [],
+        "spending": {
+          "currentAnnualSpending": 11000000,
+          "retirementAnnualSpending": 9500000,
+          "steps": [],
+          "retirementRealGlide": 0,
+          "healthcareBeforeMedicare": 0,
+          "survivorSpendingReduction": 0.2,
+          "hsaQualifiedMedicalExpenses": 0
+        },
+        "assumptions": {
+          "inflation": 0.025,
+          "returnPreRetirement": 0.06,
+          "returnPostRetirement": 0.05,
+          "capitalMarket": {
+            "stocks": {
+              "geometricReturn": 0.07,
+              "volatility": 0.16
+            },
+            "bonds": {
+              "geometricReturn": 0.045,
+              "volatility": 0.06
+            },
+            "cash": {
+              "geometricReturn": 0.03,
+              "volatility": 0.01
+            },
+            "correlation": [
+              [1, 0.1, 0],
+              [0.1, 1, 0.2],
+              [0, 0.2, 1]
+            ],
+            "blendedVolatility": 0.12,
+            "note": "Illustrative round-number assumptions chosen by the app authors; not a forecast."
+          },
+          "deterministicOffsets": {
+            "optimistic": 0.02,
+            "pessimistic": -0.02
+          },
+          "withdrawalTiming": "midYear",
+          "granularity": "annual",
+          "stateTaxRate": 0.045,
+          "taxableAccountTaxDrag": 0,
+          "rules": {
+            "anchorYear": 2026,
+            "indexing": {
+              "mode": "inflation"
+            },
+            "postSunsetLaw": "asWritten"
+          },
+          "socialSecurity": {
+            "cola": {
+              "mode": "inflation"
+            },
+            "benefitReduction": null
+          },
+          "withdrawalStrategy": "taxableFirst",
+          "bracketFillTopRate": null,
+          "surplus": {
+            "mode": "spent"
+          },
+          "minimumEndingBalance": 0,
+          "marketShock": null,
+          "grossUp": {
+            "maxIterations": 50,
+            "toleranceCents": 100
+          }
+        }
+      }
+    }
+  ],
+  "scenarios": [
+    {
+      "kind": "scenario",
+      "schemaVersion": 1,
+      "id": "scenario-v1",
+      "updatedAt": "2026-10-19T12:00:00.000Z",
+      "scenario": {
+        "id": "scenario-v1",
+        "name": "Retire 3 years earlier",
+        "baseProfileId": "sample-mid-career-couple",
+        "preset": "B_earlyRetirement",
+        "presetParams": {
+          "currentYear": 2026,
+          "years": 3
+        },
+        "ops": [
+          {
+            "op": "set",
+            "collection": "people",
+            "id": "sam",
+            "path": ["retirementAge"],
+            "value": 62
+          },
+          {
+            "op": "set",
+            "collection": "people",
+            "id": "jordan",
+            "path": ["retirementAge"],
+            "value": 60
+          }
+        ]
+      }
+    }
+  ],
+  "settings": {
+    "kind": "settings",
+    "schemaVersion": 1,
+    "id": "settings",
+    "updatedAt": "2026-10-19T12:00:00.000Z",
+    "dollarBasis": "todays",
+    "activeProfileId": "sample-mid-career-couple",
+    "onboardingComplete": true
+  }
+}

@@ -5,7 +5,9 @@ import { MemoryRouter } from 'react-router';
 import {
   compareScenarios,
   optimizeRetirementAge,
+  presetDrift,
   presetScenario,
+  projectHousehold,
   RULES,
   SAMPLE_PROFILES,
   type Household,
@@ -18,7 +20,9 @@ import { setupProfile } from '@/test/renderWithProfile';
 import { useProfileStore } from '@/state/profileStore';
 import { scenariosOf, useScenarioStore } from '@/state/scenarioStore';
 import { ScenariosPage } from './ScenariosPage';
-import { defaultOptimizerRange, longevityText, READINESS_LABELS } from './compareModel';
+import { beforeLimits, forecastNotes } from '@/features/dashboard/viewModel';
+import { defaultOptimizerRange, longevityText, OPTIMIZER_HEALTHCARE_NOTE, READINESS_LABELS } from './compareModel';
+import { shockParams } from './scenarioModel';
 
 const ctx = { currentYear: CURRENT_YEAR, rules: RULES };
 const couple = () => SAMPLE_PROFILES.find((p) => p.id === 'midCareerCouple')!.build(CURRENT_YEAR);
@@ -281,7 +285,9 @@ describe('ScenariosPage', () => {
         ops: [{ op: 'set', collection: 'people', id: 'sam', path: ['planningAge'], value: 130 }],
       } as unknown as Scenario,
     ]);
-    expect(screen.getByRole('note', { name: 'Scenario cannot run' })).toBeInTheDocument();
+    const note = screen.getByRole('note', { name: 'Scenario cannot run' });
+    // The issue path is named in words (person and field), not as "people › 0 › planningAge".
+    expect(within(note).getByText(/^Sam › Planning age: /)).toBeInTheDocument();
     await waitFor(() =>
       expect(screen.getByText(/“Too old” cannot run: its changes make the plan invalid/)).toBeInTheDocument(),
     );
@@ -310,7 +316,7 @@ describe('ScenariosPage', () => {
       { timeout: 10_000 },
     );
     await user.click(screen.getByRole('button', { name: /Show retirement age data table/ }));
-    const table = screen.getByRole('region', { name: 'Retirement ages evaluated' });
+    const table = screen.getByRole('region', { name: /^Retirement ages evaluated/ });
     const rows = within(table).getAllByRole('row').slice(1);
     expect(
       rows.map((r) =>
@@ -319,6 +325,22 @@ describe('ScenariosPage', () => {
           .map((c) => c.textContent),
       ),
     ).toEqual(evaluated.map((e) => [String(e.age), e.success ? 'Yes' : 'No', formatCents(e.endingBalanceReal)]));
+
+    // Ages before 65 were scanned, so the pre-Medicare healthcare note is shown with the result.
+    expect(evaluated.some((e) => e.age < 65)).toBe(true);
+    expect(screen.getByRole('note', { name: 'Healthcare before Medicare' })).toHaveTextContent(
+      OPTIMIZER_HEALTHCARE_NOTE,
+    );
+    // While limits are unverified, the chart and table are labeled before plan limits.
+    const projection = projectHousehold(base, ctx);
+    if (projection.status !== 'ok') throw new Error(projection.status);
+    expect(beforeLimits(projection.value)).toBe(true);
+    expect(table).toHaveAccessibleName('Retirement ages evaluated, before plan limits (unverified)');
+    expect(
+      within(table).getByRole('columnheader', { name: /^Ending balance.*\(before plan limits, unverified\)$/ }),
+    ).toBeVisible();
+    const optimizer = screen.getByRole('region', { name: 'Earliest retirement age' });
+    expect(within(optimizer).getAllByText('Before plan limits (unverified)').length).toBeGreaterThanOrEqual(2);
   }, 20_000);
 
   it('rejects an optimizer range outside valid ages', async () => {
@@ -367,5 +389,274 @@ describe('ScenariosPage', () => {
       within(screen.getByRole('dialog', { name: 'Delete this scenario?' })).getByRole('button', { name: 'Delete' }),
     );
     await waitFor(() => expect(storedScenarios(profileId).map((s) => s.name)).not.toContain('Three'));
+  });
+});
+
+const editBase = (change: (h: Household) => Household) =>
+  act(() => useProfileStore.getState().updateActiveHousehold(change(activeHousehold())));
+
+describe('ScenariosPage review fixes', () => {
+  it('shows each outcome’s forecast notes, including the pre-Medicare healthcare note, labeled by plan', async () => {
+    const { profileId } = await renderPage((base, profileId) => [
+      presetScenario(
+        'B_earlyRetirement',
+        base,
+        { years: 5, currentYear: CURRENT_YEAR },
+        { scenarioId: 'scenario-b', name: 'Retire early', baseProfileId: profileId },
+      ),
+    ]);
+    const outcomes = compareScenarios(activeHousehold(), storedScenarios(profileId), ctx);
+    const early = outcomes[1]!;
+    const expected = forecastNotes(early.dashboard!.baseline);
+    expect(early.dashboard!.baseline.warnings.map((w) => w.code)).toContain('healthcarePreMedicareUserEntered');
+    const notes = await screen.findByRole('list', { name: 'Forecast notes for Retire early' });
+    expect(
+      within(notes)
+        .getAllByRole('listitem')
+        .map((li) => li.textContent),
+    ).toEqual(expected);
+    expect(within(notes).getByText(/retire before 65\. Healthcare before Medicare/)).toBeVisible();
+    // The base plan's own notes are listed under its name.
+    const baseNotes = forecastNotes(outcomes[0]!.dashboard!.baseline);
+    if (baseNotes.length > 0) {
+      expect(
+        within(screen.getByRole('list', { name: 'Forecast notes for Base plan' }))
+          .getAllByRole('listitem')
+          .map((li) => li.textContent),
+      ).toEqual(baseNotes);
+    }
+  });
+
+  it('labels every balance-derived comparison row, the chart and its data table as before plan limits', async () => {
+    const { user, profileId } = await renderPage((base, profileId) => [
+      presetScenario(
+        'F_reducedSpending',
+        base,
+        { cut: 0.1, currentYear: CURRENT_YEAR },
+        { scenarioId: 'scenario-f', name: 'Spend less', baseProfileId: profileId },
+      ),
+    ]);
+    const outcomes = compareScenarios(activeHousehold(), storedScenarios(profileId), ctx);
+    expect(outcomes.some((o) => beforeLimits(o.dashboard!.baseline))).toBe(true);
+    await waitFor(() => expect(rowCells(/^Ending balance/)).toHaveLength(2));
+    for (const label of [
+      /^Savings at retirement/,
+      /^Monthly retirement income/,
+      /^Ending balance/,
+      /^Portfolio longevity/,
+      /^Funding success/,
+      /^Readiness/,
+      /^After-tax ending balance/,
+    ]) {
+      const header = within(compareTable()).getByRole('rowheader', { name: label });
+      expect(header).toHaveAccessibleName(/\(before plan limits, unverified\)$/);
+    }
+    expect(within(compareTable()).getByRole('rowheader', { name: /^First retirement year/ })).not.toHaveAccessibleName(
+      /before plan limits/,
+    );
+    const caption = screen.getByText(/^Portfolio value at year end \(today’s dollars\) by year/);
+    expect(within(caption).getByText('Before plan limits (unverified)')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /Show comparison data table/ }));
+    const table = screen.getByRole('region', {
+      name: 'Portfolio value at year end by scenario, today’s dollars, before plan limits (unverified)',
+    });
+    // (jsdom's name computation drops the space before the screen-reader text.)
+    expect(
+      within(table).getByRole('columnheader', { name: /^Spend less\s?\(before plan limits, unverified\)$/ }),
+    ).toBeVisible();
+  });
+
+  it('flags a preset that drifted from the base plan and rebuilds it from the base plan', async () => {
+    const { user, profileId } = await renderPage((base, profileId) => [
+      presetScenario(
+        'F_reducedSpending',
+        base,
+        { cut: 0.2, currentYear: CURRENT_YEAR },
+        { scenarioId: 'scenario-f', name: 'Spend less', baseProfileId: profileId },
+      ),
+    ]);
+    expect(screen.queryByRole('note', { name: 'Preset out of date' })).not.toBeInTheDocument();
+    editBase(
+      (h) =>
+        ({
+          ...h,
+          spending: { ...h.spending, retirementAnnualSpending: h.spending.retirementAnnualSpending + 1_000_000 },
+        }) as Household,
+    );
+    const note = await screen.findByRole('note', { name: 'Preset out of date' });
+    expect(note).toHaveTextContent(
+      /The base plan changed since this preset was built; its stored values no longer match/,
+    );
+    await user.click(within(note).getByRole('button', { name: 'Rebuild from base plan: Spend less' }));
+
+    const rebuilt = storedScenarios(profileId)[0]!;
+    const expected = presetScenario(
+      'F_reducedSpending',
+      activeHousehold(),
+      { cut: 0.2, currentYear: CURRENT_YEAR },
+      { scenarioId: 'scenario-f', name: 'Spend less', baseProfileId: profileId },
+    );
+    expect(rebuilt.ops).toEqual(expected.ops);
+    expect(rebuilt.preset).toBe('F_reducedSpending');
+    expect(presetDrift(rebuilt, activeHousehold())).toBe(false);
+    await waitFor(() => expect(screen.queryByRole('note', { name: 'Preset out of date' })).not.toBeInTheDocument());
+  });
+
+  it('turns an edited preset into a custom scenario so its preset summary no longer applies', async () => {
+    const { user, profileId } = await renderPage((base, profileId) => [
+      presetScenario(
+        'F_reducedSpending',
+        base,
+        { cut: 0.1, currentYear: CURRENT_YEAR },
+        { scenarioId: 'scenario-f', name: 'Spend less', baseProfileId: profileId },
+      ),
+    ]);
+    const list = screen.getByRole('list', { name: 'Scenarios' });
+    expect(within(list).getByText(/Preset F: retirement spending −10%/)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Edit changes in Spend less' }));
+    const editor = screen.getByRole('region', { name: 'Changes in “Spend less”' });
+    expect(editor).toHaveTextContent(/Editing a preset’s changes turns it into a custom scenario/);
+    const spending = within(editor).getByLabelText('Retirement spending (per year)');
+    await user.clear(spending);
+    await user.type(spending, '50000');
+
+    const scenario = storedScenarios(profileId)[0]!;
+    expect(scenario.preset).toBeNull();
+    expect(scenario.presetParams).toEqual({});
+    expect(within(list).queryByText(/Preset F/)).not.toBeInTheDocument();
+    expect(within(list).getByText(/^Custom scenario · 2 changes$/)).toBeInTheDocument();
+  });
+
+  it('rejects a preset D start year before the current year', async () => {
+    const { user, profileId } = await renderPage();
+    await user.click(screen.getByRole('button', { name: 'New scenario' }));
+    const dialog = screen.getByRole('dialog', { name: 'New scenario' });
+    await user.selectOptions(within(dialog).getByLabelText('Start from'), 'D_marketDownturn');
+    const start = within(dialog).getByLabelText('Start year');
+    await user.clear(start);
+    await user.type(start, String(CURRENT_YEAR - 1));
+    expect(within(dialog).getByText(`Must be at least ${CURRENT_YEAR}`)).toBeInTheDocument();
+    await user.click(within(dialog).getByRole('button', { name: 'Create scenario' }));
+    expect(storedScenarios(profileId)).toHaveLength(0);
+
+    await user.clear(start);
+    await user.type(start, String(CURRENT_YEAR));
+    expect(within(dialog).queryByText(/Must be at least/)).not.toBeInTheDocument();
+    await user.click(within(dialog).getByRole('button', { name: 'Create scenario' }));
+    await waitFor(() => expect(storedScenarios(profileId)).toHaveLength(1));
+    expect(storedScenarios(profileId)[0]!.presetParams.startYear).toBe(CURRENT_YEAR);
+  });
+
+  it('range-checks the market shock override and does not save out-of-range values', async () => {
+    const { user, profileId, base } = await renderPage((_base, profileId) => [
+      {
+        id: 'scenario-c',
+        name: 'Shock',
+        baseProfileId: profileId,
+        preset: null,
+        presetParams: {},
+        ops: [],
+      } as unknown as Scenario,
+    ]);
+    await user.click(screen.getByRole('button', { name: 'Edit changes in Shock' }));
+    const editor = screen.getByRole('region', { name: 'Changes in “Shock”' });
+    await user.selectOptions(
+      within(editor).getByLabelText('Add a change'),
+      `household:${base.id}:assumptions.marketShock`,
+    );
+    await user.click(within(editor).getByRole('button', { name: 'Add change' }));
+    const saved = () => shockParams((storedScenarios(profileId)[0]!.ops[0] as { value: unknown }).value);
+    const startYear = saved()!.startYear;
+
+    const severity = within(editor).getByLabelText('Total market drop');
+    await user.clear(severity);
+    await user.type(severity, '-100');
+    expect(within(editor).getByText('Must be above -100%')).toBeInTheDocument();
+    expect(severity).toHaveAttribute('aria-invalid', 'true');
+    expect(saved()!.severity).toBe(-0.1); // the last valid entry ("-10")
+
+    await user.clear(severity);
+    await user.type(severity, '-25');
+    const duration = within(editor).getByLabelText('Duration (years)');
+    await user.clear(duration);
+    await user.type(duration, '11');
+    expect(within(editor).getByText('Must be at most 10')).toBeInTheDocument();
+    expect(saved()).toEqual({ severity: -0.25, durationYears: 1, startYear });
+
+    await user.clear(duration);
+    await user.type(duration, '2');
+    const start = within(editor).getByLabelText('Start year');
+    await user.clear(start);
+    await user.type(start, String(CURRENT_YEAR - 1));
+    expect(within(editor).getByText(`Must be at least ${CURRENT_YEAR}`)).toBeInTheDocument();
+    expect(saved()).toEqual({ severity: -0.25, durationYears: 2, startYear });
+    await user.clear(start);
+    await user.type(start, '2999');
+    expect(within(editor).getByText(/^Must be at most \d{4}$/)).toBeInTheDocument();
+    await user.clear(start);
+    await user.type(start, String(CURRENT_YEAR + 2));
+    expect(saved()).toEqual({ severity: -0.25, durationYears: 2, startYear: CURRENT_YEAR + 2 });
+  });
+
+  it('shows per-field range errors in overrides and names invalid fields in words', async () => {
+    const { user } = await renderPage((_base, profileId) => [
+      {
+        id: 'scenario-x',
+        name: 'Edit me',
+        baseProfileId: profileId,
+        preset: null,
+        presetParams: {},
+        ops: [],
+      } as unknown as Scenario,
+    ]);
+    await user.click(screen.getByRole('button', { name: 'Edit changes in Edit me' }));
+    const editor = screen.getByRole('region', { name: 'Changes in “Edit me”' });
+    await user.selectOptions(within(editor).getByLabelText('Add a change'), 'people:sam:planningAge');
+    await user.click(within(editor).getByRole('button', { name: 'Add change' }));
+    const planning = within(editor).getByLabelText('Sam: Planning age');
+    await user.clear(planning);
+    await user.type(planning, '130');
+    expect(within(editor).getByText('Must be between 0 and 120')).toBeInTheDocument();
+    const invalid = within(editor).getByRole('note', { name: 'Scenario cannot run' });
+    expect(within(invalid).getByText(/^Sam › Planning age: /)).toBeInTheDocument();
+    expect(invalid).not.toHaveTextContent('people › 0');
+
+    await user.selectOptions(within(editor).getByLabelText('Add a change'), 'people:jordan:socialSecurity.claimAge');
+    await user.click(within(editor).getByRole('button', { name: 'Add change' }));
+    const claim = within(
+      within(editor).getByRole('group', { name: 'Jordan: Social Security claiming age' }),
+    ).getByLabelText('Years');
+    await user.clear(claim);
+    await user.type(claim, '75');
+    expect(
+      within(editor).getByText('Claiming age must be between 62 and 70', { selector: 'p[role="alert"]' }),
+    ).toBeVisible();
+  });
+
+  it('disables the optimizer when the first person is already retired and explains why', async () => {
+    const retired = couple();
+    const [sam, jordan] = retired.people;
+    await setupProfile({ ...retired, people: [{ ...sam!, retirementAge: 40 }, jordan!] } as Household);
+    render(
+      <MemoryRouter initialEntries={['/scenarios']}>
+        <ScenariosPage />
+      </MemoryRouter>,
+    );
+    expect(screen.getByRole('button', { name: 'Find earliest age' })).toBeDisabled();
+    expect(screen.getByRole('note', { name: 'Optimizer unavailable' })).toHaveTextContent(
+      `Sam is already retired (retirement age 40, age 42 this year), so there is no retirement age left to scan`,
+    );
+    // The engine agrees: it refuses the scan with an issue.
+    const h = activeHousehold();
+    expect(optimizeRetirementAge(h, ctx, { kind: 'deterministic' }, { fromAge: 42, toAge: 70 }).status).toBe('invalid');
+  });
+
+  it('starts the optimizer range at the first person’s current age', async () => {
+    const { user } = await renderPage();
+    const from = screen.getByLabelText('From age');
+    await user.clear(from);
+    await user.type(from, '41');
+    expect(screen.getByText(/Ages must be between 42 \(today\)/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Find earliest age' })).toBeDisabled();
   });
 });

@@ -5,6 +5,7 @@
  * engine's `presetScenario`.
  */
 import {
+  marketShockTotal,
   presetScenario,
   type Household,
   type OrphanedOp,
@@ -27,6 +28,8 @@ export interface ParamField {
   label: string;
   kind: 'int' | 'percent' | 'switch';
   min?: number;
+  /** `min` itself is not allowed (the value must be above it). */
+  minExclusive?: boolean;
   max?: number;
   example: string;
   tip: string;
@@ -109,9 +112,10 @@ export const PRESETS: readonly PresetMeta[] = [
         key: 'severity',
         label: 'Total market drop',
         kind: 'percent',
-        min: -0.9,
+        min: -1,
+        minExclusive: true,
         max: 0,
-        example: 'For example −30%. Enter a negative number.',
+        example: 'For example −30%. Enter a negative number above −100%.',
         tip: 'The total drawdown over the shock. Over several years it is spread evenly (geometrically) across them.',
       },
       {
@@ -127,9 +131,10 @@ export const PRESETS: readonly PresetMeta[] = [
         key: 'startYear',
         label: 'Start year',
         kind: 'int',
+        // The real bounds (this year to the last plan year) depend on the plan: see `paramLimits`.
         min: 1900,
         max: 2200,
-        example: 'Defaults to the first year everyone is retired.',
+        example: 'Defaults to the first year everyone is retired (not before this year).',
         tip: 'The calendar year the shock starts.',
       },
     ],
@@ -190,15 +195,33 @@ export const PRESET_BY_ID: Record<ScenarioPreset, PresetMeta> = Object.fromEntri
   PRESETS.map((p) => [p.id, p]),
 ) as Record<ScenarioPreset, PresetMeta>;
 
-/** Range check for one preset parameter; null when valid. */
-export function paramError(field: ParamField, value: ParamValue | undefined): string | null {
+export type ParamLimits = Partial<Record<string, { min?: number; max?: number }>>;
+
+/** The last calendar year of the plan: the latest year any person reaches their planning age (§1.4). */
+export function lastPlanYear(h: Household): number {
+  return Math.max(...h.people.map((p) => p.birthYear + p.planningAge));
+}
+
+/**
+ * Plan-dependent parameter bounds: preset D's start year runs from the current year (the engine never
+ * starts a shock in the past) to the last plan year.
+ */
+export function paramLimits(base: Household, currentYear: number): ParamLimits {
+  return { startYear: { min: currentYear, max: Math.max(currentYear, lastPlanYear(base)) } };
+}
+
+/** Range check for one preset parameter (with optional plan-dependent `limits`); null when valid. */
+export function paramError(field: ParamField, value: ParamValue | undefined, limits: ParamLimits = {}): string | null {
   if (field.kind === 'switch') return null;
   if (value === undefined) return field.key === 'startYear' ? null : 'Enter a value';
   if (typeof value !== 'number' || !Number.isFinite(value)) return 'Enter a number';
   if (field.kind === 'int' && !Number.isInteger(value)) return 'Enter a whole number';
+  const min = limits[field.key]?.min ?? field.min;
+  const max = limits[field.key]?.max ?? field.max;
   const show = (v: number) => (field.kind === 'percent' ? formatPercent(v) : String(v));
-  if (field.min !== undefined && value < field.min) return `Must be at least ${show(field.min)}`;
-  if (field.max !== undefined && value > field.max) return `Must be at most ${show(field.max)}`;
+  if (min !== undefined && field.minExclusive === true && value <= min) return `Must be above ${show(min)}`;
+  if (min !== undefined && value < min) return `Must be at least ${show(min)}`;
+  if (max !== undefined && value > max) return `Must be at most ${show(max)}`;
   return null;
 }
 
@@ -393,7 +416,8 @@ export function shockParams(value: unknown): ShockParams | null {
   const v = value as { startYear?: unknown; returns?: unknown };
   if (typeof v.startYear !== 'number' || !Array.isArray(v.returns) || v.returns.length === 0) return null;
   const returns = v.returns.filter((r): r is number => typeof r === 'number');
-  const total = returns.reduce((acc, r) => acc * (1 + r), 1) - 1;
+  // Display rounding only, so a −40% shock entered as −40% reads back as −40%.
+  const total = marketShockTotal(returns);
   return { severity: Math.round(total * 1e6) / 1e6, durationYears: returns.length, startYear: v.startYear };
 }
 
@@ -534,6 +558,111 @@ export function orphanMessage(o: OrphanedOp, h: Household): string {
   return `This scenario changes something that no longer exists in the base plan: ${what}. It is not applied.`;
 }
 
-export function issueText(issue: ValidationIssue): string {
-  return `${issue.path.length > 0 ? `${issue.path.join(' › ')}: ` : ''}${issue.message}`;
+const FIELD_LABELS: Record<string, string> = {
+  ...PATH_LABELS,
+  name: 'name',
+  birthYear: 'birth year',
+  'socialSecurity.claimAge.years': 'Social Security claiming age',
+  'socialSecurity.claimAge.months': 'Social Security claiming age',
+  'employment.annualSalary': 'salary',
+  'assumptions.marketShock.startYear': 'market shock start year',
+  'assumptions.marketShock.returns': 'market shock returns',
+  balance: 'balance',
+};
+
+const capitalize = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
+
+/** Field label for the rest of an issue path (array indexes dropped), or the raw path. */
+function fieldLabel(rest: readonly (string | number)[]): string {
+  const key = rest.filter((k) => typeof k === 'string').join('.');
+  for (let n = rest.length; n > 0; n--) {
+    const prefix = rest
+      .slice(0, n)
+      .filter((k) => typeof k === 'string')
+      .join('.');
+    const label = FIELD_LABELS[prefix];
+    if (label) return label;
+  }
+  return key;
+}
+
+/**
+ * "Sam › Planning age" for an issue at ["people", 0, "planningAge"] of the scenario's household. People
+ * are indexed after the scenario's own removals (`unset` without a path), since people cannot be added.
+ */
+export function issueLabel(path: readonly (string | number)[], h: Household, scenario?: Scenario): string {
+  if (path.length === 0) return '';
+  const removed = new Set(
+    (scenario?.ops ?? []).flatMap((op) =>
+      op.op === 'unset' && op.path === null && op.collection === 'people' ? [op.id as string] : [],
+    ),
+  );
+  const people = h.people.filter((p) => !removed.has(p.id));
+  const [head, index, ...rest] = path;
+  if (head === 'people' && typeof index === 'number') {
+    const person = people[index];
+    const who = person?.name ?? `Person ${index + 1}`;
+    const [sub, planIndex, ...planRest] = rest;
+    if (sub === 'workplacePlans' && typeof planIndex === 'number') {
+      const plan = person?.workplacePlans[planIndex];
+      const planName = `${who}’s ${plan ? PLAN_TYPE_LABELS[plan.planType] : 'workplace'} plan`;
+      return planRest.length > 0 ? `${planName} › ${capitalize(fieldLabel(planRest))}` : planName;
+    }
+    return rest.length > 0 ? `${who} › ${capitalize(fieldLabel(rest))}` : who;
+  }
+  const lists: Partial<Record<string, { noun: string; items: readonly { name: string }[] }>> = {
+    accounts: { noun: 'Account', items: h.accounts },
+    otherIncome: { noun: 'Income source', items: h.otherIncome },
+    pensions: { noun: 'Pension', items: h.pensions },
+    oneTimeEvents: { noun: 'One-time event', items: h.oneTimeEvents },
+  };
+  const list = typeof head === 'string' ? lists[head] : undefined;
+  if (list && typeof index === 'number') {
+    const name = list.items[index]?.name ?? `${list.noun} ${index + 1}`;
+    return rest.length > 0 ? `${name} › ${capitalize(fieldLabel(rest))}` : name;
+  }
+  return `Household › ${capitalize(fieldLabel(path))}`;
+}
+
+/** An invalid-scenario issue with its path in words ("Sam › Planning age: …"). */
+export function issueText(issue: ValidationIssue, h?: Household, scenario?: Scenario): string {
+  if (issue.path.length === 0) return issue.message;
+  const where = h ? issueLabel(issue.path, h, scenario) : issue.path.join(' › ');
+  return `${where}: ${issue.message}`;
+}
+
+// ---- Override range checks ----------------------------------------------------------------------
+
+/** Range check for an override value (the household schema's bounds, in words); null when valid. */
+export function overrideError(target: OverrideTarget, value: unknown): string | null {
+  const n = typeof value === 'number' && Number.isFinite(value) ? value : null;
+  switch (target.kind) {
+    case 'age':
+      if (n === null || !Number.isInteger(n)) return 'Enter a whole age';
+      if (n < 0 || n > 120) return 'Must be between 0 and 120';
+      return null;
+    case 'money':
+      if (n === null) return 'Enter an amount';
+      return n < 0 ? 'Amount cannot be negative' : null;
+    case 'rate':
+      if (n === null) return 'Enter a rate';
+      return n < -1 || n > 1 ? 'Must be between −100% and 100%' : null;
+    case 'inflation':
+      if (n === null) return 'Enter a rate';
+      return n <= -0.5 || n > 0.5 ? 'Must be above −50% and at most 50%' : null;
+    case 'deferral':
+      if (n === null) return 'Enter a share of salary';
+      return n < 0 || n > 1 ? 'Must be between 0% and 100%' : null;
+    case 'claimAge': {
+      const v = (value ?? {}) as { years?: unknown; months?: unknown };
+      if (typeof v.years !== 'number' || !Number.isInteger(v.years)) return 'Enter whole years';
+      if (typeof v.months !== 'number' || !Number.isInteger(v.months) || v.months < 0 || v.months > 11)
+        return 'Months must be from 0 to 11';
+      const months = v.years * 12 + v.months;
+      return months < 62 * 12 || months > 70 * 12 ? 'Claiming age must be between 62 and 70' : null;
+    }
+    case 'strategy':
+    case 'marketShock':
+      return null;
+  }
 }

@@ -18,7 +18,7 @@ import { salaryStopAge } from './compensation';
 import { estimateMagi, iraContributionLimit, rothIraEligibility } from '../limits/ira';
 import { hsaLimit } from '../limits/hsa';
 import type { RuleAccess } from '../rules/access';
-import { toCents } from '../money';
+import { formatWholeDollars, toCents } from '../money';
 import { priceIndex } from '../time';
 
 export interface PersonYearInput {
@@ -39,7 +39,7 @@ export interface ScheduledYear {
 
 type ScheduledAccount = Exclude<Account, { type: 'workplaceTraditional' | 'workplaceRoth' }>;
 
-const usd = (dollars: number) => `$${Math.round(dollars).toLocaleString('en-US')}`;
+const usd = formatWholeDollars;
 
 function growthFactor(schedule: ContributionSchedule, inflation: number, t: number): number {
   switch (schedule.growth.mode) {

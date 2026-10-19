@@ -174,9 +174,10 @@ export const useProfileStore = create<ProfileState>((set, get) => {
       if (t) clearTimeout(t);
       timers.delete(`profile:${id}`);
       pending.delete(`profile:${id}`);
-      await repository?.delete('profile', id);
-      // A profile's scenarios are diffs over it, so they are deleted with it.
+      // A profile's scenarios are diffs over it, so they are deleted with it, first: if the profile
+      // delete were interrupted, no scenario is left pointing at a missing base.
       await useScenarioStore.getState().removeForProfile(id);
+      await repository?.delete('profile', id);
       saveSettings();
     },
 

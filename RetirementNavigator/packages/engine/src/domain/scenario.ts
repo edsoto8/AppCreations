@@ -24,7 +24,20 @@ export const EntityCollectionSchema = z.enum([
 ]);
 export type EntityCollection = z.infer<typeof EntityCollectionSchema>;
 
-const PathSchema = z.array(z.union([z.string().min(1), z.number().int().min(0)])).max(8);
+/** Keys that would reach an object's prototype instead of its own fields. */
+const FORBIDDEN_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+
+const PathSchema = z
+  .array(
+    z.union([
+      z
+        .string()
+        .min(1)
+        .refine((k) => !FORBIDDEN_KEYS.has(k), 'This field name is not allowed'),
+      z.number().int().min(0),
+    ]),
+  )
+  .max(8);
 
 export const ScenarioOpSchema = z.discriminatedUnion('op', [
   z.object({
