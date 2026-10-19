@@ -11,7 +11,7 @@ import type { CalendarYear, Cents, DollarBasis, FilingStatus, Fraction } from '.
 import type { Household, WorkplacePlan } from './domain/household';
 import type { RulesSet, StandingRules, TaxYearRules } from './domain/rules';
 import type { EngineResult, EngineWarning, UnverifiedDetail } from './domain/results';
-import type { OrphanedOp, Scenario, ScenarioPreset } from './domain/scenario';
+import type { OrphanedOp } from './domain/scenario';
 import type { ProjectionResult } from './domain/projection';
 import type { MonteCarloChunk, MonteCarloConfig, MonteCarloResult } from './domain/montecarlo';
 import type { Insight } from './domain/insight';
@@ -399,25 +399,10 @@ export interface ScenarioApplication {
   issues: ValidationIssue[];
 }
 
-export function applyScenario(base: Household, scenario: Scenario): ScenarioApplication {
-  void base;
-  void scenario;
-  throw new NotImplementedError('applyScenario');
-}
+export { applyScenario } from './scenario/scenario'; // implemented in M5
 
 /** Build preset scenario ops (A–G) for a base household. */
-export function presetScenario(
-  preset: ScenarioPreset,
-  base: Household,
-  params: Record<string, number | string | boolean>,
-  ids: { scenarioId: string; name: string; baseProfileId: string },
-): Scenario {
-  void preset;
-  void base;
-  void params;
-  void ids;
-  throw new NotImplementedError('presetScenario');
-}
+export { presetScenario } from './scenario/scenario'; // implemented in M5
 
 export interface OptimizerResult {
   /** Earliest retirement age (primary person, or both shifted together) meeting the criterion; null if none. */
@@ -426,18 +411,28 @@ export interface OptimizerResult {
   criterion: 'deterministic' | 'monteCarlo';
 }
 
-export function optimizeRetirementAge(
-  household: Household,
-  ctx: EngineContext,
-  criterion: { kind: 'deterministic' } | { kind: 'monteCarlo'; config: MonteCarloConfig; minSuccessRate: number },
-  range: { fromAge: number; toAge: number },
-): EngineResult<OptimizerResult> {
-  void household;
-  void ctx;
-  void criterion;
-  void range;
-  throw new NotImplementedError('optimizeRetirementAge');
+/**
+ * Earliest retirement age (first person; others shift by the same amount, salary stop ages cleared)
+ * in the range meeting the criterion; every age is evaluated (a brute-force scan). Implemented in M5;
+ * the Monte Carlo criterion arrives in M6.
+ */
+export { optimizeRetirementAge } from './scenario/scenario';
+
+/** One outcome of a scenario comparison (base first). */
+export interface ScenarioOutcome {
+  /** Null for the base plan. */
+  scenarioId: string | null;
+  name: string;
+  status: 'ok' | 'invalid';
+  orphaned: OrphanedOp[];
+  issues: ValidationIssue[];
+  dashboard: DashboardResult | null;
+  /** Real ending balance after an assumed liquidation tax on tax-deferred money; null while taxes are unverified. */
+  afterTaxEndingBalanceReal: Cents | null;
 }
+
+/** Base plan plus each scenario, applied and projected (contract 1.8.0). */
+export { compareScenarios } from './scenario/scenario';
 
 // =============================================================================================
 // Monte Carlo (module: montecarlo/)

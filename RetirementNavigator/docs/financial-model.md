@@ -621,22 +621,49 @@ These rerun the projection with `returnOffset` set to +optimistic, 0 and +pessim
 confidence intervals. Everything else (contributions, spending, inflation) is unchanged.
 
 ## 10. Scenarios [M5]
-- Diff ops `set | unset | add`, keyed by `(collection, id)`, are applied in order to a deep copy of the
-  base. The result is re-validated with the household schema.
-- An op whose id is missing from the base is `orphaned` and skipped. Because a scenario stores only
-  ops, edits to the base flow through.
-- Presets:
-  - A: no ops.
-  - B: every retirement age −5 (not below the current age).
-  - C: workplace deferral +5 points and IRAs at `maxAllowed`.
-  - D: `marketShock` with a severity of −30% (by default in the first retirement year), configurable.
-  - E: retirement age +3 (3–5).
-  - F: spending −10%.
-  - G: all deferrals moved to Roth where offered. Outcomes are compared after tax; the documented
-    marginal-rate assumption is the model's own computed tax, and ending traditional balances are
-    shown after an assumed liquidation tax at the final year's marginal rate.
-- Optimizer: the earliest age in a range for which the criterion holds. It is checked against brute
-  force.
+- **Diff ops** `set | unset | add`, keyed by `(collection, id)`, are applied in order to a deep copy of
+  the base (`applyScenario`). The result is re-validated with the household schema; invalid results
+  return the issues and no household.
+  - `set` writes `value` at `path` inside the entity. The path's parent must exist, otherwise the op
+    is `invalidPath`.
+  - `unset` with a path removes that key, so the schema default applies (a required field without a
+    default makes the result invalid). Without a path it removes the entity, except the household
+    itself (`invalidPath`).
+  - `add` appends a new entity; `workplacePlans` need `parentId` (a person), else `missingParent`.
+  - An op whose id is missing from the base is `orphaned` (`missingEntity`) and skipped.
+  - Because a scenario stores only ops, edits to the base flow through.
+- **Presets** (`presetScenario`; the parameters used are stored in `presetParams`):
+  - A Baseline: no ops.
+  - B Early retirement: every retirement age −`years` (default 5), not below today's age. Salary stop
+    ages are cleared.
+  - C Aggressive savings: each workplace plan's salary deferral +`deferralIncrease` (default 5
+    points; the Roth percentage if the plan is Roth-only, capped at 100%). Traditional and Roth IRA
+    schedules move to "maximum allowed" only with `irasToMax` (off by default), because "maximum
+    allowed" contributes nothing while IRA limits are unverified (§1.7).
+  - D Market downturn: `marketShock` starting `startYear` (default: the first year everyone is
+    retired). The total drawdown is `severity` (default −30%), spread geometrically over
+    `durationYears` (default 1): each year's return is `(1+severity)^{1/n} − 1`. It is deterministic
+    and reproducible (tested).
+  - E Delayed retirement: every retirement age +`years` (3–5, default 3), capped at the planning age.
+  - F Reduced spending: retirement spending and spending steps −`cut` (default 10%). Current
+    (working-years) spending is unchanged.
+  - G Roth strategy: all workplace deferrals (salary and bonus) moved to Roth where the plan offers
+    Roth with a Roth account.
+- **Comparison** (`compareScenarios`): for the base and each scenario, the dashboard
+  (baseline, optimistic and pessimistic runs), orphaned ops and issues.
+  - **After-tax ending balance** (for G): real ending balance minus an assumed liquidation tax on
+    tax-deferred money at the final year's marginal ordinary rate,
+    `real.portfolioEnd − (taxDeferred_end / P_T) × marginalRate_T`. The marginal rate is the
+    model's own computed rate; this is the documented marginal-rate assumption.
+  - The after-tax figure is null while taxes are unverified (never estimated).
+  - Funding success is the deterministic criterion (§4.1) until M6.
+- **Optimizer** (`optimizeRetirementAge`, deterministic criterion):
+  - evaluates every age in the range, setting the first person's retirement age and shifting
+    everyone else by the same number of years (salary stop ages cleared);
+  - reports the earliest age whose baseline succeeds, or null;
+  - candidates that fail validation (for example past a planning age) are skipped.
+  - Tests check the result against an independent brute-force scan. The Monte Carlo criterion arrives
+    in M6.
 
 ## 11. Monte Carlo [M6]
 - PRNG:
