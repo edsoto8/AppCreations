@@ -773,8 +773,25 @@ Closed forms used in the tests:
 - payment: `PMT = PV·r/(1 − (1+r)^{−n})`
 
 ## 13. Insights [M7b]
-Each insight re-runs `projectHousehold` with a what-if set of scenario ops and reports the delta in
-descriptive language ("In this model, …"), with its assumptions disclosed.
+Each insight (`computeInsights`) states its change as scenario ops (`whatIfOps`), applies them to a
+copy of the plan with `applyScenario`, re-runs `projectHousehold`, and reports the baseline, the
+what-if and the difference in today's dollars, in descriptive language ("In this model, …"). Every
+insight lists its assumptions, plus "before plan limits" / "before taxes" when those rules are
+unverified. An insight that does not apply is left out.
+
+| Insight | What-if | Figure |
+|---|---|---|
+| Retiring two years later | every person not yet retired: retirement age + 2 (capped at the planning age) | real ending balance; longevity |
+| Capturing the full match | each plan's salary deferral raised to the sum of its match tiers' bands (only when below it) | savings at retirement (real end of the year before the first retirement year) |
+| Lifetime cost of fees | every expense ratio set to 0 (only when some are above 0) | real ending balance |
+| Inflation one point higher | `inflation + 0.01` | real ending balance |
+| Retirement spending 10% lower | preset F's ops with a 10% cut | real ending balance; longevity |
+| Returns one point lower | every return source (phase returns, capital-market geometric returns, account expected returns) − 0.01 | real ending balance; longevity (tone "attention" when either run depletes) |
+| Claiming Social Security one year later | each claiming age + 1 year (whole years, up to 70) when the plan has Social Security income | lifetime Social Security income, Σ flows.socialSecurity / P_t |
+| Savings needed for the goal | only when the deterministic criterion fails: a new cash account with an annual contribution X; bisection on X in [0, $500,000] to the nearest $100 | the smallest X found that meets the criterion (or "not within $500,000") |
+
+Tests: a spy confirms the projection runs once for the baseline and at least once per insight, and
+re-applying each insight's own ops reproduces its figure exactly.
 
 ## 14. Unsupported / simplified (master list)
 - Other filing statuses; unmarried couples.

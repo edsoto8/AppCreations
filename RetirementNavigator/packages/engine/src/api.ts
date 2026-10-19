@@ -10,10 +10,9 @@
 import type { CalendarYear, Cents, FilingStatus, Fraction } from './domain/primitives';
 import type { Household, WorkplacePlan } from './domain/household';
 import type { RulesSet, StandingRules, TaxYearRules } from './domain/rules';
-import type { EngineResult, EngineWarning, UnverifiedDetail } from './domain/results';
+import type { EngineWarning, UnverifiedDetail } from './domain/results';
 import type { OrphanedOp } from './domain/scenario';
 import type { ProjectionResult } from './domain/projection';
-import type { Insight } from './domain/insight';
 import type { ValidationIssue } from './domain/results';
 
 export { CONTRACT_VERSION } from './contractVersion';
@@ -484,12 +483,8 @@ export type CalculatorId =
   | 'baristaFire'
   | 'fiNumber';
 
-/** Insights by what-if re-run of `projectHousehold`. */
-export function computeInsights(household: Household, ctx: EngineContext): EngineResult<Insight[]> {
-  void household;
-  void ctx;
-  throw new NotImplementedError('computeInsights');
-}
+/** Insights by what-if re-run of `projectHousehold` (docs/financial-model.md §13). Implemented in M7b. */
+export { computeInsights } from './insights/insights';
 
 // =============================================================================================
 // IO (module: io/)
