@@ -26,14 +26,18 @@ export function useHouseholdForm(household: Household) {
     }
   }, [household, form]);
 
-  useEffect(() => {
-    const subscription = form.watch((values) => {
-      const parsed = HouseholdSchema.safeParse(values);
-      if (parsed.success) update(parsed.data);
-      else void form.trigger();
-    });
-    return () => subscription.unsubscribe();
-  }, [form, update]);
+  useEffect(
+    () =>
+      form.subscribe({
+        formState: { values: true },
+        callback: ({ values }) => {
+          const parsed = HouseholdSchema.safeParse(values);
+          if (parsed.success) update(parsed.data);
+          else void form.trigger();
+        },
+      }),
+    [form, update],
+  );
 
   return form;
 }

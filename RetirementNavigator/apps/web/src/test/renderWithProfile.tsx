@@ -15,7 +15,9 @@ let counter = 0;
 export async function setupProfile(household?: Household) {
   const repo = new DocumentRepository(await openDatabase(`rn-test-${++counter}`));
   await useProfileStore.getState().init(repo);
-  const h = household ?? SAMPLE_PROFILES[1]!.build(TEST_YEAR);
+  const sample = SAMPLE_PROFILES.find((p) => p.id === 'midCareerCouple');
+  const h = household ?? sample?.build(TEST_YEAR);
+  if (!h) throw new Error('missing sample profile');
   await useProfileStore.getState().createProfile(h);
   return { repo, store: useProfileStore };
 }

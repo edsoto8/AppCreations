@@ -22,7 +22,14 @@ function useSyncedText<T>(value: T, format: (v: T) => string) {
   useEffect(() => {
     if (!focused.current) setText(format(value));
   }, [value, format]);
-  return { text, setText, focused };
+  const onFocus = () => {
+    focused.current = true;
+  };
+  const onBlur = () => {
+    focused.current = false;
+    setText(format(value));
+  };
+  return { text, setText, onFocus, onBlur };
 }
 
 const formatMoney = (v: number | null) => (v === null ? '' : formatDollarsInput(v));
@@ -32,7 +39,7 @@ export function MoneyInput({
   onChange,
   ...rest
 }: Common & { value: number | null; onChange: (cents: number) => void }) {
-  const { text, setText, focused } = useSyncedText(value, formatMoney);
+  const { text, setText, onFocus, onBlur } = useSyncedText(value, formatMoney);
   return (
     <div className="relative">
       <span aria-hidden="true" className="pointer-events-none absolute left-3 top-2.5 text-sm text-muted-foreground">
@@ -44,11 +51,8 @@ export function MoneyInput({
         inputMode="decimal"
         autoComplete="off"
         value={text}
-        onFocus={() => (focused.current = true)}
-        onBlur={() => {
-          focused.current = false;
-          setText(formatMoney(value));
-        }}
+        onFocus={onFocus}
+        onBlur={onBlur}
         onChange={(e) => {
           setText(e.target.value);
           const cents = parseDollarsToCents(e.target.value);
@@ -66,7 +70,7 @@ export function PercentInput({
   onChange,
   ...rest
 }: Common & { value: number | null; onChange: (fraction: number) => void }) {
-  const { text, setText, focused } = useSyncedText(value, formatPct);
+  const { text, setText, onFocus, onBlur } = useSyncedText(value, formatPct);
   return (
     <div className="relative">
       <Input
@@ -75,11 +79,8 @@ export function PercentInput({
         inputMode="decimal"
         autoComplete="off"
         value={text}
-        onFocus={() => (focused.current = true)}
-        onBlur={() => {
-          focused.current = false;
-          setText(formatPct(value));
-        }}
+        onFocus={onFocus}
+        onBlur={onBlur}
         onChange={(e) => {
           setText(e.target.value);
           const fraction = parsePercent(e.target.value);
@@ -100,18 +101,15 @@ export function IntegerInput({
   onChange,
   ...rest
 }: Common & { value: number | null; onChange: (n: number) => void }) {
-  const { text, setText, focused } = useSyncedText(value, formatInt);
+  const { text, setText, onFocus, onBlur } = useSyncedText(value, formatInt);
   return (
     <Input
       {...rest}
       inputMode="numeric"
       autoComplete="off"
       value={text}
-      onFocus={() => (focused.current = true)}
-      onBlur={() => {
-        focused.current = false;
-        setText(formatInt(value));
-      }}
+      onFocus={onFocus}
+      onBlur={onBlur}
       onChange={(e) => {
         setText(e.target.value);
         if (/^-?\d+$/.test(e.target.value.trim())) onChange(Number(e.target.value.trim()));
