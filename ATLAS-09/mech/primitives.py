@@ -58,7 +58,14 @@ def bm_cyl(bm, r, h, m=I4, segs=24, bevel=0.0, bsegs=2, r_top=None, mat=0, caps=
     tb = bmesh.new()
     bmesh.ops.create_cone(tb, cap_ends=caps, cap_tris=False, segments=segs, radius1=r,
                           radius2=r if r_top is None else r_top, depth=h)
-    _bevel_sharp(tb, min(bevel, 0.3 * h, 0.3 * r), bsegs)
+    off = min(bevel, 0.3 * h, 0.3 * r)
+    if off > 0 and caps:
+        bm_ = tb
+        bm_.normal_update()
+        rims = [e for e in bm_.edges if len(e.link_faces) == 2
+                and sum(abs(f.normal.z) > 0.99 for f in e.link_faces) == 1]
+        bmesh.ops.bevel(bm_, geom=rims, offset=off, offset_type="OFFSET", segments=bsegs, profile=0.5,
+                        affect="EDGES", clamp_overlap=True)
     _append(bm, tb, m, mat)
 
 
@@ -140,7 +147,8 @@ def bm_sphere(bm, r, m=I4, segs=24, rings=12, mat=0):
     _append(bm, tb, m, mat)
 
 
-def bm_prism(bm, pts, h, m=I4, bevel=0.0, segs=2, mat=0, cuts_x=(), cuts_y=(), bend=None):
+def bm_prism(bm, pts, h, m=I4, bevel=0.0, segs=2, mat=0, cuts_x=(), cuts_y=(), bend=None, cuts_z=(),
+             warp=None):
     """Extrude a 2D polygon (local XY, CCW) along Z from -h/2..h/2.
 
     ``cuts_x`` / ``cuts_y`` add bisecting loops so the piece can be bent afterwards;
@@ -163,8 +171,14 @@ def bm_prism(bm, pts, h, m=I4, bevel=0.0, segs=2, mat=0, cuts_x=(), cuts_y=(), b
     for y in cuts_y:
         geom = list(tb.verts) + list(tb.edges) + list(tb.faces)
         bmesh.ops.bisect_plane(tb, geom=geom, plane_co=(0, y, 0), plane_no=(0, 1, 0))
+    for z in cuts_z:
+        geom = list(tb.verts) + list(tb.edges) + list(tb.faces)
+        bmesh.ops.bisect_plane(tb, geom=geom, plane_co=(0, 0, z), plane_no=(0, 0, 1))
     if bend:
         bend_verts(tb.verts, *bend)
+    if warp:
+        for v in tb.verts:
+            v.co = warp(v.co.copy())
     _append(bm, tb, m, mat)
 
 
@@ -208,7 +222,15 @@ def gear_profile(r_root, r_tip, teeth):
 
 def bm_gear(bm, r, teeth, h, m=I4, tooth=None, mat=0, bevel=0.002):
     tooth = tooth or 0.12 * r
-    bm_prism(bm, gear_profile(r - tooth, r, teeth), h, m, bevel=bevel, segs=1, mat=mat)
+    land = 0.24 * math.tau * r / teeth          # tooth tip width
+    bm_prism(bm, gear_profile(r - tooth, r, teeth), h, m, bevel=min(bevel, 0.2 * land), segs=1, mat=mat)
+
+
+def annular_sector(r0, r1, a0, a1, n=16):
+    """2D outline of a ring segment (CCW)."""
+    outer = [(r1 * math.cos(a0 + (a1 - a0) * i / n), r1 * math.sin(a0 + (a1 - a0) * i / n)) for i in range(n + 1)]
+    inner = [(r0 * math.cos(a1 - (a1 - a0) * i / n), r0 * math.sin(a1 - (a1 - a0) * i / n)) for i in range(n + 1)]
+    return outer + inner
 
 
 def poly_chamfer_rect(w, h, c, cx=0.0, cy=0.0):
@@ -392,19 +414,20 @@ def fan(kit, prefix, matrix, r, depth=0.06, blades=9):
     """Shrouded cooling fan (local Z out of the housing). Housing, rotor, guard: 3 objects."""
     def house(bm):
         bm_tube(bm, r + 0.03, r + 0.004, depth, U.T(z=depth / 2), segs=40, bevel=0.006)
-        bm_box(bm, 2 * r + 0.08, 2 * r + 0.08, 0.012, U.T(z=0.006), bevel=0.004, mat=0)
         for i in range(3):  # stator struts behind rotor
             a = 90 + 120 * i
             bm_box(bm, r, 0.018, 0.012, U.T(z=0.018) @ U.R(a, "Z") @ U.T(x=r / 2), mat=0)
         bm_cyl(bm, 0.28 * r, 0.03, U.T(z=0.02), segs=24, mat=0)
     hs = make(f"{prefix}_Fan_Housing", kit.coll, kit.m("steel_dark"), house, matrix, kit.bone)
-    # mounting plate gets a hole: cut with booleans (validated, falls back to a dark disk)
+    # square mounting plate with a bored opening: validated boolean, fallback keeps the solid plate
+    mp = make(f"{prefix}_Fan_MountPlate", kit.coll, kit.m("steel_dark"),
+              lambda bm: bm_box(bm, 2 * r + 0.08, 2 * r + 0.08, 0.012, U.T(z=0.006), bevel=0.004),
+              matrix, kit.bone)
     cutter = make(f"{prefix}_Fan_Cutter", kit.coll, kit.m("steel_dark"),
-                  lambda bm: bm_cyl(bm, r + 0.006, 0.05, U.T(z=0.0), segs=40), matrix, None, wn=False)
-
-    def _fallback(t):
-        pass
-    U.boolean_cut(hs, [cutter], f"{prefix}_fan_hole", fallback=_fallback)
+                  lambda bm: bm_cyl(bm, r + 0.012, 0.05, segs=40), matrix, None, wn=False)
+    U.boolean_cut(mp, [cutter], f"{prefix}_fan_bore", min_keep=0.3)
+    backing = make(f"{prefix}_Fan_Backing", kit.coll, kit.m("rubber"),
+                   lambda bm: bm_cyl(bm, r + 0.014, 0.004, U.T(z=-0.004), segs=40), matrix, kit.bone, wn=False)
 
     def rotor(bm):
         bm_cyl(bm, 0.26 * r, depth * 0.6, U.T(z=depth * 0.5), segs=24, bevel=0.006, mat=0)
@@ -422,7 +445,7 @@ def fan(kit, prefix, matrix, r, depth=0.06, blades=9):
             a = 360 * i / 8
             bm_box(bm, r * 0.96, 0.008, 0.008, U.T(z=depth + 0.004) @ U.R(a, "Z") @ U.T(x=r * 0.5))
     gd = make(f"{prefix}_Fan_Guard", kit.coll, kit.m("steel_dark"), guard, matrix, kit.bone, wn=False)
-    return [hs, ro, gd]
+    return [hs, mp, backing, ro, gd]
 
 
 # --------------------------------------------------------------------------- joints
@@ -505,7 +528,7 @@ def joint_drum(kit, prefix, matrix, r, w, mat="steel_dark", gear_mat="titanium",
 # --------------------------------------------------------------------------- hydraulics
 
 def piston(kit, prefix, p_base, p_end, bone_base, bone_end, r_barrel=0.05, r_rod=None,
-           barrel_frac=0.58, coll_rig=None, color="steel_dark"):
+           barrel_frac=0.58, coll_rig=None, color="steel_dark", rod_frac=0.62):
     """Hydraulic cylinder that follows joint motion.
 
     Two empties (``*_Anchor_Base`` on ``bone_base``, ``*_Anchor_Rod`` on ``bone_end``) carry the
@@ -517,7 +540,9 @@ def piston(kit, prefix, p_base, p_end, bone_base, bone_end, r_barrel=0.05, r_rod
     L = d.length
     r_rod = r_rod or r_barrel * 0.48
     lb = L * barrel_frac
-    lr = L * (1.0 - barrel_frac) + 0.30 * L   # overlap keeps the rod inside the barrel when extended
+    # Telescoping range: the rod never pokes out of the barrel's base while the pin distance
+    # stays >= rod_frac * L, and stays engaged up to (barrel_frac + rod_frac) * L.
+    lr = L * rod_frac
     rig_coll = coll_rig or kit.coll
     # local +Y points along the piston (Damped Track TRACK_Y), local X ~ joint axis
     m_base = U.frame_y(p_base, d, Vector((1, 0, 0)))

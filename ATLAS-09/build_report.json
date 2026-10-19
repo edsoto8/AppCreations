@@ -1,62 +1,41 @@
 {
- "milestone": 1,
+ "milestone": 5,
  "blender": "5.2.2 LTS",
- "mesh_checked": 50,
- "mesh_problems": 0,
- "floating": [
-  "Blockout_pelvis",
-  "Blockout_spine",
-  "Blockout_chest",
-  "Blockout_neck",
-  "Blockout_head",
-  "Blockout_sensor",
-  "Blockout_thigh.L",
-  "Blockout_shin.L",
-  "Blockout_shoulder.L",
-  "Blockout_upperarm.L",
-  "Blockout_forearm.L",
-  "Blockout_wrist.L",
-  "Blockout_thigh.R",
-  "Blockout_shin.R",
-  "Blockout_shoulder.R",
-  "Blockout_upperarm.R",
-  "Blockout_forearm.R",
-  "Blockout_wrist.R",
-  "Blockout_finger_a.L",
-  "Blockout_finger_b.L",
-  "Blockout_thumb.L",
-  "Blockout_tool.R",
-  "Blockout_Joint_pelvis",
-  "Blockout_Joint_spine",
-  "Blockout_Joint_chest",
-  "Blockout_Joint_neck",
-  "Blockout_Joint_head",
-  "Blockout_Joint_sensor",
-  "Blockout_Joint_thigh.L",
-  "Blockout_Joint_shin.L",
-  "Blockout_Joint_foot.L",
-  "Blockout_Joint_shoulder.L",
-  "Blockout_Joint_upperarm.L",
-  "Blockout_Joint_forearm.L",
-  "Blockout_Joint_wrist.L",
-  "Blockout_Joint_thigh.R",
-  "Blockout_Joint_shin.R",
-  "Blockout_Joint_foot.R",
-  "Blockout_Joint_shoulder.R",
-  "Blockout_Joint_upperarm.R",
-  "Blockout_Joint_forearm.R",
-  "Blockout_Joint_wrist.R",
-  "Blockout_Joint_finger_a.L",
-  "Blockout_Joint_finger_b.L",
-  "Blockout_Joint_thumb.L",
-  "Blockout_Joint_tool.R"
- ],
- "objects_robot": 50,
  "counts": {
-  "Blockout": {
-   "parts": 50,
+  "Torso": {
+   "parts": 143,
+   "fasteners": 124,
+   "total": 267
+  },
+  "Rig": {
+   "parts": 0,
    "fasteners": 0,
-   "total": 50
+   "total": 0
+  },
+  "Head": {
+   "parts": 70,
+   "fasteners": 35,
+   "total": 105
+  },
+  "Leg_L": {
+   "parts": 130,
+   "fasteners": 93,
+   "total": 223
+  },
+  "Arm_L": {
+   "parts": 86,
+   "fasteners": 64,
+   "total": 150
+  },
+  "Leg_R": {
+   "parts": 130,
+   "fasteners": 93,
+   "total": 223
+  },
+  "Arm_R": {
+   "parts": 82,
+   "fasteners": 64,
+   "total": 146
   },
   "QC": {
    "parts": 0,
@@ -67,238 +46,8 @@
  "log": [
   {
    "kind": "INFO",
-   "msg": "build to milestone 1 took 0.2s",
+   "msg": "build to milestone 5 took 2.6s",
    "obj": null
-  },
-  {
-   "kind": "FLOAT",
-   "msg": "not connected to the structure",
-   "obj": "Blockout_pelvis"
-  },
-  {
-   "kind": "FLOAT",
-   "msg": "not connected to the structure",
-   "obj": "Blockout_spine"
-  },
-  {
-   "kind": "FLOAT",
-   "msg": "not connected to the structure",
-   "obj": "Blockout_chest"
-  },
-  {
-   "kind": "FLOAT",
-   "msg": "not connected to the structure",
-   "obj": "Blockout_neck"
-  },
-  {
-   "kind": "FLOAT",
-   "msg": "not connected to the structure",
-   "obj": "Blockout_head"
-  },
-  {
-   "kind": "FLOAT",
-   "msg": "not connected to the structure",
-   "obj": "Blockout_sensor"
-  },
-  {
-   "kind": "FLOAT",
-   "msg": "not connected to the structure",
-   "obj": "Blockout_thigh.L"
-  },
-  {
-   "kind": "FLOAT",
-   "msg": "not connected to the structure",
-   "obj": "Blockout_shin.L"
-  },
-  {
-   "kind": "FLOAT",
-   "msg": "not connected to the structure",
-   "obj": "Blockout_shoulder.L"
-  },
-  {
-   "kind": "FLOAT",
-   "msg": "not connected to the structure",
-   "obj": "Blockout_upperarm.L"
-  },
-  {
-   "kind": "FLOAT",
-   "msg": "not connected to the structure",
-   "obj": "Blockout_forearm.L"
-  },
-  {
-   "kind": "FLOAT",
-   "msg": "not connected to the structure",
-   "obj": "Blockout_wrist.L"
-  },
-  {
-   "kind": "FLOAT",
-   "msg": "not connected to the structure",
-   "obj": "Blockout_thigh.R"
-  },
-  {
-   "kind": "FLOAT",
-   "msg": "not connected to the structure",
-   "obj": "Blockout_shin.R"
-  },
-  {
-   "kind": "FLOAT",
-   "msg": "not connected to the structure",
-   "obj": "Blockout_shoulder.R"
-  },
-  {
-   "kind": "FLOAT",
-   "msg": "not connected to the structure",
-   "obj": "Blockout_upperarm.R"
-  },
-  {
-   "kind": "FLOAT",
-   "msg": "not connected to the structure",
-   "obj": "Blockout_forearm.R"
-  },
-  {
-   "kind": "FLOAT",
-   "msg": "not connected to the structure",
-   "obj": "Blockout_wrist.R"
-  },
-  {
-   "kind": "FLOAT",
-   "msg": "not connected to the structure",
-   "obj": "Blockout_finger_a.L"
-  },
-  {
-   "kind": "FLOAT",
-   "msg": "not connected to the structure",
-   "obj": "Blockout_finger_b.L"
-  },
-  {
-   "kind": "FLOAT",
-   "msg": "not connected to the structure",
-   "obj": "Blockout_thumb.L"
-  },
-  {
-   "kind": "FLOAT",
-   "msg": "not connected to the structure",
-   "obj": "Blockout_tool.R"
-  },
-  {
-   "kind": "FLOAT",
-   "msg": "not connected to the structure",
-   "obj": "Blockout_Joint_pelvis"
-  },
-  {
-   "kind": "FLOAT",
-   "msg": "not connected to the structure",
-   "obj": "Blockout_Joint_spine"
-  },
-  {
-   "kind": "FLOAT",
-   "msg": "not connected to the structure",
-   "obj": "Blockout_Joint_chest"
-  },
-  {
-   "kind": "FLOAT",
-   "msg": "not connected to the structure",
-   "obj": "Blockout_Joint_neck"
-  },
-  {
-   "kind": "FLOAT",
-   "msg": "not connected to the structure",
-   "obj": "Blockout_Joint_head"
-  },
-  {
-   "kind": "FLOAT",
-   "msg": "not connected to the structure",
-   "obj": "Blockout_Joint_sensor"
-  },
-  {
-   "kind": "FLOAT",
-   "msg": "not connected to the structure",
-   "obj": "Blockout_Joint_thigh.L"
-  },
-  {
-   "kind": "FLOAT",
-   "msg": "not connected to the structure",
-   "obj": "Blockout_Joint_shin.L"
-  },
-  {
-   "kind": "FLOAT",
-   "msg": "not connected to the structure",
-   "obj": "Blockout_Joint_foot.L"
-  },
-  {
-   "kind": "FLOAT",
-   "msg": "not connected to the structure",
-   "obj": "Blockout_Joint_shoulder.L"
-  },
-  {
-   "kind": "FLOAT",
-   "msg": "not connected to the structure",
-   "obj": "Blockout_Joint_upperarm.L"
-  },
-  {
-   "kind": "FLOAT",
-   "msg": "not connected to the structure",
-   "obj": "Blockout_Joint_forearm.L"
-  },
-  {
-   "kind": "FLOAT",
-   "msg": "not connected to the structure",
-   "obj": "Blockout_Joint_wrist.L"
-  },
-  {
-   "kind": "FLOAT",
-   "msg": "not connected to the structure",
-   "obj": "Blockout_Joint_thigh.R"
-  },
-  {
-   "kind": "FLOAT",
-   "msg": "not connected to the structure",
-   "obj": "Blockout_Joint_shin.R"
-  },
-  {
-   "kind": "FLOAT",
-   "msg": "not connected to the structure",
-   "obj": "Blockout_Joint_foot.R"
-  },
-  {
-   "kind": "FLOAT",
-   "msg": "not connected to the structure",
-   "obj": "Blockout_Joint_shoulder.R"
-  },
-  {
-   "kind": "FLOAT",
-   "msg": "not connected to the structure",
-   "obj": "Blockout_Joint_upperarm.R"
-  },
-  {
-   "kind": "FLOAT",
-   "msg": "not connected to the structure",
-   "obj": "Blockout_Joint_forearm.R"
-  },
-  {
-   "kind": "FLOAT",
-   "msg": "not connected to the structure",
-   "obj": "Blockout_Joint_wrist.R"
-  },
-  {
-   "kind": "FLOAT",
-   "msg": "not connected to the structure",
-   "obj": "Blockout_Joint_finger_a.L"
-  },
-  {
-   "kind": "FLOAT",
-   "msg": "not connected to the structure",
-   "obj": "Blockout_Joint_finger_b.L"
-  },
-  {
-   "kind": "FLOAT",
-   "msg": "not connected to the structure",
-   "obj": "Blockout_Joint_thumb.L"
-  },
-  {
-   "kind": "FLOAT",
-   "msg": "not connected to the structure",
-   "obj": "Blockout_Joint_tool.R"
   }
  ]
 }

@@ -56,3 +56,48 @@ QC contact sheet `renders/qc_m1.png`, defects found:
    armor in M2/M4 must correct. The knee sits forward of the hip/ankle line, a deliberate load-bearing stance.
 5. Connectivity check flags blockout joint markers as floating (expected: proxies have gaps). Not carried forward.
 
+### Milestones 2–5: structure, joints/hydraulics, armor, cables/fasteners/sensors (done)
+
+The part modules (`parts_legs.py`, `parts_torso.py`, `parts_head.py`, `parts_arms.py`, `cables.py`) were written
+together but every feature is gated by `--milestone`, so each stage builds and was QC'd on its own
+(`renders/qc_m2.png` … `qc_m5.png`). Generators added to `primitives.py`: bmesh builders (box, cylinder, lathe,
+tube, torus, prism with bisect cuts + bend/warp, gear, helix, beam, rod) and assemblies (linked-duplicate bolts,
+bolt rings/lines, louvre vents with Array modifier, cooling-fin stacks with Array modifier, shrouded fans, slewing
+bearings, clevis hinges, geared joint drums, Damped-Track hydraulic pistons, Stretch-To coil-over shocks, weld seams via
+Array+Curve modifiers, chamfered/bent armor plates). Each object carries `ob["bone"]` for the M7 rig.
+
+- **M2 structure**: pelvis core and keel, waist column, chest floor, tapered chevron chest hull (prism, bisected and
+  warped), keel, power pack, roll bar, neck mount, shoulder sockets, limb hubs/cores/yokes, foot base, split toes,
+  sole pads, head shell (tapered, sloped brow), sensor bay, palm/fingers, drill motor/bit.
+  QC defects: (1) segments float apart. Expected, since the joints that connect them are M3 (connectivity check listed
+  every torso/arm part); resolved in M3. (2) Pelvis reads small next to the chest (accepted, mech style).
+- **M3 joints + hydraulics**: hip/knee/ankle/toe/shoulder/elbow/head-pitch geared drums + clevis lugs; waist, neck,
+  shoulder, wrist, lidar slewing bearings; 46 hydraulic cylinders (knee front/rear, hip, ankle, toe, waist, bicep,
+  tricep, shoulder, head tilt, gripper fingers) and 4 coil-over shocks; manifolds, pump, wrist pinion drive.
+  QC: connectivity check passes (`floating: []`) and 0 mesh problems. Defect: thighs thin from the front (fixed in M4).
+- **M4 armor + mechanics**: layered, bent armor on chest/flanks/belly/collar/top deck, pelvis codpiece, abdomen bands,
+  tassets, thigh/knee/shin/foot/toe plates, pauldrons, upper-arm and forearm plates, brow/cheek/top head plates;
+  power core (bezel, hex frame, emissive cell, glass, guard bars), radiator, fans, exhaust stacks + heat shields,
+  vents, camera pods, lens cluster, rotating lidar drum.
+  QC defects → fixes: (1) dark layered chest plates read as a pair of "eyes" → replaced with a raised top band plus
+  boolean-cut cooling slots; (2) thigh outer armor hidden behind the knee lugs → moved outboard and enlarged;
+  (3) smooth dome pauldrons looked toy-like → faceted 7-flat bent-plate shells with Solidify + Bevel; (4) thighs still
+  thin → wider femur/hub plus front-outer/inner corner shields; (5) camera pods looked like yellow toy "ears" → steel.
+- **M5 cables, fasteners, sensors, details**: 473 linked-duplicate fasteners (hex, socket, rivet meshes), 40+ hoses
+  and cable bundles (NURBS curves with bevel and crimped fittings; joint-crossing runs record their two bones for hooks),
+  stencil labels/serials ("ATLAS-09", "SN 0917-AX", "HYD 210 BAR", "DANGER HIGH PRESSURE", "NO STEP"), hazard strips,
+  LED indicators and light bars, access panels, weld seams, antennas (whip with spring base, blade, GPS puck), coupler
+  pins and quick-connects.
+  QC defects → fixes: (1) orange core conduits looped in front of the core like a mouth → rerouted down the flanks;
+  (2) `close_arm` QC camera badly framed → re-aimed; (3) degenerate faces on small bevelled cylinders and gears
+  (bevel offset larger than the face) → cylinder bevel limited to cap rims, gear bevel limited to 20% of tooth land;
+  (4) lidar window was an open surface (82 non-manifold edges) → closed annular-sector prism.
+
+Boolean log: thigh vent slots and chest cooling slots cut cleanly with EXACT. The fan bore on the back fans was first
+wrongly rejected by the "lost >50% volume" sanity check, because a fan bore legitimately removes about 55% of the
+plate. `boolean_cut` now takes `min_keep`. Earlier the fan-hole cut ran against a self-intersecting multi-shell housing
+and EXACT produced an empty result. Fixed by moving the bore into a separate simple mounting plate.
+
+Counts at M5: 641 parts + 473 fasteners = 1,114 visible robot objects (Torso 267, Head 105, Leg_L/R 223 each,
+Arm_L 150, Arm_R 146).
+

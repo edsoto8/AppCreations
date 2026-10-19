@@ -187,11 +187,12 @@ def apply_modifiers(ob):
     return ob
 
 
-def boolean_cut(target, cutters, name="cut", solver="EXACT", fallback=None):
+def boolean_cut(target, cutters, name="cut", solver="EXACT", fallback=None, min_keep=0.5):
     """Boolean DIFFERENCE with validation and fallback.
 
     1. Try the given solver, then FLOAT.
-    2. Reject the result when it is empty, loses most of the volume, or adds non-manifold edges.
+    2. Reject the result when it is empty, keeps less than ``min_keep`` of the volume, or adds
+       non-manifold edges.
     3. On rejection run ``fallback(target)`` (a simpler cut) and log the failure.
     Cutter objects are always deleted afterwards.
     """
@@ -214,7 +215,7 @@ def boolean_cut(target, cutters, name="cut", solver="EXACT", fallback=None):
             after = mesh_stats_me(me)
             bad = (len(me.polygons) == 0
                    or after["non_manifold"] > before["non_manifold"] + 0
-                   or after["volume"] < 0.5 * before["volume"])
+                   or after["volume"] < min_keep * before["volume"])
             if bad:
                 nfaces = len(me.polygons)
                 bpy.data.meshes.remove(me)
@@ -302,7 +303,7 @@ def mesh_stats_obj(ob, evaluated=True):
 def _bm_stats(bm):
     nm = sum(1 for e in bm.edges if not e.is_manifold and not e.is_wire)
     wire = sum(1 for e in bm.edges if e.is_wire)
-    zero = sum(1 for f in bm.faces if f.calc_area() < 1e-10)
+    zero = sum(1 for f in bm.faces if f.calc_area() < 1e-12)
     loose_v = sum(1 for v in bm.verts if not v.link_edges)
     try:
         vol = abs(bm.calc_volume(signed=False))

@@ -46,7 +46,7 @@ def run(args, root_dir):
     from . import qc
 
     ctx = build(args.milestone)
-    if "rig" in ctx and args.pose:
+    if ctx.get("rig") and args.pose:
         from . import rig
         rig.set_pose(ctx["rig"], args.pose)
     report = {"milestone": args.milestone, "blender": bpy.app.version_string}
@@ -85,7 +85,7 @@ def validate(ctx):
         U.log("FLOAT", "not connected to the structure", n)
     out = {"mesh_checked": mesh_rep["checked"], "mesh_problems": len(mesh_rep["problems"]),
            "floating": floating, "objects_robot": len(robot)}
-    if "rig" in ctx:
+    if ctx.get("rig"):
         from . import rig
         out["intersections"] = rig.intersection_report(ctx)
     return out
