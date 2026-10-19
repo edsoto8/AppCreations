@@ -66,6 +66,23 @@ RetirementNavigator/
     block. E2E, axe and no-outbound tests therefore run against `vite preview`.
 - No `dangerouslySetInnerHTML` with user data. All imports are validated with Zod.
 
+## Web state and forms (M2)
+- `state/profileStore.ts` (Zustand) holds profiles (validated `ProfileDoc`s), the active profile,
+  onboarding status and dollar basis.
+  - Profile writes to IndexedDB are debounced (300 ms) and flushed on `pagehide`.
+  - Settings are written immediately, because they gate navigation such as onboarding.
+- `hooks/useHouseholdForm.ts`: one React Hook Form instance over the whole household, validated by
+  the engine's `HouseholdSchema` through `zodResolver`.
+  - Cross-field rules surface on the right field.
+  - Only valid households are committed to the store; a valid household clears stale cross-field
+    errors.
+- Pages compute live readouts with engine calls on the last valid household, e.g.
+  `previewAccumulation(household, ctx, 10)`. The UI holds no financial formulas.
+- The current year is read once in the UI (`app/env.ts`, overridable with `?year=` for reproducible
+  E2E) and injected into the engine.
+- `src/zodConfig.ts` (imported first) runs Zod jitless, because Zod 4's JIT probes `new Function`,
+  which the CSP forbids.
+
 ## Tooling decisions (M1)
 - TypeScript 6.0.3: typescript-eslint 8.71 supports `<6.1`; TypeScript 7 (native) came out on 2026-10-18.
 - React Router 8 (HashRouter): works offline, under the CSP and in any static host.

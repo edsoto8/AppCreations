@@ -11,9 +11,17 @@
 | UI | React Testing Library | key flows: forms, validation messages, live readouts, toggles |
 | E2E | Playwright (against `vite preview`) | onboarding, profile, income/match, accounts, forecast, scenarios, Monte Carlo, export/import round trip, theme, mobile viewport, print |
 | Accessibility | @axe-core/playwright | every main page, both themes; keyboard navigation of controls and chart tables |
+| M2 flows | Playwright | onboarding (blank and sample), reload persistence, income/match live readout, profile validation, axe on every M2 page in both themes, no horizontal overflow at phone width |
 | Privacy | Playwright | no outbound requests other than same-origin app assets during a full flow; CSP meta present in the build |
 | Visual | Playwright screenshots, read back as images | layouts, themes, print view |
 | Performance | committed `bench/` script | MC 10k paths × 60 years; dashboard recalc; container hardware and emulated phone throttling stated |
+
+## Pinned synthetic fixture year
+Real rule values are all unverified right now, so engine mechanics (limits, phase-outs, tax,
+preview) are tested against `packages/engine/src/testing/fixtureRules.ts`. That file holds
+round-number values that are clearly labeled synthetic and are never used by the app. Tests
+against the real `RULES` assert the `unverified` path. Once values are verified, the IRS worked
+examples (Pub 590-A phase-out, Pub 915) are added against the real data.
 
 ## Rules in tests
 Tests read limits from the rules files, never from literals. The one exception is a pinned fixture

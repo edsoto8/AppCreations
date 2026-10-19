@@ -3,57 +3,72 @@
 Statuses: `done` · `simplified` (with limitation) · `unverified rule` · `not started`.
 
 ## Current phase
-**M1 Foundation complete** (tag `m1-foundation`). Next: **M2 Accumulation engine, income, accounts**.
+**M2 Accumulation engine, income, accounts: built; tag pending.** Every M2 gate passes except two
+that need verified rule values: the IRS worked example for the Roth phase-out, and the owner's
+review of `docs/rules-verification.md`. Both wait on reaching irs.gov, ssa.gov and federalregister.gov
+(see Blockers). Next after the tag: **M3 Forecasting**.
 
 ## Milestone log
 | Milestone | Status | Tag | Date |
 |---|---|---|---|
 | Phase 0 (plan, contracts, doc drafts) | done (plan approved; contracts approved 2026-10-18) | — | 2026-10-18 |
-| M1 Foundation | done | `m1-foundation` | 2026-10-18 |
-| M2–M8 | not started | | |
+| M1 Foundation | done | `m1-foundation` (local only; see Handoff) | 2026-10-18 |
+| M2 Accumulation engine, income, accounts | built; **tag waits on verified rules + owner review** | — | 2026-10-19 |
+| M3–M8 | not started | | |
 
-## M1 gate evidence
+## M2 gate evidence
 | Gate | Evidence | Result |
 |---|---|---|
-| Engine has no React/DOM imports (enforced) | Three layers: ESLint `no-restricted-imports`/`-globals`/`-properties`/`-syntax` on `packages/engine/src`; engine `tsconfig` with `lib: ["ES2023"]`, `types: []`; `src/boundary.test.ts` scanning sources. A deliberate violation file was flagged by both ESLint (5 errors) and `tsc` before being deleted. | pass |
-| `pnpm verify` green | typecheck → lint → format check → unit tests with coverage → build → E2E | pass |
-| A stored document round-trips through the schema | `apps/web/src/storage/repository.test.ts` (IndexedDB via fake-indexeddb → `migrate()` → equal); `packages/engine/src/io/migrate.test.ts` (JSON round trip) | pass |
-| + CSP meta in the built `index.html` | `e2e/shell.spec.ts` "serves the production CSP" | pass |
-| + No outbound requests (smoke) | `e2e/shell.spec.ts` visits every section on desktop and mobile; zero non-origin requests, zero console errors | pass |
+| `docs/rules-verification.md` complete and reviewed by the owner before tagging | Candidates and sources are listed, but no value could be read at source (sites blocked) | **blocked** |
+| Roth eligibility matches an IRS worked example at phase-out start, midpoint and end | Mechanics verified at start, midpoint and end for both statuses against the pinned synthetic fixture, with rounding and the $200-minimum edge (`limits/limits.test.ts`). The IRS worked example (Pub 590-A) needs the publication and verified values. | **partial (blocked)** |
+| Match readout matches hand-computed tier cases | `match/match.test.ts`: 0/2/3/4/5/10% deferral on $100k with 100% of 3% + 50% of 2%; cap binding inside a tier; zero-rate tier gap; monotonic property; UI readout asserted in RTL and E2E ($1,920 of $3,840) | pass |
+| Every rule value has a source (test) | `rules/rules.test.ts`: every verified leaf has a primary source, every null leaf has a reason, every year file has every key, candidates are marked search-excerpt; 79 leaves | pass |
+| + Null rules produce `unverified` and the UI shows a disabled feature | Engine tests on the real `RULES` (limits, IRA, HSA, tax, preview); RTL and E2E assert "Not available yet … (rule values are unverified)" and no invented limit | pass |
+| + `pnpm verify` green | typecheck, lint, format, unit (engine + web), build, E2E | pass |
 
-### Test results (2026-10-18, this container, final `pnpm verify` before the tag)
-- Engine: 7 files, 176 tests passed. Coverage is above 96% on every metric (≈99% statements/lines).
-  The threshold is 90%. `src/api.ts` (unimplemented stubs) is excluded until its functions are
-  implemented. The count includes the early M2 rules work (see below).
-- Web: 3 files, 17 tests passed.
-- E2E (Playwright, Chromium 1194, `vite preview`): 10 passed, 2 skipped (two keyboard/focus tests run on
-  desktop only). Each section is checked with axe (WCAG 2.0/2.1/2.2 A/AA) in the light theme on desktop
-  and mobile, and the shell in the dark theme. Zero violations.
-- Visual check: screenshots of the dashboard and Data pages at desktop (1280×860) and mobile (Pixel 7),
-  light and dark, read back. Fixed one mobile issue: the "Planned for M7b" badge wrapped.
-- Bundle (production): JS 363.8 kB (115.8 kB gzip), CSS 22.7 kB (5.5 kB gzip), Inter woff2 subsets
-  total 218 kB.
+### Test results (2026-10-19, this container, `pnpm verify`)
+- Engine: 13 files, 267 tests passed. Coverage 99.0% lines, 94.0% branches, 98.1% functions
+  (thresholds 90%).
+- Web: 15 files, 81 tests passed (React Testing Library). Web coverage is 89.6% lines and 74.1%
+  branches; there is no threshold for the web package.
+- E2E: 18 passed (desktop and mobile).
+  - Covers onboarding (blank and sample), reload persistence, the income/match live readout,
+    profile validation and the shell.
+  - axe runs on every M2 page in light and dark: zero violations after fixing the 24 px target size.
+  - No horizontal overflow at phone width; zero outbound requests; zero console errors after running
+    Zod jitless under the CSP.
+- Visual: 36 screenshots (9 pages × desktop/mobile × light/dark) read back.
+- Bundle: JS 738 kB (228 kB gzip), CSS 34 kB (7.4 kB gzip). Code-splitting is planned for the M8
+  performance pass.
 
 ## Feature status
 | Feature (BRIEF §) | Status | Notes |
 |---|---|---|
-| Monorepo, strict TS, ESLint, Prettier, Vitest, Playwright | done | |
-| App shell, sidebar navigation, mobile drawer, light/dark/system theme | done | |
-| Disclaimers in the UI footer | done | Print summary and docs disclaimers arrive with M7b/M8. |
-| CSP (production build) | done | The dev server is exempt (HMR websocket); documented. |
-| Unencrypted-storage notice (UI and docs) | done | Data & Privacy page, assumptions.md, user-guide.md |
-| IndexedDB layer with schemaVersion + migration chain skeleton | done | Chain is empty at v1. |
-| Zod domain models / frozen contracts | done | CONTRACT_VERSION 1.1.0 |
-| Sub-agents and skills | simplified | Created in `RetirementNavigator/.claude/`, but **not discoverable** in this session (see R3). Delegation uses general-purpose agents that are told to follow those definitions. |
-| Pages for M2–M7b features | not started | Placeholders say "Not built yet" and show no figures. |
-| Rules data | unverified rule | Government sources are blocked (see Blockers). |
+| Monorepo, tooling, app shell, theme, CSP, disclaimers (UI), unencrypted-storage notice | done | M1 |
+| IndexedDB layer, schemaVersion, migration chain | done | Chain empty at v1; kind/id checked on read |
+| Rules loader/indexer (`resolveRules`), `RuleAccess`, rules data 2026/2027/standing | done / **unverified rule** | Code done and tested; **every value unverified** (79 leaves: 55 unverified, 24 not yet published) |
+| Rules & Sources page | done | Every value with status, source, date, indexation, candidate (display-only) |
+| Compensation: salary, bonus (3 kinds, growth modes, eligibility toggles), raises (nominal / inflation+real, overrides), stop age, part-time phase | done | |
+| Workplace contributions: % of salary and bonus, auto-escalation, 402(g)/catch-ups/Roth catch-up/401(a)(17)/415(c) capping with warnings | done / **unverified rule** | Engine tested on the fixture; in the app, limits show "Not available yet" |
+| Employer match: tiers, flat, cap, vesting (display), capture readout | done | Readout is labeled "before plan limits" while limits are unverified; forfeiture is applied in M3 |
+| 10-year live preview; today's/future dollars toggle | done | |
+| Net-pay feasibility (taxes, FICA, flat state) | done / **unverified rule** | Tax model tested on the fixture; in the app, taxes show "Unverified" |
+| Profile and household editor (spouse add/remove, assumptions, anchor year) | done | Spending steps and glide come in M4 |
+| Accounts CRUD (all types, schedules, fees, allocation, deletion guards) | done | |
+| Roth IRA page (MAGI estimate and override, eligibility readout) | done / **unverified rule** | Spousal and backdoor Roth unsupported (stated) |
+| HSA page (coverage, HDHP attestation, limit, medical expenses) | done / **unverified rule** | Withdrawals in M4 |
+| Sample profiles (4), onboarding, multiple profiles | done | |
+| Sub-agents and skills | simplified | Skills are discovered; agents are not (R3); delegation uses general-purpose agents told to follow the definitions |
+| M3–M8 features | not started | Placeholders show no figures |
 
 ## Blockers and risks
 - **Rules sources unreachable.** irs.gov, ssa.gov and federalregister.gov are blocked by this
-  environment's network policy (direct fetch and curl both fail; checked again 2026-10-18 after the
-  owner chose to allowlist). The owner chose to allowlist these domains. Until access works, M2 rules
-  files ship with every value `unverified` (candidates kept for display only), and
-  `docs/rules-verification.md` cannot be completed. **The M2 tag waits on that review.**
+  environment's network policy. Direct fetch and curl both fail; this was checked again on 2026-10-19,
+  after the owner chose to allowlist the domains.
+  - Network settings may apply only to new sessions.
+  - Until access works, every rule value stays `unverified` and the features that need them show
+    "Not available yet". `docs/rules-verification.md` can't be completed.
+  - **The M2 tag waits on verification and the owner's review.**
 - **R1:** The CSP applies to the production build only.
 - **R2:** The survivor SS model omits the survivor's own early-claim reduction (documented).
 - **R3:** The sub-agents in `RetirementNavigator/.claude/agents` are not discoverable in this session;
@@ -62,6 +77,9 @@ Statuses: `done` · `simplified` (with limitation) · `unverified rule` · `not 
   or ask for the definitions to be mirrored to the repo-root `.claude/`.
 - **R4:** Benchmarks run on a 4-core cloud container. Phone numbers will come from emulated
   (throttled) runs.
+
+## Review findings (M2)
+_Pending the code-reviewer pass._
 
 ## Review findings (M1)
 The code-reviewer pass ran as a general-purpose agent following `.claude/agents/code-reviewer.md`.
@@ -89,20 +107,21 @@ No open findings.
 |---|---|---|
 | 1.0.0 | 2026-10-18 | Initial frozen contract (approved). `migrate` implemented in `io/migrate.ts` and re-exported from `api.ts` (no signature change). |
 | 1.1.0 | 2026-10-18 | From the M1 review: stricter household validation (cross-references and invariants), `InflationRateSchema` bound (−50%, 50%], factory defaults, `SettingsDoc.theme` removed (the theme lives in localStorage for pre-paint), offset timestamps accepted. No stored documents existed, so no migration is needed. `resolveRules` implemented (M2, signature unchanged). |
+| 1.2.0 | 2026-10-19 | Additive for M2: `TaxInput.wagesByPerson` (per-person wage base); `CompensationYear.age/working`; `previewAccumulation` and its row types (per-plan rows, cash-flow warnings, per-account `scheduled` amounts); standing rules `capitalGainsRates` and `roth.reducedContributionRounding` (sourced rule values instead of literals). M2 functions implemented and re-exported from `api.ts` with unchanged signatures. |
 
 ## Traceability (BRIEF §5 → milestone)
 | Feature | Milestone |
 |---|---|
 | App shell, sidebar, theme, CSP, unencrypted-storage note, disclaimers (UI) | M1 ✅ |
-| Rules loader, indexer, Rules & Sources page | M2 |
-| Profile (ages, filing, state rate), household/spouse | M2 (spending steps/glide → M4) |
-| Income: salary, bonus, raises, overrides, real raise; part-time phase input | M2 (part-time projection → M3) |
-| Workplace contributions, auto-escalation, limit capping; tiered match, flat, vesting, readout; 10-year preview | M2 |
-| Accumulation cash flow (net pay, infeasible flag, surplus routing) | M2 |
-| Accounts CRUD, fees, start/stop, schedules | M2 |
-| Roth IRA eligibility, limits, readout; Roth-vs-trad link stub | M2 (calculator M7a) |
-| HSA inputs and limits | M2 (withdrawals M4) |
-| Sample profiles, onboarding, multiple profiles | M2 |
+| Rules loader, indexer, Rules & Sources page | M2 ✅ (values unverified) |
+| Profile (ages, filing, state rate), household/spouse | M2 ✅ (spending steps/glide → M4) |
+| Income: salary, bonus, raises, overrides, real raise; part-time phase input | M2 ✅ (part-time projection → M3) |
+| Workplace contributions, auto-escalation, limit capping; tiered match, flat, vesting, readout; 10-year preview | M2 ✅ (limits unverified; forfeiture → M3) |
+| Accumulation cash flow (net pay, infeasible flag, surplus routing) | M2 ✅ (taxes unverified; surplus routing → M3) |
+| Accounts CRUD, fees, start/stop, schedules | M2 ✅ |
+| Roth IRA eligibility, limits, readout; Roth-vs-trad link stub | M2 ✅ (unverified; calculator M7a) |
+| HSA inputs and limits | M2 ✅ (unverified; withdrawals M4) |
+| Sample profiles, onboarding, multiple profiles | M2 ✅ |
 | Projection rows, reconciliation, fees, timing modes, monthly mode | M3 |
 | Dashboard cards + formula docs, forecast chart, offsets, markers, real/nominal toggle, allocation (a)(b) | M3 (death marker M4; readiness MC M6) |
 | Spending plan, SS (entered / illustrative / spousal / survivor / reduction), pensions, one-time events, taxable basis and drag | M4 |
@@ -114,24 +133,28 @@ No open findings.
 | Full E2E, axe audit, performance, independent validation, user guide | M8 |
 
 ## Handoff
-- **Already done for M2 (landed with the M1 tag, counted in M2):** rules data files `rules/2026.ts`,
-  `rules/2027.ts` and `rules/standing.ts` (every value `unverified` or `notPublished`, with
-  search-excerpt candidates for display only); rules-integrity tests (each leaf has a source or a
-  reason; every year file has every key; zero values are verified yet); `resolveRules`
-  (anchor/indexing/rounding/statutory-fixed), tested on synthetic verified data.
-- **Next steps (M2):**
-  1. Rules & Sources page.
-  2. Engine slice: compensation path, `computeMatch` and the readout, `capContributions`,
-     `rothIraEligibility`, `estimateMagi`, `hsaLimit`, net-pay feasibility (taxes `unverified` until
-     verified).
-  3. UI: profile and household editor, Income & Savings with the 10-year preview, account CRUD, Roth
-     IRA and HSA pages, sample profiles, onboarding, multiple profiles.
-  4. Gates: the IRS worked example for the Roth phase-out (start, middle and end, both statuses) needs
-     verified values and Pub 590-A. Hand-computed match tier cases. A test that every rule has a
-     source. Owner review of `rules-verification.md` before the tag.
-- **Frozen contracts:** `packages/engine/src/domain/*`, `packages/engine/src/api.ts` (1.1.0).
-- **Tags:** the session's git proxy refused to push tags (HTTP 403), though branch pushes work. The
-  milestone tag `m1-foundation` is local only. It points at the commit titled "fix(RetirementNavigator):
-  resolve M1 review findings; start M2 rules data". To publish it from a clone:
+- **Done in M2:**
+  - Engine: compensation, match, workplace/IRA/HSA limits, Roth eligibility, tax model, the
+    Income & Savings preview, rules data and resolver.
+  - UI: profiles, onboarding, Profile, Income & Savings, Accounts, Roth IRA, HSA, Rules & Sources.
+  - Tests: 267 engine and 81 web unit tests; 18 E2E tests.
+- **To tag M2 (`m2-accumulation`):**
+  1. Make irs.gov, ssa.gov and federalregister.gov reachable (environment network settings, likely
+     in a new session).
+  2. Verify each value at source (see the procedure in `docs/rules-verification.md`) and add the IRS
+     Pub 590-A worked example test for the Roth phase-out.
+  3. Owner spot-checks the top 15 values.
+  4. Tag.
+- **Next (M3 Forecasting):**
+  - Projection engine: accounts growth and fees, timing modes, monthly mode, per-row reconciliation,
+    surplus routing, vesting forfeiture, simple withdrawals.
+  - Python reference script and golden fixtures.
+  - Dashboard cards with formula docs; forecast chart with offsets and markers; allocation views
+    (a) and (b); real/nominal toggle.
+- **Frozen contracts:** `packages/engine/src/domain/*`, `packages/engine/src/api.ts` (1.2.0).
+- **Tags:** the session's git proxy refused to push tags (HTTP 403), though branch pushes work.
+  `m1-foundation` is local only, pointing at the commit titled "fix(RetirementNavigator): resolve M1
+  review findings; start M2 rules data". To publish it from a clone:
   `git tag -a m1-foundation <that commit> -m "M1 Foundation" && git push origin m1-foundation`.
-- **Open risks:** rule sourcing (blocked), agent discovery (R3), tag publishing (above).
+- **Open risks:** rule sourcing (blocked), agent discovery (R3), tag publishing (above), bundle size
+  (738 kB JS, to code-split in M8).

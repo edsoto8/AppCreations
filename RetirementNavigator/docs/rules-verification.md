@@ -41,10 +41,25 @@ Retrieval method for every row: web-search excerpt, 2026-10-18.
 - 2027 IRS items other than HSA (deferral limits, IRA, phase-outs, brackets, standard deduction,
   LTCG) have **not been published** as of 2026-10-18.
 
+## Additional rule values added in M2 (unverified, no candidate)
+- `standing:capitalGainsRates`: the 0% / 15% / 20% long-term capital gains rate schedule
+  (Rev. Proc. 2025-32 / IRS Topic 409).
+- `standing:roth.reducedContributionRounding`: the Pub 590-A reduced Roth IRA contribution worksheet
+  rounding (increment and minimum).
+
+## How verification works once sources are reachable
+1. Read each primary document and confirm the candidate value, its section or table, and whether
+   it is indexed (with the published rounding rule) or fixed by statute.
+2. Replace `candidateRule(...)` with `verifiedRule(...)` in `packages/engine/src/rules/*.ts`
+   (method `primary-document`, `retrievedOn`, a second source where available).
+3. Update the "zero values verified" expectation in `rules/rules.test.ts` and this table's status.
+4. Owner spot-checks the top 15 here before the M2 tag.
+
 ## Open items that block verification
 1. Direct access to irs.gov, ssa.gov and federalregister.gov (an environment network-policy change).
 2. Senior deduction phase-out rate: not found.
 3. RMD start age for people born in 1959: the final regulations reserve this paragraph.
 4. Uniform Lifetime Table ages 76 and above: not seen.
-5. Roth IRA reduced-contribution rounding rules (Pub 590-A worksheet): not yet checked.
+5. Roth IRA reduced-contribution rounding rules (Pub 590-A worksheet) and the LTCG rate schedule:
+   not yet checked.
 6. Rounding metadata for indexed limits (for example "multiples of $500"): not yet checked at source.

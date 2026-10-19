@@ -83,7 +83,7 @@ Deterministic forecast only. `ρ_m = (1+ρ)^{1/12} − 1`. Each month, the balan
 
 ---
 
-## 2. Rules resolution [M2]
+## 2. Rules resolution [M2, final]
 - Values are `Verified<T>`, each `verified`, `unverified` (null plus `unverifiedReason`), or
   `notPublished`.
 - `resolveRules(anchorYear, targetYear, indexRate)`:
@@ -95,10 +95,19 @@ Deterministic forecast only. `ρ_m = (1+ρ)^{1/12} − 1`. Each month, the balan
     - `statutory-fixed`: `v_target = v_b`;
     - null at the base stays null and dependent outputs are `unverified`.
   - The default index rate is the inflation assumption (a labeled assumption).
+- Resolution is per rule value. Numbers under a key named `rate` (bracket rates) are never
+  indexed; every other number in an indexed value is money in cents. With no rounding metadata the
+  projected value is rounded to the cent. A verified value with no recorded indexation is not
+  projected (it becomes `unverified`). With no verified base, the most specific null entry is
+  reported (the target year's own, else the latest usable year's).
+- Calculations read rules through `RuleAccess`, which records every null value a calculation needed
+  (key, reason, dependent features). A calculation that needed any null value returns
+  `{status:'unverified', missing}`; values a given input does not need are not read (for example,
+  LTCG breakpoints only when there are gains).
 - Sunset provisions carry `sunsetYear`. After it, law is modeled as written (the provision is absent),
   which is a labeled assumption.
 
-## 3. Income and contributions [M2]
+## 3. Income and contributions [M2, final]
 
 ### 3.1 Salary, raises, bonus (per person, working years)
 - `base_1 = baseSalary`. For t ≥ 2: `base_t = base_{t−1}·(1 + g_t)`, where `g_t` is the override for
@@ -110,54 +119,70 @@ Deterministic forecast only. `ρ_m = (1+ρ)^{1/12} − 1`. Each month, the balan
   - fixed: `b_1 = amount`, then `b_t = b_{t−1}·(1+g_t)` (with salary), `·(1+q)` (own rate), or
     unchanged (flat).
 - Part-time phase: `pt_t = annualIncome·P_t` for ages in [startAge, endAge). FICA applies; there
-  are no plan deferrals (simplification).
+  are no plan deferrals (simplification). Part-time income is added to any salary in the same year.
+- Salary stops at `stopAge` (default: retirement age); after that, salary and bonus are 0.
 
 ### 3.2 Eligible compensation
 - `E^def_t = min(base_t + [bonusCountsForDeferrals]·b_t, L^comp_t)`
 - `E^match_t = min(base_t + [bonusCountsForMatch]·b_t, L^comp_t)`
-- `L^comp` is the 401(a)(17) compensation limit.
+- `L^comp` is the 401(a)(17) compensation limit. The compensation path itself is rule-free (it
+  reports eligible pay before `L^comp`); the limit is applied where it matters: to the pay the
+  deferral percentages apply to (scaled pro rata when above `L^comp`) and to the match base
+  (`capContributions`). When `L^comp` is unverified, requested deferrals are shown on uncapped pay and
+  labeled "before limits".
 
 ### 3.3 Employee deferrals
 - Requested traditional deferral: `d^T = p^T_sal·base + p^T_bon·b`, and likewise Roth. If the bonus
   does not count for deferrals, the bonus percentages are ignored and a warning is shown. Salary
   dollars above `L^comp` are excluded.
-- Auto-escalation: `p_t = min(cap, p_1 + step·(t−1))` for the chosen bucket.
+- Auto-escalation: `p_t = min(cap, p_1 + step·(t−1))` for the chosen bucket; an election already
+  at or above the cap stays where it is.
 
 ### 3.4 Limits (warnings and caps, never silent truncation)
 - Employee limit:
   - `L^emp = L^402g + catchUp(age)`, where `catchUp` is `catchUp60to63` for ages 60–63,
     `catchUp50` for ages ≥ 50 otherwise, and 0 below 50.
   - 401(k) and 403(b) deferrals are aggregated per person. A 457(b) has its own equal limit.
+  - Requested deferrals fill the base room `max(0, L^402g − other aggregated deferrals)` first; the
+    excess, up to `catchUp(age)`, is the catch-up portion.
   - If requested > allowed, both buckets are scaled pro rata to fit, with a `deferralCapped` warning.
 - Roth catch-up: if it is in force for `Y_t` and the prior-year FICA wages exceed the threshold
   (projected wages are used for t ≥ 2; the user input is used for year 1), the catch-up portion is
   Roth. If the plan offers no Roth, the catch-up is disallowed and a warning is shown. If the year-1
   input is unknown, the catch-up stays as elected and a warning is shown.
-- 415(c): (employee excluding catch-up) + employer ≤ `min(L^415, 100% of compensation)`. The employer
-  amount is reduced first (simplification; real plans correct by refund), with a warning.
+- 415(c): (employee excluding catch-up) + employer ≤ `min(L^415, 100% of compensation)`, where
+  compensation is the eligible pay for the match (simplification). Employer money is reduced, the
+  match before the flat contribution (simplification; real plans correct by refund), with a warning.
 
 ### 3.5 Employer match (single `EmployerMatchRule`)
 - The deferral rate is `δ = (d^T + d^R)/E^match`. Tier k covers the band
   `[a_k, a_k + β_k)` with `a_1 = 0` and `a_{k+1} = a_k + β_k`.
 - `m_k = rate_k · max(0, min(δ, a_k+β_k) − a_k) · E^match`, and `match = min(Σ m_k, annualCap)`.
 - `flat = flatPct · E^match`.
-- Readout:
-  - full-capture rate `δ* = Σ_{k: rate_k>0} β_k`, i.e. `δ*·E^match` dollars;
+- Readout (per plan, on the requested deferrals, before limits):
+  - full-capture rate `δ*` = the end of the last tier with a positive rate; if a dollar cap binds
+    inside tier k, `δ* = a_k + (cap − match before tier k)/(rate_k·E^match)`; dollars `δ*·E^match`;
   - possible match `= min(Σ rate_k β_k E^match, cap)`;
   - unclaimed `= possible − match`.
-  - The `δ*` dollars are also checked against `L^emp`; the readout notes when the limit prevents
-    full capture.
+  - The readout is labeled "before plan limits" while the limits are unverified. The after-limit
+    match (with 401(a)(17) and 415(c)) is in the preview rows when the limits are verified.
 - **Vesting:** employer dollars are tracked in an `unvested` sub-ledger that grows at the account's
   return. At separation (retirement), the forfeiture is
   `unvested·(1 − v(years of service at separation))`, and it is shown as `forfeited`.
-  Simplification: the vesting fraction applies to the whole employer sub-ledger.
+  Simplification: the vesting fraction applies to the whole employer sub-ledger. M2 shows the vested
+  share at the end of each preview year; the forfeiture itself is applied in the projection (M3).
 
 ### 3.6 Non-workplace contributions
 - Dollar or percent-of-salary schedules, growing flat, with inflation, or at a set rate, between the
   start and stop years.
-- `maxAllowed` contributes the year's limit after eligibility caps.
+- `maxAllowed` contributes the year's limit after eligibility caps; for taxable, cash and other
+  accounts (no limit) it contributes nothing. Percent-of-salary schedules apply to base salary.
+  Dollar schedules grow from year 1. Monthly amounts are ×12. A schedule is active from its start
+  year (default year 1) through its stop year (default the owner's last working year).
+- HSA schedules are processed before IRAs, so this year's HSA contributions reduce the MAGI used
+  for Roth IRA eligibility.
 - IRA:
-  - annual limit plus catch-up (50+), shared by traditional and Roth IRAs;
+  - annual limit plus catch-up (50+), shared by traditional and Roth IRAs (filled in account order);
   - capped at the person's own earned income (spousal IRA unsupported);
   - the Roth IRA amount is further reduced by the phase-out (§3.7).
 - HSA:
@@ -165,21 +190,30 @@ Deterministic forecast only. `ρ_m = (1+ρ)^{1/12} − 1`. Each month, the balan
   - blocked without HDHP attestation.
 
 ### 3.7 Roth IRA eligibility
-- MAGI defaults to `salary + bonus − traditional deferrals − HSA contributions + other taxable
-  income`, a documented simplification the user can override.
+- MAGI defaults to `salary + bonus − traditional deferrals − HSA contributions + part-time income`,
+  summed over both people for married filing jointly, a documented simplification the user can
+  override (`magiOverride` on the Roth IRA account).
 - Over the phase-out range `[A, B]`:
   - `allowed = L` for MAGI ≤ A, and 0 for MAGI ≥ B;
-  - otherwise `allowed = L·(B − MAGI)/(B − A)`, rounded per the IRS worksheet (Pub 590-A): up to the
-    next $10, with a $200 minimum if above 0. These rounding rules must be verified at source before
-    M2; if they can't be, the reduced-contribution path is marked unverified.
+  - otherwise `allowed = L·(B − MAGI)/(B − A)`, rounded up to a multiple of the worksheet increment
+    with a minimum when above 0. Both the increment and the minimum are rule values
+    (`standing:roth.reducedContributionRounding`, Pub 590-A worksheet). They are currently
+    unverified, so the reduced-contribution path returns `unverified`. The full and ineligible paths
+    don't need them.
+  - Then `allowed = min(allowed, earned income) − other IRA contributions this year` (floored at 0).
 
 ### 3.8 Accumulation-phase cash flow
-- `netPay = wages + bonus + partTime − federalTax − FICA − stateTax` (taxes per §6, with traditional
-  deferrals and HSA payroll contributions pre-tax).
-- `surplus = netPay − all employee contributions (workplace + IRA + HSA + scheduled) − spending_t`.
-- If `surplus < 0`, the plan is flagged **infeasible** with a warning. Balances still assume the plan
-  is carried out, and the shortfall is shown, not hidden.
-- If `surplus > 0`, it goes to the chosen account (default: spent).
+- `netPay = wages + bonus + partTime + other income − federalTax − FICA − stateTax` (taxes per §6;
+  traditional deferrals and HSA contributions are excluded from income-tax wages; FICA is on gross
+  wages, which slightly overstates FICA for payroll HSA contributions).
+- `surplus = netPay − all employee contributions (workplace after limits + scheduled IRA/HSA/taxable/
+  cash) − spending_t`, where spending is current spending while anyone is working and retirement
+  spending once everyone is retired.
+- In years with someone working, `surplus < 0` flags the plan **infeasible** with a warning. Balances
+  still assume the plan is carried out, and the shortfall is shown, not hidden.
+- If `surplus > 0`, it goes to the chosen account (default: spent). Routing happens in the
+  projection (M3); the M2 preview only reports the surplus.
+- Every figure that needs an unverified rule (limits, taxes) is null and labeled in the UI.
 
 ## 4. Accounts, growth and fees [M3]
 - Expected return precedence: `account.expectedReturn`, then the allocation-implied
@@ -206,18 +240,22 @@ Deterministic forecast only. `ρ_m = (1+ρ)^{1/12} − 1`. Each month, the balan
 ## 6. Tax model (simplified, documented) [M4; payroll and ordinary tax used in M2 net pay]
 - Ordinary income = wages − pre-tax deductions + traditional withdrawals + taxable pensions + taxable
   other income + taxable SS + HSA non-medical withdrawals.
-- Deduction = standard deduction(status) + additional 65+ amounts per eligible filer + the senior
-  deduction (per eligible filer, phased out at `rate × (MAGI − start)` if verified; a sunset applies).
+- Deduction = standard deduction(status) + additional 65+ amounts per eligible filer (the married
+  amount for MFJ, the unmarried amount for single) + the senior deduction (per eligible filer,
+  phased out at `rate × (MAGI − start)`, MAGI = AGI as a simplification). The senior deduction is
+  absent after its verified sunset year (law as written); while its amount is unverified it counts as
+  in force, so 65+ tax results are `unverified`.
 - Taxable ordinary = `max(0, ordinary − deduction)`. Tax = Σ over brackets.
-- LTCG are stacked on top of ordinary taxable income: 0% up to `zeroRateMax`, 15% up to
-  `fifteenRateMax`, and 20% above. Any unused deduction offsets gains first.
+- LTCG are stacked on top of ordinary taxable income: the low rate up to `zeroRateMax`, the middle
+  rate up to `fifteenRateMax`, and the high rate above. The three rates are rule values
+  (`standing:capitalGainsRates`). Any unused deduction offsets gains first.
 - Taxable SS (Pub 915):
   - `PI = otherIncome + taxExempt + ½·SS`.
   - If PI ≤ base, taxable SS is 0.
   - If base < PI ≤ adjusted, it is `min(½(PI − base), ½SS)`.
   - Above adjusted, it is `min(0.85·SS, 0.85·(PI − adjusted) + min(½(adjusted − base), ½SS))`.
-- FICA: 6.2% of wages up to the wage base (per person) plus 1.45% of all wages. Additional Medicare
-  tax is unsupported.
+- FICA: the OASDI rate on each person's wages up to the wage base, plus the Medicare rate on all
+  wages (rates and wage base are rule values). Additional Medicare tax is unsupported.
 - State tax = flat rate × federal AGI (simplification).
 - Taxes are never negative; a property test checks this.
 - Filing status is MFJ through the first death year and single from the following year.
@@ -411,3 +449,8 @@ descriptive language ("In this model, …"), with its assumptions disclosed.
 - Glide paths; fat tails.
 - Early-withdrawal penalties (flag only).
 - Plan-specific match true-ups (annual model assumes a true-up).
+- HSA: when both spouses have family-coverage HSAs, the family limit is applied to each account
+  separately rather than shared (simplification).
+- Roth IRA page: a traditional IRA set to "maximum allowed" is not subtracted in the page's readout
+  (stated on the page); the engine preview does account for it.
+- 457(b) and 401(k)/403(b) catch-ups are not coordinated across plans.
