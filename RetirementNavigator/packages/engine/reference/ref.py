@@ -220,7 +220,21 @@ def project(h: dict, current_year: int, return_offset: float = 0.0) -> dict:
             basis[x["id"]] = d(x["costBasis"])
         elif x["type"] == "rothIra":
             basis[x["id"]] = d(x["contributionBasis"])
-    unvested = {x["id"]: d(x.get("unvestedEmployerBalance", 0)) for x in accounts}
+    # §4: the sub-ledger holds employer money subject to vesting; the entered unvested balance is the
+    # part not vested today, U0 = E0·(1 − v0), so E0 = U0 / (1 − v0). With no linked plan (or v0 = 1)
+    # the entered amount is never forfeited.
+    unvested = {x["id"]: 0.0 for x in accounts}
+    for k, p in enumerate(people):
+        for w in p.get("workplacePlans", []):
+            pl0 = plan_of(w)
+            dest0 = pl0["rothAccountId"] if pl0["dest"] == "roth" else pl0["traditionalAccountId"]
+            x0 = acct_by_id.get(dest0)
+            if x0 is None:
+                continue
+            u0 = min(d(x0.get("unvestedEmployerBalance", 0)), d(x0["balance"]))
+            v0 = vested_fraction(pl0["vesting"], pl0["yos0"])
+            if u0 > 0 and v0 < 1:
+                unvested[dest0] = u0 / (1.0 - v0)
 
     # Per-plan vesting state: separated flag and projection years worked.
     plan_state = [[{"separated": False, "worked": 0} for _ in pl] for pl in plans]
@@ -311,7 +325,8 @@ def project(h: dict, current_year: int, return_offset: float = 0.0) -> dict:
                 if ptp is not None and alive and ptp["startAge"] <= age < ptp["endAge"]:
                     pt = d(ptp["annualIncome"]) * price
             prow.append(
-                {"age": age, "alive": alive, "retired": retired, "working": working, "base": base, "bonus": bonus, "pt": pt}
+                # §1.4: retired = at or past the retirement age and drawing no salary.
+                {"age": age, "alive": alive, "retired": retired and not working, "working": working, "base": base, "bonus": bonus, "pt": pt}
             )
 
         phase = "retirement" if all(r["retired"] for r in prow if r["alive"]) else "accumulation"
@@ -429,6 +444,9 @@ def project(h: dict, current_year: int, return_offset: float = 0.0) -> dict:
         other = 0.0
         for inc in h.get("otherIncome", []):
             end_y = inc.get("endYear")
+            owner_k = person_idx.get(inc.get("ownerId")) if inc.get("ownerId") is not None else None
+            if owner_k is not None and year > people[owner_k]["birthYear"] + people[owner_k]["planningAge"]:
+                continue  # §1.4: owned income stops after the owner's planning age
             if inc["startYear"] <= year and (end_y is None or year <= end_y):
                 v = d(inc["annualAmount"])
                 gm = inc.get("growth", {"mode": "inflation"})
@@ -448,7 +466,8 @@ def project(h: dict, current_year: int, return_offset: float = 0.0) -> dict:
             avail = max(0.0, income - need)
             if req > avail + 1e-9:
                 scale = avail / req if req > 0 else 0.0
-                sched = {k2: whole_cents(v * scale) for k2, v in sched.items()}
+                # §1.3: scaled amounts round down to whole cents so they never exceed the income left over.
+                sched = {k2: math.floor(v * scale * 100 + 1e-9) / 100 for k2, v in sched.items()}
                 warnings.add("retirementContributionsReduced")
             need_w = max(0.0, need + sum(sched.values()) - income)
         else:
@@ -590,14 +609,19 @@ def project(h: dict, current_year: int, return_offset: float = 0.0) -> dict:
 
     ending = rows[-1]["totals"]["portfolioEnd"]
     ending_real_float = sum(bal.values()) / price
-    primary = people[0]
     summary = {
         "firstYear": y1,
         "lastYear": last,
         "retirementYear": retirement_year,
         "firstDeathYear": first_death_year,
         "depletionYear": depletion_year,
-        "depletionAge": (depletion_year - primary["birthYear"]) if depletion_year is not None else None,
+        # §8: the age of the first listed person still alive in the depletion year.
+        "depletionAge": next(
+            (depletion_year - p["birthYear"] for p in people if depletion_year <= p["birthYear"] + p["planningAge"]),
+            None,
+        )
+        if depletion_year is not None
+        else None,
         "endingBalance": ending,
         "endingBalanceReal": cents(ending_real_float),
         "infeasibleYears": [],
@@ -1210,6 +1234,114 @@ case(
 # --------------------------------------------------------------------------------------------
 # CLI
 # --------------------------------------------------------------------------------------------
+
+
+case(
+    "part-time-and-owned-income-stop-at-death",
+    "Couple both 70: B (planning age 75) has part-time pay to 95 and owns rental income; both stop after B's"
+    " planning age (§1.4), so withdrawals rise from 2032. Mid-year timing, 2% inflation.",
+    household(
+        [
+            person("person-1", Y - 70, 65, 90),
+            person(
+                "person-2",
+                Y - 70,
+                65,
+                75,
+                employment={
+                    "baseSalary": 0,
+                    "raise": {"mode": "nominal", "rate": 0},
+                    "partTime": {"startAge": 70, "endAge": 95, "annualIncome": usd(30_000)},
+                },
+            ),
+        ],
+        [acct("cash", "cash", "person-1", 400_000, expectedReturn=0.03)],
+        0,
+        60_000,
+        inflation=0.02,
+        otherIncome=[
+            {
+                "id": "rent",
+                "name": "Rent",
+                "ownerId": "person-2",
+                "startYear": Y,
+                "annualAmount": usd(6_000),
+                "growth": {"mode": "flat"},
+            }
+        ],
+    ),
+)
+
+case(
+    "salary-past-retirement-age",
+    "Retirement age 62 but salary stops at 65: still working (accumulation) until 65 (§1.4), then"
+    " withdrawals; 6% deferrals with a 100%-of-4% match, cliff vesting fully vested.",
+    household(
+        [
+            person(
+                "person-1",
+                Y - 60,
+                62,
+                80,
+                employment={"baseSalary": usd(90_000), "raise": {"mode": "nominal", "rate": 0.02}, "stopAge": 65},
+                workplacePlans=[
+                    {
+                        "id": "plan-1",
+                        "planType": "401k",
+                        "traditionalAccountId": "k401",
+                        "traditionalPctOfSalary": 0.06,
+                        "match": {
+                            "tiers": [{"matchRate": 1, "bandPctOfPay": 0.04}],
+                            "vesting": {"kind": "cliff", "years": 2},
+                            "yearsOfServiceAtStart": 5,
+                        },
+                    }
+                ],
+            )
+        ],
+        [acct("workplaceTraditional", "k401", "person-1", 300_000, expectedReturn=0.05)],
+        60_000,
+        45_000,
+        inflation=0.025,
+    ),
+)
+
+case(
+    "forfeiture-start-of-year-graded-seed",
+    "Graded vesting with 2 years of service at start and an entered unvested balance (the not-yet-vested"
+    " part, seeded as E0 = U0/(1 − v0), §4); separation after one year; start-of-year withdrawals.",
+    household(
+        [
+            person(
+                "person-1",
+                Y - 64,
+                65,
+                75,
+                employment={"baseSalary": usd(80_000), "raise": {"mode": "nominal", "rate": 0}},
+                workplacePlans=[
+                    {
+                        "id": "plan-1",
+                        "planType": "401k",
+                        "traditionalAccountId": "k401",
+                        "traditionalPctOfSalary": 0.05,
+                        "match": {
+                            "tiers": [{"matchRate": 0.5, "bandPctOfPay": 0.06}],
+                            "vesting": {"kind": "graded", "vestedByYear": [0.2, 0.4, 0.6, 0.8, 1]},
+                            "yearsOfServiceAtStart": 2,
+                        },
+                    }
+                ],
+            )
+        ],
+        [
+            acct("workplaceTraditional", "k401", "person-1", 120_000, unvestedEmployerBalance=usd(6_000), expectedReturn=0.04),
+            acct("cash", "cash", "person-1", 20_000, expectedReturn=0.02),
+        ],
+        50_000,
+        40_000,
+        withdrawalTiming="startOfYear",
+    ),
+)
 
 
 def fixture_for(c: dict) -> dict:

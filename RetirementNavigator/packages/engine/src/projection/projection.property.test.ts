@@ -247,9 +247,6 @@ function householdArb(r: ReturnRange = { min: -0.3, max: 0.3 }, spendingMax = 15
       for (const p of people) {
         p.person.planningAge = Math.min(p.person.planningAge, lastYear - p.person.birthYear);
         p.person.retirementAge = Math.min(p.person.retirementAge, p.person.planningAge);
-        if (p.person.employment?.partTime && p.person.employment.partTime.endAge > p.person.planningAge + 1) {
-          p.person.employment.partTime = null;
-        }
       }
       const owners = people.map((p) => p.person.id);
       const accounts = [
@@ -302,12 +299,51 @@ describe('projection properties (fast-check, fixed seeds)', () => {
     );
   });
 
-  it('reconciles every account row within ±1 cent and carries end → next start (10,000 runs)', () => {
+  it('reconciles every account row within ±1 cent, carries end → next start, and every end balance matches an independent recomputation within 3 cents (10,000 runs)', () => {
     fc.assert(
       fc.property(householdArb(), (input) => {
-        const r = project(parse(input));
+        const h = parse(input);
+        const r = project(h);
+        const accounts = new Map(h.accounts.map((acc) => [acc.id, acc]));
+        const { withdrawalTiming: timing, granularity, taxableAccountTaxDrag: drag } = h.assumptions;
         r.rows.forEach((row, i) => {
           for (const a of row.accounts) {
+            // Independent of the engine's reconciling item: recompute the year-end balance and the fee
+            // drag from the applied return with the §1.5 factors written out here (docs, not engine code).
+            const acc = accounts.get(a.accountId)!;
+            const taxable = acc.type === 'taxableBrokerage' || (acc.type === 'other' && acc.taxTreatment === 'taxable');
+            const rho = Math.max((1 + a.appliedReturn) * (1 - acc.expenseRatio) - 1 - (taxable ? drag : 0), -0.99);
+            const S = (a.start - a.forfeited) / 100;
+            const C = a.contributions / 100;
+            const W = (a.withdrawals - a.forfeited) / 100;
+            const endFor = (rate: number) => {
+              const gS = 1 + rate;
+              let gC: number;
+              let gW: number;
+              if (granularity === 'annual') {
+                gC = Math.sqrt(1 + rate);
+                gW = timing === 'midYear' ? gC : gS;
+              } else {
+                const rm = Math.pow(1 + rate, 1 / 12) - 1;
+                gC = Math.abs(rm) < 1e-15 ? 1 : rate / (12 * rm);
+                gW = timing === 'midYear' ? gC : gC * (1 + rm);
+              }
+              return gS * S + gC * C - gW * W;
+            };
+            const expectedEnd = Math.max(0, endFor(rho));
+            if (Math.abs(expectedEnd * 100 - a.end) > 3) {
+              throw new Error(
+                `${row.year} ${a.accountId}: end ${a.end} vs recomputed ${(expectedEnd * 100).toFixed(1)}`,
+              );
+            }
+            if (expectedEnd > 0) {
+              const expectedFee = endFor(a.appliedReturn) - endFor(rho);
+              if (Math.abs(expectedFee * 100 - a.feeDrag) > 3) {
+                throw new Error(
+                  `${row.year} ${a.accountId}: fee drag ${a.feeDrag} vs recomputed ${(expectedFee * 100).toFixed(1)}`,
+                );
+              }
+            }
             const gap = a.start + a.contributions + a.growthNet - a.withdrawals - a.end;
             if (Math.abs(gap) > 1) throw new Error(`${row.year} ${a.accountId}: off by ${gap} cents`);
             if (a.growthGross !== a.growthNet + a.feeDrag) throw new Error(`${row.year} ${a.accountId}: fee split`);

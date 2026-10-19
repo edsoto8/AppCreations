@@ -61,6 +61,21 @@ export function inBasis(cents: number, row: Pick<YearRow, 'deflator'>, basis: Do
   return basis === 'nominal' ? cents : cents / row.deflator;
 }
 
+/**
+ * A start-of-year balance is the prior year-end money, so in today's dollars it is deflated by the
+ * prior year's price level (1 in year 1): row t's start then equals row t−1's end on screen.
+ */
+export function startInBasis(
+  cents: number,
+  rows: readonly Pick<YearRow, 'deflator'>[],
+  index: number,
+  basis: DollarBasis,
+): number {
+  if (basis === 'nominal') return cents;
+  const prior = index > 0 ? rows[index - 1] : undefined;
+  return cents / (prior?.deflator ?? 1);
+}
+
 export function basisName(basis: DollarBasis): string {
   return basis === 'nominal' ? 'future dollars' : 'today’s dollars';
 }
@@ -98,7 +113,7 @@ export function forecastSeries(dashboard: DashboardResult, household: Household,
       year: row.year,
       ages: agesLabel(row, household),
       phase: row.phase,
-      start: v(row.totals.portfolioStart),
+      start: startInBasis(row.totals.portfolioStart, dashboard.baseline.rows, i, basis),
       contributions: v(row.flows.contributions),
       growth: v(row.flows.growthNet),
       withdrawals: v(row.flows.withdrawals),

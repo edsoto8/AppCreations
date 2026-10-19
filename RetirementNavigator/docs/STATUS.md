@@ -3,10 +3,14 @@
 Statuses: `done` · `simplified` (with limitation) · `unverified rule` · `not started`.
 
 ## Current phase
-**M2 Accumulation engine, income, accounts: built; tag pending.** Every M2 gate passes except two
-that need verified rule values: the IRS worked example for the Roth phase-out, and the owner's
-review of `docs/rules-verification.md`. Both wait on reaching irs.gov, ssa.gov and federalregister.gov
-(see Blockers). Next after the tag: **M3 Forecasting**.
+**M3 Forecasting: done.** Every M3 gate passes. It is tagged `m3-forecasting` locally (tag pushes
+are refused; see Handoff).
+
+**M2 is still untagged:** its gates wait on verified rule values and the owner's review of
+`docs/rules-verification.md`. irs.gov, ssa.gov and federalregister.gov remain unreachable (see
+Blockers).
+
+Next: **M4 Retirement income**.
 
 ## Milestone log
 | Milestone | Status | Tag | Date |
@@ -14,7 +18,32 @@ review of `docs/rules-verification.md`. Both wait on reaching irs.gov, ssa.gov a
 | Phase 0 (plan, contracts, doc drafts) | done (plan approved; contracts approved 2026-10-18) | — | 2026-10-18 |
 | M1 Foundation | done | `m1-foundation` (local only; see Handoff) | 2026-10-18 |
 | M2 Accumulation engine, income, accounts | built; **tag waits on verified rules + owner review** | — | 2026-10-19 |
-| M3–M8 | not started | | |
+| M3 Forecasting | done | `m3-forecasting` (local only) | 2026-10-19 |
+| M4–M8 | not started | | |
+
+## M3 gate evidence
+| Gate | Evidence | Result |
+|---|---|---|
+| Reconciliation property test passes 10,000 fast-check runs | `projection/projection.property.test.ts` (seed 20261019): per-row reconciliation and carry-forward, plus an **independent recomputation** of every year-end balance and fee drag from the §1.5 factors within 3 cents. Mutation-checked: a 0.01% change to one growth factor fails it. | pass |
+| Golden fixtures match the Python reference and external worked examples within $0.01 per year | `reference/ref.py` (independent; written from the docs by a QA pass that did not read the engine source), 19 fixtures, `golden.test.ts` at 1-cent tolerance. **Every figure matches exactly** (also checked at 0 cents). External worked examples: annuity-due table ä(10, 5%) = 8.1078; $100/month at 0.5%/month for 10 years = $16,387.93; PVIFA(0.5%, 240) × 1.005 = $140,278.68. | pass |
+| Zero-return and annuity closed-form cases exact | `project.test.ts`: zero return/zero inflation depletion exact to the cent, FV of mid-year contributions exact, level and growing annuities within 2 cents of a rounded-up starting balance (cent rounding of the input) | pass |
+| + Conservative ≤ default on paths with every net rate ≥ 0; never negative; monotonic contributions; offset ordering | property tests (1,000 / 1,000 / 500 / 500 runs) | pass |
+| + Dashboard recalculation < 100 ms | `pnpm bench` (Node 22, 4-core Xeon 2.1 GHz; Node, not a browser): median 4.8–31.1 ms, p95 ≤ 46.9 ms, max 70.6 ms per `computeDashboard` (3 projections). Runs on the main thread; phone throttling is re-checked in M8. | pass |
+| + `pnpm verify` green (now includes `pnpm reference`) | typecheck, lint, format, unit (engine + web), reference check, build, E2E | pass |
+
+### M3 test results (2026-10-19, this container)
+- Engine: 16 files, 348 tests. Coverage 99.3% lines, 92.5% branches, 98.6% functions.
+- Web: 20 files, 101 tests (RTL); 91.2% lines, 76.1% branches.
+- Python reference: `OK: 19 fixtures match the reference`.
+- E2E: 24 passed, desktop and mobile. The dashboard tests check:
+  - all ten cards, the scope labels and the dollar toggle;
+  - every chart data table;
+  - that forecast settings change the result;
+  - axe in light and dark with every table open (0 violations);
+  - no horizontal overflow at phone width, no outbound requests, no console errors.
+- Visual: 40 screenshots (10 pages × desktop/mobile × light/dark) read back.
+- Bundle: JS 1,159 kB (349 kB gzip; Recharts added about 420 kB), CSS 36 kB. Code-splitting is in
+  the M8 performance pass.
 
 ## M2 gate evidence
 | Gate | Evidence | Result |
@@ -60,7 +89,18 @@ review of `docs/rules-verification.md`. Both wait on reaching irs.gov, ssa.gov a
 | HSA page (coverage, HDHP attestation, limit, medical expenses) | done / **unverified rule** | Withdrawals in M4 |
 | Sample profiles (4), onboarding, multiple profiles | done | |
 | Sub-agents and skills | simplified | Skills are discovered; agents are not (R3); delegation uses general-purpose agents told to follow the definitions |
-| M3–M8 features | not started | Placeholders show no figures |
+| Projection engine (per-year rows, per-account flows, nominal and real, fees and taxable drag, mid-year / start-of-year timing, monthly mode, return precedence, offsets, market shock) | done | `projection/`; validated against the Python reference |
+| Contributions in the forecast | done / **unverified rule** | Owner decision 2026-10-19: as elected, **before plan limits**, labeled, while limits are unverified. This can overstate savings for people above the limits. |
+| Accumulation cash flow in the forecast | done / **unverified rule** | Net pay, surplus and the tax-based infeasible flag are null while taxes are unverified. A rule-free check still flags years where pay is below spending. Surplus routing works only with verified taxes. |
+| Vesting forfeiture at separation | done | The entered unvested balance is the not-yet-vested part; tests cover cliff and graded |
+| Part-time phase in the projection | done | Stops at the person's modeled death |
+| Simple withdrawals (taxable first, traditional first, Roth last, proportional) | simplified | Before taxes until M4. Bracket fill falls back to taxable first with a warning. |
+| Dashboard cards (10) with formula docs and tests; readiness heuristic | done | Retirement income is "before taxes" until M4 |
+| Forecast chart (baseline, fixed-offset lines, retirement / first-death / depletion markers, annual flows), today's/future toggle | done | Every chart has a data table |
+| Allocation views (a) account type, (b) tax treatment | done | (c) asset class in M6 |
+| Forecast settings (timing, granularity, order, surplus, offsets, minimum ending balance) | done | Profile page |
+| SS, pensions, one-time events, RMDs, retirement taxes, spending steps/glide/healthcare, survivor reduction | not started (M4) | Disclosed on the dashboard (`featureNotModeled`) |
+| M5–M8 features | not started | Placeholders show no figures |
 
 ## Blockers and risks
 - **Rules sources unreachable.** irs.gov, ssa.gov and federalregister.gov are blocked by this
@@ -78,6 +118,40 @@ review of `docs/rules-verification.md`. Both wait on reaching irs.gov, ssa.gov a
   or ask for the definitions to be mirrored to the repo-root `.claude/`.
 - **R4:** Benchmarks run on a 4-core cloud container. Phone numbers will come from emulated
   (throttled) runs.
+- **R5 (M3):** Until rules are verified, the forecast's contributions are before plan limits (savings
+  may be overstated for high savers). Until M4, retirement has no Social Security, pensions or
+  taxes, so most sample profiles read "At risk". The dashboard banner states both.
+- **R6 (M3):** The Python reference does not yet cover the verified-rules path (limits, taxes,
+  surplus routing) or "other" accounts. Those are covered by engine unit tests against the synthetic
+  fixture only.
+
+## Review findings (M3)
+The code-reviewer pass ran as a general-purpose agent following `.claude/agents/code-reviewer.md`
+(range `fcc4b63..805af3a`). It confirmed each finding with probe tests. Before that, the independent
+QA reference had already found four discrepancies, all resolved: contribution rounding was
+documented as whole cents; real portfolio value moved to unrounded floats; flow totals were
+documented as sums of account cents; and the bonus warning code was fixed.
+
+| # | Finding | Severity | Resolution |
+|---|---|---|---|
+| B1 | Part-time pay continued after the earner's planning age (modeled death) | blocking | Fixed: part-time pay and owner-linked other income stop from the death year. Engine test, a reference fixture, and the property generator no longer drops this case. |
+| B2 | Graded vesting under-counted the forfeiture of the entered "unvested" balance | blocking | Fixed: the ledger starts at `U0/(1 − v0)` (employer money subject to vesting), with a warning when nothing can forfeit it. Doc, engine, reference and tests updated together. |
+| B3 | The 10,000-run reconciliation was tautological (growthNet is the reconciling item), and §1.3 cited a missing test | blocking | Fixed: the same 10,000 runs now recompute every end balance and fee drag independently (within 3 cents), mutation-checked; §1.3 corrected |
+| S1 | A salary stop age after the retirement age gave "retirement" rows with salary | should fix | Fixed: retired means at or past the retirement age **and** no salary. Fixture and test added; the UI explains a later stop age. |
+| S2 | Working-year funding gaps were hidden while taxes are unverified | should fix | Fixed: a rule-free check (pay + other income < spending) flags the year with a warning |
+| S3 | Today's-dollar start balances were deflated one year too many | should fix | Fixed: starts divide by `P_{t−1}` (card and tables); doc §1.1 and §8; engine and RTL tests |
+| S4 | `inflationOverride` half-wired and could throw | should fix | Validated (`invalid`, never throws). Documented as deflator/spending only until M6 wires stochastic inflation through. |
+| S5 | Longevity could report a deceased person's age | should fix | Fixed: the age is that of the first listed person still alive (`longevity.personId`, contract 1.5.0) |
+| S6 | Granularity tip and scope banner overstated | should fix | Fixed wording |
+| S7 | Reference coverage gaps | should fix | Added fixtures for death, stop age and forfeiture with start-of-year timing (19 total). The rest is recorded in `testing-strategy.md` and R6. |
+| S8 | STATUS not updated | should fix | This update |
+| — | Rounded scaled retirement contributions could cause a 1-cent false depletion | optional | Fixed: scaled amounts round down |
+| — | Monthly real card values rounded twice | optional | Fixed: one rounding |
+| — | Card test compared against the engine's own row | optional | Fixed: an independent closed-form value |
+| — | Unvested money on an unlinked account is never forfeited | optional | Now warned |
+| — | Income/surplus cards lack the limits badge; first-death marker for someone already past their planning age | optional | Kept (minor); revisit in M4 |
+
+No open blocking or should-fix findings.
 
 ## Review findings (M2)
 The code-reviewer pass ran as a general-purpose agent following `.claude/agents/code-reviewer.md`
@@ -133,6 +207,8 @@ No open findings.
 | 1.1.0 | 2026-10-18 | From the M1 review: stricter household validation (cross-references and invariants), `InflationRateSchema` bound (−50%, 50%], factory defaults, `SettingsDoc.theme` removed (the theme lives in localStorage for pre-paint), offset timestamps accepted. No stored documents existed, so no migration is needed. `resolveRules` implemented (M2, signature unchanged). |
 | 1.2.0 | 2026-10-19 | M2 additions, **not purely additive**: `TaxInput.wagesByPerson` is a new required input (per-person wage base; breaks existing callers); `StandingRulesSchema` gains two required keys, `capitalGainsRates` and `roth.reducedContributionRounding` (sourced rule values instead of literals). Additive: `CompensationYear.age/working`; `previewAccumulation` and its row types (per-plan rows, cash-flow warnings, per-account `scheduled` amounts). M2 functions implemented and re-exported from `api.ts` with unchanged signatures. No stored documents carry these types, so no migration is needed. |
 | 1.3.0 | 2026-10-19 | From the M2 review, **not purely additive**: `ContributionRequest.compensation` is a new required input (415(c) 100%-of-compensation test). Additive: `CashFlowPreviewRow.rothIra` with the new `RothIraYear` type; warning code `bonusDeferralIgnored`; `impliedRaise`, `priceIndex` and `ageInYear` exported. Test-only subpath `@rn/engine/testing` (synthetic fixture rules; ESLint bans it in app code). No stored documents change. |
+| 1.4.0 | 2026-10-19 | M3, **not purely additive**: `YearRow.cashFlow.netPay/surplus/infeasible`, `netIncome` and `real.netIncome` are now nullable (taxes are never filled in); `flows.forfeited` and `flows.surplusRouted` are new required fields; warning codes `featureNotModeled`, `withdrawalStrategyFallback` and `retirementContributionsReduced`; new `DashboardCards`, `DashboardResult` and `computeDashboard`; `projectHousehold` implemented; `CONTRACT_VERSION` moved to `contractVersion.ts` (re-exported from `api.ts`). No stored documents are affected. |
+| 1.5.0 | 2026-10-19 | From the M3 review: `DashboardCards.longevity` (depletes) gains a required `personId`; the `summary.depletionAge` and `retirementYear` comments are corrected to their definitions. No stored documents are affected. |
 
 ## Traceability (BRIEF §5 → milestone)
 | Feature | Milestone |
@@ -147,8 +223,9 @@ No open findings.
 | Roth IRA eligibility, limits, readout; Roth-vs-trad link stub | M2 ✅ (unverified; calculator M7a) |
 | HSA inputs and limits | M2 ✅ (unverified; withdrawals M4) |
 | Sample profiles, onboarding, multiple profiles | M2 ✅ |
-| Projection rows, reconciliation, fees, timing modes, monthly mode | M3 |
-| Dashboard cards + formula docs, forecast chart, offsets, markers, real/nominal toggle, allocation (a)(b) | M3 (death marker M4; readiness MC M6) |
+| Projection rows, reconciliation, fees, timing modes, monthly mode | M3 ✅ |
+| Dashboard cards + formula docs, forecast chart, offsets, markers (incl. first death), real/nominal toggle, allocation (a)(b) | M3 ✅ (readiness MC M6) |
+| Part-time phase projection, surplus routing, vesting forfeiture | M3 ✅ (surplus routing needs verified taxes) |
 | Spending plan, SS (entered / illustrative / spousal / survivor / reduction), pensions, one-time events, taxable basis and drag | M4 |
 | Withdrawal ordering, RMDs, tax model, gross-up solver, survivor modeling, gross-to-net, HSA and Roth withdrawals | M4 |
 | Scenarios CRUD, diff, presets A–G, compare, deterministic optimizer | M5 |
@@ -158,29 +235,50 @@ No open findings.
 | Full E2E, axe audit, performance, independent validation, user guide | M8 |
 
 ## Handoff
-- **Done in M2:**
-  - Engine: compensation, match, workplace/IRA/HSA limits, Roth eligibility, tax model, the
-    Income & Savings preview, rules data and resolver.
-  - UI: profiles, onboarding, Profile, Income & Savings, Accounts, Roth IRA, HSA, Rules & Sources.
-  - Tests: 275 engine and 88 web unit tests; 18 E2E tests.
-  - The M2 code review: all blocking and should-fix findings fixed (see Review findings (M2)).
-- **To tag M2 (`m2-accumulation`):**
+- **Done in M3:**
+  - Engine `projection/`: `projectHousehold` (annual and monthly, both timings, fees and drag,
+    vesting forfeiture, surplus routing, simple withdrawals before taxes) and `computeDashboard`
+    (cards, readiness, ±offset reruns).
+  - The forecast follows the owner decision (§1.7): unverified steps are left out and labeled.
+  - Validation:
+    - an independent Python reference with 19 fixtures, matching exactly;
+    - property tests (10,000-run reconciliation with independent recomputation);
+    - closed forms and annuity tables;
+    - `pnpm bench`.
+  - UI: the dashboard (cards, forecast chart, allocation views, year-by-year table, scope banner)
+    and forecast settings on the Profile page.
+  - Tests: 348 engine and 101 web unit tests; 24 E2E tests; 40 screenshots read back.
+- **To tag M2 (`m2-accumulation`), unchanged:**
   1. Make irs.gov, ssa.gov and federalregister.gov reachable (environment network settings, likely
      in a new session).
-  2. Verify each value at source (see the procedure in `docs/rules-verification.md`) and add the IRS
-     Pub 590-A worked example test for the Roth phase-out.
+  2. Verify each value at source (procedure in `docs/rules-verification.md`) and add the IRS
+     Pub 590-A worked example test.
   3. Owner spot-checks the top 15 values.
   4. Tag.
-- **Next (M3 Forecasting):**
-  - Projection engine: accounts growth and fees, timing modes, monthly mode, per-row reconciliation,
-    surplus routing, vesting forfeiture, simple withdrawals.
-  - Python reference script and golden fixtures.
-  - Dashboard cards with formula docs; forecast chart with offsets and markers; allocation views
-    (a) and (b); real/nominal toggle.
-- **Frozen contracts:** `packages/engine/src/domain/*`, `packages/engine/src/api.ts` (1.3.0).
-- **Tags:** the session's git proxy refused to push tags (HTTP 403), though branch pushes work.
-  `m1-foundation` is local only, pointing at the commit titled "fix(RetirementNavigator): resolve M1
-  review findings; start M2 rules data". To publish it from a clone:
-  `git tag -a m1-foundation <that commit> -m "M1 Foundation" && git push origin m1-foundation`.
-- **Open risks:** rule sourcing (blocked), agent discovery (R3), tag publishing (above), bundle size
-  (740 kB JS, to code-split in M8).
+- **Next (M4 Retirement income):**
+  - Spending plan: steps, glide, pre-Medicare healthcare, survivor reduction.
+  - Social Security: entered, illustrative, spousal and survivor benefits, plus the
+    benefit-reduction option.
+  - Pensions and one-time events.
+  - Taxes in retirement: the RMD tax model with the gross-up solver, bracket-fill withdrawals,
+    gross-to-net, HSA medical and Roth-basis withdrawals, survivor filing.
+  - All of these rules are currently unverified, so they follow the §1.7 pattern or return
+    `unverified`.
+  - Also in M4:
+    - extend the Python reference to the verified path (R6);
+    - wire `inflationOverride` fully, ahead of M6;
+    - move statutory ages into the rules data (M2 note);
+    - fix the minor optional items from the M3 review.
+- **Frozen contracts:** `packages/engine/src/domain/*`, `packages/engine/src/api.ts` (1.5.0).
+- **Tags:** the session's git proxy refuses tag pushes (HTTP 403); branch pushes work.
+  `m1-foundation` and `m3-forecasting` exist locally only. To publish from a clone, recreate them on
+  the commits titled "fix(RetirementNavigator): resolve M1 review findings; start M2 rules data" and
+  "fix(RetirementNavigator): resolve M3 review findings", for example
+  `git tag -a m3-forecasting <commit> -m "M3 Forecasting" && git push origin m3-forecasting`.
+- **Open risks:**
+  - rule sourcing (blocked);
+  - agent discovery (R3);
+  - tag publishing (above);
+  - before-limits and no-SS readings (R5);
+  - reference coverage (R6);
+  - bundle size (1,159 kB JS, to code-split in M8).

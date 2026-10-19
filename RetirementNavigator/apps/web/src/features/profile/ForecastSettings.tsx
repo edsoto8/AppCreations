@@ -133,7 +133,7 @@ export function ForecastSettings({
           control={control}
           name="assumptions.granularity"
           label="Forecast granularity"
-          tip="Annual steps a year at a time. Monthly applies growth and flows month by month; results differ from annual by well under 1% of each year’s net flow. Monthly applies to the deterministic forecast only."
+          tip="Annual steps a year at a time. Monthly applies growth and flows month by month; with mid-year timing the results differ from annual by under 0.75% of each year’s net flow (returns between −15% and +15%); with start-of-year timing the difference is larger (about 3% at a 7% return). Monthly applies to the deterministic forecast only."
           example="Default: annual."
           options={[
             { value: 'annual', label: 'Annual (default)' },

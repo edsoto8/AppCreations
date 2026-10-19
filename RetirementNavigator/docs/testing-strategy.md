@@ -38,10 +38,18 @@ examples (Pub 590-A phase-out, Pub 915) are added against the real data.
     every figure exactly.
   - `pnpm reference` (`ref.py --check`, part of `pnpm verify`) recomputes the fixtures and fails on
     any change.
+  - 19 fixtures, including part-time pay and owned income stopping at death, a salary stop age after
+    the retirement age, and graded-vesting forfeiture with start-of-year timing.
+  - **Not covered by the reference** (engine unit tests against the synthetic fixture rules only):
+    - the verified-rules path (limits applied, taxes, net pay, surplus routing, the tax-based
+      infeasible flag);
+    - "other" accounts.
+    The reference would need its own fixture-rules support; planned with the M4 tax model.
 - **Closed forms:** zero return (exact), FV of mid-year contributions, level and growing annuities,
   annuity due, and monthly annuity tables (`project.test.ts`, `golden.test.ts`).
 - **Properties** (`projection.property.test.ts`, fixed seeds):
-  - reconciliation and carry-forward, 10,000 runs;
+  - reconciliation and carry-forward plus an **independent recomputation** of every year-end balance
+    and fee drag from the §1.5 factors (within 3 cents), 10,000 runs (mutation-checked);
   - no negative figures through depletion;
   - start-of-year ≤ mid-year when every net rate ρ ≥ 0;
   - more contributions never lower the balance at retirement;

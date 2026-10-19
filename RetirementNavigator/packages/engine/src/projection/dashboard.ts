@@ -22,15 +22,26 @@ export function dashboardCards(
   const retirementYear = baseline.summary.retirementYear;
   const retirementRow = rows.find((r) => r.year === retirementYear) ?? rows[rows.length - 1];
   const deflator = retirementRow?.deflator ?? 1;
+  // A start-of-year balance is the prior year-end money, so it is deflated by the prior year's
+  // price level (P_{t−1}; 1 in year 1) — the same today's-dollar figure as the prior row's end.
+  const index = retirementRow ? rows.indexOf(retirementRow) : -1;
+  const startDeflator = index > 0 ? (rows[index - 1]?.deflator ?? 1) : 1;
 
   const savingsNominal = retirementRow?.totals.portfolioStart ?? (0 as Cents);
   const net = retirementRow?.netIncome ?? null;
-  const incomeNominal = monthly(net ?? retirementRow?.grossIncome ?? 0);
-  const spendingNominal = monthly(retirementRow?.flows.spendingNeed ?? 0);
+  const incomeAnnual = net ?? retirementRow?.grossIncome ?? 0;
+  const spendingAnnual = retirementRow?.flows.spendingNeed ?? 0;
+  const incomeNominal = monthly(incomeAnnual);
+  const spendingNominal = monthly(spendingAnnual);
   const taxBasis = net === null ? 'beforeTaxes' : 'net';
-  const real = (c: number) => toCents(c / 100 / deflator);
+  // Monthly real values divide the annual cents once (no double rounding).
+  const monthlyReal = (annualCents: number) => monthly(annualCents / deflator);
+  const incomeReal = monthlyReal(incomeAnnual);
+  const spendingReal = monthlyReal(spendingAnnual);
 
-  const primary = household.people[0];
+  const depletionYear = baseline.summary.depletionYear;
+  const living =
+    depletionYear === null ? undefined : household.people.find((p) => depletionYear <= p.birthYear + p.planningAge);
   return {
     people: household.people.map((p) => {
       const currentAge = ctx.currentYear - p.birthYear;
@@ -44,21 +55,22 @@ export function dashboardCards(
     }),
     currentSavings: asCents(household.accounts.reduce((sum, a) => sum + a.balance, 0)),
     firstRetirementYear: retirementYear,
-    savingsAtRetirement: { nominal: savingsNominal, real: real(savingsNominal) },
-    monthlyRetirementIncome: { nominal: incomeNominal, real: real(incomeNominal), taxBasis },
-    monthlyRetirementSpending: { nominal: spendingNominal, real: real(spendingNominal) },
+    savingsAtRetirement: { nominal: savingsNominal, real: toCents(savingsNominal / 100 / startDeflator) },
+    monthlyRetirementIncome: { nominal: incomeNominal, real: incomeReal, taxBasis },
+    monthlyRetirementSpending: { nominal: spendingNominal, real: spendingReal },
     monthlySurplus: {
       nominal: asCents(incomeNominal - spendingNominal),
-      real: asCents(real(incomeNominal) - real(spendingNominal)),
+      real: asCents(incomeReal - spendingReal),
       taxBasis,
     },
     longevity:
-      baseline.summary.depletionYear === null || !primary
+      depletionYear === null || !living
         ? { kind: 'lastsThroughPlanningAge', planningAge: Math.max(...household.people.map((p) => p.planningAge)) }
         : {
             kind: 'depletes',
-            year: baseline.summary.depletionYear as CalendarYear,
-            age: baseline.summary.depletionYear - primary.birthYear,
+            year: depletionYear as CalendarYear,
+            age: depletionYear - living.birthYear,
+            personId: living.id,
           },
     readiness: {
       status: !baseline.summary.deterministicSuccess

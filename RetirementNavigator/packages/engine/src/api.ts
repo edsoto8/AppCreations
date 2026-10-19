@@ -436,7 +436,9 @@ export interface DashboardCards {
   /** monthlyRetirementIncome − monthlyRetirementSpending. */
   monthlySurplus: { nominal: Cents; real: Cents; taxBasis: 'net' | 'beforeTaxes' };
   longevity:
-    { kind: 'lastsThroughPlanningAge'; planningAge: number } | { kind: 'depletes'; year: CalendarYear; age: number };
+    | { kind: 'lastsThroughPlanningAge'; planningAge: number }
+    /** `age` is the age that year of `personId`, the first listed person still alive then. */
+    | { kind: 'depletes'; year: CalendarYear; age: number; personId: string };
   /** Labeled heuristic: on track = baseline and pessimistic succeed; borderline = baseline only; at risk = baseline fails. */
   readiness: { status: 'onTrack' | 'borderline' | 'atRisk'; baselineSuccess: boolean; pessimisticSuccess: boolean };
 }

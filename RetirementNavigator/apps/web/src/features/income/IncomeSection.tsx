@@ -285,7 +285,9 @@ export function IncomeSection({
             example={
               employment.stopAge === null
                 ? `At retirement (age ${person.retirementAge}).`
-                : `Earlier than retirement (age ${person.retirementAge}).`
+                : employment.stopAge < person.retirementAge
+                  ? `Earlier than retirement (age ${person.retirementAge}).`
+                  : `After the retirement age (${person.retirementAge}): the forecast counts you as working until salary stops.`
             }
             error={form.formState.errors.people?.[index]?.employment?.stopAge?.message}
           >

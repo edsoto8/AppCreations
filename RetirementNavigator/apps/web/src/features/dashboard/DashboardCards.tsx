@@ -94,6 +94,11 @@ export function DashboardCards({
   const taxesBadge = beforeTaxes ? <BeforeTaxesBadge /> : null;
   const primary = household.people[0];
   const multi = household.people.length > 1;
+  const longevity = cards.longevity;
+  const depletionName =
+    longevity.kind === 'depletes'
+      ? (household.people.find((p) => p.id === longevity.personId)?.name ?? primary?.name)
+      : primary?.name;
   const offsets = household.assumptions.deterministicOffsets;
   const surplus = cards.monthlySurplus[key];
   const readiness = READINESS[cards.readiness.status];
@@ -226,8 +231,8 @@ export function DashboardCards({
           tip={
             <>
               The first year the baseline forecast cannot fully fund spending, and{' '}
-              {multi ? `${primary?.name}’s` : 'your'} age in that year (calendar year minus birth year). If that never
-              happens, the money lasts through the planning age.
+              {multi ? 'the age that year of the first listed person still living' : 'your age in that year'} (calendar
+              year minus birth year). If that never happens, the money lasts through the planning age.
             </>
           }
           value={
@@ -237,7 +242,7 @@ export function DashboardCards({
           }
           detail={
             cards.longevity.kind === 'depletes'
-              ? `In ${cards.longevity.year}${multi ? `, at ${primary?.name}’s age` : ''}. Baseline forecast.`
+              ? `In ${cards.longevity.year}${multi ? `, at ${depletionName}’s age` : ''}. Baseline forecast.`
               : `Money remains through ${dashboard.baseline.summary.lastYear}, the end of the plan. Baseline forecast.`
           }
           badges={limitsBadge}

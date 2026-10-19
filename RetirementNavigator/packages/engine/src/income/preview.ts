@@ -191,6 +191,9 @@ function otherIncomeFor(household: Household, year: number, t: number): { gross:
   let taxable = 0;
   for (const income of household.otherIncome) {
     if (year < income.startYear || (income.endYear !== null && year > income.endYear)) continue;
+    // Income owned by a person stops after that person's planning age (modeled death, §1.4).
+    const owner = income.ownerId === null ? null : household.people.find((p) => p.id === income.ownerId);
+    if (owner && year > owner.birthYear + owner.planningAge) continue;
     const growth =
       income.growth.mode === 'flat'
         ? 1
@@ -339,8 +342,18 @@ export function accumulationYear(
     workplaceEmployee === null || scheduled.total === null ? null : workplaceEmployee + scheduled.total;
   const netPay = taxes === null ? null : grossPay + other.gross - taxes.totalTax / 100;
   const surplus = netPay === null || contributions === null ? null : netPay - contributions - spending;
-  const infeasible = surplus === null || !anyWorking ? null : surplus < -0.005;
-  if (infeasible) {
+  let infeasible = surplus === null || !anyWorking ? null : surplus < -0.005;
+  // Without verified taxes the surplus is unknown, but taxes and contributions are never negative:
+  // pay + other income below spending alone proves the year is infeasible (no rule value needed).
+  const provenGap = grossPay + other.gross - spending;
+  if (infeasible === null && anyWorking && provenGap < -0.005) {
+    infeasible = true;
+    yearWarnings.push({
+      code: 'savingsPlanInfeasible',
+      year,
+      message: `In ${year}, pay and other income do not cover spending even before taxes and contributions (shortfall at least $${Math.round(-provenGap).toLocaleString('en-US')}).`,
+    });
+  } else if (infeasible) {
     yearWarnings.push({
       code: 'savingsPlanInfeasible',
       year,

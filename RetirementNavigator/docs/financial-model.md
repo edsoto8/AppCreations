@@ -23,6 +23,9 @@ current calendar year. `i_t` = inflation in year t, `r` = nominal annual return 
   Every year-t figure, flows and year-end balances alike, converts as `real = nominal / P_t`. This
   simple convention is the one most planners use. The per-row `deflator` field in the projection
   result is `P_t`.
+- **Start-of-year balances** (`portfolioStart`, an account's `start`) are the prior year-end money,
+  so in today's dollars they divide by `P_{t−1}` (1 in year 1). Row t's real start then equals row
+  t−1's real end, both on the cards (savings at retirement) and in the tables.
 - Under stochastic inflation (Monte Carlo) each path carries its own price index series, and real
   bands come from those per-path series. They are never deflated with a fixed assumption.
 
@@ -37,8 +40,10 @@ the current salary are year-1 nominal, which is the same as today's dollars.
   `end` are each rounded to cents independently. `growthNet` is then the reconciling item:
   `growthNet = end − start − contributions + withdrawals`, so
   `start + contributions + growthNet − withdrawals = end` holds exactly (0 cents), which is within
-  the ±1 cent the brief requires. A test also asserts `|growthNet − round(growthNet_float)| ≤ 2`
-  cents, so the reconciling item cannot hide an error. `feeDrag = round(fee_float)` and
+  the ±1 cent the brief requires. Because that identity holds by construction, the 10,000-run
+  property test also **recomputes every account's year-end balance and fee drag independently**
+  from the applied return with the §1.5 factors written out in the test, and checks them within
+  3 cents. A 0.01% change to one growth factor makes it fail. `feeDrag = round(fee_float)` and
   `growthGross = growthNet + feeDrag`.
 - Year t+1 `start` equals year t `end` in cents (the float64 balance carries forward unrounded).
 - **Contribution amounts are whole cents.** They are payment amounts, and the limit functions work
@@ -63,10 +68,13 @@ the current salary are year-1 nominal, which is the same as today's dollars.
 - Catch-up eligibility, RMD start and SS claiming all use the same age rule. Regulatory limits are
   calendar-year values for `Y_t`.
 - **Longevity:** person p lives through the year they reach `planningAge` and is modeled as dying at
-  the start of year `Dp = birthYear + planningAge + 1`. The household runs through
+  the start of year `Dp = birthYear + planningAge + 1`. From `Dp`, the person's part-time pay and
+  any other income they own (`otherIncome.ownerId`) stop. Household-owned income continues. The household runs through
   `max_p(birthYear_p + planningAge_p)`. "First death year" = `min_p Dp` when that falls within the
   horizon.
 - Already-retired user: if `retirementAge ≤ age(Y_1)`, the person is retired from year 1.
+- A person is **retired** in year t when they are at or past their retirement age **and draw no
+  salary**. A salary stop age later than the retirement age keeps them working.
 - Household **phase** for year t is `retirement` once every living person is retired; otherwise it
   is `accumulation`. `summary.retirementYear` is the first retirement-phase year (year 1 for an
   already-retired household).
@@ -283,6 +291,9 @@ and labeled**, never with a filled-in value:
   spending once everyone is retired.
 - In years with someone working, `surplus < 0` flags the plan **infeasible** with a warning. Balances
   still assume the plan is carried out, and the shortfall is shown, not hidden.
+- When taxes are unverified the surplus is unknown. Taxes and contributions are never negative, so
+  `gross pay + other income − spending < 0` still **proves** the year infeasible. It is flagged with
+  a warning ("even before taxes and contributions"); no rule value is needed or filled in.
 - If `surplus > 0`, it goes to the chosen account (default: spent) as a mid-year contribution
   (`flows.surplusRouted`; a taxable account's basis rises by the same amount). A negative surplus
   is not withdrawn from savings; the year is listed in `summary.infeasibleYears`.
@@ -311,8 +322,12 @@ and labeled**, never with a filled-in value:
     Roth, else the traditional account);
   - scheduled amounts go to their own account;
   - a routed surplus goes to the surplus account.
-- **Vesting and forfeiture:** employer money also accrues in an unvested sub-ledger of the match
-  destination account, `u' = u·g_S + employer·g_C`, starting from `unvestedEmployerBalance`.
+- **Vesting and forfeiture:** employer money subject to vesting accrues in a sub-ledger of the
+  match destination account, `u' = u·g_S + employer·g_C`.
+  - The entered `unvestedEmployerBalance` is the part **not vested today**, `U0 = E0·(1 − v0)`, with
+    `v0 = v(yearsOfServiceAtStart)`. So the ledger starts at `E0 = U0/(1 − v0)`.
+  - If the plan is fully vested at the start (`v0 = 1`), or no plan sends employer money to the
+    account, the entered amount is never forfeited, with a warning.
   - Separation is the start of the first projection year in which the owner has no salary
     (including year 1).
   - Years of service at separation = `yearsOfServiceAtStart` + projection years worked.
@@ -328,7 +343,8 @@ For each retirement-phase year:
 1. `need = retirementAnnualSpending · P_t`.
 2. Cash income `I = earned (part-time) + other income`, before taxes.
 3. Scheduled contributions are funded only from `max(0, I − need)`, and are scaled down if that is
-   smaller (warning `retirementContributionsReduced`).
+   smaller (warning `retirementContributionsReduced`). The scaled amounts round **down** to whole
+   cents, so they never exceed the income left over.
 4. Withdrawal need `W = max(0, need + contributions − I)`, before taxes. It is drawn by the
    strategy's order (§7.3). Within one group, accounts are drawn pro rata by their caps; no account
    goes below its cap (§1.5). `bracketFill` needs the tax model, so it falls back to taxableFirst
@@ -471,7 +487,7 @@ Accumulation-phase years make no withdrawals: spending is funded from pay (§3.8
 | Projected monthly retirement income | `netIncome/12`, or `grossIncome/12` labeled "before taxes" while netIncome is null (all of M3) | toggle | net, or before taxes (labeled) | first retirement year |
 | Estimated monthly retirement spending | `spendingNeed/12` | toggle | net need | first retirement year |
 | Surplus / shortfall | income − spending (monthly) | toggle | same basis as income | first retirement year |
-| Portfolio longevity | depletion age, or "lasts through planning age" | — | — | — |
+| Portfolio longevity | depletion age of the first listed person still alive that year, or "lasts through planning age" | — | — | — |
 | Readiness | heuristic, below | — | — | — |
 
 Readiness (a labeled heuristic):
@@ -482,8 +498,9 @@ Readiness (a labeled heuristic):
 
 - "First retirement year" is the first year in which every living person is retired; for an
   already-retired household it is year 1.
-- Real values divide by that year's deflator `P_t`. Monthly figures are the annual cents ÷ 12,
-  rounded half to even.
+- Real values divide by that year's deflator `P_t`, except savings at retirement, which is a
+  start-of-year balance and divides by `P_{t−1}` (§1.1). Monthly figures divide the annual cents by
+  12 (and by `P_t` for real values) and round once, half to even.
 - Cards that depend on an excluded (unverified) feature carry its label, for example "before plan
   limits" or "before taxes" (§1.7). A figure that needs a null rule directly (net pay) is not shown
   as a number.

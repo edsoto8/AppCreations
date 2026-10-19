@@ -151,7 +151,7 @@ export const ProjectionSummarySchema = z.object({
   retirementYear: CalendarYearSchema,
   firstDeathYear: CalendarYearSchema.nullable(),
   depletionYear: CalendarYearSchema.nullable(),
-  /** Primary person's age in the depletion year. */
+  /** Age in the depletion year of the first listed person still alive that year. */
   depletionAge: z.number().int().nullable(),
   endingBalance: C,
   endingBalanceReal: C,

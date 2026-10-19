@@ -34,8 +34,8 @@ function ForecastScopeBanner({ dashboard }: { dashboard: DashboardResult }) {
         {excluded.length > 0 ? (
           <div className="flex flex-col gap-1">
             <p className="text-muted-foreground">
-              The app never fills in unverified values, so these steps are skipped and the affected figures are labeled
-              “Before plan limits (unverified)”:
+              The app never fills in unverified values, so these steps are skipped. Affected figures are labeled “Before
+              plan limits (unverified)” or “Before taxes”, and take-home pay is not shown:
             </p>
             <ul className="list-disc pl-5 text-muted-foreground">
               {excluded.map((f) => (

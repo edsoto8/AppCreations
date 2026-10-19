@@ -138,10 +138,7 @@ export function projectHousehold(
           : account.type === 'rothIra'
             ? account.contributionBasis / 100
             : 0,
-      unvested:
-        account.type === 'workplaceTraditional' || account.type === 'workplaceRoth'
-          ? Math.min(account.unvestedEmployerBalance, account.balance) / 100
-          : 0,
+      unvested: 0,
       plan: null,
     });
   }
@@ -151,6 +148,25 @@ export function projectHousehold(
         plan.matchDestination === 'roth' && plan.rothAccountId ? plan.rothAccountId : plan.traditionalAccountId;
       const state = states.get(dest);
       if (state) state.plan = { plan, owner: person };
+    }
+  }
+  // The sub-ledger holds employer money still subject to vesting. The entered
+  // `unvestedEmployerBalance` is the part not yet vested today, U0 = E0·(1 − v0), so E0 = U0/(1 − v0)
+  // (§4). An unvested amount on an account with no linked plan, or with a fully vested plan, is kept.
+  for (const state of states.values()) {
+    const account = state.account;
+    if (account.type !== 'workplaceTraditional' && account.type !== 'workplaceRoth') continue;
+    const entered = Math.min(account.unvestedEmployerBalance, account.balance) / 100;
+    if (entered <= 0) continue;
+    const match = state.plan?.plan.match;
+    const v0 = match ? vestedFraction(match.vesting, match.yearsOfServiceAtStart) : 1;
+    if (v0 < 1) {
+      state.unvested = entered / (1 - v0);
+    } else {
+      warnings.push({
+        code: 'featureNotModeled',
+        message: `${account.name}: the unvested employer balance is not forfeited, because no plan with an unvested schedule sends employer money to this account.`,
+      });
     }
   }
   /** Projection years each person has worked so far (years of service accrue per working year). */
@@ -178,13 +194,27 @@ export function projectHousehold(
 
   for (let t = 1; t <= years; t++) {
     const year = firstYear + t - 1;
-    if (t > 1) deflator *= 1 + (options.inflationOverride?.(t) ?? a.inflation);
+    if (t > 1) {
+      // SIMPLIFICATION (M3): an inflation override drives only the deflator and spending; pay, schedules
+      // and rule indexing use the inflation assumption. M6 (stochastic inflation) wires it through.
+      const i = options.inflationOverride?.(t) ?? a.inflation;
+      if (!Number.isFinite(i) || i <= -1) {
+        return {
+          status: 'invalid',
+          issues: [{ path: ['options', 'inflationOverride'], message: 'Inflation must be above −100%' }],
+        };
+      }
+      deflator *= 1 + i;
+    }
     const rules = rulesForYear(household, ctx, year);
     const acc = accumulationYear(household, setup, t, rules);
     for (const w of acc.cashFlow.warnings) warnings.push(w);
 
     const alive = (p: Person) => year <= p.birthYear + p.planningAge;
-    const retired = (p: Person) => year - p.birthYear >= p.retirementAge;
+    // Retired = at or past the retirement age and drawing no salary (a stop age after the retirement
+    // age keeps the person working, so the household stays in the accumulation phase).
+    const retired = (p: Person) =>
+      year - p.birthYear >= p.retirementAge && !(acc.people.get(p.id)?.compensation.working ?? false);
     const retirementPhase = household.people.every((p) => !alive(p) || retired(p));
     if (retirementPhase && retirementYear === null) retirementYear = year;
     const someoneDied = household.people.some((p) => !alive(p));
@@ -278,8 +308,9 @@ export function projectHousehold(
       const leftover = Math.max(0, earned + otherIncome - spendingNeed);
       if (leftover < scheduledTotal - 0.005) {
         const k = leftover / scheduledTotal;
-        // Contribution amounts are whole cents (§1.3); the scaled amounts are rounded too.
-        for (const [id, v] of scheduled) scheduled.set(id, toCents(v * k) / 100);
+        // Contribution amounts are whole cents (§1.3); scaled amounts round down so they never
+        // exceed the income left over.
+        for (const [id, v] of scheduled) scheduled.set(id, Math.floor(v * k * 100 + 1e-9) / 100);
         warnings.push({
           code: 'retirementContributionsReduced',
           year,
@@ -501,7 +532,11 @@ export function projectHousehold(
 
   warnings.push(...notModeledWarnings(household));
   const last = rows[rows.length - 1];
-  const primary = household.people[0];
+  // The age shown for the depletion year is the first listed person still alive that year.
+  const depletionPerson =
+    depletionYear === null
+      ? null
+      : (household.people.find((p) => (depletionYear ?? 0) <= p.birthYear + p.planningAge) ?? null);
   const endingBalance = last?.totals.portfolioEnd ?? (0 as Cents);
   const endingBalanceReal = last?.real.portfolioEnd ?? (0 as Cents);
   const missing = setup.access.missing;
@@ -518,7 +553,7 @@ export function projectHousehold(
         retirementYear: (retirementYear ?? lastYear) as YearRow['year'],
         firstDeathYear: firstDeathYear as YearRow['year'] | null,
         depletionYear: depletionYear as YearRow['year'] | null,
-        depletionAge: depletionYear !== null && primary ? depletionYear - primary.birthYear : null,
+        depletionAge: depletionPerson ? (depletionYear ?? 0) - depletionPerson.birthYear : null,
         endingBalance,
         endingBalanceReal,
         infeasibleYears: infeasibleYears as YearRow['year'][],

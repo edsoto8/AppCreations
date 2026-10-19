@@ -598,8 +598,10 @@ describe('workplace plans: before limits (unverified) and after limits (fixture)
         ],
       }),
     );
-    // 4 years of service at separation: 80% vested, 20% of 9,000 forfeited.
-    expect(account(r.rows[2]!, 'k').forfeited).toBe(dollars(1_800));
+    // The entered $1,000 is the part not vested today (2 years: 40% vested), so $1,666.67 of employer
+    // money is subject to vesting; plus $8,000 of match = $9,666.67. At separation after 4 years of
+    // service 80% is vested: 20% × 9,666.67 = $1,933.33 forfeited.
+    expect(account(r.rows[2]!, 'k').forfeited).toBe(dollars(1_933.33));
   });
 
   it('routes a verified surplus to the surplus account', () => {
@@ -647,6 +649,159 @@ describe('workplace plans: before limits (unverified) and after limits (fixture)
     expect(r.summary.infeasibleYears).toEqual([YEAR, YEAR + 1]);
     expect(r.rows[0]!.cashFlow.infeasible).toBe(true);
     expect(r.rows[2]!.cashFlow.infeasible).toBeNull();
+  });
+});
+
+describe('review fixes (M3)', () => {
+  const ss = { source: { kind: 'none' }, claimAge: { years: 67, months: 0 } };
+
+  it('stops part-time pay and owned other income after the person’s planning age', () => {
+    const base = household({
+      filingStatus: 'marriedFilingJointly',
+      people: [
+        { id: 'person-1', name: 'A', birthYear: YEAR - 70, retirementAge: 65, planningAge: 90, socialSecurity: ss },
+        {
+          id: 'person-2',
+          name: 'B',
+          birthYear: YEAR - 70,
+          retirementAge: 65,
+          planningAge: 75,
+          socialSecurity: ss,
+          employment: {
+            baseSalary: 0,
+            raise: { mode: 'nominal', rate: 0 },
+            partTime: { startAge: 70, endAge: 95, annualIncome: dollars(50_000) },
+          },
+        },
+      ],
+      accounts: [cash(500_000, { expectedReturn: 0 })],
+      spending: { retirementAnnualSpending: dollars(60_000) },
+    });
+    const h = HouseholdSchema.parse({
+      ...base,
+      otherIncome: [
+        {
+          id: 'rent',
+          name: 'Rent',
+          ownerId: 'person-2',
+          startYear: YEAR,
+          annualAmount: dollars(5_000),
+          growth: { mode: 'flat' },
+        },
+      ],
+    });
+    const r = project(h);
+    // B lives through age 75 (YEAR+5): $50k part-time + $5k rent, so $5k is withdrawn.
+    expect(r.rows[5]!.people[1]!.partTimeIncome).toBe(dollars(50_000));
+    expect(r.rows[5]!.flows.withdrawals).toBe(dollars(5_000));
+    expect(r.rows[5]!.flows.otherIncome).toBe(dollars(5_000));
+    // From YEAR+6 B has died: no part-time pay, no rent; the whole $60k is withdrawn.
+    expect(r.rows[6]!.people[1]!.alive).toBe(false);
+    expect(r.rows[6]!.people[1]!.partTimeIncome).toBe(0);
+    expect(r.rows[6]!.flows.otherIncome).toBe(0);
+    expect(r.rows[6]!.flows.withdrawals).toBe(dollars(60_000));
+  });
+
+  it('keeps a person who still draws salary past the retirement age in the accumulation phase', () => {
+    const r = project(
+      household({
+        person: {
+          birthYear: YEAR - 60,
+          retirementAge: 62,
+          employment: { baseSalary: dollars(100_000), raise: { mode: 'nominal', rate: 0 }, stopAge: 65 },
+        },
+        accounts: [cash(100_000, { expectedReturn: 0 })],
+        spending: { currentAnnualSpending: dollars(50_000), retirementAnnualSpending: dollars(40_000) },
+      }),
+    );
+    expect(r.rows[3]!.phase).toBe('accumulation');
+    expect(r.rows[4]!.people[0]!.baseSalary).toBe(dollars(100_000));
+    expect(r.rows[5]!.phase).toBe('retirement');
+    expect(r.summary.retirementYear).toBe(YEAR + 5);
+  });
+
+  it('flags a working year as infeasible without taxes when pay alone cannot cover spending', () => {
+    const r = project(
+      household({
+        filingStatus: 'marriedFilingJointly',
+        people: [
+          { id: 'person-1', name: 'A', birthYear: YEAR - 56, retirementAge: 55, socialSecurity: ss },
+          {
+            id: 'person-2',
+            name: 'B',
+            birthYear: YEAR - 50,
+            retirementAge: 65,
+            socialSecurity: ss,
+            employment: { baseSalary: dollars(30_000), raise: { mode: 'nominal', rate: 0 } },
+          },
+        ],
+        accounts: [cash(1_000_000, { expectedReturn: 0 })],
+        spending: { currentAnnualSpending: dollars(100_000), retirementAnnualSpending: dollars(40_000) },
+      }),
+    );
+    expect(r.rows[0]!.cashFlow.netPay).toBeNull();
+    expect(r.rows[0]!.cashFlow.infeasible).toBe(true);
+    expect(r.summary.infeasibleYears).toHaveLength(15);
+    expect(r.warnings.some((w) => w.code === 'savingsPlanInfeasible' && w.message.includes('even before taxes'))).toBe(
+      true,
+    );
+  });
+
+  it('reports the depletion age of a person still alive', () => {
+    const d = computeDashboard(
+      household({
+        filingStatus: 'marriedFilingJointly',
+        people: [
+          { id: 'person-1', name: 'A', birthYear: YEAR - 70, retirementAge: 65, planningAge: 75, socialSecurity: ss },
+          { id: 'person-2', name: 'B', birthYear: YEAR - 60, retirementAge: 60, planningAge: 95, socialSecurity: ss },
+        ],
+        accounts: [cash(200_000, { expectedReturn: 0 })],
+        spending: { retirementAnnualSpending: dollars(20_000) },
+      }),
+      ctx,
+    );
+    if (d.status !== 'ok') throw new Error('dashboard');
+    // Depletes in YEAR+10, after A's last year (YEAR+5): B's age, 70.
+    expect(d.value.baseline.summary.depletionYear).toBe(YEAR + 10);
+    expect(d.value.baseline.summary.depletionAge).toBe(70);
+    expect(d.value.cards.longevity).toEqual({ kind: 'depletes', year: YEAR + 10, age: 70, personId: 'person-2' });
+  });
+
+  it('rejects an inflation override of −100% or less instead of throwing', () => {
+    const r = projectHousehold(household({ accounts: [cash(1_000)] }), ctx, { inflationOverride: () => -1 });
+    expect(r.status).toBe('invalid');
+  });
+
+  it('never lets rounded retirement contributions exceed the income left over', () => {
+    const sched = (id: string) => ({
+      type: 'taxableBrokerage',
+      id,
+      name: id,
+      ownerId: 'person-1',
+      balance: 0,
+      costBasis: 0,
+      expectedReturn: 0,
+      contribution: { amount: { kind: 'dollars', amount: dollars(5_000), frequency: 'annual' }, stopYear: YEAR },
+    });
+    const r = project(
+      household({
+        person: {
+          ...retiree,
+          employment: {
+            baseSalary: 0,
+            raise: { mode: 'nominal', rate: 0 },
+            partTime: { startAge: 70, endAge: 71, annualIncome: 1_000_003 },
+          },
+        },
+        accounts: [sched('t1'), sched('t2'), sched('t3')],
+        spending: { retirementAnnualSpending: dollars(10_000) },
+        assumptions: { withdrawalTiming: 'startOfYear' },
+      }),
+    );
+    // $0.03 left over for three schedules: one cent each, no shortfall, no false depletion.
+    expect(r.rows[0]!.flows.contributions).toBe(3);
+    expect(r.rows[0]!.flows.shortfall).toBe(0);
+    expect(r.rows[0]!.depleted).toBe(false);
   });
 });
 
@@ -701,8 +856,12 @@ describe('samples, dashboard and warnings', () => {
     expect(cards.people[0]).toMatchObject({ currentAge: 60, retirementAge: 62, yearsToRetirement: 2 });
     expect(cards.currentSavings).toBe(dollars(1_200_000));
     expect(cards.firstRetirementYear).toBe(YEAR + 2);
-    expect(cards.savingsAtRetirement.nominal).toBe(row.totals.portfolioStart);
-    expect(cards.savingsAtRetirement.real).toBe(dollars(row.totals.portfolioStart / 100 / 1.02 ** 2));
+    // Two accumulation years at 4% with no contributions: $1,200,000 × 1.04².
+    expect(cards.savingsAtRetirement.nominal).toBe(dollars(1_200_000 * 1.04 ** 2));
+    expect(row.totals.portfolioStart).toBe(cards.savingsAtRetirement.nominal);
+    // A start-of-year balance is the prior year-end money: deflated by P_{t−1} = 1.02.
+    expect(cards.savingsAtRetirement.real).toBe(dollars((1_200_000 * 1.04 ** 2) / 1.02));
+    expect(cards.savingsAtRetirement.real).toBe(baseline.rows[1]!.real.portfolioEnd);
     expect(cards.monthlyRetirementSpending.nominal).toBe(dollars((36_000 * 1.02 ** 2) / 12));
     expect(cards.monthlyRetirementSpending.real).toBe(dollars(3_000));
     expect(cards.monthlyRetirementIncome.taxBasis).toBe('beforeTaxes');

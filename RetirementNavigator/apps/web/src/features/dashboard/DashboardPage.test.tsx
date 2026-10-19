@@ -259,4 +259,18 @@ describe('DashboardPage', () => {
     expect(screen.getByText(/Everyone is past their planning age/)).toBeInTheDocument();
     expect(screen.queryByRole('region', { name: 'Readiness' })).not.toBeInTheDocument();
   });
+
+  it('in today’s dollars, each year’s start equals the prior year’s end (start is deflated by the prior year)', async () => {
+    const user = userEvent.setup();
+    await renderWithProfile(<DashboardPage />, { household: sample('earlyCareer') });
+    await user.click(screen.getByRole('button', { name: /Show year-by-year table/ }));
+    const table = screen.getByRole('region', { name: 'Forecast details by year, today’s dollars' });
+    const header = within(table)
+      .getAllByRole('columnheader')
+      .map((h) => h.textContent);
+    const start = header.indexOf('Portfolio start');
+    const end = header.length - 1;
+    const rows = dataRows(table).map(cells);
+    for (let i = 1; i < 12; i++) expect(rows[i]![start]).toBe(rows[i - 1]![end]);
+  });
 });

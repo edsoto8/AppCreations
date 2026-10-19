@@ -223,18 +223,18 @@
           {
             "accountId": "roth",
             "start": 3406174,
-            "contributions": 263251,
+            "contributions": 263250,
             "employerContributions": 0,
             "feeDrag": 0,
             "growthNet": 176809,
             "withdrawals": 0,
             "forfeited": 0,
-            "end": 3846234,
-            "basisEnd": 1513251
+            "end": 3846233,
+            "basisEnd": 1513250
           }
         ],
         "flows": {
-          "contributions": 1030000,
+          "contributions": 1029999,
           "employerContributions": 0,
           "feeDrag": 0,
           "withdrawals": 0,
@@ -245,15 +245,15 @@
         },
         "totals": {
           "portfolioStart": 9424695,
-          "portfolioEnd": 10951365,
+          "portfolioEnd": 10951364,
           "byTaxTreatment": {
             "taxDeferred": 0,
-            "taxFree": 3846234,
+            "taxFree": 3846233,
             "taxable": 7105131
           }
         },
         "real": {
-          "portfolioEnd": 10632394,
+          "portfolioEnd": 10632393,
           "spendingNeed": 2000000,
           "grossIncome": 3000000
         },
@@ -286,30 +286,30 @@
           {
             "accountId": "taxable",
             "start": 7105131,
-            "contributions": 783743,
+            "contributions": 783742,
             "employerContributions": 0,
             "feeDrag": 0,
             "growthNet": 374611,
             "withdrawals": 0,
             "forfeited": 0,
-            "end": 8263485,
-            "basisEnd": 6300492
+            "end": 8263484,
+            "basisEnd": 6300491
           },
           {
             "accountId": "roth",
-            "start": 3846234,
+            "start": 3846233,
             "contributions": 277157,
             "employerContributions": 0,
             "feeDrag": 0,
             "growthNet": 199157,
             "withdrawals": 0,
             "forfeited": 0,
-            "end": 4322548,
-            "basisEnd": 1790408
+            "end": 4322547,
+            "basisEnd": 1790407
           }
         ],
         "flows": {
-          "contributions": 1060900,
+          "contributions": 1060899,
           "employerContributions": 0,
           "feeDrag": 0,
           "withdrawals": 0,
@@ -319,16 +319,16 @@
           "shortfall": 0
         },
         "totals": {
-          "portfolioStart": 10951365,
-          "portfolioEnd": 12586033,
+          "portfolioStart": 10951364,
+          "portfolioEnd": 12586031,
           "byTaxTreatment": {
             "taxDeferred": 0,
-            "taxFree": 4322548,
-            "taxable": 8263485
+            "taxFree": 4322547,
+            "taxable": 8263484
           }
         },
         "real": {
-          "portfolioEnd": 11863543,
+          "portfolioEnd": 11863541,
           "spendingNeed": 2000000,
           "grossIncome": 3000000
         },
@@ -360,31 +360,31 @@
         "accounts": [
           {
             "accountId": "taxable",
-            "start": 8263485,
+            "start": 8263484,
             "contributions": 800977,
             "employerContributions": 0,
             "feeDrag": 0,
             "growthNet": 432955,
             "withdrawals": 0,
             "forfeited": 0,
-            "end": 9497417,
-            "basisEnd": 7101469
+            "end": 9497416,
+            "basisEnd": 7101468
           },
           {
             "accountId": "roth",
-            "start": 4322548,
-            "contributions": 291750,
+            "start": 4322547,
+            "contributions": 291749,
             "employerContributions": 0,
             "feeDrag": 0,
             "growthNet": 223332,
             "withdrawals": 0,
             "forfeited": 0,
-            "end": 4837630,
-            "basisEnd": 2082158
+            "end": 4837628,
+            "basisEnd": 2082156
           }
         ],
         "flows": {
-          "contributions": 1092727,
+          "contributions": 1092726,
           "employerContributions": 0,
           "feeDrag": 0,
           "withdrawals": 0,
@@ -394,16 +394,16 @@
           "shortfall": 0
         },
         "totals": {
-          "portfolioStart": 12586033,
-          "portfolioEnd": 14335047,
+          "portfolioStart": 12586031,
+          "portfolioEnd": 14335044,
           "byTaxTreatment": {
             "taxDeferred": 0,
-            "taxFree": 4837630,
-            "taxable": 9497417
+            "taxFree": 4837628,
+            "taxable": 9497416
           }
         },
         "real": {
-          "portfolioEnd": 13118598,
+          "portfolioEnd": 13118595,
           "spendingNeed": 2000000,
           "grossIncome": 3000000
         },
@@ -435,27 +435,27 @@
         "accounts": [
           {
             "accountId": "taxable",
-            "start": 9497417,
+            "start": 9497416,
             "contributions": 0,
             "employerContributions": 0,
             "feeDrag": 0,
             "growthNet": 419282,
             "withdrawals": 2251018,
             "forfeited": 0,
-            "end": 7665681,
+            "end": 7665680,
             "basisEnd": 5458887
           },
           {
             "accountId": "roth",
-            "start": 4837630,
+            "start": 4837628,
             "contributions": 0,
             "employerContributions": 0,
             "feeDrag": 0,
             "growthNet": 241881,
             "withdrawals": 0,
             "forfeited": 0,
-            "end": 5079511,
-            "basisEnd": 2082158
+            "end": 5079509,
+            "basisEnd": 2082156
           }
         ],
         "flows": {
@@ -469,16 +469,16 @@
           "shortfall": 0
         },
         "totals": {
-          "portfolioStart": 14335047,
-          "portfolioEnd": 12745192,
+          "portfolioStart": 14335044,
+          "portfolioEnd": 12745189,
           "byTaxTreatment": {
             "taxDeferred": 0,
-            "taxFree": 5079511,
-            "taxable": 7665681
+            "taxFree": 5079509,
+            "taxable": 7665680
           }
         },
         "real": {
-          "portfolioEnd": 11323938,
+          "portfolioEnd": 11323935,
           "spendingNeed": 2000000,
           "grossIncome": 2000000
         },
@@ -510,27 +510,27 @@
         "accounts": [
           {
             "accountId": "taxable",
-            "start": 7665681,
+            "start": 7665680,
             "contributions": 0,
             "employerContributions": 0,
             "feeDrag": 0,
             "growthNet": 326027,
             "withdrawals": 2318548,
             "forfeited": 0,
-            "end": 5673160,
-            "basisEnd": 3847593
+            "end": 5673159,
+            "basisEnd": 3847592
           },
           {
             "accountId": "roth",
-            "start": 5079511,
+            "start": 5079509,
             "contributions": 0,
             "employerContributions": 0,
             "feeDrag": 0,
-            "growthNet": 253976,
+            "growthNet": 253975,
             "withdrawals": 0,
             "forfeited": 0,
-            "end": 5333487,
-            "basisEnd": 2082158
+            "end": 5333484,
+            "basisEnd": 2082156
           }
         ],
         "flows": {
@@ -544,16 +544,16 @@
           "shortfall": 0
         },
         "totals": {
-          "portfolioStart": 12745192,
-          "portfolioEnd": 11006647,
+          "portfolioStart": 12745189,
+          "portfolioEnd": 11006643,
           "byTaxTreatment": {
             "taxDeferred": 0,
-            "taxFree": 5333487,
-            "taxable": 5673160
+            "taxFree": 5333484,
+            "taxable": 5673159
           }
         },
         "real": {
-          "portfolioEnd": 9494430,
+          "portfolioEnd": 9494427,
           "spendingNeed": 2000000,
           "grossIncome": 2000000
         },
@@ -585,27 +585,27 @@
         "accounts": [
           {
             "accountId": "taxable",
-            "start": 5673160,
+            "start": 5673159,
             "contributions": 0,
             "employerContributions": 0,
             "feeDrag": 0,
             "growthNet": 224684,
             "withdrawals": 2388105,
             "forfeited": 0,
-            "end": 3509739,
-            "basisEnd": 2266990
+            "end": 3509738,
+            "basisEnd": 2266989
           },
           {
             "accountId": "roth",
-            "start": 5333487,
+            "start": 5333484,
             "contributions": 0,
             "employerContributions": 0,
             "feeDrag": 0,
-            "growthNet": 266674,
+            "growthNet": 266675,
             "withdrawals": 0,
             "forfeited": 0,
-            "end": 5600161,
-            "basisEnd": 2082158
+            "end": 5600159,
+            "basisEnd": 2082156
           }
         ],
         "flows": {
@@ -619,16 +619,16 @@
           "shortfall": 0
         },
         "totals": {
-          "portfolioStart": 11006647,
-          "portfolioEnd": 9109900,
+          "portfolioStart": 11006643,
+          "portfolioEnd": 9109897,
           "byTaxTreatment": {
             "taxDeferred": 0,
-            "taxFree": 5600161,
-            "taxable": 3509739
+            "taxFree": 5600159,
+            "taxable": 3509738
           }
         },
         "real": {
-          "portfolioEnd": 7629398,
+          "portfolioEnd": 7629395,
           "spendingNeed": 2000000,
           "grossIncome": 2000000
         },
@@ -644,8 +644,8 @@
       "firstDeathYear": null,
       "depletionYear": null,
       "depletionAge": null,
-      "endingBalance": 9109900,
-      "endingBalanceReal": 7629398,
+      "endingBalance": 9109897,
+      "endingBalanceReal": 7629395,
       "infeasibleYears": [],
       "deterministicSuccess": true
     },

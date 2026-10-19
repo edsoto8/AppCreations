@@ -76,8 +76,11 @@ export function compensationPathFloat(
           : 0;
     const pt = employment?.partTime;
     // SIMPLIFICATION: part-time income is entered in today's dollars and grows with inflation.
+    // Part-time pay stops after the person's planning age (modeled death, §1.4).
     const partTimeIncome =
-      pt && age >= pt.startAge && age < pt.endAge ? (pt.annualIncome / 100) * priceIndex(inflation, t) : 0;
+      pt && age >= pt.startAge && age < pt.endAge && age <= person.planningAge
+        ? (pt.annualIncome / 100) * priceIndex(inflation, t)
+        : 0;
     rows.push({
       year,
       age,

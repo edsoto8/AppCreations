@@ -4,7 +4,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { formatCents } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { DataTableDisclosure } from './DataTableDisclosure';
-import { agesLabel, basisName, inBasis, phaseLabel } from './viewModel';
+import { agesLabel, basisName, inBasis, phaseLabel, startInBasis } from './viewModel';
 
 /** "Forecast details": every baseline row, collapsible, in the selected dollar basis. */
 export function ForecastDetails({
@@ -50,7 +50,7 @@ export function ForecastDetails({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {result.rows.map((row) => {
+              {result.rows.map((row, i) => {
                 const money = (cents: number) => formatCents(inBasis(cents, row, basis));
                 const marked = beforeLimits && row.flows.contributions > 0;
                 return (
@@ -58,7 +58,9 @@ export function ForecastDetails({
                     <TableCell>{row.year}</TableCell>
                     <TableCell>{agesLabel(row, household)}</TableCell>
                     <TableCell>{phaseLabel(row.phase)}</TableCell>
-                    <TableCell className="text-right">{money(row.totals.portfolioStart)}</TableCell>
+                    <TableCell className="text-right">
+                      {formatCents(startInBasis(row.totals.portfolioStart, result.rows, i, basis))}
+                    </TableCell>
                     <TableCell className="text-right">
                       {money(row.flows.contributions)}
                       {marked ? <span aria-hidden="true">*</span> : null}
