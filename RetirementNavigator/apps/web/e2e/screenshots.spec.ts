@@ -5,6 +5,7 @@ import { appUrl, onboardWithSample } from './helpers';
 for (const theme of ['light', 'dark'] as const) {
   for (const path of [
     '/welcome',
+    '/',
     '/profile',
     '/income',
     '/accounts',
@@ -19,7 +20,7 @@ for (const theme of ['light', 'dark'] as const) {
       if (path !== '/welcome') await onboardWithSample(page, 1);
       await page.goto(appUrl(path));
       await page.waitForLoadState('networkidle');
-      const name = `${testInfo.project.name}-${theme}-${path.slice(1)}.png`;
+      const name = `${testInfo.project.name}-${theme}-${path.slice(1) || 'dashboard'}.png`;
       await page.screenshot({ path: `test-results/screens/${name}`, fullPage: true });
     });
   }

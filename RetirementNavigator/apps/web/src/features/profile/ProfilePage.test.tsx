@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { SAMPLE_PROFILES } from '@rn/engine';
 import { renderWithProfile, TEST_YEAR } from '@/test/renderWithProfile';
@@ -70,5 +70,70 @@ describe('ProfilePage', () => {
     await renderWithProfile(<ProfilePage />, { household: early() });
     await user.selectOptions(screen.getByLabelText('Rules anchor year'), '2027');
     await waitFor(() => expect(active().assumptions.rules.anchorYear).toBe(2027));
+  });
+
+  describe('forecast settings', () => {
+    it('saves withdrawal timing, granularity, strategy and the minimum ending balance', async () => {
+      const user = userEvent.setup();
+      await renderWithProfile(<ProfilePage />, { household: early() });
+      await user.selectOptions(screen.getByLabelText('Withdrawal timing'), 'startOfYear');
+      await user.selectOptions(screen.getByLabelText('Forecast granularity'), 'monthly');
+      const strategy = screen.getByLabelText('Withdrawal order');
+      expect(
+        within(strategy).getByRole('option', { name: /needs the tax model, uses taxable-first for now/ }),
+      ).toBeInTheDocument();
+      await user.selectOptions(strategy, 'proportional');
+      const minimum = screen.getByLabelText('Minimum ending balance');
+      await user.clear(minimum);
+      await user.type(minimum, '50000');
+      await waitFor(() => {
+        const a = active().assumptions;
+        expect(a.withdrawalTiming).toBe('startOfYear');
+        expect(a.granularity).toBe('monthly');
+        expect(a.withdrawalStrategy).toBe('proportional');
+        expect(a.minimumEndingBalance).toBe(5_000_000);
+      });
+    });
+
+    it('routes the surplus to a taxable or cash account only, and back to spent', async () => {
+      const user = userEvent.setup();
+      await renderWithProfile(<ProfilePage />);
+      const surplus = screen.getByLabelText('Surplus while working');
+      const options = within(surplus)
+        .getAllByRole('option')
+        .map((o) => o.textContent);
+      // The couple's brokerage is eligible; workplace, IRA and HSA accounts are not offered.
+      expect(options).toEqual(['Spent (not saved)', 'Saved to Joint brokerage (Taxable brokerage)']);
+      await user.selectOptions(surplus, 'account:joint-brokerage');
+      await waitFor(() =>
+        expect(active().assumptions.surplus).toEqual({ mode: 'account', accountId: 'joint-brokerage' }),
+      );
+      await user.selectOptions(surplus, 'spent');
+      await waitFor(() => expect(active().assumptions.surplus).toEqual({ mode: 'spent' }));
+    });
+
+    it('saves return offsets and rejects ones outside the schema range', async () => {
+      const user = userEvent.setup();
+      await renderWithProfile(<ProfilePage />, { household: early() });
+      const optimistic = screen.getByLabelText('Optimistic return offset');
+      await user.clear(optimistic);
+      await user.type(optimistic, '3');
+      const pessimistic = screen.getByLabelText('Pessimistic return offset');
+      await user.clear(pessimistic);
+      await user.type(pessimistic, '-1.5');
+      await waitFor(() =>
+        expect(active().assumptions.deterministicOffsets).toEqual({ optimistic: 0.03, pessimistic: -0.015 }),
+      );
+
+      await user.clear(optimistic);
+      await user.type(optimistic, '20');
+      expect(await screen.findByText('Must be between 0 and +10 points')).toBeInTheDocument();
+      // The last valid value typed ("2" on the way to "20") is kept; 20 points is never saved.
+      expect(active().assumptions.deterministicOffsets.optimistic).toBe(0.02);
+      await user.clear(pessimistic);
+      await user.type(pessimistic, '2');
+      expect(await screen.findByText('Must be between −10 and 0 points')).toBeInTheDocument();
+      expect(active().assumptions.deterministicOffsets.pessimistic).toBe(-0.015);
+    });
   });
 });

@@ -11,6 +11,7 @@ import { IntegerField, MoneyField, PercentField, SelectField, TextField } from '
 import { useHouseholdForm } from '@/hooks/useHouseholdForm';
 import { CURRENT_YEAR } from '@/app/env';
 import { newId } from '@/lib/ids';
+import { ForecastSettings } from './ForecastSettings';
 
 type HouseholdControl = Control<HouseholdInput, unknown, Household>;
 
@@ -235,6 +236,8 @@ function ProfileForm({ household }: { household: Household }) {
           />
         </CardContent>
       </Card>
+
+      <ForecastSettings control={control} accounts={(values.accounts ?? household.accounts) as Household['accounts']} />
     </form>
   );
 }

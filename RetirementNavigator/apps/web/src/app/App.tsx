@@ -6,6 +6,7 @@ import { NAV_ITEMS } from './navigation';
 import { PlaceholderPage } from '@/features/placeholder/PlaceholderPage';
 import { NotFoundPage } from '@/features/placeholder/NotFoundPage';
 import { DataPage } from '@/features/data/DataPage';
+import { DashboardPage } from '@/features/dashboard/DashboardPage';
 import { ProfilePage } from '@/features/profile/ProfilePage';
 import { IncomeSavingsPage } from '@/features/income/IncomeSavingsPage';
 import { AccountsPage } from '@/features/accounts/AccountsPage';
@@ -18,6 +19,7 @@ import { useProfileStore } from '@/state/profileStore';
 import { getRepository } from '@/storage/instance';
 
 const PAGES: Record<string, () => React.ReactElement> = {
+  '/': () => <DashboardPage />,
   '/profile': () => <ProfilePage />,
   '/income': () => <IncomeSavingsPage />,
   '/accounts': () => <AccountsPage />,

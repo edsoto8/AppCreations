@@ -24,9 +24,15 @@ describe('AppShell', () => {
   });
 
   it('shows honest placeholders for unbuilt pages, with no figures', () => {
+    renderAt('/scenarios');
+    expect(screen.getByRole('heading', { level: 1, name: 'Scenarios' })).toBeInTheDocument();
+    expect(screen.getByText('Planned for M5')).toBeInTheDocument();
+  });
+
+  it('renders the dashboard at the root route', () => {
     renderAt('/');
     expect(screen.getByRole('heading', { level: 1, name: 'Dashboard' })).toBeInTheDocument();
-    expect(screen.getByText('Planned for M3')).toBeInTheDocument();
+    expect(screen.getByText('No profile yet')).toBeInTheDocument();
   });
 
   it('navigates between sections and marks the active link', async () => {
