@@ -96,8 +96,14 @@ export const YearRowSchema = z.object({
     growthGross: C,
     feeDrag: C,
     growthNet: C,
-    /** Spending withdrawals (excludes forfeitures). */
+    /** Spending withdrawals (excludes forfeitures), including RMDs and HSA medical withdrawals. */
     withdrawals: C,
+    /** Of `withdrawals`, required minimum distributions. */
+    rmd: C,
+    /** Of `withdrawals`, tax-free HSA withdrawals for qualified medical expenses. */
+    hsaMedical: C,
+    /** RMD (or fixed income) beyond the year's need, reinvested after tax in a taxable or cash account. */
+    reinvested: C,
     /** Unvested employer money forfeited at separation. */
     forfeited: C,
     /** Accumulation-phase surplus added to the surplus account. */

@@ -182,6 +182,12 @@ export const SocialSecurityInputSchema = z.object({
     z.object({ kind: z.literal('none') }),
     /** Monthly benefit at full retirement age from the person's SSA statement, in today's dollars. Takes priority. */
     z.object({ kind: z.literal('statement'), piaMonthly: NonNegativeCentsSchema }),
+    /**
+     * Monthly benefit at the planned claiming age, read from the person's SSA statement (which lists
+     * the benefit at each claiming age), in today's dollars. Needs no rule values for the person's own
+     * benefit; spousal and survivor amounts still need the verified SSA rules. (Contract 1.6.0.)
+     */
+    z.object({ kind: z.literal('atClaimAge'), monthlyAtClaim: NonNegativeCentsSchema }),
     /** Illustrative estimator, not an official SSA calculation. */
     z.object({
       kind: z.literal('estimateAverage'),

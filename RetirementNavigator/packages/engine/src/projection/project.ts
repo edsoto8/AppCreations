@@ -15,13 +15,28 @@ import type { Account, Household, Person, WorkplacePlan } from '../domain/househ
 import type { CappedContributions, EngineContext, ProjectionOptions, TaxBreakdown } from '../api';
 import type { EngineResult, EngineWarning } from '../domain/results';
 import type { AccountYear, PersonYear, ProjectionResult, TaxYearDetail, YearRow } from '../domain/projection';
-import type { Cents } from '../domain/primitives';
+import type { Cents, Fraction } from '../domain/primitives';
 import { CONTRACT_VERSION } from '../contractVersion';
 import { HouseholdSchema } from '../domain/household';
 import { zodIssues } from '../validation';
 import { asCents, toCents } from '../money';
 import { vestedFraction } from '../match/match';
 import { accumulationSetup, accumulationYear, rulesForYear } from '../income/preview';
+import { solveWithdrawals, type SolverAccount } from '../tax/grossUp';
+import { computeTax } from '../tax/tax';
+import { RuleAccess } from '../rules/access';
+import { rothQualifiedYear } from '../rmd/roth';
+import {
+  Gaps,
+  eventsYear,
+  pensionYear,
+  reinvestAccount,
+  rmdFor,
+  socialSecuritySetup,
+  socialSecurityYear,
+  spendingNeed as spendingNeedFor,
+  type YearContext,
+} from './retirement';
 import {
   WITHDRAWAL_ORDER,
   allocateWithdrawals,
@@ -62,9 +77,14 @@ function isTaxableForDrag(account: Account): boolean {
   return account.type === 'taxableBrokerage' || (account.type === 'other' && account.taxTreatment === 'taxable');
 }
 
-function taxDetail(household: Household, taxes: TaxBreakdown, wages: Cents): TaxYearDetail {
+function taxDetail(
+  filingStatus: Household['filingStatus'],
+  taxes: TaxBreakdown,
+  wages: Cents,
+  solver: { iterations: number; converged: boolean } = { iterations: 0, converged: true },
+): TaxYearDetail {
   return {
-    filingStatus: household.filingStatus,
+    filingStatus,
     wages,
     ordinaryIncome: taxes.agi,
     taxableSocialSecurity: taxes.taxableSocialSecurity,
@@ -79,29 +99,50 @@ function taxDetail(household: Household, taxes: TaxBreakdown, wages: Cents): Tax
     stateTax: taxes.stateTax,
     totalTax: taxes.totalTax,
     marginalOrdinaryRate: taxes.marginalOrdinaryRate,
-    solver: { iterations: 0, converged: true },
+    solver,
   };
 }
 
-/** Warnings for inputs whose modeling arrives in M4 (shown once, so the UI can label them). */
-function notModeledWarnings(household: Household): EngineWarning[] {
-  const notes: string[] = [];
-  if (household.people.some((p) => p.socialSecurity.source.kind !== 'none')) {
-    notes.push('Social Security benefits are not included yet (modeled in M4).');
-  }
-  if (household.pensions.length > 0) notes.push('Pensions are not included yet (modeled in M4).');
-  if (household.oneTimeEvents.length > 0) notes.push('One-time events are not included yet (modeled in M4).');
-  const s = household.spending;
-  if (s.steps.length > 0 || s.retirementRealGlide !== 0 || s.healthcareBeforeMedicare > 0) {
-    notes.push('Spending steps, the spending glide and the pre-Medicare healthcare line are not applied yet (M4).');
-  }
-  if (household.people.length > 1) {
-    notes.push('The survivor spending reduction after the first death is not applied yet (M4).');
-  }
-  notes.push(
-    'Retirement-phase taxes, required minimum distributions and HSA medical withdrawals are modeled in M4: retirement withdrawals here are before taxes.',
+/**
+ * Bracket fill (§7.3): how much traditional money fits before taxable ordinary income reaches the top
+ * of the bracket taxed at `topRate`, at the year's fixed income. Null when brackets are unverified or
+ * no rate is set (the strategy then falls back to taxable first).
+ */
+function bracketRoom(
+  input: Parameters<typeof solveWithdrawals>[0],
+  rules: Parameters<typeof solveWithdrawals>[1],
+  topRate: number | null,
+  gaps: Gaps,
+): number | null {
+  if (topRate === null) return null;
+  const bracketsRule = rules.values.tax.brackets[input.filingStatus];
+  if (bracketsRule.status !== 'verified') return null;
+  const brackets = bracketsRule.value;
+  const i = brackets.findIndex((b) => Math.abs(b.rate - topRate) < 1e-9);
+  if (i < 0) return null;
+  const top = brackets[i + 1]?.lowerBound;
+  if (top === undefined) return Number.POSITIVE_INFINITY;
+  const base = gaps.take(
+    computeTax(
+      {
+        filingStatus: input.filingStatus,
+        ages: input.ages,
+        wages: toCents(input.wages),
+        wagesByPerson: input.wagesByPerson.map(toCents),
+        otherOrdinaryIncome: toCents(input.ordinary),
+        socialSecurityBenefits: toCents(input.socialSecurity),
+        longTermCapitalGains: toCents(input.gains),
+        preTaxDeductions: 0 as Cents,
+        stateTaxRate: input.stateTaxRate as Fraction,
+      },
+      rules,
+    ),
   );
-  return notes.map((message) => ({ code: 'featureNotModeled', message }));
+  if (base === null) return null;
+  // Room = top + deductions − ordinary income already counted (incl. taxable SS at the fixed income);
+  // ordinary income = AGI − gains, so unused deductions add room.
+  const ordinaryCounted = base.agi / 100 - input.gains;
+  return Math.max(0, top / 100 + base.deductions / 100 - ordinaryCounted);
 }
 
 export function projectHousehold(
@@ -173,16 +214,28 @@ export function projectHousehold(
   const yearsWorked = new Map(household.people.map((p) => [p.id, 0]));
   const separated = new Set<string>();
 
-  let strategy = a.withdrawalStrategy;
-  if (strategy === 'bracketFill') {
-    warnings.push({
-      code: 'withdrawalStrategyFallback',
-      message: 'Bracket-fill withdrawals need the tax model (M4); this forecast uses the taxable-first order.',
-    });
-    strategy = 'taxableFirst';
-  }
-  const order = WITHDRAWAL_ORDER[strategy];
+  const bracketFill = a.withdrawalStrategy === 'bracketFill';
+  // Bracket fill fills traditional first (up to the bracket room), then taxable first (§7.3).
+  const order = WITHDRAWAL_ORDER[a.withdrawalStrategy === 'bracketFill' ? 'taxableFirst' : a.withdrawalStrategy];
+  let bracketFillFellBack = false;
   const categories = household.accounts.map((acc) => ({ id: acc.id, category: withdrawalCategoryOf(acc) }));
+  const gaps = new Gaps();
+  const ss = socialSecuritySetup(household, ctx.rules, firstYear, gaps);
+  warnings.push(...ss.warnings);
+  const standingAccess = new RuleAccess('standing');
+  const roth401kRmd = household.accounts.some((acc) => acc.type === 'workplaceRoth')
+    ? standingAccess.get(ctx.rules.standing.rmd.roth401kLifetimeRmdRequired, 'rmd.roth401kLifetimeRmdRequired', 'rmd')
+    : false;
+  /** Price level by calendar year (filled as the loop advances; years before year 1 use 1). */
+  const deflators = new Map<number, number>();
+  /** Price level of a past or current projection year (years before year 1 count as year 1). */
+  const deflatorAt = (y: number) => deflators.get(Math.max(y, firstYear)) ?? 1;
+  const warnedOnce = new Set<string>();
+  const warnOnce = (key: string, w: EngineWarning) => {
+    if (warnedOnce.has(key)) return;
+    warnedOnce.add(key);
+    warnings.push(w);
+  };
 
   const rows: YearRow[] = [];
   let deflator = 1;
@@ -206,24 +259,54 @@ export function projectHousehold(
       }
       deflator *= 1 + i;
     }
+    deflators.set(year, deflator);
     const rules = rulesForYear(household, ctx, year);
-    const acc = accumulationYear(household, setup, t, rules);
+    const alive = (p: Person) => year <= p.birthYear + p.planningAge;
+    if (firstDeathYear === null && household.people.some((p) => !alive(p))) firstDeathYear = year;
+    const pre: YearContext = {
+      household,
+      year,
+      t,
+      deflator,
+      alive,
+      retired: () => false,
+      retirementPhase: false,
+      firstRetirementYear: retirementYear,
+      firstDeathYear,
+    };
+    // Income that does not depend on the phase (§7.1 step 2): SS, pensions, one-time events.
+    const ssPaid = socialSecurityYear(pre, ss, ctx.rules.standing, gaps);
+    const ssTotal = [...ssPaid.values()].reduce((x, y) => x + y, 0);
+    const pensions = pensionYear(pre, deflatorAt);
+    const events = eventsYear(pre);
+    // RMDs (§7.1 step 3) on the start-of-year balance.
+    const rmd = new Map<string, number>();
+    for (const state of states.values()) {
+      const amount = rmdFor(pre, state.account, state.balance, ctx.rules.standing, gaps, roth401kRmd);
+      if (amount > 0) rmd.set(state.account.id, amount);
+    }
+    const rmdTotal = [...rmd.values()].reduce((x, y) => x + y, 0);
+    const inflowOrdinary =
+      events.inflows.reduce((x, e) => x + e.ordinary, 0) + pensions.lumpSums.reduce((x, l) => x + l.taxable, 0);
+    const inflowGains = events.inflows.reduce((x, e) => x + e.gains, 0);
+    const acc = accumulationYear(household, setup, t, rules, {
+      cash: ssTotal + pensions.annuity,
+      ordinary: pensions.taxable + rmdTotal + inflowOrdinary,
+      socialSecurity: ssTotal,
+      gains: inflowGains,
+    });
     for (const w of acc.cashFlow.warnings) warnings.push(w);
 
-    const alive = (p: Person) => year <= p.birthYear + p.planningAge;
     // Retired = at or past the retirement age and drawing no salary (a stop age after the retirement
     // age keeps the person working, so the household stays in the accumulation phase).
     const retired = (p: Person) =>
       year - p.birthYear >= p.retirementAge && !(acc.people.get(p.id)?.compensation.working ?? false);
     const retirementPhase = household.people.every((p) => !alive(p) || retired(p));
     if (retirementPhase && retirementYear === null) retirementYear = year;
-    const someoneDied = household.people.some((p) => !alive(p));
     const markers: YearRow['markers'] = [];
     if (retirementYear === year) markers.push('retirement');
-    if (someoneDied && firstDeathYear === null) {
-      firstDeathYear = year;
-      markers.push('firstDeath');
-    }
+    if (firstDeathYear === year) markers.push('firstDeath');
+    const c: YearContext = { ...pre, retired, retirementPhase, firstRetirementYear: retirementYear };
 
     // ---- Contributions per account (dollars) ---------------------------------------------------
     const contrib = new Map<string, number>();
@@ -281,8 +364,8 @@ export function projectHousehold(
         catchUp: toCents(catchUp),
         employerMatch: toCents(match),
         employerFlat: toCents(flat),
-        socialSecurity: 0 as Cents,
-        pension: 0 as Cents,
+        socialSecurity: toCents(ssPaid.get(person.id) ?? 0),
+        pension: toCents(pensions.byPerson.get(person.id) ?? 0),
       });
     }
     let workplaceEmployee = 0;
@@ -296,16 +379,15 @@ export function projectHousehold(
     }
     let scheduledTotal = [...scheduled.values()].reduce((x, y) => x + y, 0);
 
-    const spendingToday = retirementPhase
-      ? household.spending.retirementAnnualSpending
-      : household.spending.currentAnnualSpending;
-    const spendingNeed = (spendingToday / 100) * deflator;
+    const spendingNeed = spendingNeedFor(c);
     const earned = acc.float.grossPay;
     const otherIncome = acc.float.otherIncome;
+    // Cash income this year (gross): pay, other income, SS and pension annuities.
+    const fixedCash = earned + otherIncome + ssTotal + pensions.annuity;
 
     // Retirement phase: contributions are funded only from cash income left after spending.
     if (retirementPhase && scheduledTotal > 0) {
-      const leftover = Math.max(0, earned + otherIncome - spendingNeed);
+      const leftover = Math.max(0, fixedCash - spendingNeed - events.outflow);
       if (leftover < scheduledTotal - 0.005) {
         const k = leftover / scheduledTotal;
         // Contribution amounts are whole cents (§1.3); scaled amounts round down so they never
@@ -320,6 +402,29 @@ export function projectHousehold(
       }
     }
     for (const [id, v] of scheduled) add(contrib, id, v);
+
+    // Deposits at mid-year: lump-sum pensions and one-time inflows (§7.6).
+    let inflowTotal = 0;
+    const deposits = new Map<string, number>();
+    for (const lump of pensions.lumpSums) {
+      add(contrib, lump.accountId, lump.amount);
+      add(deposits, lump.accountId, lump.amount);
+      inflowTotal += lump.amount;
+    }
+    for (const e of events.inflows) {
+      inflowTotal += e.amount;
+      if (e.accountId === null) {
+        warnings.push({
+          code: 'oneTimeInflowSpent',
+          year,
+          message: `In ${year}, a one-time inflow of ${usd(e.amount)} has no account to go to, so it is treated as spent.`,
+        });
+        continue;
+      }
+      add(contrib, e.accountId, e.amount);
+      // A taxable deposit adds basis equal to the amount (its gain is realized in the event).
+      add(deposits, e.accountId, e.amount);
+    }
 
     // Accumulation-phase surplus routing (needs net pay, i.e. verified taxes).
     let surplusRouted = 0;
@@ -370,17 +475,172 @@ export function projectHousehold(
       caps.set(account.id, withdrawalCap(start, contrib.get(account.id) ?? 0, net));
     }
 
-    // ---- Withdrawals (retirement phase): fund the need before taxes ----------------------------
-    let withdrawalNeed = 0;
-    let unfunded = 0;
-    let withdrawals = new Map<string, number>();
-    if (retirementPhase) {
-      withdrawalNeed = Math.max(0, spendingNeed + scheduledTotal - earned - otherIncome);
-      const allocation = allocateWithdrawals(withdrawalNeed, categories, caps, order);
-      withdrawals = allocation.byAccount;
-      unfunded = allocation.unfunded;
+    // ---- Withdrawals: RMDs, HSA medical, then the need (§7.1–7.3) -----------------------------
+    const withdrawals = new Map<string, number>();
+    // Caps before any withdrawal: the basis and gain fractions use the year's full available balance.
+    const capsAtStart = new Map(caps);
+    const take = (id: string, amount: number) => {
+      if (amount <= 0) return;
+      withdrawals.set(id, (withdrawals.get(id) ?? 0) + amount);
+      caps.set(id, Math.max(0, (caps.get(id) ?? 0) - amount));
+    };
+    let rmdTaken = 0;
+    for (const [id, amount] of rmd) {
+      const x = Math.min(amount, caps.get(id) ?? 0);
+      take(id, x);
+      rmdTaken += x;
     }
-    const depleted = retirementPhase && unfunded > 0.005;
+    const outflow = events.outflow;
+    const need = retirementPhase ? spendingNeed + outflow + scheduledTotal : outflow;
+    // HSA medical (retirement phase): tax-free, up to the medical expenses and the remaining need.
+    let hsaMedical = 0;
+    const hsaMedicalBy = new Map<string, number>();
+    if (retirementPhase) {
+      const medical = (household.spending.hsaQualifiedMedicalExpenses / 100) * deflator;
+      const room = Math.max(0, Math.min(medical, need - fixedCash - rmdTaken));
+      if (room > 0) {
+        const hsas = household.accounts
+          .filter((acct) => acct.type === 'hsa')
+          .map((acct) => ({ id: acct.id, category: 'hsa' as const }));
+        const got = allocateWithdrawals(room, hsas, caps, [['hsa']]);
+        for (const [id, w] of got.byAccount) {
+          take(id, w);
+          hsaMedical += w;
+          hsaMedicalBy.set(id, w);
+        }
+      }
+    }
+    const cashBefore = retirementPhase ? fixedCash + rmdTaken + hsaMedical : 0;
+    let unfunded: number;
+    let excess: number;
+    let solved: ReturnType<typeof solveWithdrawals> | null = null;
+    let yearFiling: Household['filingStatus'] = household.filingStatus;
+    let spendingWithdrawals: number;
+    if (retirementPhase) {
+      const living = household.people.filter((p) => alive(p));
+      const filingStatus =
+        household.filingStatus === 'marriedFilingJointly' && (firstDeathYear === null || year <= firstDeathYear)
+          ? 'marriedFilingJointly'
+          : 'single';
+      const solverAccounts: SolverAccount[] = household.accounts.map((acct) => {
+        const state = states.get(acct.id);
+        const category = withdrawalCategoryOf(acct);
+        return {
+          id: acct.id,
+          category,
+          cap: caps.get(acct.id) ?? 0,
+          basis: acct.type === 'taxableBrokerage' && state ? state.basis + (contrib.get(acct.id) ?? 0) : 0,
+          ordinary: category === 'traditional' || category === 'hsa',
+          gains: acct.type === 'taxableBrokerage',
+        };
+      });
+      const baseInput = {
+        need,
+        fixedCash: cashBefore,
+        wages: earned,
+        wagesByPerson: household.people.map((p) => {
+          const comp = acc.people.get(p.id)?.compensation;
+          return comp ? (comp.baseSalary + comp.bonus + comp.partTimeIncome) / 100 : 0;
+        }),
+        ordinary: acc.float.otherTaxable + pensions.taxable + rmdTaken + inflowOrdinary,
+        socialSecurity: ssTotal,
+        gains: inflowGains,
+        filingStatus: filingStatus as 'single' | 'marriedFilingJointly',
+        ages: living.map((p) => year - p.birthYear),
+        stateTaxRate: a.stateTaxRate,
+        accounts: solverAccounts,
+        order,
+        traditionalFirstUpTo: null as number | null,
+        maxIterations: a.grossUp.maxIterations,
+        toleranceDollars: a.grossUp.toleranceCents / 100,
+      };
+      if (bracketFill) {
+        const room = bracketRoom(baseInput, rules, a.bracketFillTopRate, gaps);
+        if (room === null) bracketFillFellBack = true;
+        else baseInput.traditionalFirstUpTo = room;
+      }
+      yearFiling = baseInput.filingStatus;
+      solved = solveWithdrawals(baseInput, rules);
+      if (solved.status === 'unverified') {
+        setup.access.absorb(solved.missing);
+        // Taxes unverified: fund the need before taxes (§1.7).
+        const before = Math.max(0, need - cashBefore);
+        excess = Math.max(0, cashBefore - need);
+        const allocation = allocateWithdrawals(before, categories, caps, order);
+        for (const [id, w] of allocation.byAccount) take(id, w);
+        spendingWithdrawals = before - allocation.unfunded;
+        unfunded = allocation.unfunded;
+      } else {
+        const v = solved.value;
+        for (const [id, w] of v.byAccount) take(id, w);
+        spendingWithdrawals = v.withdrawn;
+        unfunded = v.unfunded;
+        excess = v.excess;
+        if (!v.converged) {
+          warnings.push({
+            code: 'grossUpNotConverged',
+            year,
+            message: `In ${year}, the tax gross-up did not converge within ${a.grossUp.maxIterations} iterations; the last estimate is shown.`,
+          });
+        }
+      }
+    } else {
+      // Accumulation: spending comes from pay; one-time outflows are withdrawn (before taxes).
+      const allocation = allocateWithdrawals(outflow, categories, caps, order);
+      for (const [id, w] of allocation.byAccount) take(id, w);
+      spendingWithdrawals = outflow - allocation.unfunded;
+      unfunded = allocation.unfunded;
+      // RMD money is not spent while working: it is reinvested.
+      excess = rmdTaken;
+    }
+    // Reinvest the excess (§7.1 step 6).
+    let reinvested = 0;
+    const target = reinvestAccount(household);
+    if (excess > 0.005 && target) {
+      reinvested = excess;
+      add(contrib, target, excess);
+      add(deposits, target, excess);
+    }
+    // Roth IRA earnings and HSA non-medical warnings (§7.4).
+    for (const acct of household.accounts) {
+      const w = withdrawals.get(acct.id) ?? 0;
+      if (w <= 0) continue;
+      const owner = household.people.find((p) => p.id === acct.ownerId);
+      if (acct.type === 'rothIra' && owner) {
+        const state = states.get(acct.id);
+        const basisAvailable = (state?.basis ?? 0) + (contrib.get(acct.id) ?? 0);
+        if (w > basisAvailable + 0.005) {
+          const qualified = gaps.take(
+            rothQualifiedYear(
+              owner.birthYear as never,
+              owner.birthMonth,
+              acct.firstContributionYear ?? firstYear,
+              ctx.rules.standing,
+            ),
+          );
+          if (qualified !== null && year < qualified) {
+            warnOnce(`roth-${acct.id}`, {
+              code: 'rothEarningsWithdrawnEarly',
+              year,
+              accountId: acct.id,
+              message: `${acct.name}: Roth IRA earnings are withdrawn before they are qualified (from ${qualified}). No tax or penalty is modeled.`,
+            });
+          }
+        }
+      }
+      if (acct.type === 'hsa' && owner) {
+        const nonMedical = w - (hsaMedicalBy.get(acct.id) ?? 0);
+        if (nonMedical > 0.005 && year - owner.birthYear < 65) {
+          warnOnce(`hsa-${acct.id}`, {
+            code: 'hsaNonMedicalPre65',
+            year,
+            accountId: acct.id,
+            message: `${acct.name}: non-medical HSA withdrawals before 65 are penalized; the penalty is not modeled.`,
+          });
+        }
+      }
+    }
+    const depleted = unfunded > 0.005;
     if (depleted && depletionYear === null) {
       depletionYear = year;
       markers.push('depletion');
@@ -414,7 +674,7 @@ export function projectHousehold(
       const F = forfeited.get(id) ?? 0;
       const C = contrib.get(id) ?? 0;
       const W = withdrawals.get(id) ?? 0;
-      const cap = caps.get(id) ?? 0;
+      const cap = capsAtStart.get(id) ?? 0;
       const E = endBalance(S - F, C, W, f.net);
       const grossEnd = f.gross.gS * (S - F) + f.gross.gC * C - f.gross.gW * W;
       const growthNetFloat = E - (S - F) - C + W;
@@ -450,7 +710,7 @@ export function projectHousehold(
         feeDrag,
         growthNet,
         withdrawals: out,
-        rmd: 0 as Cents,
+        rmd: toCents(Math.min(rmd.get(id) ?? 0, capsAtStart.get(id) ?? 0)),
         forfeited: forfeit,
         end,
         basisEnd: toCents(state.basis),
@@ -468,12 +728,22 @@ export function projectHousehold(
       byTreatment[taxTreatmentOf(state.account)] += end;
     }
 
-    const fundedWithdrawals = withdrawalNeed - unfunded;
-    const shortfall = retirementPhase ? Math.min(spendingNeed, unfunded) : 0;
-    const grossIncome = earned + otherIncome + (retirementPhase ? fundedWithdrawals : 0);
+    const shortfall = Math.min(spendingNeed + outflow, unfunded);
+    // Gross income: cash income, RMDs and HSA medical, plus withdrawals for the need (retirement
+    // phase); in accumulation years pay, other income, SS, pensions and RMDs (reinvested).
+    const grossIncome = retirementPhase
+      ? fixedCash + rmdTaken + hsaMedical + spendingWithdrawals
+      : fixedCash + rmdTaken;
     const netPay = acc.cashFlow.netPay;
-    const netIncome = retirementPhase ? null : netPay;
-    const taxes = retirementPhase ? null : acc.cashFlow.taxes;
+    const retirementTax = retirementPhase && solved?.status === 'ok' ? solved.value : null;
+    const taxes = retirementPhase ? (retirementTax?.tax ?? null) : acc.cashFlow.taxes;
+    const netIncome = retirementPhase
+      ? retirementTax
+        ? toCents(grossIncome - retirementTax.tax.totalTax / 100)
+        : null
+      : netPay === null
+        ? null
+        : toCents(netPay / 100 + rmdTaken);
 
     rows.push({
       year,
@@ -490,14 +760,17 @@ export function projectHousehold(
         growthNet: asCents(sums.growthNet),
         withdrawals: asCents(sums.withdrawals),
         forfeited: asCents(sums.forfeited),
+        rmd: toCents(rmdTaken),
+        hsaMedical: toCents(hsaMedical),
+        reinvested: toCents(reinvested),
         surplusRouted: toCents(surplusRouted),
-        socialSecurity: 0 as Cents,
-        pensions: 0 as Cents,
+        socialSecurity: toCents(ssTotal),
+        pensions: toCents(pensions.annuity),
         otherIncome: toCents(otherIncome),
-        oneTimeInflows: 0 as Cents,
-        oneTimeOutflows: 0 as Cents,
-        spendingNeed: toCents(spendingNeed),
-        spendingFunded: toCents(spendingNeed - shortfall),
+        oneTimeInflows: toCents(inflowTotal),
+        oneTimeOutflows: toCents(outflow),
+        spendingNeed: toCents(spendingNeed + outflow),
+        spendingFunded: toCents(spendingNeed + outflow - shortfall),
         shortfall: toCents(shortfall),
       },
       cashFlow: {
@@ -506,7 +779,14 @@ export function projectHousehold(
         surplus: retirementPhase ? null : surplus,
         infeasible: retirementPhase ? null : acc.cashFlow.infeasible,
       },
-      tax: taxes ? taxDetail(household, taxes, toCents(earned)) : null,
+      tax: taxes
+        ? taxDetail(
+            yearFiling,
+            taxes,
+            toCents(earned),
+            retirementTax ? { iterations: retirementTax.iterations, converged: retirementTax.converged } : undefined,
+          )
+        : null,
       totals: {
         portfolioStart: asCents(portfolioStart),
         portfolioEnd: asCents(portfolioEnd),
@@ -530,7 +810,14 @@ export function projectHousehold(
     });
   }
 
-  warnings.push(...notModeledWarnings(household));
+  setup.access.absorb(gaps.missing);
+  setup.access.absorb(standingAccess.missing);
+  if (bracketFillFellBack) {
+    warnings.push({
+      code: 'withdrawalStrategyFallback',
+      message: 'Bracket-fill withdrawals need verified tax brackets; this forecast uses the taxable-first order.',
+    });
+  }
   const last = rows[rows.length - 1];
   // The age shown for the depletion year is the first listed person still alive that year.
   const depletionPerson =

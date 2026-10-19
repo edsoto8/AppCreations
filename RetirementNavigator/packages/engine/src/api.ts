@@ -7,7 +7,7 @@
  *
  * Purity: no Date.now(), no Math.random(), no globals. The current year and the PRNG are injected.
  */
-import type { AgeYearsMonths, CalendarYear, Cents, DollarBasis, FilingStatus, Fraction } from './domain/primitives';
+import type { CalendarYear, Cents, DollarBasis, FilingStatus, Fraction } from './domain/primitives';
 import type { Household, WorkplacePlan } from './domain/household';
 import type { RulesSet, StandingRules, TaxYearRules } from './domain/rules';
 import type { EngineResult, EngineWarning, UnverifiedDetail } from './domain/results';
@@ -288,18 +288,7 @@ export interface GrossUpSolution {
  * Bounded fixed-point iteration: find withdrawals W such that net(W) = need within tolerance, where
  * taxes depend on W. Non-convergence returns the best iterate with `converged: false` and a warning.
  */
-export function solveGrossUp(
-  netNeed: Cents,
-  state: GrossUpState,
-  rules: ResolvedYearRules,
-  opts: { maxIterations: number; toleranceCents: number },
-): EngineResult<GrossUpSolution> {
-  void netNeed;
-  void state;
-  void rules;
-  void opts;
-  throw new NotImplementedError('solveGrossUp');
-}
+export { solveGrossUp } from './tax/grossUp'; // implemented in M4
 
 /** The per-year state the solver needs (balances, bases, fixed income, strategy). Built by the projection. */
 export interface GrossUpState {
@@ -318,84 +307,28 @@ export interface GrossUpState {
 // Social Security (module: socialSecurity/)
 // =============================================================================================
 
-export function fullRetirementAge(
-  birthYear: CalendarYear,
-  birthMonth: number,
-  standing: StandingRules,
-): EngineResult<AgeYearsMonths> {
-  void birthYear;
-  void birthMonth;
-  void standing;
-  throw new NotImplementedError('fullRetirementAge');
-}
+export { fullRetirementAge } from './socialSecurity/socialSecurity'; // implemented in M4
 
 /** Own retirement benefit at a claiming age (early reduction or delayed credits), monthly. */
-export function ssBenefitAtClaim(
-  input: { piaMonthly: Cents; birthYear: CalendarYear; birthMonth: number; claimAge: AgeYearsMonths },
-  standing: StandingRules,
-): EngineResult<{ monthly: Cents; adjustmentFactor: number; monthsFromFra: number }> {
-  void input;
-  void standing;
-  throw new NotImplementedError('ssBenefitAtClaim');
-}
+export { ssBenefitAtClaim } from './socialSecurity/socialSecurity'; // implemented in M4
 
 /** Illustrative PIA estimate — NOT an official SSA calculation. */
-export function estimatePia(
-  input:
-    | { kind: 'average'; birthYear: CalendarYear; averageAnnualEarnings: Cents; yearsOfEarnings: number }
-    | { kind: 'history'; birthYear: CalendarYear; earnings: { year: CalendarYear; earnings: Cents }[] },
-  rules: RulesSet,
-): EngineResult<{ piaMonthly: Cents; aimeMonthly: Cents; eligibilityYear: CalendarYear; label: string }> {
-  void input;
-  void rules;
-  throw new NotImplementedError('estimatePia');
-}
+export { estimatePia } from './socialSecurity/socialSecurity'; // implemented in M4
 
 /** Spousal benefit on the other spouse's PIA, reduced for claiming before the spouse's FRA. */
-export function spousalBenefit(
-  input: {
-    ownPiaMonthly: Cents;
-    otherPiaMonthly: Cents;
-    birthYear: CalendarYear;
-    birthMonth: number;
-    claimAge: AgeYearsMonths;
-  },
-  standing: StandingRules,
-): EngineResult<{ monthlyExcess: Cents }> {
-  void input;
-  void standing;
-  throw new NotImplementedError('spousalBenefit');
-}
+export { spousalBenefit } from './socialSecurity/socialSecurity'; // implemented in M4
 
 /** Survivor benefit (simple model, documented): the higher of own and deceased's benefit incl. DRCs. */
-export function survivorBenefit(
-  input: { survivorOwnMonthly: Cents; deceasedBenefitMonthly: Cents; deceasedPiaMonthly: Cents },
-  standing: StandingRules,
-): EngineResult<{ monthly: Cents }> {
-  void input;
-  void standing;
-  throw new NotImplementedError('survivorBenefit');
-}
+export { survivorBenefit } from './socialSecurity/socialSecurity'; // implemented in M4
 
 // =============================================================================================
 // RMD (module: rmd/)
 // =============================================================================================
 
-export function rmdStartAge(birthYear: CalendarYear, standing: StandingRules): EngineResult<number> {
-  void birthYear;
-  void standing;
-  throw new NotImplementedError('rmdStartAge');
-}
+export { rmdStartAge } from './rmd/rmd'; // implemented in M4
 
 /** RMD for a year = prior Dec 31 balance / Uniform Lifetime Table period for the age in that year. */
-export function rmdAmount(
-  input: { age: number; priorYearEndBalance: Cents },
-  standing: StandingRules,
-): EngineResult<Cents> {
-  void input;
-  void standing;
-  throw new NotImplementedError('rmdAmount');
-}
+export { rmdAmount } from './rmd/rmd'; // implemented in M4
 
 // =============================================================================================
 // Projection (module: projection/)

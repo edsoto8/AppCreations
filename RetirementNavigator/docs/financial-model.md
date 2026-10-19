@@ -338,7 +338,7 @@ and labeled**, never with a filled-in value:
   "other" tax-deferred; tax-free = workplace Roth, Roth IRA, HSA, "other" tax-free; taxable =
   taxable brokerage, cash, "other" taxable. HSA is shown as tax-free (qualified medical use).
 
-### 4.1 Retirement-phase cash flow (M3: simple withdrawals, before taxes)
+### 4.1 Retirement-phase cash flow (M3 baseline; superseded in M4 by §7.1, kept for the before-taxes path)
 For each retirement-phase year:
 1. `need = retirementAnnualSpending · P_t`.
 2. Cash income `I = earned (part-time) + other income`, before taxes.
@@ -364,13 +364,16 @@ Accumulation-phase years make no withdrawals: spending is funded from pay (§3.8
 
 ## 5. Spending [M4]
 - Accumulation years: `spend_t = currentAnnualSpending · P_t`.
-- Retirement years:
-  - `spend_t = S_step(age_primary) · (1+glide)^{t − t_R} · P_t`, where `S_step` is the
-    retirement spending or the latest step whose `fromAge ≤ age`, and `t_R` is the first retirement
-    year;
-  - plus `healthcareBeforeMedicare · P_t` while any living retired person is under 65;
-  - times `(1 − survivorReduction)` from the first death year onward.
-- One-time outflows add to the need in their year; inflows go to the destination account.
+- Retirement-phase years:
+  - `spend_t = S_step(age_1) · (1+glide)^{t − t_R} · P_t`, where:
+    - `S_step` is the retirement spending, or the latest step whose `fromAge ≤ age_1`;
+    - `age_1` is the first listed person's age that year (calendar arithmetic, even after their death);
+    - `t_R` is the first retirement-phase year (glide exponent 0 in that year);
+  - plus `healthcareBeforeMedicare · P_t` while any **living retired** person is under 65 (a
+    user-entered line item; early-retirement plans carry a persistent note);
+  - times `(1 − survivorSpendingReduction)` from the first death year onward, for couples.
+- Rule-free: none of this needs a rule value.
+- One-time events (§7.6) add outflows to the year's withdrawal need and inflows to an account.
 
 ## 6. Tax model (simplified, documented) [M4; payroll and ordinary tax used in M2 net pay]
 - Ordinary income = wages − pre-tax deductions + traditional withdrawals + taxable pensions + taxable
@@ -399,27 +402,69 @@ Accumulation-phase years make no withdrawals: spending is funded from pay (§3.8
   early-withdrawal penalties beyond a flag and a warning.
 
 ## 7. Retirement income [M4]
+Everything here follows §1.7. A step that needs a null rule value is **left out and labeled**, and
+listed in `excludedFeatures`; it is never filled in. With the bundled (unverified) rules:
+- Social Security works only from an `atClaimAge` input;
+- spousal and survivor benefits, RMDs, taxes and Roth qualification are left out.
 
-### 7.1 Order of operations each retirement-phase year
-1. Fixed income: SS, pensions, other income, one-time inflows.
-2. RMDs, taken from each traditional account where `age ≥ rmdStartAge`:
-   `RMD = priorYearEnd / period(age)`.
-3. HSA qualified withdrawals up to the qualified medical expenses (tax-free).
-4. The gross-up solver funds the remaining net need using the withdrawal strategy.
-5. Excess RMD after tax is reinvested in the taxable account (or cash if there is none).
+### 7.1 Order of operations each year
+1. **Spending need** (§5) plus one-time outflows (`amountBasis` today's dollars × `P_t`, or nominal).
+2. **Fixed income** (gross):
+   - earned (part-time) pay;
+   - Social Security (§7.5);
+   - pension annuities (§7.6);
+   - other income, owned by a living person or the household.
+   Lump-sum pensions and one-time inflows are **deposits** to their destination account at mid-year.
+   They are not spending income.
+3. **RMDs** (retirement or accumulation phase; verified rules only, else `rmd` is excluded). For each
+   traditional account (workplace traditional, traditional IRA, "other" tax-deferred, and workplace
+   Roth only if `roth401kLifetimeRmdRequired`) whose owner is alive and `age ≥ rmdStartAge(birthYear)`:
+   - `RMD = min(cap, priorYearEnd / period(age))`; in year 1, `priorYearEnd` is the entered balance;
+   - it counts as a withdrawal from that account and as ordinary income.
+4. **HSA medical** (retirement phase): tax-free withdrawals up to
+   `min(hsaQualifiedMedicalExpenses · P_t, remaining need)`, drawn pro rata from the HSAs' caps.
+   - Medical expenses are part of the spending need, not added to it.
+   - In accumulation years medical costs are paid from pay (simplification).
+  - Medical withdrawals count in `flows.hsaMedical` and in `flows.withdrawals`.
+5. **Remaining need.** In the **retirement phase**, `need − (fixed income + RMDs + HSA medical)`, net
+   of taxes, is funded by withdrawals:
+   - taxes verified: the gross-up solver (§7.2);
+   - otherwise before taxes (`W = max(0, remaining)`), as in M3.
+
+   In the **accumulation phase**, spending is funded from pay (§3.8). Social Security, pension
+   annuities and RMDs received while someone still works count as income for net pay, surplus and
+   the infeasible check (their tax is in the year's tax). RMD money is reinvested (step 6). One-time
+   outflows are withdrawn from the portfolio by the same strategy, before taxes (simplification).
+6. **Excess.** If fixed income, RMDs and HSA medical exceed the need (after tax when taxes are
+   verified), the excess is **reinvested** mid-year in the first taxable brokerage account, else the
+   first cash account; with neither it is spent. RMD money in excess is never left in the
+   tax-deferred account.
+7. **Taxes** (verified rules only), on:
+   - wages (part-time);
+   - ordinary income: traditional withdrawals including RMDs, the taxable share of pensions and
+     other income, HSA non-medical withdrawals at 65+, one-time `ordinaryIncome` inflows;
+   - Social Security benefits (taxable share per Pub 915, §6);
+   - long-term gains: the gain part of taxable-brokerage withdrawals, `W·(1 − basis/cap)`, plus
+     `gainFraction` of one-time `capitalGain` inflows;
+   - filing status: MFJ through the first death year, then single;
+   - with `ages` of the living filers.
+   Roth withdrawals, Roth basis, HSA medical and cash are untaxed.
 
 ### 7.2 Gross-up solver
-- Find gross withdrawals `W` so that `fixed + W − tax(W) = need` within tolerance.
-- Iteration:
-  - start at `W_0 = max(0, need − fixedNet)`;
-  - each step computes `W_{k+1} = max(0, need + tax(W_k) − fixed)` and allocates it by strategy;
-  - stop when `|W_{k+1} − W_k| ≤ $1`, or after N iterations (default 50).
-- It converges because the effective marginal rate (federal, SS inclusion and state combined) is
-  below 1, which makes the map a contraction.
-- Non-convergence returns the last iterate with `converged:false` and a warning. Tests cover both
-  outcomes.
-- Depletion: if balances can't fund the need, `unfunded > 0`, `depleted = true`, and balances are
-  floored at 0 (never negative).
+- Find gross withdrawals `W` so that `fixed + RMD + HSA medical + W − tax(W) = need` within the
+  tolerance (`grossUp.toleranceCents`, default $1).
+- Iteration (bounded fixed point, `grossUp.maxIterations`, default 50):
+  - `W_0 = max(0, need − (fixed + RMD + HSA) + tax(W = 0))`;
+  - `W_{k+1} = max(0, need + tax(W_k) − fixed − RMD − HSA)`, where each `W_k` is allocated by the
+    strategy and the caps, and the tax uses that allocation's ordinary income and gains;
+  - stop when `|W_{k+1} − W_k| ≤ tolerance`.
+  The map is a contraction because the combined marginal rate (federal, SS inclusion and state) is
+  below 1.
+- If W exceeds the total cap, W is capped and the rest is `unfunded` (depletion, §4.1).
+- Non-convergence returns the last iterate with `solver.converged = false` and a
+  `grossUpNotConverged` warning. The tests cover convergence, non-convergence and depletion.
+- Output per year: `grossIncome`, `tax` (detail with solver iterations), `netIncome = grossIncome −
+  totalTax`.
 
 ### 7.3 Withdrawal strategies
 | Strategy | Order |
@@ -428,54 +473,108 @@ Accumulation-phase years make no withdrawals: spending is funded from pay (§3.8
 | traditionalFirst | traditional → cash → taxable → Roth → HSA |
 | rothLast | cash, taxable and traditional pro rata by available balance → HSA → Roth |
 | proportional | all accounts pro rata by available balance |
+| bracketFill | traditional up to the bracket top (below) → cash → taxable → Roth → HSA |
 
-"Available balance" is each account's withdrawal cap for the year (§1.5).
-| bracketFill | traditional up to the top of the target bracket's taxable income → cash → taxable → Roth → HSA |
+- "Available balance" is each account's withdrawal cap for the year (§1.5), after RMDs.
+- **Bracket fill (heuristic):** traditional withdrawals beyond RMDs fill taxable ordinary income up to
+  the top of the bracket whose rate is `bracketFillTopRate`: `T = max(0, top + deductions −
+  ordinary income already counted − taxable SS at the fixed income)`.
+  - SS taxation is estimated at the fixed income (simplification).
+  - Bracket fill never withdraws more than the need (no deliberate Roth conversions).
+  - It needs verified brackets, and falls back to taxableFirst with a warning otherwise.
 
 ### 7.4 Roth and HSA withdrawals
-- Roth IRA: qualified from the year the owner reaches 59½ (calendar year `birthYear + 59` if
-  `birthMonth ≤ 6`, else `+60`) **and** at least 5 tax years after the first contribution year
-  (verified rules). Before that, basis comes out first untaxed, and earnings are flagged with a
-  warning (simplified; no penalty is modeled).
-- There are no Roth IRA owner RMDs. Roth 401(k) lifetime RMDs follow the verified rule.
-- HSA: qualified medical withdrawals are tax-free; non-medical withdrawals after 65 are ordinary
-  income; non-medical withdrawals before 65 are flagged as penalized (simplified).
+- **Roth IRA** withdrawals come from contribution basis first (untaxed). Earnings are qualified, and
+  untaxed, from the calendar year the owner turns 59½ **and** at least `fiveYearRuleYears` after
+  `firstContributionYear` (year 1 if unknown).
+  - "Turns 59½" means `birthYear + 59` if `birthMonth ≤ 6`, else `birthYear + 60`, using
+    `qualifiedAgeMonths`.
+  - Earnings withdrawn earlier are flagged with `rothEarningsWithdrawnEarly`. No tax or penalty is
+    modeled (simplified).
+  - With unverified rules the check is excluded (`rothQualification`) and no flag is shown.
+- **Workplace Roth:** treated as qualified (simplification; its own 5-year rule is not tracked).
+- There are no Roth IRA owner RMDs. Workplace Roth RMDs follow `roth401kLifetimeRmdRequired`.
+- **HSA:**
+  - qualified medical withdrawals are tax-free (§7.1 step 4);
+  - non-medical withdrawals (in the strategy order) are ordinary income at any age;
+  - before 65 they are also flagged `hsaNonMedicalPre65` as penalized (no penalty amount is modeled).
 
 ### 7.5 Social Security
-- Claim factor, with `m = FRA_months − claim_months`:
-  - if m > 0: `1 − (5/9%·min(m,36) + 5/12%·max(0, m−36))`;
-  - if m < 0: `1 + 2/3%·min(−m, months to 70)`.
-  - All constants come from verified standing rules.
-- Benefits begin in the claim year, and the first year is prorated by the months of entitlement
-  (birth month + claim months).
-- Statement PIA is in today's dollars; the nominal benefit is `PIA·f·12·Π(1+COLA)` from year 1 to t.
-  The COLA is an assumption (default: inflation).
-- **Spousal:** the excess is `max(0, share·PIA_other − PIA_own)`, reduced by the spousal early-claim
-  factors, and is payable from the year both have claimed.
-- **Survivor (simple model):**
-  - from the first death year, the survivor receives `max(own, deceased's claimed-age benefit
-    including DRCs)`, floored at the RIB-LIM share of the deceased's PIA if verified, and the lower
-    benefit ends;
-  - if the deceased had not yet claimed, their benefit is computed as if claimed at the death age;
-  - the survivor's own early-claim survivor reduction is **not** modeled (simplification).
-- Earnings test: unsupported. A warning is shown when someone claims before FRA while still earning.
-- Benefit-reduction scenario: an optional user cut from a year onward (labeled as an assumption).
-- WEP/GPO: applied only per their verified current status (the candidate source says repealed).
+- **Own benefit at claim**, by input kind:
+  - `atClaimAge`: the entered monthly benefit at the planned claiming age (today's dollars) is used
+    directly. No rule values are needed.
+  - `statement` (PIA at FRA): `monthly = PIA · f` with the claim factor `f` below (verified FRA
+    table and factors needed, else excluded: `socialSecurityClaiming`).
+  - `estimateAverage` / `estimateHistory`: an illustrative PIA (below), labeled "not an official SSA
+    calculation" (`ssEstimateIllustrative`), then `f` as above.
+- **Claim factor**, with `m = FRA_months − claim_months`:
+  - if m > 0: `1 − (r1·min(m,36) + r2·max(0, m−36))`;
+  - if m < 0: `1 + d·min(−m, months to delayedCreditMaxAge)`.
+  - r1, r2, d and the max age are verified standing rules.
+- **Timing:** benefits begin in the claim year, `birthYear + claimAge.years`, prorated by the months
+  of entitlement that year: `max(0, 12 − (birthMonth − 1 + claimAge.months))`. The person must be
+  alive.
+- **Amount in year t:** `12 · monthly · P_t` (COLA = inflation), or `12 · monthly · Π(1 + cola)` for
+  a set COLA rate. The `benefitReduction` assumption multiplies by `(1 − reduction)` from its year
+  (labeled an assumption, not a prediction).
+- **Spousal (verified rules only, else excluded: `spousalSurvivorBenefits`):**
+  - excess = `max(0, maxShareOfPia·PIA_other − PIA_own)`, reduced for claiming before one's own FRA
+    with the spousal factors;
+  - payable from the year both have claimed.
+  - Needs both PIAs: `atClaimAge` inputs have no PIA, so spousal is excluded for them.
+- **Survivor (simple model; verified rules only, else excluded):**
+  - from the first death year, the survivor receives `max(own, deceased's benefit including delayed
+    credits)`, floored at `ribLimFloorShareOfPia × deceased PIA` when a PIA is known;
+  - the deceased's benefit stops;
+  - if the deceased had not claimed, their benefit is computed as if claimed at the death age;
+  - the survivor's own early-claim survivor reduction is not modeled;
+  - for an `atClaimAge` deceased who had not claimed yet, the entered amount stands in for the
+    benefit at the death age (simplification; no PIA is known).
+  - While excluded, each person keeps only their own benefit, and the survivor gets nothing extra.
+- **Earnings test:** unsupported. `ssClaimBeforeFraWhileWorking` warns when someone claims before FRA
+  (verified FRA) or before 67 (unverified FRA, labeled) while drawing salary or part-time pay.
+- **WEP/GPO:** applied only per the verified current status. The candidate says they are repealed;
+  no reduction is modeled either way.
 - **Illustrative estimator (not an official SSA calculation):**
-  - from history: wage-index each year with AWI to eligibility year − 2, take the top 35 years,
-    `AIME = Σ/420`, and compute `PIA = 0.9·min(AIME,b1) + 0.32·clip(AIME−b1, 0, b2−b1) +
-    0.15·max(0, AIME−b2)`, truncated to the dime;
-  - average mode: `AIME = avg·min(years,35)/35/12`, using the current year's bend points in today's
-    dollars;
+  - from history: wage-index each year with AWI to the eligibility year − 2, take the top 35 years,
+    `AIME = Σ/420`, and `PIA = 0.9·min(AIME,b1) + 0.32·clip(AIME−b1, 0, b2−b1) + 0.15·max(0,
+    AIME−b2)` (factors from rules), truncated to the dime;
+  - average mode: `AIME = avg·min(years,35)/35/12`, using the current year's bend points;
   - entered history is assumed already capped at each year's taxable maximum (labeled).
 
-### 7.6 Pensions and other income
-- Annuity from the start age: amount in today's dollars or nominal at start, then COLA. The taxable
-  share is per the input.
-- A lump sum is paid at the start age into the destination account and taxed per the account type
-  (rollover assumed).
-- Survivor continuation is `survivorFraction` of the annuity after the owner's death.
+### 7.6 Pensions, other income and one-time events
+- **Pension annuity:**
+  - starts in the year the owner reaches `startAge`;
+  - the amount is today's dollars × `P_t`, or nominal at start;
+  - it then grows by its COLA (flat, inflation or a rate) from the start year;
+  - `taxableFraction` of it is ordinary income.
+  - After the owner's death, `survivorFraction` continues to a surviving spouse; for a single owner it
+    stops.
+- **Lump sum:** paid in the start year into `destinationAccountId` (a rollover; untaxed when the
+  destination is tax-deferred, otherwise taxed per `taxableFraction` as ordinary income).
+- **Other income:** as in §3.8. Owned income stops after the owner's death (§1.4).
+- **Flows:** `flows.pensions` is annuity income only. Lump sums and one-time inflows are counted
+  in `flows.oneTimeInflows` (deposits). `flows.spendingNeed` includes one-time outflows, which are
+  also reported separately in `flows.oneTimeOutflows`.
+- **One-time events** (in their `year`; `amountBasis` today's dollars × `P_t`, or nominal):
+  - **outflow:** added to that year's withdrawal need (§7.1 step 1);
+  - **inflow:** deposited mid-year into `destinationAccountId`, or else the surplus account, the first
+    taxable brokerage, the first cash account; with none, it is spent with an `oneTimeInflowSpent`
+    warning.
+    - Tax: `ordinaryIncome` → ordinary income; `capitalGain` → `gainFraction` × amount as long-term
+      gains; `none` → untaxed.
+    - Basis: a taxable-brokerage deposit adds basis equal to the after-gain amount (the gain is
+      realized in the event).
 
+### 7.7 Survivor modeling
+- **First death year** `D = birthYear + planningAge + 1` of the first to die (§1.4). From D:
+  - the deceased's salary, part-time pay, owned other income and SS stop;
+  - survivor SS (§7.5) and pension continuation (§7.6) apply;
+  - spending is reduced by `survivorSpendingReduction` (§5);
+  - accounts stay in the household, and the survivor's age governs RMDs on the deceased's accounts
+    (spousal rollover assumption);
+  - filing status is MFJ in D, single from D + 1.
+- The tests cover both orderings (older or younger spouse dies first) and equal planning ages.
 ## 8. Dashboard cards [M3, extended M4/M6]
 | Card | Definition | Dollar basis | Tax basis | Year |
 |---|---|---|---|---|

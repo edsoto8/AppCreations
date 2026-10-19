@@ -215,7 +215,7 @@ export interface AccumulationYear {
   /** Per person and plan (plan order): contributions after limits, or null when a limit is unverified. */
   planCapped: Map<string, (CappedContributions | null)[]>;
   /** Float64 dollars for the projection (spending, gross pay and other income). */
-  float: { grossPay: number; otherIncome: number; spending: number; anyWorking: boolean };
+  float: { grossPay: number; otherIncome: number; otherTaxable: number; spending: number; anyWorking: boolean };
 }
 
 export interface AccumulationSetup {
@@ -234,11 +234,23 @@ export function accumulationSetup(household: Household, ctx: EngineContext, year
   };
 }
 
+/**
+ * Income beyond pay and other income that the projection adds in accumulation years (Social Security,
+ * pensions, RMDs, one-time inflows): cash, and the parts that are taxable.
+ */
+export interface ExtraIncome {
+  cash: number;
+  ordinary: number;
+  socialSecurity: number;
+  gains: number;
+}
+
 export function accumulationYear(
   household: Household,
   setup: AccumulationSetup,
   t: number,
   rules: ResolvedYearRules,
+  extra: ExtraIncome = { cash: 0, ordinary: 0, socialSecurity: 0, gains: 0 },
 ): AccumulationYear {
   const { firstYear, paths, access } = setup;
   const inflation = household.assumptions.inflation;
@@ -325,9 +337,9 @@ export function accumulationYear(
         ages,
         wages: toCents(grossPay),
         wagesByPerson,
-        otherOrdinaryIncome: toCents(other.taxable),
-        socialSecurityBenefits: 0 as Cents,
-        longTermCapitalGains: 0 as Cents,
+        otherOrdinaryIncome: toCents(other.taxable + extra.ordinary),
+        socialSecurityBenefits: toCents(extra.socialSecurity),
+        longTermCapitalGains: toCents(extra.gains),
         // SIMPLIFICATION: HSA contributions are treated as pre-tax for income tax (FICA on gross wages).
         preTaxDeductions: toCents(preTax + hsaPreTax),
         stateTaxRate: household.assumptions.stateTaxRate as Fraction,
@@ -340,12 +352,12 @@ export function accumulationYear(
 
   const contributions =
     workplaceEmployee === null || scheduled.total === null ? null : workplaceEmployee + scheduled.total;
-  const netPay = taxes === null ? null : grossPay + other.gross - taxes.totalTax / 100;
+  const netPay = taxes === null ? null : grossPay + other.gross + extra.cash - taxes.totalTax / 100;
   const surplus = netPay === null || contributions === null ? null : netPay - contributions - spending;
   let infeasible = surplus === null || !anyWorking ? null : surplus < -0.005;
   // Without verified taxes the surplus is unknown, but taxes and contributions are never negative:
   // pay + other income below spending alone proves the year is infeasible (no rule value needed).
-  const provenGap = grossPay + other.gross - spending;
+  const provenGap = grossPay + other.gross + extra.cash - spending;
   if (infeasible === null && anyWorking && provenGap < -0.005) {
     infeasible = true;
     yearWarnings.push({
@@ -363,7 +375,7 @@ export function accumulationYear(
   return {
     people,
     planCapped,
-    float: { grossPay, otherIncome: other.gross, spending, anyWorking },
+    float: { grossPay, otherIncome: other.gross, otherTaxable: other.taxable, spending, anyWorking },
     cashFlow: {
       year,
       grossPay: toCents(grossPay + other.gross),

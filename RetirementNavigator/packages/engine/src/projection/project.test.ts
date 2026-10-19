@@ -23,7 +23,7 @@ type Over = {
   person?: Record<string, unknown>;
   people?: Record<string, unknown>[];
   accounts?: Record<string, unknown>[];
-  spending?: { currentAnnualSpending?: number; retirementAnnualSpending?: number };
+  spending?: Record<string, unknown>;
   assumptions?: Record<string, unknown>;
   filingStatus?: 'single' | 'marriedFilingJointly';
 };
@@ -675,7 +675,7 @@ describe('review fixes (M3)', () => {
         },
       ],
       accounts: [cash(500_000, { expectedReturn: 0 })],
-      spending: { retirementAnnualSpending: dollars(60_000) },
+      spending: { retirementAnnualSpending: dollars(60_000), survivorSpendingReduction: 0 },
     });
     const h = HouseholdSchema.parse({
       ...base,
@@ -756,7 +756,7 @@ describe('review fixes (M3)', () => {
           { id: 'person-2', name: 'B', birthYear: YEAR - 60, retirementAge: 60, planningAge: 95, socialSecurity: ss },
         ],
         accounts: [cash(200_000, { expectedReturn: 0 })],
-        spending: { retirementAnnualSpending: dollars(20_000) },
+        spending: { retirementAnnualSpending: dollars(20_000), survivorSpendingReduction: 0 },
       }),
       ctx,
     );
@@ -831,15 +831,12 @@ describe('samples, dashboard and warnings', () => {
     }
   });
 
-  it('lists inputs that are modeled in M4', () => {
-    const notes = (id: string) =>
-      project(SAMPLE_PROFILES.find((s) => s.id === id)!.build(YEAR))
-        .warnings.filter((w) => w.code === 'featureNotModeled')
-        .map((w) => w.message);
-    expect(notes('nearRetirement').some((m) => m.includes('Social Security'))).toBe(true);
-    expect(notes('midCareerCouple').some((m) => m.includes('Social Security'))).toBe(false);
-    expect(notes('midCareerCouple').some((m) => m.includes('survivor spending reduction'))).toBe(true);
-    expect(notes('earlyCareer').some((m) => m.includes('before taxes'))).toBe(true);
+  it('leaves out Social Security that needs unverified rules, and labels it', () => {
+    // Near retirement: a PIA-at-FRA statement needs the (unverified) FRA table and claim factors.
+    const r = project(SAMPLE_PROFILES.find((x) => x.id === 'nearRetirement')!.build(YEAR));
+    expect(r.excludedFeatures).toContain('socialSecurityClaiming');
+    expect(r.rows.every((row) => row.flows.socialSecurity === 0)).toBe(true);
+    expect(r.warnings.some((w) => w.code === 'featureNotModeled')).toBe(false);
   });
 
   it('dashboard cards follow their documented definitions', () => {

@@ -35,10 +35,10 @@ estimates, not guarantees, tax advice, or investment recommendations. Taxes are 
   - contributions are as you elected them, **before plan limits**;
   - retirement income is **before taxes**;
   - take-home pay is not shown.
-- **Not in the forecast yet:** Social Security, pensions, one-time events, required minimum
-  distributions and taxes in retirement arrive in a later milestone (M4). The banner lists the ones
-  that apply to you. Until then, retirement spending is drawn from your accounts in the order you
-  choose.
+- Retirement spending is funded first by income (Social Security, pensions, other income), then by
+  withdrawals in the order you choose. Taxes, required minimum distributions and some Social
+  Security amounts need verified rules; until then they are left out and labeled (see Retirement
+  Income).
 - **Forecast settings** (on the Profile page):
   - withdrawal timing (mid-year, or start of year as a conservative choice);
   - annual or monthly calculation;
@@ -46,6 +46,38 @@ estimates, not guarantees, tax advice, or investment recommendations. Taxes are 
   - where leftover pay goes while working;
   - the optimistic and pessimistic offsets;
   - a minimum ending balance in today's dollars.
+
+## Retirement Income
+- **Social Security:** for each person, choose how to enter it.
+  - **Benefit at your claiming age** (recommended for now): the monthly amount your SSA statement
+    lists for the age you plan to claim, in today's dollars. It needs no rule values, so it is
+    included in the forecast today.
+  - **Benefit at full retirement age**, or the **illustrative estimate** from earnings (not an
+    official SSA calculation): these need SSA rule values (full retirement age, early and delayed
+    factors) that are not verified yet. They show as "Not available yet" and are left out of the
+    forecast.
+  - Spousal and survivor benefits also need verified SSA rules. Until then each person keeps their
+    own benefit, and the forecast says so.
+  - Benefits rise with the COLA assumption (inflation by default). An optional benefit-reduction
+    scenario is an assumption, not a prediction.
+  - Claiming before full retirement age while still working shows a warning: the earnings test is
+    not modeled.
+- **Pensions:**
+  - start age, amount (today's dollars or nominal at start), COLA and taxable share;
+  - annuity or lump sum (paid into an account);
+  - the share that continues to a surviving spouse.
+- **Other income** and **one-time events:**
+  - an inheritance or home sale is deposited into an account;
+  - a large expense is withdrawn from savings in its year.
+- **Spending plan:**
+  - spending steps by age;
+  - a yearly real change (glide);
+  - healthcare before Medicare, which you enter yourself (early-retirement plans should include
+    it);
+  - the reduction after the first death.
+- **Gross to net:** each retirement year lists income by source, taxes and net income.
+  - While tax rules are unverified, income is shown **before taxes**.
+  - Required minimum distributions are left out and labeled until their rules are verified.
 
 ## Profiles
 - The header switcher changes the active profile.

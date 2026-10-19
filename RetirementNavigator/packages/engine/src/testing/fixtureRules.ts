@@ -86,6 +86,38 @@ export function fixtureStanding(): StandingRules {
     roth: {
       ...base.roth,
       reducedContributionRounding: fixed({ roundUpToDollars: 10, minimumDollars: 200 }),
+      qualifiedAgeMonths: fixed(59 * 12 + 6),
+      fiveYearRuleYears: fixed(5),
+    },
+    // SYNTHETIC RMD values: start age 73 (born 1900–1959) / 75 (born 1960+); a round Uniform Lifetime
+    // Table for ages 70–120 with period = 30 − 0.5·(age − 70) (30 at 70, 25 at 80, 5 at 120).
+    rmd: {
+      startAgeByBirthYear: fixed([
+        { fromBirthYear: 1900, toBirthYear: 1959, age: 73 },
+        { fromBirthYear: 1960, toBirthYear: null, age: 75 },
+      ]),
+      uniformLifetimeTable: fixed(Array.from({ length: 51 }, (_, k) => ({ age: 70 + k, period: (60 - k) / 2 }))),
+      roth401kLifetimeRmdRequired: fixed(false),
+    },
+    // SYNTHETIC Social Security values: FRA 66y0m (born before 1950) / 67y0m (1950+); early reduction
+    // 0.5%/month for 36 months then 0.4%; delayed credits 0.6%/month to 70; spousal 50% with
+    // 0.6%/0.4%; survivor 100% with an 80% RIB-LIM floor; PIA factors 0.9/0.3/0.15;
+    // AWI(Y) = $50,000 + $1,000·(Y − 2000) for 1970–2025 ($20,000 … $75,000).
+    socialSecurity: {
+      ...base.socialSecurity,
+      fraByBirthYear: fixed([
+        { fromBirthYear: 1900, toBirthYear: 1949, years: 66, months: 0 },
+        { fromBirthYear: 1950, toBirthYear: null, years: 67, months: 0 },
+      ]),
+      earlyReduction: fixed({ first36PerMonth: 0.005, beyond36PerMonth: 0.004 }),
+      delayedCreditPerMonth: fixed(0.006),
+      delayedCreditMaxAge: fixed(70),
+      spousal: fixed({ maxShareOfPia: 0.5, first36PerMonth: 0.006, beyond36PerMonth: 0.004 }),
+      survivor: fixed({ maxShareOfDeceased: 1, ribLimFloorShareOfPia: 0.8 }),
+      piaFactors: fixed<[number, number, number]>([0.9, 0.3, 0.15]),
+      awiSeries: fixed(
+        Array.from({ length: 56 }, (_, k) => ({ year: 1970 + k, awi: dollars(50_000 + 1_000 * (k - 30)) })),
+      ),
     },
   };
 }

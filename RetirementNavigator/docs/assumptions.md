@@ -68,6 +68,16 @@ Stochastic inflation (optional): median 2.5%, volatility 1.5%, correlations with
   - extra cash income in retirement is assumed spent;
   - retirement-year contributions come only from income left after spending.
 - The household phase (not each person's) picks the pre- or post-retirement fallback return.
+- M4 retirement income (financial-model §5, §7):
+  - Social Security is included from an entered "benefit at your claiming age" (no rule values
+    needed). PIA-based inputs, spousal and survivor benefits wait for verified SSA rules.
+  - HSA medical withdrawals are taken only in retirement years.
+  - One-time outflows while working are withdrawn from savings before taxes.
+  - Excess retirement income is reinvested in the first taxable (else cash) account.
+  - Bracket fill never withdraws more than the need.
+  - SS taxation for the bracket-fill room is estimated at the fixed income.
+  - The survivor rolls the deceased's accounts over: RMDs follow the survivor's age.
+  - Workplace Roth withdrawals are treated as qualified.
 - Taxable basis falls pro rata to the share of the year's available balance withdrawn.
 
 ## Data and privacy

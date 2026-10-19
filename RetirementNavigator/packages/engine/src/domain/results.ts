@@ -30,7 +30,8 @@ export type WarningCode =
   | 'orphanedScenarioOp'
   | 'featureNotModeled'
   | 'withdrawalStrategyFallback'
-  | 'retirementContributionsReduced';
+  | 'retirementContributionsReduced'
+  | 'oneTimeInflowSpent';
 
 export interface EngineWarning {
   code: WarningCode;
