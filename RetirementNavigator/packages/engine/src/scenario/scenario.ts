@@ -360,6 +360,10 @@ export function optimizeRetirementAge(
       // Each age is scored on the quick-run paths (0 … quickRunPaths − 1), so a scan stays fast; the
       // same paths are used for every age (common random numbers).
       mc = { config: config.data, paths: config.data.quickRunPaths, minSuccessRate: criterion.minSuccessRate };
+      // Problems that do not depend on the age (a correlation matrix that is not PSD, an invalid
+      // plan) are reported once instead of silently skipping every age.
+      const check = runMonteCarloChunk(household, ctx, mc.config, { pathStart: 0, pathEnd: 1 });
+      if (check.status === 'invalid') issues.push(...check.issues);
     }
   }
   if (issues.length > 0) return { status: 'invalid', issues };
@@ -385,7 +389,12 @@ export function optimizeRetirementAge(
   const earliest = evaluated.find((e) => e.success)?.age ?? null;
   return {
     status: 'ok',
-    value: { earliestAge: earliest, evaluated, criterion: mc ? 'monteCarlo' : 'deterministic' },
+    value: {
+      earliestAge: earliest,
+      evaluated,
+      criterion: mc ? 'monteCarlo' : 'deterministic',
+      monteCarloPaths: mc ? mc.paths : null,
+    },
     warnings: [],
   };
 }

@@ -729,9 +729,10 @@ confidence intervals. Everything else (contributions, spending, inflation) is un
 - Each path reuses the projection core (withdrawals, gross-up and taxes) through
   `ProjectionOptions.returnOverride` / `inflationOverride`, on the annual model (monthly mode is
   deterministic only).
-- **Stochastic inflation** drives each path's deflator, spending, Social Security COLA and
-  inflation-linked pensions. **Simplification:** salaries (inflation-based raises) and the indexing
-  of tax-year rule values use the inflation assumption, not the path's inflation.
+- **Stochastic inflation** drives each path's deflator, retirement spending, Social Security COLA
+  and inflation-linked pensions. **Simplification:** salaries (inflation-based raises), working-years
+  spending (and so the accumulation surplus and the feasibility check) and the indexing of tax-year
+  rule values use the inflation assumption, not the path's inflation.
 - **Performance (no change to results):** a run shares its return-independent work across paths
   (validated household, rule resolution, each year's accumulation slice for identical inputs), and
   message text is built without locale formatting. Measured in `bench/results/montecarlo.json`.

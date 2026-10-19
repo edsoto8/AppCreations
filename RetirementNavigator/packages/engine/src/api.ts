@@ -412,6 +412,8 @@ export interface OptimizerResult {
   earliestAge: number | null;
   evaluated: { age: number; success: boolean; endingBalanceReal: Cents; successRate: number | null }[];
   criterion: 'deterministic' | 'monteCarlo';
+  /** Monte Carlo criterion: the paths each age was scored on (paths 0 … n − 1, the quick-run count); null otherwise (contract 1.10.0). */
+  monteCarloPaths: number | null;
 }
 
 /**
@@ -446,6 +448,9 @@ export { compareScenarios } from './scenario/scenario';
  * merge identically, because path i's numbers depend only on (seed, i). Implemented in M6.
  */
 export { runMonteCarloChunk } from './montecarlo/run';
+
+/** Prepare a run once and run its chunks (a worker reuses the preparation; contract 1.10.0). */
+export { prepareMonteCarlo, runPreparedChunk, type PreparedMonteCarlo } from './montecarlo/run';
 
 /**
  * Merge chunks into a result with the assumptions shown beside the success rate. Contract 1.9.0:

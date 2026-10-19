@@ -39,7 +39,6 @@ const config: MonteCarloConfig = {
 const extras = {
   impliedArithmeticMeans: { stocks: 0.07, bonds: 0.04, cash: 0.02 },
   assumptions: ['test'],
-  minimumEndingReal: 0,
 };
 
 describe('percentile (nearest rank)', () => {

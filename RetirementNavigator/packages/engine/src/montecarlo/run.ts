@@ -32,6 +32,17 @@ import { summarize } from './summary';
 const ASSETS = ['stocks', 'bonds', 'cash'] as const;
 const ASSET_LABEL = { stocks: 'Stocks', bonds: 'Bonds', cash: 'Cash' } as const;
 
+/**
+ * Everything a run needs that does not depend on the path: the validated household, the baseline
+ * medians, the shock loadings and the shared projection cache. Prepare once per run and reuse it for
+ * every chunk (a worker keeps it between sub-chunks). Not serializable; not persisted.
+ */
+export interface PreparedMonteCarlo {
+  readonly config: MonteCarloConfig;
+  /** @internal */
+  readonly state: Prepared;
+}
+
 interface Prepared {
   household: Household;
   ctx: EngineContext;
@@ -146,6 +157,17 @@ function drawPath(p: Prepared, seed: number, path: number, returns: Float64Array
   }
 }
 
+/** Validate and prepare a run once (household, baseline medians, PSD check, shared cache). */
+export function prepareMonteCarlo(
+  household: Household,
+  ctx: EngineContext,
+  config: MonteCarloConfig,
+): EngineResult<PreparedMonteCarlo> {
+  const prepared = prepare(household, ctx, config);
+  if (prepared.status !== 'ok') return prepared;
+  return { status: 'ok', value: { config, state: prepared.value }, warnings: [] };
+}
+
 /** Run paths [pathStart, pathEnd). Pure; chunks from different workers merge identically. */
 export function runMonteCarloChunk(
   household: Household,
@@ -153,14 +175,31 @@ export function runMonteCarloChunk(
   config: MonteCarloConfig,
   range: { pathStart: number; pathEnd: number },
 ): EngineResult<MonteCarloChunk> {
-  const { pathStart, pathEnd } = range;
+  const bad = rangeIssue(range);
+  if (bad) return bad;
+  const prepared = prepareMonteCarlo(household, ctx, config);
+  if (prepared.status !== 'ok') return prepared;
+  return runPreparedChunk(prepared.value, range);
+}
+
+function rangeIssue({ pathStart, pathEnd }: { pathStart: number; pathEnd: number }): EngineResult<never> | null {
   if (!Number.isInteger(pathStart) || !Number.isInteger(pathEnd) || pathStart < 0 || pathEnd <= pathStart) {
     return invalid([{ path: ['range'], message: 'The path range must be whole numbers with start < end' }]);
   }
   if (pathEnd > 10_000) return invalid([{ path: ['range', 'pathEnd'], message: 'At most 10,000 paths' }]);
-  const prepared = prepare(household, ctx, config);
-  if (prepared.status !== 'ok') return prepared;
-  const p = prepared.value;
+  return null;
+}
+
+/** Run paths [pathStart, pathEnd) of a prepared run; identical to `runMonteCarloChunk` for that range. */
+export function runPreparedChunk(
+  prepared: PreparedMonteCarlo,
+  range: { pathStart: number; pathEnd: number },
+): EngineResult<MonteCarloChunk> {
+  const bad = rangeIssue(range);
+  if (bad) return bad;
+  const { pathStart, pathEnd } = range;
+  const config = prepared.config;
+  const p = prepared.state;
   const n = pathEnd - pathStart;
   const years = p.years;
   const nA = p.accountIds.length;
@@ -233,7 +272,8 @@ export function summarizeMonteCarlo(
       (asset) =>
         `${ASSET_LABEL[asset]}: median ${pct(cma[asset].geometricReturn)} a year, volatility ${pct(cma[asset].volatility)} (arithmetic mean ${pct(arithmetic(asset))}).`,
     ),
-    `Accounts without an allocation: their expected return with ${pct(cma.blendedVolatility)} volatility, moving with stocks.`,
+    'Each account’s median return is the return the deterministic forecast gives it (its own expected return if set, otherwise from its allocation or the plan’s return for the phase).',
+    `Accounts without an allocation: ${pct(cma.blendedVolatility)} volatility, moving with stocks.`,
     config.inflation.mode === 'stochastic'
       ? `Inflation: stochastic, median ${pct(config.inflation.median)}, volatility ${pct(config.inflation.volatility)}.`
       : `Inflation: fixed at ${pct(a.inflation)} a year.`,
@@ -245,6 +285,5 @@ export function summarizeMonteCarlo(
   return summarize(chunks, config, firstYear, {
     impliedArithmeticMeans: means,
     assumptions,
-    minimumEndingReal: a.minimumEndingBalance / 100,
   });
 }

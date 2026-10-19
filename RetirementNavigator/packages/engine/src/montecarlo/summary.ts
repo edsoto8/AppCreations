@@ -37,8 +37,6 @@ function bandsFrom(values: Float64Array, paths: number, years: number, firstYear
 export interface SummaryExtras {
   impliedArithmeticMeans: MonteCarloResult['impliedArithmeticMeans'];
   assumptions: string[];
-  /** Today's-dollars minimum ending balance (dollars) for the success test. */
-  minimumEndingReal: number;
 }
 
 /** Concatenate chunks in path order (they must cover 0..paths−1 contiguously). */
@@ -85,8 +83,10 @@ export function summarize(
   endingReal.sort();
 
   // Histogram of real ending balances: 20 equal-width bins from 0 to the 99th percentile (the top bin
-  // also holds everything above it).
-  const top = Math.max(1, percentile(endingReal, 0.99));
+  // also holds everything above it). When nearly every path ends at 0, the bins span to the largest
+  // ending balance instead, so they stay meaningful.
+  const p99 = percentile(endingReal, 0.99);
+  const top = Math.max(1, p99 > 0 ? p99 : percentile(endingReal, 1));
   const bins = 20;
   const width = top / bins;
   const counts = new Array<number>(bins).fill(0);

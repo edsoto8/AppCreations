@@ -13,7 +13,15 @@ import { FIXTURE_YEAR, fixtureRules } from '../testing/fixtureRules';
 import { RULES } from '../rules/index';
 import * as api from '../api';
 import { mergeChunks } from './summary';
-import { impliedArithmeticMeans, monteCarloReadiness, runMonteCarloChunk, summarizeMonteCarlo } from './run';
+import {
+  impliedArithmeticMeans,
+  monteCarloReadiness,
+  prepareMonteCarlo,
+  runMonteCarloChunk,
+  runPreparedChunk,
+  summarizeMonteCarlo,
+} from './run';
+import { Stream, cholesky } from './random';
 
 const YEAR = FIXTURE_YEAR;
 const ctx = { currentYear: YEAR, rules: fixtureRules() };
@@ -206,5 +214,121 @@ describe('arithmetic means and readiness bands', () => {
       'atRisk',
       'atRisk',
     ]);
+  });
+});
+
+describe('M6 review: shared work never changes a path; prepared runs; zero volatility with stochastic inflation', () => {
+  const stochastic = (median = 0.03, volatility = 0.02): MonteCarloConfig =>
+    config({ seed: 99, inflation: { mode: 'stochastic', median, volatility, correlationWithAssets: [0, 0.1, 0.3] } });
+
+  it('each cached path equals an uncached projection of independently rebuilt draws (all samples, both rule sets)', () => {
+    for (const rules of [fixtureRules(), RULES]) {
+      const context = { currentYear: YEAR, rules };
+      for (const s of SAMPLE_PROFILES) {
+        const h = HouseholdSchema.parse({
+          ...s.build(YEAR),
+          assumptions: { ...s.build(YEAR).assumptions, granularity: 'annual' },
+        });
+        const c = stochastic();
+        const chunk = run(h, c, 0, 34, context);
+        const base = projectHousehold(h, context);
+        if (base.status !== 'ok') throw new Error('baseline');
+        const cma = h.assumptions.capitalMarket;
+        const corr = c.inflation.mode === 'stochastic' ? c.inflation.correlationWithAssets : [0, 0, 0];
+        const m = cma.correlation.map((row, i) => [...row, corr[i]!]);
+        m.push([...corr, 1]);
+        const L = cholesky(m)!;
+        const years = base.value.rows.length;
+        for (const p of [0, 7, 33]) {
+          const stream = new Stream(99, p);
+          const R: Map<string, number>[] = [];
+          const I: number[] = [];
+          for (let t = 0; t < years; t++) {
+            const z = [0, 1, 2, 3].map(() => stream.normal());
+            const e = [0, 1, 2, 3].map((i) => L[i]!.reduce((acc, v, j) => acc + v * z[j]!, 0));
+            const row = base.value.rows[t]!;
+            const byAccount = new Map<string, number>();
+            for (const a of h.accounts) {
+              const g = row.accounts.find((x) => x.accountId === a.id)!.appliedReturn;
+              const shock = a.allocation
+                ? a.allocation.stocks * cma.stocks.volatility * e[0]! +
+                  a.allocation.bonds * cma.bonds.volatility * e[1]! +
+                  a.allocation.cash * cma.cash.volatility * e[2]!
+                : cma.blendedVolatility * e[0]!;
+              byAccount.set(a.id, Math.exp(Math.log(1 + g) + shock) - 1);
+            }
+            R.push(byAccount);
+            I.push(Math.exp(Math.log(1.03) + 0.02 * e[3]!) - 1);
+          }
+          const r = projectHousehold(h, context, {
+            returnOverride: (t, id) => R[t - 1]!.get(id),
+            inflationOverride: (t) => I[t - 1],
+          });
+          if (r.status !== 'ok') throw new Error('path');
+          r.value.rows.forEach((row, y) => {
+            expect(chunk.balances[p * years + y]).toBe(row.totals.portfolioEnd / 100);
+            expect(chunk.balancesReal[p * years + y]).toBe(row.real.portfolioEnd / 100);
+          });
+          expect(chunk.success[p]).toBe(r.value.summary.deterministicSuccess ? 1 : 0);
+          expect(chunk.depletionAge[p]).toBe(r.value.summary.depletionAge ?? -1);
+        }
+      }
+    }
+  });
+
+  it('zero volatility with stochastic inflation at the plan’s own rate equals the baseline, nominal and real', () => {
+    const base = near();
+    const cma = base.assumptions.capitalMarket;
+    const flat = HouseholdSchema.parse({
+      ...base,
+      assumptions: {
+        ...base.assumptions,
+        capitalMarket: {
+          ...cma,
+          stocks: { ...cma.stocks, volatility: 0 },
+          bonds: { ...cma.bonds, volatility: 0 },
+          cash: { ...cma.cash, volatility: 0 },
+          blendedVolatility: 0,
+        },
+      },
+    });
+    const deterministic = projectHousehold(flat, ctx);
+    if (deterministic.status !== 'ok') throw new Error('baseline');
+    const chunk = run(flat, stochastic(flat.assumptions.inflation, 0), 0, 3);
+    deterministic.value.rows.forEach((row, y) => {
+      expect(Math.abs(chunk.balances[y]! - row.totals.portfolioEnd / 100)).toBeLessThanOrEqual(0.01);
+      expect(Math.abs(chunk.balancesReal[y]! - row.real.portfolioEnd / 100)).toBeLessThanOrEqual(0.01);
+    });
+  });
+
+  it('a prepared run gives the same chunks as runMonteCarloChunk, in any split', () => {
+    const h = near();
+    const c = stochastic();
+    const prepared = prepareMonteCarlo(h, ctx, c);
+    if (prepared.status !== 'ok') throw new Error('prepare');
+    const parts = [
+      runPreparedChunk(prepared.value, { pathStart: 0, pathEnd: 11 }),
+      runPreparedChunk(prepared.value, { pathStart: 11, pathEnd: 30 }),
+    ].map((r) => {
+      if (r.status !== 'ok') throw new Error('chunk');
+      return r.value;
+    });
+    same(mergeChunks(parts), run(h, c, 0, 30));
+    expect(runPreparedChunk(prepared.value, { pathStart: 3, pathEnd: 2 }).status).toBe('invalid');
+  });
+
+  it('spans the histogram to the largest ending balance when almost every path ends at zero', () => {
+    const chunk: MonteCarloChunk = {
+      pathStart: 0,
+      pathEnd: 200,
+      years: 1,
+      balances: new Float64Array(200).map((_, i) => (i === 199 ? 50_000 : 0)),
+      balancesReal: new Float64Array(200).map((_, i) => (i === 199 ? 40_000 : 0)),
+      success: new Uint8Array(200),
+      depletionAge: new Int16Array(200).fill(80),
+    };
+    const r = summarizeMonteCarlo([chunk], config(), near(), YEAR as CalendarYear);
+    expect(r.histogram.at(-1)!.to).toBe(4_000_000);
+    expect(r.histogram.at(-1)!.count).toBe(1);
   });
 });

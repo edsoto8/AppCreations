@@ -620,6 +620,32 @@ describe('diff and preset edge cases', () => {
     expect(presetScenario('G_rothStrategy', noRoth, { currentYear: YEAR }, ids).ops).toEqual([]);
   });
 
+  it('optimizer reports an unusable Monte Carlo configuration once instead of skipping every age', () => {
+    const base = couple();
+    const config = {
+      paths: 1000,
+      quickRunPaths: 100,
+      seed: 1,
+      inflation: {
+        mode: 'stochastic' as const,
+        median: 0.02,
+        volatility: 0.01,
+        correlationWithAssets: [0.99, -0.99, 0.99],
+      },
+      rebalancing: 'annual' as const,
+    };
+    const r = optimizeRetirementAge(
+      base,
+      ctx,
+      { kind: 'monteCarlo', config, minSuccessRate: 0.8 },
+      { fromAge: 50, toAge: 52 },
+    );
+    expect(r.status).toBe('invalid');
+    if (r.status === 'invalid') expect(r.issues[0]!.message).toMatch(/not positive semi-definite/);
+    const ok = optimizeRetirementAge(base, ctx, { kind: 'deterministic' }, { fromAge: 50, toAge: 51 });
+    expect(ok.status === 'ok' && ok.value.monteCarloPaths).toBeNull();
+  });
+
   it('optimizer rejects a target rate outside (0, 1]; comparison marks a plan that cannot project', () => {
     const base = couple();
     const config = {

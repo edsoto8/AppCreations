@@ -325,8 +325,10 @@ export function projectWithCache(
   for (let t = 1; t <= years; t++) {
     const year = firstYear + t - 1;
     if (t > 1) {
-      // SIMPLIFICATION (M3): an inflation override drives only the deflator and spending; pay, schedules
-      // and rule indexing use the inflation assumption. M6 (stochastic inflation) wires it through.
+      // SIMPLIFICATION: an inflation override (Monte Carlo) drives the deflator and what is priced from
+      // it: retirement spending, Social Security COLA and inflation-linked pensions. Pay, working-years
+      // spending, schedules and rule indexing use the inflation assumption (docs §11). If that ever
+      // changes, the deflator must join the accumulation cache key (cachedAccumulationYear).
       const i = options.inflationOverride?.(t) ?? a.inflation;
       if (!Number.isFinite(i) || i <= -1) {
         return {
