@@ -12,6 +12,7 @@ import { IncomeSavingsPage } from '@/features/income/IncomeSavingsPage';
 import { AccountsPage } from '@/features/accounts/AccountsPage';
 import { RothIraPage } from '@/features/roth-ira/RothIraPage';
 import { HsaPage } from '@/features/hsa/HsaPage';
+import { RetirementIncomePage } from '@/features/retirement-income/RetirementIncomePage';
 import { RulesPage } from '@/features/rules/RulesPage';
 import { ProfilesPage } from '@/features/profiles/ProfilesPage';
 import { OnboardingPage } from '@/features/onboarding/OnboardingPage';
@@ -25,6 +26,7 @@ const PAGES: Record<string, () => React.ReactElement> = {
   '/accounts': () => <AccountsPage />,
   '/roth-ira': () => <RothIraPage />,
   '/hsa': () => <HsaPage />,
+  '/retirement-income': () => <RetirementIncomePage />,
   '/rules': () => <RulesPage />,
   '/profiles': () => <ProfilesPage />,
   '/data': () => <DataPage />,

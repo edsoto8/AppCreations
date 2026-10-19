@@ -11,6 +11,7 @@ for (const theme of ['light', 'dark'] as const) {
     '/accounts',
     '/roth-ira',
     '/hsa',
+    '/retirement-income',
     '/rules',
     '/profiles',
     '/data',

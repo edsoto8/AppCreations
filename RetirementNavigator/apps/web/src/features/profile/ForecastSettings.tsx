@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { NativeSelect } from '@/components/ui/native-select';
 import { Field } from '@/components/form/Field';
 import { PercentInput } from '@/components/form/inputs';
-import { MoneyField, SelectField } from '@/components/form/fields';
+import { MoneyField, PercentField, SelectField } from '@/components/form/fields';
 import { ACCOUNT_TYPE_LABELS } from '@/features/accounts/accountModel';
 
 type HouseholdControl = Control<HouseholdInput, unknown, Household>;
@@ -21,7 +21,7 @@ const STRATEGIES = [
   { value: 'traditionalFirst', label: 'Tax-deferred first' },
   { value: 'rothLast', label: 'Roth last' },
   { value: 'proportional', label: 'Proportional' },
-  { value: 'bracketFill', label: 'Bracket fill (needs the tax model, uses taxable-first for now)' },
+  { value: 'bracketFill', label: 'Bracket fill (needs verified tax brackets)' },
 ] as const;
 
 /** The order each strategy draws accounts in (docs/financial-model.md §7.3). */
@@ -30,7 +30,8 @@ const STRATEGY_ORDER: Record<(typeof STRATEGIES)[number]['value'], string> = {
   traditionalFirst: 'Order: tax-deferred, then cash, then taxable, then Roth, then HSA.',
   rothLast: 'Order: cash, taxable and tax-deferred together, then HSA, then Roth.',
   proportional: 'Order: every account at once, in proportion to its balance.',
-  bracketFill: 'Uses the taxable-first order until the tax model arrives (M4).',
+  bracketFill:
+    'Order: tax-deferred up to the top of the chosen bracket, then cash, taxable, Roth and HSA. While tax brackets are unverified it uses the taxable-first order.',
 };
 
 /** A return offset in percentage points, with a range message in plain words. */
@@ -144,11 +145,20 @@ export function ForecastSettings({
           control={control}
           name="assumptions.withdrawalStrategy"
           label="Withdrawal order"
-          tip="Which accounts fund retirement spending first. Within a group, accounts are drawn in proportion to what each can provide. Bracket fill needs the tax model (a later milestone) and uses taxable-first until then."
+          tip="Which accounts fund retirement spending first. Within a group, accounts are drawn in proportion to what each can provide. Bracket fill draws tax-deferred money until taxable income reaches the top of a chosen bracket; it needs verified tax brackets and uses taxable-first until then."
           example={STRATEGY_ORDER[strategy]}
           options={STRATEGIES}
           className="sm:col-span-2"
         />
+        {strategy === 'bracketFill' ? (
+          <PercentField
+            control={control}
+            name="assumptions.bracketFillTopRate"
+            label="Bracket to fill (its tax rate)"
+            tip="Tax-deferred withdrawals fill taxable income up to the top of the federal bracket with this rate (for example the 12% bracket). Enter a rate from your bracket table; it is your choice, not a rule value."
+            example="For example 12. Leave empty to use taxable first."
+          />
+        ) : null}
         <SurplusField control={control} accounts={accounts} />
         <MoneyField
           control={control}

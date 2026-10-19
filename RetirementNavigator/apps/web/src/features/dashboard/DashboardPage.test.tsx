@@ -15,6 +15,7 @@ import { formatCents } from '@/lib/format';
 import { renderWithProfile } from '@/test/renderWithProfile';
 import { useProfileStore } from '@/state/profileStore';
 import { DashboardPage } from './DashboardPage';
+import { excludedFeatureLabel, notModeledMessages } from './viewModel';
 
 const CARD_TITLES = [
   'Current age',
@@ -84,7 +85,11 @@ describe('DashboardPage', () => {
     // Banner: excluded steps and not-yet-modeled items, with a link to the sources.
     const banner = screen.getByRole('note', { name: /leaves out steps whose rule values are not verified yet/ });
     expect(within(banner).getByText(/before plan limits\.$/)).toBeInTheDocument();
-    expect(within(banner).getByText(/retirement withdrawals here are before taxes/)).toBeInTheDocument();
+    // Every item comes from the engine result: excluded (unverified) steps and anything not modeled yet.
+    for (const f of d.baseline.excludedFeatures) {
+      expect(within(banner).getByText(excludedFeatureLabel(f))).toBeInTheDocument();
+    }
+    for (const m of notModeledMessages(d.baseline)) expect(within(banner).getByText(m)).toBeInTheDocument();
     expect(within(banner).getByRole('link', { name: 'See Rules & Sources' })).toHaveAttribute('href', '/rules');
     expect(d.baseline.excludedFeatures).toContain('workplaceLimits');
     expect(within(card('Projected savings at retirement')).getByText('Before plan limits (unverified)')).toBeVisible();

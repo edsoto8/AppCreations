@@ -380,3 +380,51 @@ describe('HouseholdSchema', () => {
     expect(a.data.assumptions.socialSecurity.cola).not.toBe(b.data.assumptions.socialSecurity.cola);
   });
 });
+
+describe('M4 destination and earnings validation', () => {
+  it('rejects a lump sum into a Roth or another person’s IRA, an inflow into an IRA, and duplicate earnings years', async () => {
+    const { minimalHouseholdInput } = await import('../samples/minimal');
+    const base = minimalHouseholdInput(2026);
+    const accounts = [
+      ...(base.accounts ?? []),
+      { type: 'rothIra', id: 'roth', name: 'Roth', ownerId: 'person-1', balance: 0, contributionBasis: 0 },
+      { type: 'traditionalIra', id: 'ira', name: 'IRA', ownerId: 'person-1', balance: 0 },
+    ];
+    const pension = (dest: string) => ({
+      id: 'p',
+      name: 'P',
+      ownerId: 'person-1',
+      startAge: 65,
+      annualAmount: 0,
+      amountBasis: 'nominalAtStart',
+      payout: { kind: 'lumpSum', amount: 100, destinationAccountId: dest },
+    });
+    const parse = (extra: Record<string, unknown>) => HouseholdSchema.safeParse({ ...base, accounts, ...extra });
+    expect(parse({ pensions: [pension('ira')] }).success).toBe(true);
+    expect(parse({ pensions: [pension('account-1')] }).success).toBe(true);
+    expect(parse({ pensions: [pension('roth')] }).success).toBe(false);
+    const event = (dest: string) => ({
+      id: 'e',
+      name: 'E',
+      year: 2030,
+      direction: 'inflow',
+      amount: 100,
+      amountBasis: 'nominal',
+      destinationAccountId: dest,
+    });
+    expect(parse({ oneTimeEvents: [event('account-1')] }).success).toBe(true);
+    expect(parse({ oneTimeEvents: [event('ira')] }).success).toBe(false);
+    const ss = {
+      source: {
+        kind: 'estimateHistory',
+        earnings: [
+          { year: 2020, earnings: 100 },
+          { year: 2020, earnings: 200 },
+        ],
+      },
+      claimAge: { years: 67, months: 0 },
+    };
+    const people = [{ ...base.people[0]!, socialSecurity: ss }];
+    expect(HouseholdSchema.safeParse({ ...base, people }).success).toBe(false);
+  });
+});

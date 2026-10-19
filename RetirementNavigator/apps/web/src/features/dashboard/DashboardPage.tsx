@@ -46,7 +46,7 @@ function ForecastScopeBanner({ dashboard }: { dashboard: DashboardResult }) {
         ) : null}
         {later.length > 0 ? (
           <div className="flex flex-col gap-1">
-            <p className="text-muted-foreground">Modeled in a later milestone (figures are labeled “Before taxes”):</p>
+            <p className="text-muted-foreground">Not modeled in this version:</p>
             <ul className="list-disc pl-5 text-muted-foreground">
               {later.map((m) => (
                 <li key={m}>{m}</li>

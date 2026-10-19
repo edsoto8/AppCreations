@@ -16,8 +16,19 @@ const EXCLUDED_LABELS: Record<string, string> = {
   iraLimits: 'IRA limits: IRA contributions are as scheduled, before the annual limit.',
   hsaLimits: 'HSA limits: HSA contributions are as scheduled, before the annual limit.',
   rothIraEligibility: 'Roth IRA income limits: Roth IRA contributions are as scheduled, before the income phase-out.',
-  federalIncomeTax: 'Income taxes: take-home pay and the working-years surplus are not shown as numbers.',
+  federalIncomeTax:
+    'Income taxes: take-home pay, the working-years surplus and retirement taxes are not shown as numbers; retirement income is before taxes.',
   payrollTax: 'Payroll taxes: take-home pay and the working-years surplus are not shown as numbers.',
+  capitalGainsTax: 'Capital gains tax: taxes on investment gains are not estimated; retirement income is before taxes.',
+  ssBenefitTaxation: 'Taxes on Social Security benefits: not estimated; retirement income is before taxes.',
+  socialSecurityClaiming:
+    'Social Security claiming adjustments: a benefit entered at full retirement age, or estimated, is left out. A benefit entered at your claiming age (from your SSA statement) is included.',
+  socialSecurityEstimator: 'Illustrative Social Security estimator: estimated benefits are left out.',
+  spousalSurvivorBenefits:
+    'Spousal and survivor Social Security benefits: each person keeps only their own benefit, and a survivor gets nothing extra.',
+  rmd: 'Required minimum distributions: none are taken; withdrawals follow your withdrawal order only.',
+  rothQualification:
+    'Roth qualification (age 59½ and the five-year rule): early Roth earnings withdrawals are not flagged.',
 };
 
 /** Plain-language line for an excluded (unverified) step; unknown keys fall back to the key. */

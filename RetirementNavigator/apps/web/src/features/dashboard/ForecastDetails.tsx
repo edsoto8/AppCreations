@@ -20,14 +20,15 @@ export function ForecastDetails({
 }) {
   const unit = basisName(basis);
   const anyForfeited = result.rows.some((r) => r.flows.forfeited > 0);
+  const retirementBeforeTaxes = result.rows.some((r) => r.phase === 'retirement' && r.tax === null);
   return (
     <Card aria-labelledby="details-title">
       <CardHeader>
         <CardTitle id="details-title">Forecast details</CardTitle>
         <CardDescription>
           Every year of the baseline forecast in {unit}
-          {result.granularity === 'monthly' ? ', computed month by month' : ''}. Retirement-year withdrawals and income
-          are before taxes.
+          {result.granularity === 'monthly' ? ', computed month by month' : ''}.
+          {retirementBeforeTaxes ? ' Retirement-year withdrawals and income are before taxes.' : ''}
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-3">

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router';
 import { UserPlus, UserMinus } from 'lucide-react';
 import type { Control } from 'react-hook-form';
 import { RULES, type Household, type HouseholdInput } from '@rn/engine';
@@ -168,8 +169,12 @@ function ProfileForm({ household }: { household: Household }) {
         <CardHeader>
           <CardTitle>Spending</CardTitle>
           <CardDescription>
-            In today’s dollars per year. Retirement spending is an after-tax need. Spending steps and gradual reductions
-            arrive with retirement-income planning.
+            In today’s dollars per year. Retirement spending is an after-tax need. Spending steps by age, gradual
+            changes and survivor spending are on the{' '}
+            <Link to="/retirement-income" className="font-medium text-foreground underline underline-offset-4">
+              Retirement Income
+            </Link>{' '}
+            page.
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4 sm:grid-cols-2">

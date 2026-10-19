@@ -80,7 +80,7 @@ describe('ProfilePage', () => {
       await user.selectOptions(screen.getByLabelText('Forecast granularity'), 'monthly');
       const strategy = screen.getByLabelText('Withdrawal order');
       expect(
-        within(strategy).getByRole('option', { name: /needs the tax model, uses taxable-first for now/ }),
+        within(strategy).getByRole('option', { name: /Bracket fill \(needs verified tax brackets\)/ }),
       ).toBeInTheDocument();
       await user.selectOptions(strategy, 'proportional');
       const minimum = screen.getByLabelText('Minimum ending balance');

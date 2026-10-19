@@ -194,7 +194,15 @@ export const SocialSecurityInputSchema = z.object({
       averageAnnualEarnings: NonNegativeCentsSchema,
       yearsOfEarnings: z.number().int().min(0).max(50),
     }),
-    z.object({ kind: z.literal('estimateHistory'), earnings: z.array(EarningsRecordSchema).max(80) }),
+    z.object({
+      kind: z.literal('estimateHistory'),
+      earnings: z
+        .array(EarningsRecordSchema)
+        .max(80)
+        .refine((e) => new Set(e.map((x) => x.year)).size === e.length, {
+          message: 'Only one earnings entry per year',
+        }),
+    }),
   ]),
   claimAge: AgeYearsMonthsSchema.refine(
     (a) => a.years * 12 + a.months >= 62 * 12 && a.years * 12 + a.months <= 70 * 12,
@@ -664,8 +672,23 @@ export const HouseholdSchema = z
     });
     h.pensions.forEach((pension, i) => {
       if (!personIds.has(pension.ownerId)) issue(['pensions', i, 'ownerId'], 'Unknown owner');
-      if (pension.payout.kind === 'lumpSum' && !accountsById.has(pension.payout.destinationAccountId)) {
-        issue(['pensions', i, 'payout', 'destinationAccountId'], 'Unknown destination account');
+      if (pension.payout.kind === 'lumpSum') {
+        const dest = accountsById.get(pension.payout.destinationAccountId);
+        if (!dest) {
+          issue(['pensions', i, 'payout', 'destinationAccountId'], 'Unknown destination account');
+        } else if (
+          !SURPLUS_ACCOUNT_TYPES.has(dest.type) &&
+          !(
+            (dest.type === 'traditionalIra' || dest.type === 'workplaceTraditional') &&
+            dest.ownerId === pension.ownerId
+          )
+        ) {
+          // A rollover goes to the owner's own tax-deferred account; otherwise taxable, cash or other.
+          issue(
+            ['pensions', i, 'payout', 'destinationAccountId'],
+            'A lump sum can go to the owner’s traditional IRA or workplace plan, or to a brokerage, cash or other account',
+          );
+        }
       }
     });
     h.otherIncome.forEach((income, i) => {
@@ -673,8 +696,13 @@ export const HouseholdSchema = z
         issue(['otherIncome', i, 'ownerId'], 'Unknown owner');
     });
     h.oneTimeEvents.forEach((event, i) => {
-      if (event.destinationAccountId !== null && !accountsById.has(event.destinationAccountId)) {
-        issue(['oneTimeEvents', i, 'destinationAccountId'], 'Unknown destination account');
+      if (event.destinationAccountId !== null) {
+        const dest = accountsById.get(event.destinationAccountId);
+        if (!dest) issue(['oneTimeEvents', i, 'destinationAccountId'], 'Unknown destination account');
+        else if (event.direction === 'inflow' && !SURPLUS_ACCOUNT_TYPES.has(dest.type)) {
+          // Inflows must not bypass contribution limits on tax-advantaged accounts.
+          issue(['oneTimeEvents', i, 'destinationAccountId'], 'An inflow can go to a brokerage, cash or other account');
+        }
       }
     });
     if (h.assumptions.surplus.mode === 'account') {
