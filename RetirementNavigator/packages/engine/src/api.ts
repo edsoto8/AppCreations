@@ -8,9 +8,9 @@
  * Purity: no Date.now(), no Math.random(), no globals. The current year and the PRNG are injected.
  */
 import type { AgeYearsMonths, CalendarYear, Cents, DollarBasis, FilingStatus, Fraction } from './domain/primitives';
-import type { EmployerMatchRule, Household, WorkplacePlan } from './domain/household';
+import type { Household, WorkplacePlan } from './domain/household';
 import type { RulesSet, StandingRules, TaxYearRules } from './domain/rules';
-import type { EngineResult } from './domain/results';
+import type { EngineResult, EngineWarning, UnverifiedDetail } from './domain/results';
 import type { OrphanedOp, Scenario, ScenarioPreset } from './domain/scenario';
 import type { ProjectionResult } from './domain/projection';
 import type { MonteCarloChunk, MonteCarloConfig, MonteCarloResult } from './domain/montecarlo';
@@ -18,7 +18,7 @@ import type { Insight } from './domain/insight';
 import type { ExportBundle } from './domain/documents';
 import type { ValidationIssue } from './domain/results';
 
-export const CONTRACT_VERSION = '1.1.0';
+export const CONTRACT_VERSION = '1.2.0';
 
 export class NotImplementedError extends Error {
   constructor(fn: string) {
@@ -55,8 +55,15 @@ export { resolveRules } from './rules/resolve';
 // Income and contributions (modules: income/, match/, limits/)
 // =============================================================================================
 
+/**
+ * One year of a person's employment income. Eligible compensation is BEFORE the 401(a)(17)
+ * compensation limit; `capContributions` applies that limit. Years after the person stops working
+ * have zero salary and bonus (part-time income may continue).
+ */
 export interface CompensationYear {
   year: CalendarYear;
+  age: number;
+  working: boolean;
   baseSalary: Cents;
   bonus: Cents;
   partTimeIncome: Cents;
@@ -67,19 +74,8 @@ export interface CompensationYear {
   realRaise: number;
 }
 
-/** Salary/bonus path for one person, year 1 through the person's last working year. */
-export function computeCompensationPath(
-  household: Household,
-  personId: string,
-  ctx: EngineContext,
-  years: number,
-): EngineResult<CompensationYear[]> {
-  void household;
-  void personId;
-  void ctx;
-  void years;
-  throw new NotImplementedError('computeCompensationPath');
-}
+/** Salary/bonus path for one person for `years` years from year 1 (rule-free). */
+export { computeCompensationPath } from './income/compensation'; // implemented in M2
 
 export interface MatchBreakdown {
   /** Match earned per tier, in tier order. */
@@ -99,12 +95,7 @@ export interface MatchBreakdown {
  * Tiered match on eligible compensation (already capped at the 401(a)(17) limit by the caller or by
  * `capContributions`). `employeeDeferral` is the employee's total deferral dollars for the year.
  */
-export function computeMatch(rule: EmployerMatchRule, eligibleComp: Cents, employeeDeferral: Cents): MatchBreakdown {
-  void rule;
-  void eligibleComp;
-  void employeeDeferral;
-  throw new NotImplementedError('computeMatch');
-}
+export { computeMatch } from './match/match'; // implemented in M2
 
 export interface ContributionRequest {
   year: CalendarYear;
@@ -132,14 +123,7 @@ export interface CappedContributions {
 }
 
 /** Apply 402(g), catch-up (50+, 60–63), Roth-catch-up, 401(a)(17) and 415(c) limits with warnings. */
-export function capContributions(
-  req: ContributionRequest,
-  rules: ResolvedYearRules,
-): EngineResult<CappedContributions> {
-  void req;
-  void rules;
-  throw new NotImplementedError('capContributions');
-}
+export { capContributions } from './limits/workplace'; // implemented in M2
 
 export interface RothIraEligibility {
   status: 'full' | 'reduced' | 'ineligible';
@@ -153,42 +137,63 @@ export interface RothIraEligibility {
   calculation: string;
 }
 
-export function rothIraEligibility(
-  input: {
-    magi: Cents;
-    filingStatus: FilingStatus;
-    age: number;
-    earnedIncome: Cents;
-    /** Traditional IRA contributions this year (they share the annual limit). */
-    otherIraContributions: Cents;
-  },
-  rules: ResolvedYearRules,
-): EngineResult<RothIraEligibility> {
-  void input;
-  void rules;
-  throw new NotImplementedError('rothIraEligibility');
-}
+export { rothIraEligibility } from './limits/ira'; // implemented in M2
 
 /** Default MAGI estimate (documented simplification): salary + bonus - traditional deferrals - HSA. */
-export function estimateMagi(input: {
-  salary: Cents;
-  bonus: Cents;
-  traditionalDeferrals: Cents;
-  hsaContributions: Cents;
-  otherIncome: Cents;
-}): Cents {
-  void input;
-  throw new NotImplementedError('estimateMagi');
+export { estimateMagi } from './limits/ira'; // implemented in M2
+
+export { hsaLimit } from './limits/hsa'; // implemented in M2
+
+export interface PersonPreviewRow {
+  year: CalendarYear;
+  age: number;
+  compensation: CompensationYear;
+  /** Employee deferrals implied by the elections, before any limit. */
+  requestedTraditional: Cents;
+  requestedRoth: Cents;
+  /** Employer match on the requested deferrals before limits (always available; no rules needed). */
+  matchBeforeLimits: MatchBreakdown;
+  /** Workplace contributions after limits, summed over the person's plans; null if a limit is unverified. */
+  contributions: CappedContributions | null;
+  /** Employee + employer after limits; null if unverified. */
+  totalSaved: Cents | null;
+  /** totalSaved / total compensation; null if unverified or no compensation. */
+  savingsRate: number | null;
+  /** Vested share of employer money at the end of the year (first plan). */
+  vestedFractionEndOfYear: number;
+  warnings: EngineWarning[];
 }
 
-export function hsaLimit(
-  input: { coverage: 'selfOnly' | 'family'; age: number; hdhpAttested: boolean },
-  rules: ResolvedYearRules,
-): EngineResult<Cents> {
-  void input;
-  void rules;
-  throw new NotImplementedError('hsaLimit');
+export interface CashFlowPreviewRow {
+  year: CalendarYear;
+  grossPay: Cents;
+  /** Federal + FICA + state estimate; null if a tax rule is unverified. */
+  taxes: TaxBreakdown | null;
+  netPay: Cents | null;
+  /** Workplace employee deferrals after limits plus scheduled IRA/HSA/taxable/cash contributions. */
+  employeeContributions: Cents | null;
+  spending: Cents;
+  /** netPay − contributions − spending; null if unverified. */
+  surplus: Cents | null;
+  infeasible: boolean | null;
+  /** Household-level warnings for the year (IRA/HSA caps, infeasible plan) plus each person's warnings. */
+  warnings: EngineWarning[];
 }
+
+export interface AccumulationPreview {
+  years: number;
+  people: { personId: string; rows: PersonPreviewRow[] }[];
+  cashFlow: CashFlowPreviewRow[];
+  /** Rules that were null; outputs depending on them are null. */
+  unverified: UnverifiedDetail[];
+}
+
+/**
+ * Income & Savings live preview (M2): salary, bonus, contributions, match, limits and accumulation-phase
+ * net-pay feasibility for the next `years` years. Always `ok`; parts that need null rules are null and
+ * listed in `unverified`.
+ */
+export { previewAccumulation } from './income/preview'; // implemented in M2
 
 // =============================================================================================
 // Tax (module: tax/)
@@ -199,6 +204,8 @@ export interface TaxInput {
   /** Ages of the filers this year (for 65+ deductions). */
   ages: number[];
   wages: Cents;
+  /** FICA wages per person (sums to `wages`); the Social Security wage base applies per person. */
+  wagesByPerson: Cents[];
   /** Ordinary income other than wages and SS (traditional withdrawals, pensions, taxable other income). */
   otherOrdinaryIncome: Cents;
   socialSecurityBenefits: Cents;
@@ -223,21 +230,10 @@ export interface TaxBreakdown {
 }
 
 /** Simplified federal + flat state + FICA estimate (docs/financial-model.md §6). */
-export function computeTax(input: TaxInput, rules: ResolvedYearRules): EngineResult<TaxBreakdown> {
-  void input;
-  void rules;
-  throw new NotImplementedError('computeTax');
-}
+export { computeTax } from './tax/tax'; // implemented in M2
 
 /** Taxable portion of Social Security via the provisional-income formula (Pub 915). */
-export function taxableSocialSecurity(
-  input: { benefits: Cents; otherIncome: Cents; taxExemptInterest: Cents; filingStatus: FilingStatus },
-  rules: ResolvedYearRules,
-): EngineResult<Cents> {
-  void input;
-  void rules;
-  throw new NotImplementedError('taxableSocialSecurity');
-}
+export { taxableSocialSecurity } from './tax/tax'; // implemented in M2
 
 export interface GrossUpSolution {
   /** Gross withdrawals by account id. */

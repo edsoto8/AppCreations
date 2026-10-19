@@ -49,6 +49,9 @@ export const STANDING_RULES: StandingRules = {
     oasdiEmployeeRate: candidateRule(0.062, PUB15, fixed),
     medicareEmployeeRate: candidateRule(0.0145, PUB15, fixed),
   },
+  capitalGainsRates: unverifiedRule(
+    'The long-term capital gains rate schedule has not been read at source (Rev. Proc. 2025-32 / IRS Topic 409).',
+  ),
   ssBenefitTaxation: {
     thresholds: {
       single: candidateRule({ base: dollars(25_000), adjustedBase: dollars(34_000) }, SSA_TAX, fixed),
@@ -68,6 +71,9 @@ export const STANDING_RULES: StandingRules = {
   roth: {
     qualifiedAgeMonths: candidateRule(59 * 12 + 6, { ...PUB590B, locator: 'Qualified distributions' }, fixed),
     fiveYearRuleYears: candidateRule(5, { ...PUB590B, locator: 'Qualified distributions' }, fixed),
+    reducedContributionRounding: unverifiedRule(
+      'The rounding rules of the Pub 590-A reduced Roth IRA contribution worksheet have not been read at source.',
+    ),
   },
   socialSecurity: {
     fraByBirthYear: candidateRule(

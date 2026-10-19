@@ -194,6 +194,8 @@ export const FraEntrySchema = z.object({
 
 export const StandingRulesSchema = z.object({
   payroll: z.object({ oasdiEmployeeRate: verified(Rate), medicareEmployeeRate: verified(Rate) }),
+  /** Long-term capital gains rates applied in the 0% / 15% / 20% bands. */
+  capitalGainsRates: verified(z.object({ low: Rate, middle: Rate, high: Rate })),
   ssBenefitTaxation: z.object({
     /** Provisional-income thresholds for 50% and 85% inclusion. */
     thresholds: PerStatusSchema(verified(z.object({ base: Money, adjustedBase: Money }))),
@@ -216,6 +218,10 @@ export const StandingRulesSchema = z.object({
   roth: z.object({
     qualifiedAgeMonths: verified(z.number().int()),
     fiveYearRuleYears: verified(z.number().int()),
+    /** Roth IRA reduced-contribution worksheet rounding (Pub 590-A): round up to a multiple, with a minimum. */
+    reducedContributionRounding: verified(
+      z.object({ roundUpToDollars: z.number().positive(), minimumDollars: z.number().min(0) }),
+    ),
   }),
   socialSecurity: z.object({
     fraByBirthYear: verified(z.array(FraEntrySchema)),

@@ -18,18 +18,18 @@ current calendar year. `i_t` = inflation in year t, `r` = nominal annual return 
 - Money at every public engine boundary, in storage and in exports: **integer cents** (`Cents`).
 - Internal projection math: float64 dollars. Monte Carlo: float64 throughout.
 - Rates: decimals. Nominal and real rates are separate branded types.
-- The engine runs in **nominal** dollars. Real (today's-dollar) figures: `real = nominal / D_t`, where
-  the deflator is `D_t = Π_{k=1..t} (1 + i_k)` (end of year t) and `D_0 = 1` is the start of year 1.
-  Flows in year t are deflated by the mid-year deflator `D_{t−½} = D_{t−1}·(1 + i_t)^½`, and
-  year-end balances by `D_t`. (Per-row `deflator` in the result is `D_t`.)
-- Under stochastic inflation (Monte Carlo) each path carries its own deflator series, and real
+- The engine runs in **nominal** dollars. **Today's dollars are year-1 dollars.** The price index of
+  year t is `P_t = Π_{k=2..t} (1 + i_k)`, with `P_1 = 1`; under constant inflation, `P_t = (1+i)^{t−1}`.
+  Every year-t figure, flows and year-end balances alike, converts as `real = nominal / P_t`. This
+  simple convention is the one most planners use. The per-row `deflator` field in the projection
+  result is `P_t`.
+- Under stochastic inflation (Monte Carlo) each path carries its own price index series, and real
   bands come from those per-path series. They are never deflated with a fixed assumption.
 
 ### 1.2 Inputs in today's dollars
-Recurring inputs entered "per year" (spending, part-time income, statement PIA, other income) are in
-today's dollars at year 1 and are converted to nominal as `x_t = x · D_{t−½}` (flows), unless their
-growth mode says otherwise. Balances and the current salary are year-1 nominal, which is the same as
-today's dollars at year 1.
+Recurring inputs entered "per year" (spending, part-time income, statement PIA, other income with
+inflation growth) are year-1 amounts, so their nominal value in year t is `x_t = x · P_t`. Balances and
+the current salary are year-1 nominal, which is the same as today's dollars.
 
 ### 1.3 Rounding policy
 - Each row is computed in float64 and converted to cents **once**, on output, rounding half to even.
@@ -109,7 +109,7 @@ Deterministic forecast only. `ρ_m = (1+ρ)^{1/12} − 1`. Each month, the balan
   - percent of salary: `b_t = pct·base_t`.
   - fixed: `b_1 = amount`, then `b_t = b_{t−1}·(1+g_t)` (with salary), `·(1+q)` (own rate), or
     unchanged (flat).
-- Part-time phase: `pt_t = annualIncome·D_{t−½}` for ages in [startAge, endAge). FICA applies; there
+- Part-time phase: `pt_t = annualIncome·P_t` for ages in [startAge, endAge). FICA applies; there
   are no plan deferrals (simplification).
 
 ### 3.2 Eligible compensation
@@ -194,12 +194,12 @@ Deterministic forecast only. `ρ_m = (1+ρ)^{1/12} − 1`. Each month, the balan
 - Roth IRA: withdrawals come from contribution basis first, then earnings (§7.4).
 
 ## 5. Spending [M4]
-- Accumulation years: `spend_t = currentAnnualSpending · D_{t−½}`.
+- Accumulation years: `spend_t = currentAnnualSpending · P_t`.
 - Retirement years:
-  - `spend_t = S_step(age_primary) · (1+glide)^{t − t_R} · D_{t−½}`, where `S_step` is the
+  - `spend_t = S_step(age_primary) · (1+glide)^{t − t_R} · P_t`, where `S_step` is the
     retirement spending or the latest step whose `fromAge ≤ age`, and `t_R` is the first retirement
     year;
-  - plus `healthcareBeforeMedicare · D_{t−½}` while any living retired person is under 65;
+  - plus `healthcareBeforeMedicare · P_t` while any living retired person is under 65;
   - times `(1 − survivorReduction)` from the first death year onward.
 - One-time outflows add to the need in their year; inflows go to the destination account.
 

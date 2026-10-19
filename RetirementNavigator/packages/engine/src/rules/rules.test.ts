@@ -95,3 +95,28 @@ describe('rule helpers', () => {
     expect(notPublishedRule('reason text', 'indexed')).toMatchObject({ status: 'notPublished', indexation: 'indexed' });
   });
 });
+
+describe('RuleAccess', () => {
+  it('records each missing key once, merging features, and absorbs other accessors', async () => {
+    const { RuleAccess } = await import('./access');
+    const a = new RuleAccess(2026);
+    const missingRule = unverifiedRule<number>('not verified');
+    expect(a.get(missingRule, 'ira.limit', 'iraLimits')).toBeNull();
+    a.get(missingRule, 'ira.limit', 'iraLimits');
+    a.get(missingRule, 'ira.limit', 'rothIraEligibility');
+    expect(a.missing).toEqual([
+      { key: '2026:ira.limit', reason: 'not verified', features: ['iraLimits', 'rothIraEligibility'] },
+    ]);
+    const b = new RuleAccess('standing');
+    b.get(missingRule, 'payroll.oasdiEmployeeRate', 'payrollTax');
+    a.absorb(b.missing);
+    a.absorb([{ key: '2026:ira.limit', reason: 'x', features: ['iraLimits', 'hsaLimits'] }]);
+    expect(a.missing.map((m) => m.key)).toEqual(['2026:ira.limit', 'standing:payroll.oasdiEmployeeRate']);
+    expect(a.missing[0]!.features).toEqual(['iraLimits', 'rothIraEligibility', 'hsaLimits']);
+    expect(a.ok).toBe(false);
+    const ref = { publication: 'p', url: 'https://www.irs.gov/x' };
+    const c = new RuleAccess(2026);
+    expect(c.get(verifiedRule(5, ref, { retrievedOn: '2026-10-19', indexation: 'indexed' }), 'x', 'iraLimits')).toBe(5);
+    expect(c.ok).toBe(true);
+  });
+});
