@@ -47,6 +47,24 @@ Retrieval method for every row: web-search excerpt, 2026-10-18.
 - `standing:roth.reducedContributionRounding`: the Pub 590-A reduced Roth IRA contribution worksheet
   rounding (increment and minimum).
 
+## Statutory constants written into the code (pending verification, M4 review S6)
+These are fixed by statute or by the method itself rather than published each year, so they are
+constants in the code instead of `Verified<T>` values. Each is unverified like every other value:
+it is listed here so the owner can check it at source together with the rule data. None of them
+changes a figure on its own while the related rules are unverified (those features are left out
+and labeled).
+
+| Constant | Where | Used for | Source to check |
+|---|---|---|---|
+| Medicare age 65 | `projection/retirement.ts` (`spendingNeed`), `projection/project.ts` (HSA warning, early-retirement healthcare note) | when the pre-Medicare healthcare line stops; HSA non-medical penalty warning before 65; the persistent early-retirement note | ssa.gov / medicare eligibility; IRS Pub 969 (HSA, age 65) |
+| Additional standard deduction and senior deduction age 65 | `tax/tax.ts` | which filers get the age-based deductions | IRS Pub 501 / Pub 554 |
+| Social Security claim range 62–70 | `domain/household.ts` (claim-age validation), `projection/retirement.ts` (survivor clamp), web `retirement-income/model.ts` (comparison rows "Earliest (62)", "Latest age the app models (70)") | allowed claiming ages; the death-age clamp for an unclaimed survivor benefit | ssa.gov (retirement benefit ages; delayed credits stop at 70) |
+| Estimator method: 35 computation years, divisor 420, eligibility at 62, wage indexing to the eligibility year − 2 | `socialSecurity/socialSecurity.ts` | the illustrative PIA estimate (labeled "not an official SSA calculation") | ssa.gov (AIME/PIA computation) |
+| Provisional-income share of benefits equals the tier-1 inclusion share | `tax/tax.ts` (`taxableSsFloat`) | Pub 915 worksheet | IRS Pub 915 worksheet 1 |
+
+Removed in M4: the earnings-test warning no longer assumes 67 when FRA is unverified, and the
+bracket-fill tip no longer cites a bracket rate as an example.
+
 ## How verification works once sources are reachable
 1. Read each primary document and confirm the candidate value, its section or table, and whether
    it is indexed (with the published rounding rule) or fixed by statute.
