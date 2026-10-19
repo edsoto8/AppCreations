@@ -4,7 +4,15 @@
  * result; this module only divides by the row's own deflator (real = nominal / P_t, docs §1.1)
  * and groups account balances for display.
  */
-import type { AccountType, DashboardResult, DollarBasis, Household, ProjectionResult, YearRow } from '@rn/engine';
+import type {
+  AccountType,
+  AssetClassYear,
+  DashboardResult,
+  DollarBasis,
+  Household,
+  ProjectionResult,
+  YearRow,
+} from '@rn/engine';
 import { ACCOUNT_TYPES, ACCOUNT_TYPE_LABELS } from '@/features/accounts/accountModel';
 
 /** Rule-dependent steps whose exclusion means contributions are "as elected, before plan limits". */
@@ -38,6 +46,11 @@ export function excludedFeatureLabel(feature: string): string {
 
 export function beforeLimits(result: ProjectionResult): boolean {
   return result.excludedFeatures.some((f) => (LIMIT_FEATURES as readonly string[]).includes(f));
+}
+
+/** Whether retirement-year withdrawals and income are before taxes (a retirement row has no tax estimate). */
+export function retirementBeforeTaxes(result: ProjectionResult): boolean {
+  return result.rows.some((r) => r.phase === 'retirement' && r.tax === null);
 }
 
 /** Unique `featureNotModeled` messages (things modeled in a later milestone). */
@@ -202,6 +215,39 @@ export function allocationByTaxTreatment(
       taxFree: inBasis(row.totals.byTaxTreatment.taxFree, row, basis),
       taxable: inBasis(row.totals.byTaxTreatment.taxable, row, basis),
     })),
+  };
+}
+
+export const ASSET_CLASS_SERIES: AllocationSeries[] = [
+  { key: 'stocks', label: 'Stocks', color: 'var(--chart-1)' },
+  { key: 'bonds', label: 'Bonds', color: 'var(--chart-3)' },
+  { key: 'cash', label: 'Cash', color: 'var(--chart-4)' },
+  { key: 'unallocated', label: 'No allocation set', color: 'var(--chart-7)' },
+];
+
+/**
+ * View (c): year-end balances by asset class from the engine's `allocationByAssetClass` rows, in
+ * the selected basis (each row's own deflator). The "no allocation" series appears only when some
+ * account has no allocation, and the asset classes only when some account has one.
+ */
+export function allocationByAssetClassView(
+  rows: readonly AssetClassYear[],
+  result: ProjectionResult,
+  household: Household,
+  basis: DollarBasis,
+): AllocationView {
+  const anyAllocated = household.accounts.some((a) => a.allocation);
+  const anyUnallocated = household.accounts.some((a) => !a.allocation);
+  const series = ASSET_CLASS_SERIES.filter((s) => (s.key === 'unallocated' ? anyUnallocated : anyAllocated));
+  const byYear = new Map(result.rows.map((r) => [r.year as number, r]));
+  return {
+    series,
+    points: rows.map((r) => {
+      const row = byYear.get(r.year);
+      const point: AllocationView['points'][number] = { year: r.year, ages: row ? agesLabel(row, household) : '' };
+      for (const s of series) point[s.key] = inBasis(r[s.key as 'stocks' | 'bonds' | 'cash' | 'unallocated'], r, basis);
+      return point;
+    }),
   };
 }
 

@@ -14,6 +14,9 @@ import { RothIraPage } from '@/features/roth-ira/RothIraPage';
 import { HsaPage } from '@/features/hsa/HsaPage';
 import { RetirementIncomePage } from '@/features/retirement-income/RetirementIncomePage';
 import { ScenariosPage } from '@/features/scenarios/ScenariosPage';
+import { MonteCarloPage } from '@/features/monte-carlo/MonteCarloPage';
+import { InsightsPage } from '@/features/insights/InsightsPage';
+import { PrintSummaryPage } from '@/features/print/PrintSummary';
 import { RulesPage } from '@/features/rules/RulesPage';
 import { ProfilesPage } from '@/features/profiles/ProfilesPage';
 import { OnboardingPage } from '@/features/onboarding/OnboardingPage';
@@ -29,6 +32,8 @@ const PAGES: Record<string, () => React.ReactElement> = {
   '/hsa': () => <HsaPage />,
   '/retirement-income': () => <RetirementIncomePage />,
   '/scenarios': () => <ScenariosPage />,
+  '/monte-carlo': () => <MonteCarloPage />,
+  '/insights': () => <InsightsPage />,
   '/rules': () => <RulesPage />,
   '/profiles': () => <ProfilesPage />,
   '/data': () => <DataPage />,
@@ -60,6 +65,14 @@ export function AppRoutes() {
           );
         })}
         <Route path="/welcome" element={<OnboardingPage />} />
+        <Route
+          path="/print"
+          element={
+            <OnboardingGate>
+              <PrintSummaryPage />
+            </OnboardingGate>
+          }
+        />
         <Route path="*" element={<NotFoundPage />} />
       </Route>
     </Routes>

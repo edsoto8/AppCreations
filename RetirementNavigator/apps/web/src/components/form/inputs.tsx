@@ -153,3 +153,29 @@ export function PercentSlider({
     </div>
   );
 }
+
+const formatDecimal = (v: number | null) => (v === null ? '' : String(Math.round(v * 1e6) / 1e6));
+
+/** Plain decimal input (e.g. a correlation between −1 and 1). Invalid text is not propagated. */
+export function DecimalInput({
+  value,
+  onChange,
+  ...rest
+}: Common & { value: number | null; onChange: (n: number) => void }) {
+  const { text, setText, onFocus, onBlur } = useSyncedText(value, formatDecimal);
+  return (
+    <Input
+      {...rest}
+      inputMode="decimal"
+      autoComplete="off"
+      value={text}
+      onFocus={onFocus}
+      onBlur={onBlur}
+      onChange={(e) => {
+        setText(e.target.value);
+        const cleaned = e.target.value.trim().replace(/^−/, '-');
+        if (/^-?\d*\.?\d+$/.test(cleaned) || /^-?\d+\.?$/.test(cleaned)) onChange(Number(cleaned));
+      }}
+    />
+  );
+}

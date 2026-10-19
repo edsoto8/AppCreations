@@ -12,12 +12,7 @@
  */
 import { z } from 'zod';
 import type { EngineContext } from '../api';
-import {
-  HouseholdSchema,
-  SocialSecurityInputSchema,
-  type Household,
-  type HouseholdInput,
-} from '../domain/household';
+import { HouseholdSchema, SocialSecurityInputSchema, type Household, type HouseholdInput } from '../domain/household';
 import {
   AgeSchema,
   InflationRateSchema,
@@ -26,7 +21,7 @@ import {
   ZERO_CENTS,
   type Cents,
 } from '../domain/primitives';
-import type { EngineResult, EngineWarning, ValidationIssue, WarningCode } from '../domain/results';
+import type { EngineResult, EngineWarning, UnverifiedDetail, ValidationIssue, WarningCode } from '../domain/results';
 import type { ProjectionResult, YearRow } from '../domain/projection';
 import type { ProjectionOptions } from '../api';
 import { projectHousehold } from '../projection/project';
@@ -80,19 +75,28 @@ export function limitsBasisOf(projection: ProjectionResult): LimitsBasisLabel {
 }
 
 /** Union of the excluded features and null rule keys of several projections (first seen order). */
-export function mergeLabels(projections: readonly ProjectionResult[]): {
+export function mergeLabels(
+  projections: readonly ProjectionResult[],
+  extra: readonly CalculatorUnverified[] = [],
+): {
   excludedFeatures: string[];
   unverified: CalculatorUnverified[];
 } {
   const features: string[] = [];
   const byKey = new Map<string, CalculatorUnverified>();
+  const addKey = (u: CalculatorUnverified) => {
+    const existing = byKey.get(u.key);
+    if (!existing) byKey.set(u.key, { key: u.key, reason: u.reason, features: [...u.features] });
+    else for (const f of u.features) if (!existing.features.includes(f)) existing.features.push(f);
+  };
   for (const p of projections) {
     for (const f of p.excludedFeatures) if (!features.includes(f)) features.push(f);
-    for (const u of p.unverified) {
-      const existing = byKey.get(u.key);
-      if (!existing) byKey.set(u.key, { key: u.key, reason: u.reason, features: [...u.features] });
-      else for (const f of u.features) if (!existing.features.includes(f)) existing.features.push(f);
-    }
+    p.unverified.forEach(addKey);
+  }
+  // Null rule values a calculator's own engine calls needed (for example the year-1 limit step).
+  for (const u of extra) {
+    addKey(u);
+    for (const f of u.features) if (!features.includes(f)) features.push(f);
   }
   return { excludedFeatures: features, unverified: [...byKey.values()] };
 }
@@ -100,6 +104,27 @@ export function mergeLabels(projections: readonly ProjectionResult[]): {
 /** Engine warnings without the codes a synthetic household raises by construction (documented per calculator). */
 export function dropWarnings(warnings: readonly EngineWarning[], codes: readonly WarningCode[]): EngineWarning[] {
   return warnings.filter((w) => !codes.includes(w.code));
+}
+
+// ---- Invariant reads ------------------------------------------------------------------------------
+
+/**
+ * `items[index]` where the calculator's own construction guarantees the item exists (for example a
+ * projection row of a validated horizon). A missing item is a programming error, so this throws a
+ * RangeError, the same guard as `asCents`; user data never reaches it.
+ */
+export function itemAt<T>(items: readonly T[], index: number): T {
+  const item = items[index];
+  if (item === undefined) throw new RangeError(`Expected an item at index ${index}`);
+  return item;
+}
+
+export const lastOf = <T>(items: readonly T[]): T => itemAt(items, items.length - 1);
+
+/** A value the construction guarantees is present (programming-error guard, as `itemAt`). */
+export function notNull<T>(value: T | null | undefined, what: string): T {
+  if (value === null || value === undefined) throw new RangeError(`Expected ${what}`);
+  return value;
 }
 
 // ---- Steps (early-return plumbing) ------------------------------------------------------------
@@ -125,6 +150,53 @@ export function buildHousehold(input: HouseholdInput): Step<Household> {
     return invalid(zodIssues(parsed.error).map((i) => ({ path: ['household', ...i.path], message: i.message })));
   }
   return { ok: true, value: parsed.data };
+}
+
+/**
+ * Read an engine sub-result that may need rule values: `ok` gives the value; `unverified` records the
+ * missing keys in `missing` and gives null. As in the projection (`Gaps`), an `invalid` sub-result
+ * also reads as null: calculator inputs are validated with the same bounds first, so it is not
+ * expected (no case is known).
+ */
+export function ruleValue<T>(r: EngineResult<T>, missing: UnverifiedDetail[]): T | null {
+  if (r.status === 'ok') return r.value;
+  if (r.status === 'unverified') missing.push(...r.missing);
+  return null;
+}
+
+/** An engine result as a step (`unverified` and `invalid` both stop the calculator and are passed through). */
+export function toStep<T>(r: EngineResult<T>): Step<T> {
+  return r.status === 'ok' ? { ok: true, value: r.value } : { ok: false, result: r };
+}
+
+/** Continue with `f` after a successful step; a failure is passed through. */
+export function andThen<T, U>(s: Step<T>, f: (value: T) => Step<U>): Step<U> {
+  return s.ok ? f(s.value) : s;
+}
+
+/** The calculator's engine result: its value and warnings, or the failure the steps passed through. */
+export function toResult<T>(s: Step<{ value: T; warnings: EngineWarning[] }>): EngineResult<T> {
+  return s.ok ? { status: 'ok', value: s.value.value, warnings: s.value.warnings } : s.result;
+}
+
+/** Apply `f` to a successful step; a failure is passed through. */
+export function mapStep<T, U>(s: Step<T>, f: (value: T) => U): Step<U> {
+  return s.ok ? { ok: true, value: f(s.value) } : s;
+}
+
+/** Combine steps into one: the values in order, or the first failure. */
+export function all<T extends unknown[]>(...steps: { [K in keyof T]: Step<T[K]> }): Step<T> {
+  const values: unknown[] = [];
+  for (const s of steps as Step<unknown>[]) {
+    if (!s.ok) return s;
+    values.push(s.value);
+  }
+  return { ok: true, value: values as T };
+}
+
+/** A search step: project a synthetic household and test the deterministic success criterion. */
+export function successStep(input: HouseholdInput, ctx: EngineContext): Step<Evaluation<Projected>> {
+  return mapStep(projectInput(input, ctx), (p) => ({ pass: p.projection.summary.deterministicSuccess, detail: p }));
 }
 
 export interface Projected {
@@ -184,7 +256,8 @@ export function searchMinimum<T>(
 ): Step<SearchOutcome<T>> {
   const first = evaluate(lo);
   if (!first.ok) return first;
-  if (first.value.pass) return { ok: true, value: { status: 'atBound', value: lo, detail: first.value.detail, evaluations: 1 } };
+  if (first.value.pass)
+    return { ok: true, value: { status: 'atBound', value: lo, detail: first.value.detail, evaluations: 1 } };
   const last = evaluate(hi);
   if (!last.ok) return last;
   if (!last.value.pass) {
@@ -228,7 +301,8 @@ export function searchMaximum<T>(
   }
   const last = evaluate(hi);
   if (!last.ok) return last;
-  if (last.value.pass) return { ok: true, value: { status: 'atBound', value: hi, detail: last.value.detail, evaluations: 2 } };
+  if (last.value.pass)
+    return { ok: true, value: { status: 'atBound', value: hi, detail: last.value.detail, evaluations: 2 } };
   let low = lo;
   let high = hi;
   let best = first.value.detail;
@@ -297,8 +371,8 @@ export const RetirementPlanFields = {
   minimumEndingBalance: NonNegativeCentsSchema.default(ZERO_CENTS),
 };
 
-const PlanObject = z.object(RetirementPlanFields);
-export type RetirementPlan = z.output<typeof PlanObject>;
+const _planObject = z.object(RetirementPlanFields);
+export type RetirementPlan = z.output<typeof _planObject>;
 
 /** Cross-field checks shared by the retirement-plan calculators. */
 export function checkPlan(plan: RetirementPlan, ctx: z.RefinementCtx): void {
@@ -347,7 +421,10 @@ export function savingsAccount(
 ): NonNullable<HouseholdInput['accounts']>[number] {
   const contribution =
     annualContribution > 0
-      ? { amount: { kind: 'dollars' as const, amount: annualContribution, frequency: 'annual' as const }, growth: { mode: 'inflation' as const } }
+      ? {
+          amount: { kind: 'dollars' as const, amount: annualContribution, frequency: 'annual' as const },
+          growth: { mode: 'inflation' as const },
+        }
       : null;
   const base = { id: SAVINGS_ID, name: 'Savings', ownerId: PERSON_ID, balance, expenseRatio, contribution };
   return treatment === 'taxable'
@@ -367,7 +444,6 @@ export function retirementPlanHousehold(
   overrides: {
     currentBalance?: number;
     annualContribution?: number;
-    retirementAge?: number;
     partTime?: { startAge: number; endAge: number; annualIncome: number } | null;
   } = {},
 ): HouseholdInput {
@@ -381,7 +457,7 @@ export function retirementPlanHousehold(
         id: PERSON_ID,
         name: 'You',
         birthYear: currentYear - plan.age,
-        retirementAge: overrides.retirementAge ?? plan.retirementAge,
+        retirementAge: plan.retirementAge,
         planningAge: plan.planningAge,
         employment: partTime ? { baseSalary: 0, raise: { mode: 'nominal', rate: 0 }, partTime } : null,
         socialSecurity: plan.socialSecurity

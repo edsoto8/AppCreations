@@ -149,8 +149,84 @@
   }
 }
 
+/*
+ * Print stylesheet (printable summary, BRIEF §5.10): no app chrome or controls, black on white in
+ * either theme, cards and table rows kept whole across pages, links printed as plain text.
+ */
 @media print {
-  .no-print {
+  @page {
+    margin: 12mm;
+  }
+  .no-print,
+  aside,
+  header.sticky,
+  nav,
+  button,
+  input,
+  [role='tooltip'] {
     display: none !important;
+  }
+  html,
+  html.dark {
+    color-scheme: light;
+  }
+  html,
+  body {
+    background: #fff !important;
+  }
+  *,
+  *::before,
+  *::after {
+    color: #000 !important;
+    background-color: transparent !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+  * {
+    border-color: #888 !important;
+  }
+  body {
+    font-size: 10pt;
+  }
+  /* The shell's sidebar offset and page width. */
+  .md\:pl-64 {
+    padding-left: 0 !important;
+  }
+  main {
+    max-width: none !important;
+    padding: 0 !important;
+  }
+  /* The summary prints its own disclaimers. */
+  body:has(.print-summary) main + footer {
+    display: none !important;
+  }
+  a,
+  a:visited {
+    text-decoration: none !important;
+  }
+  a[href]::after {
+    content: none !important;
+  }
+  [role='region'] {
+    overflow: visible !important;
+  }
+  .print-cards .grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: 0.5rem !important;
+  }
+  .print-cards .grid > *,
+  .print-avoid-break,
+  tr {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  h1,
+  h2,
+  h3 {
+    break-after: avoid;
+    page-break-after: avoid;
+  }
+  thead {
+    display: table-header-group;
   }
 }

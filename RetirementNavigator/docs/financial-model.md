@@ -746,31 +746,288 @@ confidence intervals. Everything else (contributions, spending, inflation) is un
   years.
 
 ## 12. Calculators [M7a]
-Each calculator is a thin wrapper that builds an engine input and calls engine functions; none has
-formulas of its own.
+The 15 standalone calculators live in `packages/engine/src/calculators/` (one file each, exported from
+`calculators/index.ts`, with `runCalculator(id, input, ctx)` dispatching by `CalculatorId`). Each one is a
+thin wrapper: it validates its own small input with Zod (`invalid` with field paths, never a throw for
+user data), builds an engine input (usually a synthetic household validated by `HouseholdSchema`, on the
+template of `samples/minimal.ts`), calls existing engine functions, and reports figures read from the
+engine results. None has a financial formula of its own.
 
-| Calculator | Engine call |
-|---|---|
-| Compound interest | single taxable account projection |
-| 401(k) contribution | `capContributions` + projection |
-| Employer match optimizer | `computeMatch` readout |
-| Roth vs traditional | twin projections, after-tax compare |
-| Retirement age | `optimizeRetirementAge` |
-| Savings gap | solve for the extra contribution meeting the success criterion (bisection over projection) |
-| Inflation purchasing power | deflator |
-| Withdrawal (fixed % and sustainable rate) | projection with spending = rate × balance / bisection |
-| SS claiming comparison | `ssBenefitAtClaim` at 62–70 plus cumulative totals |
-| Fee impact | twin projections with f vs 0 |
-| Lump sum vs recurring | twin projections |
-| Spending planner | spending steps |
-| Coast FIRE | contributions stop now; success? |
-| Barista FIRE | part-time phase |
-| FI number | `spending / withdrawal rate` via the withdrawal calculator |
+### 12.0 Shared conventions
+- **Money and rates:** integer cents in and out; rates are decimals. Year 1 is `ctx.currentYear`; a
+  person's birth year is `currentYear − age`.
+- **Labels on every result** (`CalculatorLabels`):
+  - `basis.dollars`: `nominal`, `todaysDollars` or `nominalAndTodaysDollars` (fields named `…Real` are
+    today's dollars, §1.1);
+  - `basis.tax`: `beforeTaxes` (no tax subtracted: growth-only figures, or tax rules unverified so the
+    projection funded the need before taxes, §1.7) or `afterTaxes` (the projection computed taxes and
+    grossed withdrawals up, §7.2). It is read from the projection's `excludedFeatures`;
+  - `basis.limits`: `afterLimits`, `beforeLimits` (workplace limits unverified, §1.7) or `notApplicable`;
+  - `excludedFeatures` and `unverified`: the union of the projections' own lists (plus any null keys
+    the calculator's other engine calls needed);
+  - `assumptions`: short descriptive statements shown beside the result.
+- **Unverified rules:** a calculator never substitutes a rule value. When a figure needs a null rule it
+  either returns `unverified` with the missing keys (Social Security claiming comparison in PIA mode)
+  or reports the projection's before-limits / before-taxes figures with the labels above (§1.7).
+- **Synthetic households:** the plan calculators model no salary in working years (pay and
+  working-years spending are outside the calculator; `currentAnnualSpending` is 0). With verified tax
+  rules such a household is flagged infeasible by construction (net pay 0 is below its contributions),
+  so its `savingsPlanInfeasible` warning is dropped; every other engine warning is passed through,
+  except where a calculator says otherwise.
+- **Searches (bisection):** `searchMinimum` (smallest passing value) and `searchMaximum` (largest
+  passing value) on a predicate that is monotone in the searched input. Both evaluate the bounds first:
+  `atBound` (the near bound already passes, or the far bound still passes), `notWithinBound` (nothing
+  in the range passes) or `found`. Money searches run on whole cents and stop at a $1 bracket (the
+  passing end is returned, so the result is at most $1 above the exact boundary); rate searches stop at
+  1e-6. Each search reports its `evaluations` (bounded at 200).
+- **Arithmetic the calculators do:** sums and differences of engine cents, bisection midpoints, and
+  input construction (a withdrawal rate × a balance and a deferral rate × pay, rounded half to even to
+  whole cents; a total split into equal whole-cent payments). Construction invariants (a validated
+  horizon has rows) are read through `itemAt`/`lastOf`/`notNull`, which throw a `RangeError` only on a
+  programming error, like `asCents`.
+- **"No duplicated formulas" gate:** `calculators/noDuplicatedFormulas.test.ts` reads every calculator
+  source file (tests excluded) and fails on `Math.pow`, `**`, `Math.exp`/`Math.expm1` or `Math.log*`
+  outside comments.
 
-Closed forms used in the tests:
-- future value: `FV = PV(1+r)^n + PMT·((1+r)^n − 1)/r`
-- growing annuity: `PMT·((1+r)^n − (1+g)^n)/(r − g)`
-- payment: `PMT = PV·r/(1 − (1+r)^{−n})`
+### 12.1 Compound interest (`compoundInterest`)
+- **Inputs:** `principal`, `annualContribution` (default 0), `contributionGrowth` (default 0),
+  `annualReturn`, `years` (1–100), `inflation` (default 0, for the today's-dollar columns),
+  `expenseRatio` (default 0).
+- **Engine call:** `projectHousehold` on a one-cash-account household that stays in the accumulation
+  phase for exactly `years` rows (the person reaches the retirement age in year `years + 1`; that row
+  is not reported). The account return is the input; contributions are a dollar schedule (flat, or
+  growing at `contributionGrowth`) for `years` years.
+- **Outputs:** per year start balance, contributions, growth after fees (the reconciling item, §1.3),
+  fee drag, end balance and real end balance; totals = sums of the rows, so
+  `principal + totalContributions + totalGrowth = endingBalance` exactly.
+- **Basis:** nominal and today's dollars; before taxes; limits not applicable.
+- **Timing:** contributions mid-year (§1.5), so the closed form tested is
+  `FV = PV(1+ρ)^n + PMT·(1+ρ)^½·((1+ρ)^n − 1)/ρ` with `ρ = (1+r)(1−f) − 1`, and the growing annuity
+  `PMT·(1+ρ)^½·((1+ρ)^n − (1+g)^n)/(ρ − g)`.
+
+### 12.2 401(k) contribution (`contribution401k`)
+- **Inputs:** `age`, `retirementAge` (> age), `salary`, `salaryGrowth` (nominal raise), `planType`,
+  `planOffersRoth` (default true), `traditionalPctOfSalary`, `rothPctOfSalary`, `match` (an
+  `EmployerMatchRule`, or null), `traditionalBalance`, `rothBalance`, `annualReturn`, `inflation`,
+  `priorYearFicaWages` (null = unknown).
+- **Engine calls:** `previewAccumulation` (year 1: requested deferrals, pre-limit match, eligible pay
+  and compensation); `resolveRules` + `capContributions` (year 1: 402(g) with the 50+ and 60–63
+  catch-ups, the Roth catch-up rule, 401(a)(17), 415(c), with their warnings, §3.4); `projectHousehold`
+  on a one-person household with that plan, its traditional and Roth accounts and planning age = the
+  retirement age (every working year's contributions and the balances).
+- **Outputs:** `yearOne` (requested amounts, pre-limit match readout, capped amounts or null, limit
+  warnings); per working year salary, employee traditional/Roth, catch-up, employer match and flat,
+  account balances (nominal and real); totals (employee, employer, growth, balance at the start of the
+  retirement year nominal and in today's dollars, §1.1).
+- **Basis:** nominal and today's dollars; before taxes; `afterLimits`, or `beforeLimits` while the
+  limits are unverified (then `yearOne.capped` is null, the missing keys are listed, and the projection
+  shows contributions as elected, which can overstate savings above the limits).
+- **Notes:** from year 2 the Roth catch-up test uses the projected prior-year wages (§3.4), so a
+  higher earner's catch-up can move to Roth after year 1.
+
+### 12.3 Employer match optimizer (`matchOptimizer`)
+- **Inputs:** `eligiblePay`, `match` (`EmployerMatchRule`), `currentDeferralRate`, `scanStep`
+  (default 0.5%), `scanTo` (default 20%).
+- **Engine call:** `computeMatch` at the current rate and at each grid rate `k·scanStep` up to `scanTo`
+  (deferral dollars = rate × pay, whole cents).
+- **Outputs:** the engine readout (`pctToCaptureFullMatch`, `dollarsToCaptureFullMatch`,
+  `maxPossibleMatch`), `unclaimedAtCurrentRate` (match left on the table per year),
+  `additionalDeferralNeeded` = max(0, dollars to capture − current deferral), the scan table and the
+  lowest scanned rate whose match equals the possible match (a cross-check; with a dollar cap binding
+  inside a tier the grid point is at or above the exact capture rate).
+- **Basis:** nominal; before taxes; **before plan limits** (402(g), 401(a)(17), 415(c) are not applied;
+  the 401(k) contribution calculator shows the after-limit match). Annual true-up assumed (§14).
+
+### 12.4 Roth vs traditional (`rothVsTraditional`)
+- **Inputs:** `age`, `retirementAge`, `planningAge`, `salary`, `salaryGrowth`, `deferralPct` (the same
+  share of salary in both cases), returns before and in retirement, `inflation`, `currentSpending`
+  (working years, today's dollars), `retirementSpending` (net need), `stateTaxRate`.
+- **Engine calls:** a one-person household with a 401(k) offering Roth (traditional and Roth accounts,
+  no match) and a taxable brokerage that receives the working-years surplus (`assumptions.surplus`);
+  `presetScenario('G_rothStrategy')` builds the Roth twin; `compareScenarios` projects both
+  (`computeDashboard`).
+- **Outputs:** per side the ending balance (nominal and real), the tax-deferred part, the engine's
+  `afterTaxEndingBalanceReal` (§10: real ending balance minus tax-deferred money ÷ `P_T` × the final
+  year's marginal ordinary rate, the model's own rate), that marginal rate, depletion year and success;
+  the Roth − traditional difference after tax and before tax (today's dollars).
+- **How the tax saving enters:** the traditional case pays less tax while working, so its net pay is
+  higher; the part above spending and contributions is invested in the taxable account (verified tax
+  rules only, §3.8). Withdrawals in retirement are grossed up for taxes (§7.2).
+- **Basis:** nominal and today's dollars; `afterTaxes` when both after-tax figures exist; while tax
+  rules are unverified the after-tax figures are null and the basis is `beforeTaxes` (the twins are
+  then identical before taxes: no surplus is routed and no tax is computed). Limits follow the
+  projection.
+
+### 12.5 Retirement age (`retirementAge`)
+- **Inputs:** the plan fields (12.0: `age`, `planningAge`, `currentBalance`, `annualContribution`
+  (today's dollars, rising with inflation, until the year before retirement), returns before and in
+  retirement, `inflation`, `retirementSpending`, optional Social Security entered at the claiming age,
+  `taxTreatment` (`taxDeferred` default, `taxFree`, `taxable` brokerage with `costBasis`),
+  `expenseRatio`, `withdrawalTiming`, `minimumEndingBalance`), plus `fromAge`, `toAge`
+  (≤ planning age, > current age).
+- **Engine calls:** `optimizeRetirementAge` (deterministic criterion, a brute-force scan of every age,
+  §10) on the plan household retiring at `toAge`; then `withRetirementAge` + `projectHousehold` at the
+  earliest successful age (or `toAge` when none succeeds) for the outcome shown and the labels. The
+  optimizer's own range checks (for example a range starting before the current age) are passed through
+  as `invalid`.
+- **Outputs:** `earliestAge` (null if none), every evaluated age (success, real ending balance), and the
+  outcome at the shown age.
+- **Basis:** today's dollars (real ending balance); tax basis from the projection.
+
+### 12.6 Savings gap (`savingsGap`)
+- **Inputs:** the plan fields, plus `maxExtraContribution` (default $1,000,000 a year). Needs at least
+  one working year.
+- **Engine calls:** `projectHousehold` on the plan household as entered, and inside `searchMinimum`
+  over an extra annual contribution added to the entered one (both today's dollars, rising with
+  inflation, until the year before retirement).
+- **Search:** [$0, `maxExtraContribution`], whole cents, $1 tolerance. Higher contributions never lower
+  the balance (an engine property test), so success is monotone in the extra amount. `atBound` = the
+  plan already meets the criterion (extra 0); `notWithinBound` = not even the bound is enough (extra
+  null).
+- **Outputs:** the extra and total annual contribution, the plan's outcome as entered and with the extra.
+- **Basis:** today's dollars; tax basis from the projection.
+
+### 12.7 Inflation purchasing power (`inflationPurchasingPower`)
+- **Inputs:** `amount` (today's dollars), `futureAmount` (a fixed nominal amount; default = `amount`),
+  `years` (1–100), `inflation`.
+- **Engine call:** `projectHousehold` on a household built only to convert dollars with the engine's
+  price index `P_t` (§1.1): a retirement spending need of `amount` gives the nominal cost of today's
+  amount each year (`flows.spendingNeed = amount·P_t`), and a flat nominal pension of `futureAmount`
+  in payment from year 1 gives its value in today's dollars (`real.grossIncome = futureAmount/P_t`).
+  The household has no accounts; its funding is irrelevant and its warnings are not reported.
+- **Outputs:** per year from now (0…years) the price level, the cost of today's amount and today's value
+  of the future amount; the figures `years` from now.
+- **Basis:** nominal and today's dollars; taxes not applicable (`beforeTaxes`); no rule values are
+  needed (empty labels). Constant inflation; closed forms tested `A(1+i)^n` and `F/(1+i)^n`.
+
+### 12.8 Withdrawal (`withdrawal`)
+- **Inputs (both modes):** `startingBalance`, `age` (default 65), `years` (the plan runs through
+  age + years − 1 ≤ 120), `annualReturn`, `inflation`, `taxTreatment` (default `taxFree`), `costBasis`,
+  `expenseRatio`, `withdrawalTiming`, optional Social Security at the claiming age,
+  `minimumEndingBalance`.
+- **Fixed percentage** (`withdrawalRate`): `projectHousehold` on a household retired from year 1 whose
+  retirement spending is `rate × startingBalance` in today's dollars (so it rises with inflation, §5).
+  Outputs: the initial spending, per year need (nominal and real), withdrawals, shortfall and balances,
+  longevity (lasts through the horizon, or the depletion year and age, and the years fully funded),
+  ending balance and success.
+- **Sustainable rate** (`maxRate`, default 100%): `searchMaximum` over the initial rate in [0, `maxRate`],
+  tolerance 1e-6, each step the fixed-percentage plan; the result is the highest rate meeting the
+  deterministic criterion (§4.1), with the plan at that rate. `atBound` = even `maxRate` lasts;
+  `notWithinBound` = not even 0% meets the criterion (for example a minimum ending balance above what
+  the balance can reach).
+- **Basis:** nominal and today's dollars; the spending is a net need, so the tax basis is `afterTaxes`
+  when the projection computed taxes and `beforeTaxes` while tax rules are unverified (for a
+  tax-deferred account that overstates longevity).
+- **Closed forms tested:** with mid-year withdrawals `E_t = E_{t−1}(1+r) − W_t(1+r)^½`, the level
+  ending balance `S(1+r)^n − W(1+r)^½((1+r)^n − 1)/r`, and the exhausting payment
+  `W = S(1+r)^½(1 − q)/(1 − q^n)`, `q = (1+i)/(1+r)` (the payment formula `PV·r/(1 − (1+r)^{−n})` divided
+  by `(1+r)^½` when i = 0); start-of-year timing gives the annuity due `S·r/((1+r)(1 − (1+r)^{−n}))`.
+
+### 12.9 Social Security claiming comparison (`ssClaimingComparison`)
+- **Inputs:** `birthYear`, `birthMonth`, `throughAge` (≥ 62, not yet passed), and either
+  - mode `pia`: `piaMonthly` (the PIA from the SSA statement, today's dollars), or
+  - mode `amountsAtClaimAge`: up to 12 `{claimAge, monthlyAtClaim}` options (the benefit at each claiming
+    age as the statement lists it).
+- **Engine calls:** PIA mode: `fullRetirementAge` and `ssBenefitAtClaim` at each whole age 62–70; any
+  null rule value makes the whole result `unverified` with the missing keys (never a substituted value).
+  Amounts mode needs no rule value (§7.5). In both modes the lifetime totals come from
+  `projectHousehold`, one run per claiming age, of a retired single person with that Social Security
+  input and inflation 0 (the COLA follows inflation, so nominal = today's dollars); a total is the sum
+  of `flows.socialSecurity` from this year through `throughAge`, including the claim-year proration by
+  birth month.
+- **Outputs:** per option the monthly benefit, the claim factor and months from FRA (PIA mode), the first
+  benefit year, the total through `throughAge`, the running total by age, and the break-even age against
+  the earliest option (the first age its running total reaches the earliest's; null if never); the
+  option with the highest total; FRA (PIA mode). Claiming ages before this year's age are left out.
+- **Basis:** today's dollars; gross benefits (`beforeTaxes`: taxation of benefits is not part of the
+  comparison). Own retirement benefit only; spousal and survivor benefits and the earnings test are out
+  of scope.
+
+### 12.10 Fee impact (`feeImpact`)
+- **Inputs:** as compound interest, with a required `expenseRatio`.
+- **Engine calls:** `projectHousehold` twice (the compound-interest household with f and with 0).
+- **Outputs:** both totals; `lifetimeCost` = ending balance without fees − with fees (nominal and real),
+  which is the fees plus the growth they would have earned; `feesCharged` = Σ yearly fee drag; per year
+  both balances and the cumulative cost.
+- **Basis:** nominal and today's dollars; before taxes. Closed forms tested: FV at `ρ = (1+r)(1−f) − 1`
+  and at r.
+
+### 12.11 Lump sum vs recurring (`lumpSumVsRecurring`)
+- **Inputs:** `total`, `spreadYears`, `horizonYears` (≥ spreadYears), `annualReturn`, `inflation`,
+  `expenseRatio`.
+- **Engine calls:** `projectHousehold` twice: the total as the starting balance, and a zero balance with
+  `total ÷ spreadYears` (whole cents, half to even) contributed mid-year in each of the first
+  `spreadYears` years; both run to `horizonYears`.
+- **Outputs:** both totals (the recurring `totalContributions` is the amount actually invested, which
+  can differ from `total` by the rounding), the differences (nominal and real) and per-year balances.
+- **Assumptions:** the lump is invested at the start of year 1; money waiting to be invested earns
+  nothing in this comparison. Closed forms tested: `T(1+r)^H` and `P(1+r)^½((1+r)^n − 1)/r·(1+r)^{H−n}`.
+
+### 12.12 Spending planner (`spendingPlanner`)
+- **Inputs:** one or two people (`name`, `age`, `planningAge`, optional Social Security at the claiming
+  age; two people file jointly), `startingBalance`, `taxTreatment`, `costBasis`, `annualReturn`,
+  `expenseRatio`, `inflation`, `retirementSpending`, `steps` (by the first person's age), `realGlide`,
+  `healthcareBeforeMedicare`, `survivorSpendingReduction`, `withdrawalTiming`.
+- **Engine call:** `projectHousehold` on a household retired from this year with that spending plan (§5:
+  steps, glide, the pre-Medicare line while a retired person is under 65, the survivor reduction from
+  the first death year, §7.7).
+- **Outputs:** per year ages, spending need (nominal and real), funded, shortfall, Social Security,
+  withdrawals, balances and markers; longevity (lasts through the planning age, or the depletion year
+  and age); the first death year; the total need.
+- **Basis:** nominal and today's dollars; tax basis from the projection. Engine warnings are passed
+  through (the pre-Medicare note applies to real people here).
+
+### 12.13 Coast FIRE (`coastFire`)
+- **Inputs:** the plan fields, plus `maxBalance` (default $100 million).
+- **Engine calls:** `projectHousehold` with contributions stopped from today (does the plan still meet
+  the criterion?), with the entered contributions (for comparison), and inside `searchMinimum` over
+  today's balance with no contributions.
+- **Search:** [$0, `maxBalance`], whole cents, $1 tolerance; success is monotone in the starting balance.
+  `atBound` = $0 already coasts (nothing to fund beyond other income).
+- **Outputs:** `coasts`, both outcomes, the coast number and the gap (coast number − today's balance,
+  at least 0; null above the bound).
+- **Basis:** today's dollars; tax basis from the projection. Closed form tested (zero inflation): the
+  present value at retirement of the spending, `S(1+r)^{−½}(1 − (1+r)^{−N})/(1 − (1+r)^{−1})`, discounted
+  `(1+r)^{−n}` to today.
+
+### 12.14 Barista FIRE (`baristaFire`)
+- **Inputs:** the plan fields, plus `partTime` (`startAge`, `endAge` exclusive, `annualIncome` in today's
+  dollars) and `maxPartTimeIncome` (default $500,000).
+- **Engine calls:** `projectHousehold` on the plan household with the part-time phase (§3.1: today's
+  dollars rising with inflation; FICA applies when verified; no plan deferrals); in retirement the
+  part-time pay is cash income that funds spending before withdrawals (§4.1, §7.1). `searchMinimum` over
+  the part-time income.
+- **Search:** [$0, `maxPartTimeIncome`], whole cents, $1 tolerance. `atBound` = no part-time income is
+  needed.
+- **Outputs:** success at the entered income, the minimum part-time income and the plan at it, and the
+  total part-time pay at the entered income (gross, nominal).
+- **Basis:** today's dollars; tax basis from the projection (with verified rules, payroll and income tax
+  on the part-time pay raise the minimum).
+
+### 12.15 FI number (`fiNumber`)
+- **Inputs:** the drawdown fields of 12.8 without the balance, plus `annualSpending` (today's dollars, a
+  net need rising with inflation), `withdrawalRate` (optional), `maxBalance` (default $100 million).
+- **Choice (documented):** the FI number is computed through the withdrawal calculator's drawdown plan,
+  never as a hand-coded `spending ÷ rate`:
+  - `sustainable.fiNumber`: `searchMinimum` over the starting balance ([$0, `maxBalance`], $1) for the
+    smallest balance whose plan spending `annualSpending` meets the deterministic criterion through the
+    horizon; at that balance the withdrawal calculator's sustainable-rate search reports the initial
+    rate it supports.
+  - `ruleOfThumb.fiNumber` (when a rate is given): `searchMinimum` over the starting balance for the
+    smallest balance whose fixed-percentage plan (`rate × balance`) has a first-year spending need (read
+    from the projection) of at least `annualSpending`: the rule-of-thumb "spending ÷ rate", found
+    through the engine; the same plan reports whether it lasts under the return assumption.
+- **Basis:** nominal and today's dollars; tax basis from the projection.
+- **Closed form tested:** the growing-annuity present value
+  `S = W(1+r)^{−½}(1 − q^n)/(1 − q)`, `q = (1+i)/(1+r)`, with mid-year withdrawals.
+
+### 12.16 Tests
+Each calculator has a closed-form or engine-parity test (closed forms are computed in the tests only,
+with zero-tax setups: cash, tax-free or before-tax paths), an invalid-input test and, where rules matter,
+the unverified path with the bundled rules; verified paths use the SYNTHETIC fixture rules
+(`testing/fixtureRules.ts`, not real values). Parity tests: 401(k) year 1 vs the projection rows,
+match scan vs `computeMatch`, Roth vs traditional vs `compareScenarios`, retirement age vs a brute-force
+projection of each age, SS amounts vs `ssBenefitAtClaim`, fee impact vs two compound-interest runs.
 
 ## 13. Insights [M7b]
 Each insight (`computeInsights`) states its change as scenario ops (`whatIfOps`), applies them to a

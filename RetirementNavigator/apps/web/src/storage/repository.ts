@@ -3,7 +3,14 @@
  * passes through `migrate()` so documents from older schema versions are upgraded and validated, and
  * is checked to be the requested kind stored under its own id.
  */
-import { migrate, StoredDocSchema, zodIssues, type EngineResult, type StoredDoc } from '@rn/engine';
+import {
+  migrate,
+  StoredDocSchema,
+  zodIssues,
+  type EngineResult,
+  type StoredDoc,
+  type ValidationIssue,
+} from '@rn/engine';
 import { STORES, type Db, type StoreName } from './db';
 
 type Kind = StoredDoc['kind'];
@@ -56,7 +63,30 @@ export class DocumentRepository {
     await this.db.delete(STORE_FOR_KIND[kind], id);
   }
 
-  /** Remove every stored document. The "delete all my data" UI (M7b) also clears the theme preference. */
+  /**
+   * Validate every document, then write them all in one transaction (after clearing every store when
+   * `clear` is set). Nothing is written if any document is invalid, and an interrupted transaction
+   * writes nothing either, so an import is never half-applied.
+   */
+  async writeAll(docs: readonly unknown[], opts: { clear: boolean }): Promise<EngineResult<StoredDoc[]>> {
+    const values: StoredDoc[] = [];
+    const issues: ValidationIssue[] = [];
+    docs.forEach((doc, i) => {
+      const parsed = StoredDocSchema.safeParse(doc);
+      if (parsed.success) values.push(parsed.data);
+      else issues.push(...zodIssues(parsed.error).map((issue) => ({ ...issue, path: [i, ...issue.path] })));
+    });
+    if (issues.length > 0) return { status: 'invalid', issues };
+    const tx = this.db.transaction([...STORES], 'readwrite');
+    await Promise.all([
+      ...(opts.clear ? STORES.map((s) => tx.objectStore(s).clear()) : []),
+      ...values.map((value) => tx.objectStore(STORE_FOR_KIND[value.kind]).put(value, value.id)),
+      tx.done,
+    ]);
+    return { status: 'ok', value: values, warnings: [] };
+  }
+
+  /** Remove every stored document. The "delete all my data" UI also clears the theme preference. */
   async deleteAll(): Promise<void> {
     const tx = this.db.transaction([...STORES], 'readwrite');
     await Promise.all([...STORES.map((s) => tx.objectStore(s).clear()), tx.done]);

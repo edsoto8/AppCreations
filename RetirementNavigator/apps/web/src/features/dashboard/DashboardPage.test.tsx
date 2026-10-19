@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import {
   HouseholdSchema,
   RULES,
+  allocationByAssetClass,
   SAMPLE_PROFILES,
   computeDashboard,
   minimalHouseholdInput,
@@ -13,6 +14,7 @@ import {
 import { CURRENT_YEAR } from '@/app/env';
 import { formatCents } from '@/lib/format';
 import { renderWithProfile } from '@/test/renderWithProfile';
+import { shortHousehold } from '@/test/monteCarloFixtures';
 import { useProfileStore } from '@/state/profileStore';
 import { DashboardPage } from './DashboardPage';
 import { excludedFeatureLabel, notModeledMessages } from './viewModel';
@@ -208,7 +210,59 @@ describe('DashboardPage', () => {
       'Taxable brokerage',
       'Total',
     ]);
-    expect(screen.getByText(/Coming in M6/)).toBeInTheDocument();
+    // By asset class: the sample sets no allocations, so every balance is "No allocation set".
+    await user.click(screen.getByRole('button', { name: /Show by asset class data table/ }));
+    const byAsset = screen.getByRole('region', { name: 'By asset class by year, today’s dollars' });
+    expect(
+      within(byAsset)
+        .getAllByRole('columnheader')
+        .map((h) => h.textContent),
+    ).toEqual(['Year', 'Age', 'No allocation set', 'Total']);
+    expect(cells(dataRows(byAsset)[0]!).slice(2)).toEqual([
+      formatCents(first.totals.portfolioEnd),
+      formatCents(first.totals.portfolioEnd),
+    ]);
+    expect(screen.getByText(/No account has an allocation set yet/)).toBeInTheDocument();
+  });
+
+  it('allocation view (c) by asset class equals the engine’s allocationByAssetClass in both dollar bases', async () => {
+    const user = userEvent.setup();
+    const household = shortHousehold();
+    const d = dashboardOf(household);
+    const rows = allocationByAssetClass(household, d.baseline);
+    await renderWithProfile(<DashboardPage />, { household });
+    const section = screen.getByRole('heading', { name: 'By asset class' }).closest('section')!;
+    expect(within(section).getByText(/1 of 2 accounts have no allocation set/)).toBeInTheDocument();
+    await user.click(within(section).getByRole('button', { name: /Show by asset class data table/ }));
+    const table = screen.getByRole('region', { name: 'By asset class by year, today’s dollars' });
+    expect(
+      within(table)
+        .getAllByRole('columnheader')
+        .map((h) => h.textContent),
+    ).toEqual(['Year', 'Age', 'Stocks', 'Bonds', 'Cash', 'No allocation set', 'Total']);
+    const body = dataRows(table);
+    expect(body).toHaveLength(rows.length);
+    rows.forEach((r, i) => {
+      const real = (c: number) => formatCents(c / r.deflator);
+      expect(cells(body[i]!).slice(0, 6)).toEqual([
+        String(r.year),
+        expect.any(String),
+        real(r.stocks),
+        real(r.bonds),
+        real(r.cash),
+        real(r.unallocated),
+      ]);
+    });
+
+    await user.click(screen.getByRole('radio', { name: 'Future dollars' }));
+    const nominal = screen.getByRole('region', { name: 'By asset class by year, future dollars' });
+    const last = rows.at(-1)!;
+    expect(cells(dataRows(nominal).at(-1)!).slice(2, 6)).toEqual([
+      formatCents(last.stocks),
+      formatCents(last.bonds),
+      formatCents(last.cash),
+      formatCents(last.unallocated),
+    ]);
   });
 
   it('hand-checked retiree: $100,000 cash at 0% return and inflation, $10,000 a year, runs out in year 11', async () => {

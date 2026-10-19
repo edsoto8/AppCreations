@@ -24,7 +24,13 @@ export function AppShell() {
   const [menuOpen, setMenuOpen] = useState(false);
   const location = useLocation();
   const current = NAV_ITEMS.find((item) => item.path === location.pathname);
-  const pageLabel = current?.label ?? (location.pathname === '/welcome' ? 'Welcome' : 'Page not found');
+  const pageLabel =
+    current?.label ??
+    (location.pathname === '/welcome'
+      ? 'Welcome'
+      : location.pathname === '/print'
+        ? 'Printable summary'
+        : 'Page not found');
   const firstRender = useRef(true);
 
   // Per-route title (WCAG 2.4.2) and focus to the new content after client-side navigation.

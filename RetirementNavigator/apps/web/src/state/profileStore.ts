@@ -4,10 +4,29 @@
  * `scenarioStore`, which this store initializes, flushes, and prunes when a profile is deleted.
  */
 import { create } from 'zustand';
-import { HouseholdSchema, type DollarBasis, type Household, type ProfileDoc } from '@rn/engine';
+import {
+  CURRENT_SCHEMA_VERSION,
+  HouseholdSchema,
+  type DollarBasis,
+  type EngineResult,
+  type ExportBundle,
+  type Household,
+  type ProfileDoc,
+  type ScenarioDoc,
+  type SettingsDoc,
+  type StoredDoc,
+} from '@rn/engine';
 import type { DocumentRepository } from '@/storage/repository';
 import { newId } from '@/lib/ids';
 import { useScenarioStore } from './scenarioStore';
+import { planImport, type ImportMode } from './importPlan';
+
+export interface ImportOutcome {
+  profiles: number;
+  scenarios: number;
+  /** Profiles and scenarios that got a fresh id because theirs was taken (add alongside). */
+  renamedIds: number;
+}
 
 const SAVE_DELAY_MS = 300;
 
@@ -29,6 +48,19 @@ export interface ProfileState {
   setActive: (id: string) => void;
   completeOnboarding: () => void;
   setDollarBasis: (basis: DollarBasis) => void;
+  /**
+   * Every loaded profile, the scenarios built on them and the settings, as one export bundle
+   * (`exportedAt` is passed in: the caller reads the clock).
+   */
+  exportBundle: (exportedAt: string) => ExportBundle;
+  /**
+   * Store a validated bundle (`importJson`) in one transaction, then show it: `replace` removes every
+   * current document first; `add` keeps them and gives colliding ids fresh ones. Nothing changes,
+   * in storage or in memory, unless every document is written.
+   */
+  importBundle: (bundle: ExportBundle, mode: ImportMode) => Promise<EngineResult<ImportOutcome>>;
+  /** Remove every profile, scenario and the settings from storage and memory (onboarding again). */
+  deleteAllData: () => Promise<void>;
   /** Wait for pending saves (tests, before unload). */
   flush: () => Promise<void>;
 }
@@ -195,6 +227,115 @@ export const useProfileStore = create<ProfileState>((set, get) => {
     setDollarBasis: (dollarBasis) => {
       set({ dollarBasis });
       saveSettings();
+    },
+
+    exportBundle: (exportedAt) => {
+      const { profiles, activeId, onboardingComplete, dollarBasis } = get();
+      const profileDocs = Object.values(profiles);
+      const ids = new Set(profileDocs.map((p) => p.id as string));
+      // A scenario whose base profile is not loaded could not be imported again, so it is left out.
+      const scenarios = Object.values(useScenarioStore.getState().scenarios).filter((d) =>
+        ids.has(d.scenario.baseProfileId),
+      );
+      return {
+        format: 'retirement-navigator-export',
+        schemaVersion: CURRENT_SCHEMA_VERSION,
+        exportedAt,
+        profiles: profileDocs,
+        scenarios,
+        settings: {
+          kind: 'settings',
+          schemaVersion: CURRENT_SCHEMA_VERSION,
+          id: 'settings',
+          updatedAt: exportedAt,
+          activeProfileId: activeId && ids.has(activeId) ? (activeId as SettingsDoc['activeProfileId']) : null,
+          onboardingComplete,
+          dollarBasis,
+        },
+      };
+    },
+
+    importBundle: async (bundle, mode) => {
+      const repo = repository;
+      if (!repo) return { status: 'invalid', issues: [{ path: [], message: 'Local storage is not open yet' }] };
+      // Write pending edits first; with "replace" they are then discarded along with the old data.
+      await get().flush();
+      const scenarioStore = useScenarioStore.getState();
+      const current = get();
+      const plan = planImport(
+        bundle,
+        mode,
+        { profiles: new Set(Object.keys(current.profiles)), scenarios: new Set(Object.keys(scenarioStore.scenarios)) },
+        newId,
+      );
+      const firstImported = plan.profiles[0]?.id ?? null;
+      const settings: SettingsDoc =
+        mode === 'replace'
+          ? (plan.settings ?? {
+              kind: 'settings',
+              schemaVersion: CURRENT_SCHEMA_VERSION,
+              id: 'settings',
+              updatedAt: now(),
+              activeProfileId: firstImported,
+              onboardingComplete: plan.profiles.length > 0,
+              dollarBasis: current.dollarBasis,
+            })
+          : {
+              kind: 'settings',
+              schemaVersion: CURRENT_SCHEMA_VERSION,
+              id: 'settings',
+              updatedAt: now(),
+              activeProfileId: (current.activeId ?? firstImported) as SettingsDoc['activeProfileId'],
+              onboardingComplete: current.onboardingComplete || plan.profiles.length > 0,
+              dollarBasis: current.dollarBasis,
+            };
+      let written: EngineResult<StoredDoc[]>;
+      try {
+        written = await repo.writeAll([...plan.profiles, ...plan.scenarios, settings], { clear: mode === 'replace' });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        return { status: 'invalid', issues: [{ path: [], message: `Could not save the import: ${message}` }] };
+      }
+      if (written.status !== 'ok') return written;
+      const stored = written.value;
+      const profileDocs = stored.filter((d): d is ProfileDoc => d.kind === 'profile');
+      const scenarioDocs = stored.filter((d): d is ScenarioDoc => d.kind === 'scenario');
+      const storedSettings = stored.find((d): d is SettingsDoc => d.kind === 'settings') ?? settings;
+      const imported = Object.fromEntries(profileDocs.map((d) => [d.id, d]));
+      const profiles = mode === 'replace' ? imported : { ...current.profiles, ...imported };
+      const wanted = storedSettings.activeProfileId;
+      if (mode === 'replace') {
+        for (const t of timers.values()) clearTimeout(t);
+        timers.clear();
+        pending.clear();
+      }
+      set({
+        profiles,
+        activeId: wanted && profiles[wanted] ? wanted : (Object.keys(profiles)[0] ?? null),
+        onboardingComplete: storedSettings.onboardingComplete,
+        dollarBasis: storedSettings.dollarBasis,
+        invalidDocuments: mode === 'replace' ? 0 : current.invalidDocuments,
+      });
+      scenarioStore.load(scenarioDocs, { replace: mode === 'replace' });
+      return {
+        status: 'ok',
+        value: {
+          profiles: profileDocs.length,
+          scenarios: scenarioDocs.length,
+          renamedIds: Object.keys(plan.remappedProfiles).length + Object.keys(plan.remappedScenarios).length,
+        },
+        warnings: [],
+      };
+    },
+
+    deleteAllData: async () => {
+      for (const t of timers.values()) clearTimeout(t);
+      timers.clear();
+      pending.clear();
+      useScenarioStore.getState().reset();
+      await repository?.deleteAll();
+      // No settings write here: an empty store is the first-run state.
+      set({ profiles: {}, activeId: null, onboardingComplete: false, dollarBasis: 'todays', invalidDocuments: 0 });
     },
 
     flush: async () => {

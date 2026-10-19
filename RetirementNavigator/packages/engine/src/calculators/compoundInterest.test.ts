@@ -33,7 +33,11 @@ describe('compoundInterest', () => {
     expect(dollars(pv) + result.value.totals.totalContributions + result.value.totals.totalGrowth).toBe(
       result.value.totals.endingBalance,
     );
-    expect(result.value.basis).toEqual({ dollars: 'nominalAndTodaysDollars', tax: 'beforeTaxes', limits: 'notApplicable' });
+    expect(result.value.basis).toEqual({
+      dollars: 'nominalAndTodaysDollars',
+      tax: 'beforeTaxes',
+      limits: 'notApplicable',
+    });
   });
 
   it('matches the growing-annuity closed form, net of the expense ratio, in today’s dollars too', () => {

@@ -14,3 +14,12 @@ function readYear(): number {
 }
 
 export const CURRENT_YEAR = readYear();
+
+/**
+ * Today's local date as YYYY-MM-DD for file names and "prepared on" lines (UI only; the engine never
+ * reads the clock). The year is `CURRENT_YEAR`, so a `?year=` override applies here too.
+ */
+export function todayStamp(now: Date = new Date()): string {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${CURRENT_YEAR}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+}

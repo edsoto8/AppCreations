@@ -65,3 +65,27 @@ describe('DocumentRepository (M1 gate: a stored document round-trips through the
     expect((await repo.get('scenario', 'household-1'))?.status).toBe('invalid');
   });
 });
+
+describe('DocumentRepository.writeAll (imports are all or nothing)', () => {
+  it('writes every document in one transaction, clearing first when asked', async () => {
+    await repo.put(profile());
+    const second = { ...profile(), id: 'household-2', household: minimalHouseholdInput(2026, 'household-2') };
+    const result = await repo.writeAll([second], { clear: true });
+    expect(result.status).toBe('ok');
+    const ids = (await repo.list('profile')).map((r) => (r.status === 'ok' ? r.value.id : null));
+    expect(ids).toEqual(['household-2']);
+    await repo.writeAll([profile()], { clear: false });
+    expect(await repo.list('profile')).toHaveLength(2);
+  });
+
+  it('writes nothing, and clears nothing, when any document is invalid', async () => {
+    await repo.put(profile());
+    const bad = { ...profile(), id: 'household-3', household: { ...profile().household, people: [] } };
+    const second = { ...profile(), id: 'household-2', household: minimalHouseholdInput(2026, 'household-2') };
+    const result = await repo.writeAll([second, bad], { clear: true });
+    expect(result.status).toBe('invalid');
+    if (result.status === 'invalid') expect(result.issues[0]!.path[0]).toBe(1);
+    const ids = (await repo.list('profile')).map((r) => (r.status === 'ok' ? r.value.id : null));
+    expect(ids).toEqual(['household-1']);
+  });
+});

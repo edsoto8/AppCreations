@@ -18,10 +18,13 @@ import {
   dropWarnings,
   growthHousehold,
   growthRows,
+  lastOf,
+  mapStep,
   mergeLabels,
   parseInput,
   projectInput,
   sumOf,
+  toResult,
   type CalculatorLabels,
   type GrowthRow,
   type Step,
@@ -82,24 +85,23 @@ export function runGrowth(
     }),
     ctx,
   );
-  if (!projected.ok) return projected;
-  const rows = growthRows(projected.value.projection.rows, input.years);
-  const last = rows[rows.length - 1];
-  return {
-    ok: true,
-    value: {
+  return mapStep(projected, (p) => {
+    const rows = growthRows(p.projection.rows, input.years);
+    // years ≥ 1 (schema), so the projection has at least one growth row.
+    const last = lastOf(rows);
+    return {
       rows,
       totals: {
-        endingBalance: last?.endBalance ?? input.principal,
-        endingBalanceReal: last?.endBalanceReal ?? input.principal,
+        endingBalance: last.endBalance,
+        endingBalanceReal: last.endBalanceReal,
         totalContributions: sumOf(rows.map((r) => r.contributions)),
         totalGrowth: sumOf(rows.map((r) => r.growth)),
         totalFeeDrag: sumOf(rows.map((r) => r.feeDrag)),
       },
-      labels: mergeLabels([projected.value.projection]),
-      warnings: dropWarnings(projected.value.warnings, GROWTH_NOISE),
-    },
-  };
+      labels: mergeLabels([p.projection]),
+      warnings: dropWarnings(p.warnings, GROWTH_NOISE),
+    };
+  });
 }
 
 export const GROWTH_ASSUMPTIONS = [
@@ -115,17 +117,16 @@ export function compoundInterest(
 ): EngineResult<CompoundInterestResult> {
   const parsed = parseInput(CompoundInterestInputSchema, input);
   if (!parsed.ok) return parsed.result;
-  const run = runGrowth(parsed.value, ctx);
-  if (!run.ok) return run.result;
-  return {
-    status: 'ok',
-    value: {
-      rows: run.value.rows,
-      totals: run.value.totals,
-      basis: { dollars: 'nominalAndTodaysDollars', tax: 'beforeTaxes', limits: 'notApplicable' },
-      ...run.value.labels,
-      assumptions: GROWTH_ASSUMPTIONS,
-    },
-    warnings: run.value.warnings,
-  };
+  return toResult(
+    mapStep(runGrowth(parsed.value, ctx), (run) => ({
+      value: {
+        rows: run.rows,
+        totals: run.totals,
+        basis: { dollars: 'nominalAndTodaysDollars', tax: 'beforeTaxes', limits: 'notApplicable' },
+        ...run.labels,
+        assumptions: GROWTH_ASSUMPTIONS,
+      },
+      warnings: run.warnings,
+    })),
+  );
 }

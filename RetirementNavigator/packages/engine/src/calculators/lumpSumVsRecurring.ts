@@ -15,7 +15,16 @@ import { InflationRateSchema, NominalRateSchema, NonNegativeCentsSchema } from '
 import type { EngineResult } from '../domain/results';
 import { asCents, roundHalfEven } from '../money';
 import { GROWTH_ASSUMPTIONS, runGrowth, type GrowthTotals } from './compoundInterest';
-import { ExpenseRatioSchema, YearsSchema, parseInput, type CalculatorLabels } from './common';
+import {
+  ExpenseRatioSchema,
+  YearsSchema,
+  all,
+  itemAt,
+  mapStep,
+  parseInput,
+  toResult,
+  type CalculatorLabels,
+} from './common';
 
 export const LumpSumVsRecurringInputSchema = z
   .object({
@@ -62,36 +71,34 @@ export function lumpSumVsRecurring(
   };
   // Input construction: the total in `spreadYears` equal whole-cent payments.
   const annual = asCents(roundHalfEven(x.total / x.spreadYears));
-  const lump = runGrowth({ ...common, principal: x.total, annualContribution: 0 as Cents }, ctx);
-  if (!lump.ok) return lump.result;
-  const recurring = runGrowth(
-    { ...common, principal: 0 as Cents, annualContribution: annual, contributionYears: x.spreadYears },
-    ctx,
+  const runs = all(
+    runGrowth({ ...common, principal: x.total, annualContribution: 0 as Cents }, ctx),
+    runGrowth({ ...common, principal: 0 as Cents, annualContribution: annual, contributionYears: x.spreadYears }, ctx),
   );
-  if (!recurring.ok) return recurring.result;
-  const a = lump.value;
-  const b = recurring.value;
-  return {
-    status: 'ok',
-    value: {
-      recurringAnnualAmount: annual,
-      lumpSum: a.totals,
-      recurring: b.totals,
-      difference: (a.totals.endingBalance - b.totals.endingBalance) as Cents,
-      differenceReal: (a.totals.endingBalanceReal - b.totals.endingBalanceReal) as Cents,
-      rows: a.rows.map((row, k) => ({
-        year: row.year,
-        lumpSumBalance: row.endBalance,
-        recurringBalance: b.rows[k]?.endBalance ?? (0 as Cents),
-      })),
-      basis: { dollars: 'nominalAndTodaysDollars', tax: 'beforeTaxes', limits: 'notApplicable' },
-      ...a.labels,
-      assumptions: [
-        ...GROWTH_ASSUMPTIONS,
-        'The lump sum is invested at the start of year 1; the recurring amounts are invested evenly through each year of the spread period.',
-        'Money waiting to be invested in the recurring case is not modeled (it earns nothing in this comparison).',
-      ],
-    },
-    warnings: a.warnings,
-  };
+  return toResult(
+    mapStep(runs, ([a, b]) => {
+      return {
+        value: {
+          recurringAnnualAmount: annual,
+          lumpSum: a.totals,
+          recurring: b.totals,
+          difference: (a.totals.endingBalance - b.totals.endingBalance) as Cents,
+          differenceReal: (a.totals.endingBalanceReal - b.totals.endingBalanceReal) as Cents,
+          rows: a.rows.map((row, k) => ({
+            year: row.year,
+            lumpSumBalance: row.endBalance,
+            recurringBalance: itemAt(b.rows, k).endBalance, // same horizon: rows align
+          })),
+          basis: { dollars: 'nominalAndTodaysDollars', tax: 'beforeTaxes', limits: 'notApplicable' },
+          ...a.labels,
+          assumptions: [
+            ...GROWTH_ASSUMPTIONS,
+            'The lump sum is invested at the start of year 1; the recurring amounts are invested evenly through each year of the spread period.',
+            'Money waiting to be invested in the recurring case is not modeled (it earns nothing in this comparison).',
+          ],
+        },
+        warnings: a.warnings,
+      };
+    }),
+  );
 }

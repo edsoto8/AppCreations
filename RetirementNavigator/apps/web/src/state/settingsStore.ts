@@ -50,3 +50,17 @@ export const useSettingsStore = create<SettingsState>((set) => ({
     set({ theme });
   },
 }));
+
+/**
+ * "Delete all my data": forget the saved theme (the only localStorage key the app owns) and follow
+ * the system theme again, without writing the preference back.
+ */
+export function clearStoredTheme(): void {
+  try {
+    window.localStorage.removeItem(THEME_STORAGE_KEY);
+  } catch {
+    // Storage unavailable: nothing was stored.
+  }
+  document.documentElement.classList.toggle('dark', prefersDark());
+  useSettingsStore.setState({ theme: 'system' });
+}

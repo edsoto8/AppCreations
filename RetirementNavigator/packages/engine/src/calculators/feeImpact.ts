@@ -11,7 +11,17 @@ import type { Cents, NominalRate } from '../domain/primitives';
 import { InflationRateSchema, NominalRateSchema, NonNegativeCentsSchema, ZERO_CENTS } from '../domain/primitives';
 import type { EngineResult } from '../domain/results';
 import { GROWTH_ASSUMPTIONS, runGrowth, type GrowthTotals } from './compoundInterest';
-import { ExpenseRatioSchema, YearsSchema, parseInput, sumOf, type CalculatorLabels } from './common';
+import {
+  ExpenseRatioSchema,
+  YearsSchema,
+  all,
+  itemAt,
+  mapStep,
+  parseInput,
+  sumOf,
+  toResult,
+  type CalculatorLabels,
+} from './common';
 
 export const FeeImpactInputSchema = z.object({
   principal: NonNegativeCentsSchema,
@@ -50,38 +60,36 @@ export interface FeeImpactResult extends CalculatorLabels {
 export function feeImpact(input: FeeImpactInput, ctx: EngineContext): EngineResult<FeeImpactResult> {
   const parsed = parseInput(FeeImpactInputSchema, input);
   if (!parsed.ok) return parsed.result;
-  const withFees = runGrowth(parsed.value, ctx);
-  if (!withFees.ok) return withFees.result;
-  const withoutFees = runGrowth({ ...parsed.value, expenseRatio: 0 }, ctx);
-  if (!withoutFees.ok) return withoutFees.result;
-  const a = withFees.value;
-  const b = withoutFees.value;
-  const rows = a.rows.map((row, k) => {
-    const free = b.rows[k]?.endBalance ?? row.endBalance;
-    return {
-      year: row.year,
-      balanceWithFees: row.endBalance,
-      balanceWithoutFees: free,
-      cumulativeCost: (free - row.endBalance) as Cents,
-      feeDrag: row.feeDrag,
-    };
-  });
-  return {
-    status: 'ok',
-    value: {
-      withFees: a.totals,
-      withoutFees: b.totals,
-      lifetimeCost: (b.totals.endingBalance - a.totals.endingBalance) as Cents,
-      lifetimeCostReal: (b.totals.endingBalanceReal - a.totals.endingBalanceReal) as Cents,
-      feesCharged: sumOf(a.rows.map((r) => r.feeDrag)),
-      rows,
-      basis: { dollars: 'nominalAndTodaysDollars', tax: 'beforeTaxes', limits: 'notApplicable' },
-      ...a.labels,
-      assumptions: [
-        ...GROWTH_ASSUMPTIONS,
-        'The comparison runs the same plan twice, with the expense ratio and with none; everything else is identical.',
-      ],
-    },
-    warnings: a.warnings,
-  };
+  const runs = all(runGrowth(parsed.value, ctx), runGrowth({ ...parsed.value, expenseRatio: 0 }, ctx));
+  return toResult(
+    mapStep(runs, ([a, b]) => {
+      const rows = a.rows.map((row, k) => {
+        const free = itemAt(b.rows, k).endBalance; // same horizon: rows align
+        return {
+          year: row.year,
+          balanceWithFees: row.endBalance,
+          balanceWithoutFees: free,
+          cumulativeCost: (free - row.endBalance) as Cents,
+          feeDrag: row.feeDrag,
+        };
+      });
+      return {
+        value: {
+          withFees: a.totals,
+          withoutFees: b.totals,
+          lifetimeCost: (b.totals.endingBalance - a.totals.endingBalance) as Cents,
+          lifetimeCostReal: (b.totals.endingBalanceReal - a.totals.endingBalanceReal) as Cents,
+          feesCharged: sumOf(a.rows.map((r) => r.feeDrag)),
+          rows,
+          basis: { dollars: 'nominalAndTodaysDollars', tax: 'beforeTaxes', limits: 'notApplicable' },
+          ...a.labels,
+          assumptions: [
+            ...GROWTH_ASSUMPTIONS,
+            'The comparison runs the same plan twice, with the expense ratio and with none; everything else is identical.',
+          ],
+        },
+        warnings: a.warnings,
+      };
+    }),
+  );
 }

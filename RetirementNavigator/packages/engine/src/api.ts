@@ -483,6 +483,13 @@ export type CalculatorId =
   | 'baristaFire'
   | 'fiNumber';
 
+/**
+ * The 15 calculators (docs/financial-model.md §12): thin wrappers that build engine inputs and call
+ * the engine, with no formulas of their own. `CALCULATORS` / `runCalculator` index them by
+ * `CalculatorId`. Implemented in M7a (contract 1.10.0).
+ */
+export * from './calculators/index';
+
 /** Insights by what-if re-run of `projectHousehold` (docs/financial-model.md §13). Implemented in M7b. */
 export { computeInsights } from './insights/insights';
 

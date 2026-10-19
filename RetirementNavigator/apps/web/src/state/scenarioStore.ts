@@ -44,6 +44,15 @@ export interface ScenarioState {
   deleteScenario: (id: string) => Promise<void>;
   /** Delete every scenario whose base is `profileId` (in memory and on disk). */
   removeForProfile: (profileId: string) => Promise<void>;
+  /**
+   * Put already-stored scenario documents in memory (after an import wrote them). With `replace`,
+   * every other scenario is dropped and pending saves are discarded (they belong to replaced data).
+   */
+  load: (docs: readonly ScenarioDoc[], opts: { replace: boolean }) => void;
+  /** Drop every scenario from memory and discard pending saves (after "delete all my data"). */
+  reset: () => void;
+  /** Discard pending saves without writing them (before storage is replaced or cleared). */
+  discardPending: () => void;
   /** Wait for pending saves (tests, before unload). */
   flush: () => Promise<void>;
 }
@@ -179,6 +188,25 @@ export const useScenarioStore = create<ScenarioState>((set, get) => {
       for (const id of ids) cancel(id);
       const repo = repository;
       if (repo) await Promise.all([...ids].map((id) => repo.delete('scenario', id)));
+    },
+
+    load: (docs, opts) => {
+      if (opts.replace) get().discardPending();
+      const loaded = Object.fromEntries(docs.map((d) => [d.id, d]));
+      set((s) =>
+        opts.replace ? { scenarios: loaded, invalidDocuments: 0 } : { scenarios: { ...s.scenarios, ...loaded } },
+      );
+    },
+
+    reset: () => {
+      get().discardPending();
+      set({ scenarios: {}, invalidDocuments: 0 });
+    },
+
+    discardPending: () => {
+      for (const t of timers.values()) clearTimeout(t);
+      timers.clear();
+      pending.clear();
     },
 
     flush: async () => {

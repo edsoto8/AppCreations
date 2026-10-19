@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { Area, AreaChart, CartesianGrid, Tooltip, XAxis, YAxis, type TooltipContentProps } from 'recharts';
-import type { DashboardResult, DollarBasis, Household } from '@rn/engine';
+import { allocationByAssetClass, type DashboardResult, type DollarBasis, type Household } from '@rn/engine';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { formatCents } from '@/lib/format';
@@ -11,6 +11,7 @@ import { DataTableDisclosure } from './DataTableDisclosure';
 import {
   agePrefix,
   allocationByAccountType,
+  allocationByAssetClassView,
   allocationByTaxTreatment,
   basisName,
   formatCompactCents,
@@ -148,6 +149,16 @@ function StackedAllocation({
   );
 }
 
+function assetClassDescription(unallocated: number, total: number): string {
+  const base = 'Each account’s year-end balance split by its target stock/bond/cash allocation, rebalanced every year.';
+  if (unallocated === 0) return base;
+  const who =
+    unallocated === total
+      ? 'No account has an allocation set yet, so every balance is'
+      : `${unallocated} of ${total} accounts have no allocation set; their balances are`;
+  return `${base} ${who} shown as “No allocation set” (set allocations on the Accounts page).`;
+}
+
 export function AllocationCharts({
   dashboard,
   household,
@@ -167,6 +178,12 @@ export function AllocationCharts({
     () => allocationByTaxTreatment(dashboard.baseline, household, basis),
     [dashboard, household, basis],
   );
+  const assetRows = useMemo(() => allocationByAssetClass(household, dashboard.baseline), [household, dashboard]);
+  const byAsset = useMemo(
+    () => allocationByAssetClassView(assetRows, dashboard.baseline, household, basis),
+    [assetRows, dashboard, household, basis],
+  );
+  const unallocated = household.accounts.filter((a) => !a.allocation);
   const unit = basisName(basis);
   return (
     <Card aria-labelledby="allocation-title">
@@ -196,15 +213,14 @@ export function AllocationCharts({
           unit={unit}
           beforeLimits={beforeLimits}
         />
-        <section aria-labelledby="allocation-asset-class" className="flex flex-col gap-1">
-          <h3 id="allocation-asset-class" className="text-sm font-semibold">
-            By asset class
-          </h3>
-          <p className="text-sm text-muted-foreground">
-            Coming in M6, together with Monte Carlo. Stocks, bonds and cash are not projected separately yet, so no
-            figures are shown.
-          </p>
-        </section>
+        <StackedAllocation
+          id="allocation-asset-class"
+          title="By asset class"
+          description={assetClassDescription(unallocated.length, household.accounts.length)}
+          view={byAsset}
+          unit={unit}
+          beforeLimits={beforeLimits}
+        />
       </CardContent>
     </Card>
   );

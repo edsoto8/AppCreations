@@ -24,9 +24,9 @@ describe('AppShell', () => {
   });
 
   it('shows honest placeholders for unbuilt pages, with no figures', () => {
-    renderAt('/monte-carlo');
-    expect(screen.getByRole('heading', { level: 1, name: 'Monte Carlo' })).toBeInTheDocument();
-    expect(screen.getByText('Planned for M6')).toBeInTheDocument();
+    renderAt('/calculators');
+    expect(screen.getByRole('heading', { level: 1, name: 'Calculators' })).toBeInTheDocument();
+    expect(screen.getByText('Planned for M7a')).toBeInTheDocument();
   });
 
   it('renders the dashboard at the root route', () => {
