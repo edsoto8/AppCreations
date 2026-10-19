@@ -1,0 +1,25 @@
+{
+  "measuredOn": {
+    "cpu": "Intel(R) Xeon(R) Processor @ 2.10GHz",
+    "cores": 4,
+    "browser": "headless Chromium (Playwright)"
+  },
+  "profile": "Mid-career couple sample, bundled rules (before taxes)",
+  "target": "10,000 paths < 3 s (laptop), < 10 s (phone)",
+  "note": "Seconds as reported by the page. Throttled runs are emulated, not a real phone; the worker count is the container core count, which a phone may not have.",
+  "results": [
+    {
+      "project": "desktop",
+      "cpuThrottling": "none",
+      "executor": "4 Web Workers (measured)",
+      "firstRunAfterOpeningPage": {
+        "quick": "1.5",
+        "full": "6.0"
+      },
+      "secondRun": {
+        "quick": "1.0",
+        "full": "3.3"
+      }
+    }
+  ]
+}

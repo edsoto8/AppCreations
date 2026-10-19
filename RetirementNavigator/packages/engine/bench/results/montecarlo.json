@@ -10,21 +10,21 @@
     {
       "rules": "bundled (unverified; before taxes)",
       "years": 60,
-      "quickRun1000Ms": 1270,
-      "full10000Ms": 8658,
-      "summarizeMs": 140,
-      "msPerPath": 0.866,
-      "projectedWallMs4Workers": 2305,
+      "quickRun1000Ms": 1281,
+      "full10000Ms": 8214,
+      "summarizeMs": 143,
+      "msPerPath": 0.821,
+      "projectedWallMs4Workers": 2196,
       "successRate": 0.3541
     },
     {
       "rules": "synthetic fixture (verified path; taxes and gross-up)",
       "years": 60,
-      "quickRun1000Ms": 1352,
-      "full10000Ms": 13160,
-      "summarizeMs": 124,
-      "msPerPath": 1.316,
-      "projectedWallMs4Workers": 3415,
+      "quickRun1000Ms": 1299,
+      "full10000Ms": 12559,
+      "summarizeMs": 119,
+      "msPerPath": 1.256,
+      "projectedWallMs4Workers": 3258,
       "successRate": 0.2605
     }
   ]

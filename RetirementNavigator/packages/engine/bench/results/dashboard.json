@@ -13,144 +13,144 @@
       "rules": "bundled (unverified)",
       "granularity": "annual",
       "years": 70,
-      "medianMs": 14.57499699999994,
-      "p95Ms": 19.312278000000106,
-      "maxMs": 21.26147500000002
+      "medianMs": 5.781925999999885,
+      "p95Ms": 11.624307000000044,
+      "maxMs": 14.56200100000001
     },
     {
       "profile": "earlyCareer",
       "rules": "bundled (unverified)",
       "granularity": "monthly",
       "years": 70,
-      "medianMs": 11.301672000000053,
-      "p95Ms": 16.812122000000272,
-      "maxMs": 23.95054200000004
+      "medianMs": 3.7090229999998883,
+      "p95Ms": 10.906476999999995,
+      "maxMs": 16.433160000000044
     },
     {
       "profile": "earlyCareer",
       "rules": "synthetic fixture (verified path)",
       "granularity": "annual",
       "years": 70,
-      "medianMs": 12.733492000000297,
-      "p95Ms": 18.761513999999806,
-      "maxMs": 29.533956000000217
+      "medianMs": 4.334613999999874,
+      "p95Ms": 7.528094000000237,
+      "maxMs": 10.852927000000363
     },
     {
       "profile": "earlyCareer",
       "rules": "synthetic fixture (verified path)",
       "granularity": "monthly",
       "years": 70,
-      "medianMs": 11.429215000000113,
-      "p95Ms": 18.696767999999793,
-      "maxMs": 21.906119999999646
+      "medianMs": 3.6476079999997637,
+      "p95Ms": 5.52610199999981,
+      "maxMs": 6.332892000000356
     },
     {
       "profile": "midCareerCouple",
       "rules": "bundled (unverified)",
       "granularity": "annual",
       "years": 57,
-      "medianMs": 10.891023000000132,
-      "p95Ms": 15.845054999999775,
-      "maxMs": 28.86867699999857
+      "medianMs": 7.688005999999405,
+      "p95Ms": 12.313718000000335,
+      "maxMs": 16.384121999999934
     },
     {
       "profile": "midCareerCouple",
       "rules": "bundled (unverified)",
       "granularity": "monthly",
       "years": 57,
-      "medianMs": 13.343121999998402,
-      "p95Ms": 19.891410000000178,
-      "maxMs": 52.122935999999754
+      "medianMs": 4.651170999999522,
+      "p95Ms": 7.358124000000316,
+      "maxMs": 11.119509000000107
     },
     {
       "profile": "midCareerCouple",
       "rules": "synthetic fixture (verified path)",
       "granularity": "annual",
       "years": 57,
-      "medianMs": 37.84297200000037,
-      "p95Ms": 66.55464099999881,
-      "maxMs": 71.0194330000013
+      "medianMs": 5.547787999999855,
+      "p95Ms": 9.40791100000024,
+      "maxMs": 10.973923000000468
     },
     {
       "profile": "midCareerCouple",
       "rules": "synthetic fixture (verified path)",
       "granularity": "monthly",
       "years": 57,
-      "medianMs": 36.80348099999901,
-      "p95Ms": 55.989940000003116,
-      "maxMs": 63.678138999999646
+      "medianMs": 5.693793999999798,
+      "p95Ms": 8.41113199999927,
+      "maxMs": 9.11709299999984
     },
     {
       "profile": "nearRetirement",
       "rules": "bundled (unverified)",
       "granularity": "annual",
       "years": 35,
-      "medianMs": 6.433539999998175,
-      "p95Ms": 10.261967999998888,
-      "maxMs": 12.993466999996599
+      "medianMs": 2.2051910000000134,
+      "p95Ms": 3.5946169999997437,
+      "maxMs": 4.770626000000448
     },
     {
       "profile": "nearRetirement",
       "rules": "bundled (unverified)",
       "granularity": "monthly",
       "years": 35,
-      "medianMs": 6.0643419999978505,
-      "p95Ms": 8.381747999999789,
-      "maxMs": 9.483774000000267
+      "medianMs": 2.2919360000005327,
+      "p95Ms": 3.671624999999949,
+      "maxMs": 4.458725999999842
     },
     {
       "profile": "nearRetirement",
       "rules": "synthetic fixture (verified path)",
       "granularity": "annual",
       "years": 35,
-      "medianMs": 7.75746799999979,
-      "p95Ms": 11.944921999998769,
-      "maxMs": 20.102043999999296
+      "medianMs": 2.4804749999993874,
+      "p95Ms": 6.782020999999986,
+      "maxMs": 7.131593000000066
     },
     {
       "profile": "nearRetirement",
       "rules": "synthetic fixture (verified path)",
       "granularity": "monthly",
       "years": 35,
-      "medianMs": 9.677772999999434,
-      "p95Ms": 11.174623999999312,
-      "maxMs": 15.559497000002011
+      "medianMs": 2.5398140000006606,
+      "p95Ms": 4.775692999999592,
+      "maxMs": 5.489499000000251
     },
     {
       "profile": "highEarner",
       "rules": "bundled (unverified)",
       "granularity": "annual",
       "years": 51,
-      "medianMs": 7.158207000000402,
-      "p95Ms": 11.631688000001304,
-      "maxMs": 15.643131000000722
+      "medianMs": 3.237021000000823,
+      "p95Ms": 5.3279919999986305,
+      "maxMs": 7.765056999998706
     },
     {
       "profile": "highEarner",
       "rules": "bundled (unverified)",
       "granularity": "monthly",
       "years": 51,
-      "medianMs": 7.794812000000093,
-      "p95Ms": 13.49902700000166,
-      "maxMs": 26.253709000000526
+      "medianMs": 2.935639999999694,
+      "p95Ms": 3.707829999999376,
+      "maxMs": 4.072051000001011
     },
     {
       "profile": "highEarner",
       "rules": "synthetic fixture (verified path)",
       "granularity": "annual",
       "years": 51,
-      "medianMs": 15.968855999999505,
-      "p95Ms": 21.580587000000378,
-      "maxMs": 24.760701999999583
+      "medianMs": 4.732347999999547,
+      "p95Ms": 6.467824999999721,
+      "maxMs": 10.704804999999396
     },
     {
       "profile": "highEarner",
       "rules": "synthetic fixture (verified path)",
       "granularity": "monthly",
       "years": 51,
-      "medianMs": 13.900368000002345,
-      "p95Ms": 21.302608000001783,
-      "maxMs": 22.75774100000126
+      "medianMs": 3.8146560000004683,
+      "p95Ms": 5.858100999999806,
+      "maxMs": 6.212234999999055
     }
   ]
 }

@@ -30,14 +30,19 @@ async function runOnce(page: Page): Promise<{ quick: string; full: string }> {
 test('@perf Monte Carlo 10,000 paths × planning horizon', async ({ page }, testInfo) => {
   test.setTimeout(600_000);
   const throttled = testInfo.project.name === 'mobile';
-  await onboardWithSample(page, 1);
   if (throttled) {
     // No Worker: the runner falls back to the in-process executor on the (throttled) main thread.
+    // Installed before any page loads (hash navigation never reloads the document).
     await page.addInitScript(() => Object.defineProperty(window, 'Worker', { value: undefined }));
+  }
+  await onboardWithSample(page, 1);
+  await page.goto(appUrl('/monte-carlo'));
+  await page.reload();
+  if (throttled) {
     const cdp = await page.context().newCDPSession(page);
     await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
+    expect(await page.evaluate(() => typeof Worker)).toBe('undefined');
   }
-  await page.goto(appUrl('/monte-carlo'));
   const workers = await page.evaluate(() => Math.min(4, navigator.hardwareConcurrency || 2));
   const first = await runOnce(page);
   await page.getByLabel('Seed', { exact: true }).fill('7');
