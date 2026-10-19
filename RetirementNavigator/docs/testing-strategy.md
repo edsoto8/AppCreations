@@ -1,4 +1,4 @@
-# Testing Strategy (Phase 0 draft)
+# Testing Strategy
 
 ## Layers
 | Layer | Tool | Scope |
@@ -72,10 +72,36 @@ year used for the golden tests.
 ## Coverage
 Engine ≥ 90% of lines and branches, enforced by the Vitest coverage thresholds in `pnpm verify`.
 
+## Monte Carlo (M6)
+- Seed determinism, chunking independence and the quick-run prefix (`montecarlo/run.test.ts`); the
+  web runner's quick-run reuse and pool splits equal direct engine summaries (`runner.test.ts`).
+- Zero volatility equals the deterministic baseline (fixed and stochastic inflation); each cached
+  path equals an uncached projection of independently rebuilt draws bit for bit (all samples, both
+  rule sets); PSD rejection; summary percentiles, histogram and merging (`summary.test.ts`).
+
+## Calculators and insights (M7)
+- Each calculator: closed forms computed in the test, or parity with a direct engine call; the UI's
+  figures equal the engine's (`parity.test.tsx`); `noDuplicatedFormulas.test.ts` guards calculator
+  sources.
+- Insights: a spy confirms a re-run per insight, and re-applying each insight's ops reproduces its
+  figure; the claiming and match insights are checked against the engine readout.
+- IO: CSV injection, JSON round trip, malformed files, id consistency, a fixture per schema version.
+
 ## Independent validation (M8)
 A fresh-context `qa-engineer` sub-agent reads only `docs/financial-model.md` and the tests (not the
-engine source), recomputes the cases independently, and files `docs/validation-report.md`.
+engine source), recomputes the cases independently through the public API, and files
+`docs/validation-report.md`.
+
+## End-to-end (Playwright, production build under the CSP)
+`shell` (CSP, every section without outbound requests, console errors or axe violations, theme,
+keyboard, titles, phone width), `m2` (onboarding, income and match, profile), `m3` (dashboard and
+forecast settings), `m4` (retirement income), `m5` (scenarios and the optimizer), `m6` (Monte Carlo in
+real workers), `m7a` (calculators, Roth-vs-traditional link), `m7b` (export → delete all → import,
+CSV, malformed import, insights, print), `m8` (account management). Each runs on desktop and a phone
+viewport with axe in both themes. `@screens` (screenshots) and `@perf` (browser benchmark) are
+separate scripts.
 
 ## `pnpm verify`
-typecheck → lint → test (with coverage) → build → preview smoke (Playwright) — all green before any
-milestone tag.
+typecheck → lint → format check → unit tests with coverage (engine, web) → Python reference check →
+build → E2E — all green before any milestone tag. `pnpm bench` and `pnpm --filter @rn/web
+bench:browser` record performance.

@@ -1,4 +1,4 @@
-# Architecture (Phase 0 draft)
+# Architecture
 
 ## Layout
 ```
@@ -35,16 +35,28 @@ RetirementNavigator/
 2. The store is persisted to IndexedDB (debounced ~150 ms).
 3. A derived selector builds the projection input and calls `computeDashboard(household, { currentYear, rules })`
    (the baseline `projectHousehold` plus the optimistic and pessimistic reruns).
-   - Measured in M3 (`pnpm bench`, 4-core Xeon 2.1 GHz): median 5–31 ms, p95 ≤ 47 ms per full
-     dashboard recalculation for the sample profiles.
-   - That is under the 100 ms target, so it runs on the main thread inside `useMemo`, with
-     `useDeferredValue` to keep typing responsive.
-   - `forecast.worker.ts` is deferred until a profile measures slower; it is re-checked in the M8
-     performance pass, including emulated phone throttling.
+   - Measured (`pnpm bench`, 4-core Xeon 2.1 GHz, after the M6 optimizations): median 2–8 ms, p95
+     ≤ 13 ms per full dashboard recalculation for the sample profiles (annual and monthly, both rule
+     sets).
+   - That is far under the 100 ms target (≈ 50 ms even at 4× phone throttling), so it runs on the
+     main thread inside `useMemo`, with `useDeferredValue` to keep typing responsive; no forecast
+     worker is needed.
 4. View models convert between today's and nominal dollars (`real = nominal / deflator`) for cards,
    charts, tables and exports.
-5. Monte Carlo always runs in `montecarlo.worker.ts`. The worker runs a quick 1,000-path chunk, then
-   refines in chunks to the selected count. It posts progress messages and supports a cancel token.
+5. Monte Carlo always runs in `montecarlo.worker.ts` (a module worker, its own same-origin asset).
+   - `features/monte-carlo/runner.ts` keeps a pool of min(4, `hardwareConcurrency`) workers, spawned
+     and warmed when the page opens, and splits each path range contiguously across them. The quick
+     run (paths 0–999) is summarized first and its chunks are reused by the full run.
+   - Protocol: `run` → `progress` per 100-path sub-chunk → one `chunk` (typed-array buffers
+     transferred) or `error`; `optimize` → `optimizeProgress` per age → `optimized`. Replies carry a
+     `runId`; stale ones are ignored. Cancel terminates the workers (fresh ones are spawned next time).
+     A worker that fails to load fails its range with a clear message.
+   - Each worker prepares a run once (`prepareMonteCarlo`) and runs sub-chunks with
+     `runPreparedChunk`; paths share return-independent work through the projection cache.
+   - Without `Worker` (tests, or a browser without workers) an in-process executor runs the same calls.
+6. **Code splitting:** every page except the dashboard and onboarding is a lazy route chunk behind a
+   loading status (entry bundle 317 kB instead of 1.58 MB). Zod and the app's jitless switch are one
+   chunk, so the switch runs before any schema use (the CSP forbids Zod's JIT probe).
 
 ## State shape
 - `profiles: Record<id, ProfileDoc>`, `activeProfileId`.
