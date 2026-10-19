@@ -110,7 +110,7 @@ function workplaceYear(
       (plan.traditionalPctOfBonus > 0 || plan.rothPctOfBonus > 0)
     ) {
       warnings.push({
-        code: 'deferralCapped',
+        code: 'bonusDeferralIgnored',
         year: comp.year,
         personId: person.id,
         message:

@@ -26,6 +26,29 @@ against the real `RULES` assert the `unverified` path. A few web tests
 after-limit figures. Once values are verified, the IRS worked
 examples (Pub 590-A phase-out, Pub 915) are added against the real data.
 
+## Projection validation (M3)
+- **Golden fixtures:** `packages/engine/reference/ref.py` is an independent Python 3 (stdlib)
+  reference, written from this document by a QA pass that did not read the engine source.
+  - 16 fixtures in `reference/fixtures/` cover zero/high/negative inflation, negative returns and
+    shocks, couples with first death, already-retired and retire-at-planning-age households,
+    depletion, zero balances, bonus edge cases, raise overrides, tiered match with escalation and a
+    cap, cliff and graded vesting, all five withdrawal strategies, monthly and start-of-year timing,
+    fees and drag.
+  - `src/projection/golden.test.ts` compares every figure within 1 cent; the engine currently matches
+    every figure exactly.
+  - `pnpm reference` (`ref.py --check`, part of `pnpm verify`) recomputes the fixtures and fails on
+    any change.
+- **Closed forms:** zero return (exact), FV of mid-year contributions, level and growing annuities,
+  annuity due, and monthly annuity tables (`project.test.ts`, `golden.test.ts`).
+- **Properties** (`projection.property.test.ts`, fixed seeds):
+  - reconciliation and carry-forward, 10,000 runs;
+  - no negative figures through depletion;
+  - start-of-year ≤ mid-year when every net rate ρ ≥ 0;
+  - more contributions never lower the balance at retirement;
+  - optimistic ≥ baseline ≥ pessimistic when nothing depletes.
+- **Benchmark:** `pnpm bench` times `computeDashboard` per sample profile and writes
+  `packages/engine/bench/results/dashboard.json` with the hardware.
+
 ## Rules in tests
 Tests read limits from the rules files, never from literals. The one exception is a pinned fixture
 year used for the golden tests.

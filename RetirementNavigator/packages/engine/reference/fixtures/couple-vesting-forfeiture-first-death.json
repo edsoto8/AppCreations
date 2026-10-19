@@ -1,0 +1,4137 @@
+{
+  "name": "couple-vesting-forfeiture-first-death",
+  "description": "MFJ couple (60 and 55) retiring in different years: cliff vesting forfeits all unvested money, graded vesting forfeits 20% into a Roth match destination; bonus counts for deferrals but not match; part-time and other income; traditionalFirst withdrawals; first death in the horizon.",
+  "currentYear": 2026,
+  "household": {
+    "id": "household-1",
+    "name": "Fixture",
+    "filingStatus": "marriedFilingJointly",
+    "people": [
+      {
+        "id": "person-1",
+        "name": "Person 1",
+        "birthYear": 1966,
+        "retirementAge": 62,
+        "planningAge": 70,
+        "socialSecurity": {
+          "source": {
+            "kind": "none"
+          },
+          "claimAge": {
+            "years": 67,
+            "months": 0
+          }
+        },
+        "employment": {
+          "baseSalary": 12000000,
+          "raise": {
+            "mode": "nominal",
+            "rate": 0.03
+          },
+          "partTime": {
+            "startAge": 62,
+            "endAge": 65,
+            "annualIncome": 2000000
+          }
+        },
+        "workplacePlans": [
+          {
+            "id": "plan-a",
+            "planType": "401k",
+            "traditionalAccountId": "a401",
+            "traditionalPctOfSalary": 0.04,
+            "match": {
+              "tiers": [
+                {
+                  "matchRate": 1,
+                  "bandPctOfPay": 0.03
+                },
+                {
+                  "matchRate": 0.5,
+                  "bandPctOfPay": 0.02
+                }
+              ],
+              "vesting": {
+                "kind": "cliff",
+                "years": 3
+              },
+              "yearsOfServiceAtStart": 0
+            }
+          }
+        ]
+      },
+      {
+        "id": "person-2",
+        "name": "Person 2",
+        "birthYear": 1971,
+        "retirementAge": 60,
+        "planningAge": 85,
+        "socialSecurity": {
+          "source": {
+            "kind": "none"
+          },
+          "claimAge": {
+            "years": 67,
+            "months": 0
+          }
+        },
+        "employment": {
+          "baseSalary": 8000000,
+          "bonus": {
+            "kind": "percentOfSalary",
+            "pct": 0.1
+          },
+          "bonusCountsForDeferrals": true,
+          "bonusCountsForMatch": false,
+          "raise": {
+            "mode": "inflationPlus",
+            "realRate": 0.005
+          }
+        },
+        "workplacePlans": [
+          {
+            "id": "plan-b",
+            "planType": "403b",
+            "traditionalAccountId": "b403",
+            "rothAccountId": "b403roth",
+            "planOffersRoth": true,
+            "traditionalPctOfSalary": 0.03,
+            "traditionalPctOfBonus": 0.1,
+            "matchDestination": "roth",
+            "match": {
+              "tiers": [
+                {
+                  "matchRate": 1,
+                  "bandPctOfPay": 0.03
+                },
+                {
+                  "matchRate": 0.5,
+                  "bandPctOfPay": 0.02
+                }
+              ],
+              "vesting": {
+                "kind": "graded",
+                "vestedByYear": [0, 0.2, 0.4, 0.6, 0.8, 1]
+              },
+              "yearsOfServiceAtStart": 0
+            }
+          }
+        ]
+      }
+    ],
+    "accounts": [
+      {
+        "type": "workplaceTraditional",
+        "id": "a401",
+        "name": "A401",
+        "ownerId": "person-1",
+        "balance": 20000000,
+        "planType": "401k",
+        "unvestedEmployerBalance": 150000
+      },
+      {
+        "type": "workplaceTraditional",
+        "id": "b403",
+        "name": "B403",
+        "ownerId": "person-2",
+        "balance": 10000000,
+        "planType": "403b"
+      },
+      {
+        "type": "workplaceRoth",
+        "id": "b403roth",
+        "name": "B403ROTH",
+        "ownerId": "person-2",
+        "balance": 1000000,
+        "planType": "403b",
+        "unvestedEmployerBalance": 50000
+      },
+      {
+        "type": "taxableBrokerage",
+        "id": "taxable",
+        "name": "TAXABLE",
+        "ownerId": "person-1",
+        "balance": 15000000,
+        "costBasis": 10000000,
+        "expectedReturn": 0.05
+      },
+      {
+        "type": "cash",
+        "id": "cash",
+        "name": "CASH",
+        "ownerId": "person-2",
+        "balance": 2000000,
+        "expectedReturn": 0.01
+      }
+    ],
+    "spending": {
+      "currentAnnualSpending": 9000000,
+      "retirementAnnualSpending": 7000000
+    },
+    "assumptions": {
+      "inflation": 0.025,
+      "returnPreRetirement": 0.05,
+      "returnPostRetirement": 0.04,
+      "capitalMarket": {
+        "stocks": {
+          "geometricReturn": 0.07,
+          "volatility": 0.16
+        },
+        "bonds": {
+          "geometricReturn": 0.045,
+          "volatility": 0.06
+        },
+        "cash": {
+          "geometricReturn": 0.03,
+          "volatility": 0.01
+        },
+        "correlation": [
+          [1, 0.1, 0],
+          [0.1, 1, 0.2],
+          [0, 0.2, 1]
+        ],
+        "blendedVolatility": 0.12,
+        "note": "Illustrative round-number assumptions chosen by the app authors; not a forecast."
+      },
+      "rules": {
+        "anchorYear": 2026
+      },
+      "withdrawalStrategy": "traditionalFirst"
+    },
+    "otherIncome": [
+      {
+        "id": "rental",
+        "name": "Rental",
+        "startYear": 2031,
+        "endYear": 2040,
+        "annualAmount": 1200000,
+        "growth": {
+          "mode": "inflation"
+        }
+      }
+    ]
+  },
+  "expected": {
+    "rows": [
+      {
+        "year": 2026,
+        "phase": "accumulation",
+        "deflator": 1.0,
+        "people": [
+          {
+            "personId": "person-1",
+            "age": 60,
+            "alive": true,
+            "retired": false,
+            "baseSalary": 12000000,
+            "bonus": 0,
+            "partTimeIncome": 0,
+            "eligibleCompForDeferrals": 12000000,
+            "eligibleCompForMatch": 12000000,
+            "employeeTraditional": 480000,
+            "employeeRoth": 0,
+            "employerMatch": 420000,
+            "employerFlat": 0
+          },
+          {
+            "personId": "person-2",
+            "age": 55,
+            "alive": true,
+            "retired": false,
+            "baseSalary": 8000000,
+            "bonus": 800000,
+            "partTimeIncome": 0,
+            "eligibleCompForDeferrals": 8800000,
+            "eligibleCompForMatch": 8000000,
+            "employeeTraditional": 320000,
+            "employeeRoth": 0,
+            "employerMatch": 280000,
+            "employerFlat": 0
+          }
+        ],
+        "accounts": [
+          {
+            "accountId": "a401",
+            "start": 20000000,
+            "contributions": 900000,
+            "employerContributions": 420000,
+            "feeDrag": 0,
+            "growthNet": 1022226,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 21922226,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "b403",
+            "start": 10000000,
+            "contributions": 320000,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 507902,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 10827902,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "b403roth",
+            "start": 1000000,
+            "contributions": 280000,
+            "employerContributions": 280000,
+            "feeDrag": 0,
+            "growthNet": 56915,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 1336915,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "taxable",
+            "start": 15000000,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 750000,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 15750000,
+            "basisEnd": 10000000
+          },
+          {
+            "accountId": "cash",
+            "start": 2000000,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 20000,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 2020000,
+            "basisEnd": 0
+          }
+        ],
+        "flows": {
+          "contributions": 1500000,
+          "employerContributions": 700000,
+          "feeDrag": 0,
+          "withdrawals": 0,
+          "forfeited": 0,
+          "spendingNeed": 9000000,
+          "spendingFunded": 9000000,
+          "shortfall": 0
+        },
+        "totals": {
+          "portfolioStart": 48000000,
+          "portfolioEnd": 51857043,
+          "byTaxTreatment": {
+            "taxDeferred": 32750128,
+            "taxFree": 1336915,
+            "taxable": 17770000
+          }
+        },
+        "real": {
+          "portfolioEnd": 51857043,
+          "spendingNeed": 9000000,
+          "grossIncome": 20800000
+        },
+        "grossIncome": 20800000,
+        "depleted": false,
+        "markers": []
+      },
+      {
+        "year": 2027,
+        "phase": "accumulation",
+        "deflator": 1.025,
+        "people": [
+          {
+            "personId": "person-1",
+            "age": 61,
+            "alive": true,
+            "retired": false,
+            "baseSalary": 12360000,
+            "bonus": 0,
+            "partTimeIncome": 0,
+            "eligibleCompForDeferrals": 12360000,
+            "eligibleCompForMatch": 12360000,
+            "employeeTraditional": 494400,
+            "employeeRoth": 0,
+            "employerMatch": 432600,
+            "employerFlat": 0
+          },
+          {
+            "personId": "person-2",
+            "age": 56,
+            "alive": true,
+            "retired": false,
+            "baseSalary": 8241000,
+            "bonus": 824100,
+            "partTimeIncome": 0,
+            "eligibleCompForDeferrals": 9065100,
+            "eligibleCompForMatch": 8241000,
+            "employeeTraditional": 329640,
+            "employeeRoth": 0,
+            "employerMatch": 288435,
+            "employerFlat": 0
+          }
+        ],
+        "accounts": [
+          {
+            "accountId": "a401",
+            "start": 21922226,
+            "contributions": 927000,
+            "employerContributions": 432600,
+            "feeDrag": 0,
+            "growthNet": 1119003,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 23968229,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "b403",
+            "start": 10827902,
+            "contributions": 329640,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 549536,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 11707078,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "b403roth",
+            "start": 1336915,
+            "contributions": 288435,
+            "employerContributions": 288435,
+            "feeDrag": 0,
+            "growthNet": 73968,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 1699318,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "taxable",
+            "start": 15750000,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 787500,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 16537500,
+            "basisEnd": 10000000
+          },
+          {
+            "accountId": "cash",
+            "start": 2020000,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 20200,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 2040200,
+            "basisEnd": 0
+          }
+        ],
+        "flows": {
+          "contributions": 1545075,
+          "employerContributions": 721035,
+          "feeDrag": 0,
+          "withdrawals": 0,
+          "forfeited": 0,
+          "spendingNeed": 9225000,
+          "spendingFunded": 9225000,
+          "shortfall": 0
+        },
+        "totals": {
+          "portfolioStart": 51857043,
+          "portfolioEnd": 55952325,
+          "byTaxTreatment": {
+            "taxDeferred": 35675307,
+            "taxFree": 1699318,
+            "taxable": 18577700
+          }
+        },
+        "real": {
+          "portfolioEnd": 54587635,
+          "spendingNeed": 9000000,
+          "grossIncome": 20902537
+        },
+        "grossIncome": 21425100,
+        "depleted": false,
+        "markers": []
+      },
+      {
+        "year": 2028,
+        "phase": "accumulation",
+        "deflator": 1.050625,
+        "people": [
+          {
+            "personId": "person-1",
+            "age": 62,
+            "alive": true,
+            "retired": true,
+            "baseSalary": 0,
+            "bonus": 0,
+            "partTimeIncome": 2101250,
+            "eligibleCompForDeferrals": 0,
+            "eligibleCompForMatch": 0,
+            "employeeTraditional": 0,
+            "employeeRoth": 0,
+            "employerMatch": 0,
+            "employerFlat": 0
+          },
+          {
+            "personId": "person-2",
+            "age": 57,
+            "alive": true,
+            "retired": false,
+            "baseSalary": 8489260,
+            "bonus": 848926,
+            "partTimeIncome": 0,
+            "eligibleCompForDeferrals": 9338186,
+            "eligibleCompForMatch": 8489260,
+            "employeeTraditional": 339570,
+            "employeeRoth": 0,
+            "employerMatch": 297124,
+            "employerFlat": 0
+          }
+        ],
+        "accounts": [
+          {
+            "accountId": "a401",
+            "start": 23968229,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 1145385,
+            "withdrawals": 1060549,
+            "forfeited": 1060549,
+            "end": 24053065,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "b403",
+            "start": 11707078,
+            "contributions": 339570,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 593740,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 12640388,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "b403roth",
+            "start": 1699318,
+            "contributions": 297124,
+            "employerContributions": 297124,
+            "feeDrag": 0,
+            "growthNet": 92304,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 2088746,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "taxable",
+            "start": 16537500,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 826875,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 17364375,
+            "basisEnd": 10000000
+          },
+          {
+            "accountId": "cash",
+            "start": 2040200,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 20402,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 2060602,
+            "basisEnd": 0
+          }
+        ],
+        "flows": {
+          "contributions": 636694,
+          "employerContributions": 297124,
+          "feeDrag": 0,
+          "withdrawals": 0,
+          "forfeited": 1060549,
+          "spendingNeed": 9455625,
+          "spendingFunded": 9455625,
+          "shortfall": 0
+        },
+        "totals": {
+          "portfolioStart": 55952325,
+          "portfolioEnd": 58207176,
+          "byTaxTreatment": {
+            "taxDeferred": 36693453,
+            "taxFree": 2088746,
+            "taxable": 19424977
+          }
+        },
+        "real": {
+          "portfolioEnd": 55402427,
+          "spendingNeed": 9000000,
+          "grossIncome": 10888220
+        },
+        "grossIncome": 11439436,
+        "depleted": false,
+        "markers": []
+      },
+      {
+        "year": 2029,
+        "phase": "accumulation",
+        "deflator": 1.0768906249999999,
+        "people": [
+          {
+            "personId": "person-1",
+            "age": 63,
+            "alive": true,
+            "retired": true,
+            "baseSalary": 0,
+            "bonus": 0,
+            "partTimeIncome": 2153781,
+            "eligibleCompForDeferrals": 0,
+            "eligibleCompForMatch": 0,
+            "employeeTraditional": 0,
+            "employeeRoth": 0,
+            "employerMatch": 0,
+            "employerFlat": 0
+          },
+          {
+            "personId": "person-2",
+            "age": 58,
+            "alive": true,
+            "retired": false,
+            "baseSalary": 8744999,
+            "bonus": 874500,
+            "partTimeIncome": 0,
+            "eligibleCompForDeferrals": 9619499,
+            "eligibleCompForMatch": 8744999,
+            "employeeTraditional": 349800,
+            "employeeRoth": 0,
+            "employerMatch": 306075,
+            "employerFlat": 0
+          }
+        ],
+        "accounts": [
+          {
+            "accountId": "a401",
+            "start": 24053065,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 1202653,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 25255718,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "b403",
+            "start": 12640388,
+            "contributions": 349800,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 640657,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 13630845,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "b403roth",
+            "start": 2088746,
+            "contributions": 306075,
+            "employerContributions": 306075,
+            "feeDrag": 0,
+            "growthNet": 111996,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 2506817,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "taxable",
+            "start": 17364375,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 868219,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 18232594,
+            "basisEnd": 10000000
+          },
+          {
+            "accountId": "cash",
+            "start": 2060602,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 20606,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 2081208,
+            "basisEnd": 0
+          }
+        ],
+        "flows": {
+          "contributions": 655875,
+          "employerContributions": 306075,
+          "feeDrag": 0,
+          "withdrawals": 0,
+          "forfeited": 0,
+          "spendingNeed": 9692016,
+          "spendingFunded": 9692016,
+          "shortfall": 0
+        },
+        "totals": {
+          "portfolioStart": 58207176,
+          "portfolioEnd": 61707182,
+          "byTaxTreatment": {
+            "taxDeferred": 38886563,
+            "taxFree": 2506817,
+            "taxable": 20313802
+          }
+        },
+        "real": {
+          "portfolioEnd": 57301252,
+          "spendingNeed": 9000000,
+          "grossIncome": 10932661
+        },
+        "grossIncome": 11773280,
+        "depleted": false,
+        "markers": []
+      },
+      {
+        "year": 2030,
+        "phase": "accumulation",
+        "deflator": 1.1038128906249998,
+        "people": [
+          {
+            "personId": "person-1",
+            "age": 64,
+            "alive": true,
+            "retired": true,
+            "baseSalary": 0,
+            "bonus": 0,
+            "partTimeIncome": 2207626,
+            "eligibleCompForDeferrals": 0,
+            "eligibleCompForMatch": 0,
+            "employeeTraditional": 0,
+            "employeeRoth": 0,
+            "employerMatch": 0,
+            "employerFlat": 0
+          },
+          {
+            "personId": "person-2",
+            "age": 59,
+            "alive": true,
+            "retired": false,
+            "baseSalary": 9008442,
+            "bonus": 900844,
+            "partTimeIncome": 0,
+            "eligibleCompForDeferrals": 9909286,
+            "eligibleCompForMatch": 9008442,
+            "employeeTraditional": 360338,
+            "employeeRoth": 0,
+            "employerMatch": 315296,
+            "employerFlat": 0
+          }
+        ],
+        "accounts": [
+          {
+            "accountId": "a401",
+            "start": 25255718,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 1262786,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 26518504,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "b403",
+            "start": 13630845,
+            "contributions": 360338,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 690441,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 14681624,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "b403roth",
+            "start": 2506817,
+            "contributions": 315296,
+            "employerContributions": 315296,
+            "feeDrag": 0,
+            "growthNet": 133127,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 2955240,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "taxable",
+            "start": 18232594,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 911629,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 19144223,
+            "basisEnd": 10000000
+          },
+          {
+            "accountId": "cash",
+            "start": 2081208,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 20812,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 2102020,
+            "basisEnd": 0
+          }
+        ],
+        "flows": {
+          "contributions": 675634,
+          "employerContributions": 315296,
+          "feeDrag": 0,
+          "withdrawals": 0,
+          "forfeited": 0,
+          "spendingNeed": 9934316,
+          "spendingFunded": 9934316,
+          "shortfall": 0
+        },
+        "totals": {
+          "portfolioStart": 61707182,
+          "portfolioEnd": 65401611,
+          "byTaxTreatment": {
+            "taxDeferred": 41200128,
+            "taxFree": 2955240,
+            "taxable": 21246243
+          }
+        },
+        "real": {
+          "portfolioEnd": 59250632,
+          "spendingNeed": 9000000,
+          "grossIncome": 10977324
+        },
+        "grossIncome": 12116912,
+        "depleted": false,
+        "markers": []
+      },
+      {
+        "year": 2031,
+        "phase": "retirement",
+        "deflator": 1.1314082128906247,
+        "people": [
+          {
+            "personId": "person-1",
+            "age": 65,
+            "alive": true,
+            "retired": true,
+            "baseSalary": 0,
+            "bonus": 0,
+            "partTimeIncome": 0,
+            "eligibleCompForDeferrals": 0,
+            "eligibleCompForMatch": 0,
+            "employeeTraditional": 0,
+            "employeeRoth": 0,
+            "employerMatch": 0,
+            "employerFlat": 0
+          },
+          {
+            "personId": "person-2",
+            "age": 60,
+            "alive": true,
+            "retired": true,
+            "baseSalary": 0,
+            "bonus": 0,
+            "partTimeIncome": 0,
+            "eligibleCompForDeferrals": 0,
+            "eligibleCompForMatch": 0,
+            "employeeTraditional": 0,
+            "employeeRoth": 0,
+            "employerMatch": 0,
+            "employerFlat": 0
+          }
+        ],
+        "accounts": [
+          {
+            "accountId": "a401",
+            "start": 26518504,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 977093,
+            "withdrawals": 4223746,
+            "forfeited": 0,
+            "end": 23271851,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "b403",
+            "start": 14681624,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 540955,
+            "withdrawals": 2338422,
+            "forfeited": 0,
+            "end": 12884157,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "b403roth",
+            "start": 2955240,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 104267,
+            "withdrawals": 348554,
+            "forfeited": 348554,
+            "end": 2710953,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "taxable",
+            "start": 19144223,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 957212,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 20101435,
+            "basisEnd": 10000000
+          },
+          {
+            "accountId": "cash",
+            "start": 2102020,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 21020,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 2123040,
+            "basisEnd": 0
+          }
+        ],
+        "flows": {
+          "contributions": 0,
+          "employerContributions": 0,
+          "feeDrag": 0,
+          "withdrawals": 6562168,
+          "forfeited": 348554,
+          "spendingNeed": 7919857,
+          "spendingFunded": 7919857,
+          "shortfall": 0
+        },
+        "totals": {
+          "portfolioStart": 65401611,
+          "portfolioEnd": 61091436,
+          "byTaxTreatment": {
+            "taxDeferred": 36156008,
+            "taxFree": 2710953,
+            "taxable": 22224475
+          }
+        },
+        "real": {
+          "portfolioEnd": 53995928,
+          "spendingNeed": 7000000,
+          "grossIncome": 7000000
+        },
+        "grossIncome": 7919857,
+        "depleted": false,
+        "markers": ["retirement"]
+      },
+      {
+        "year": 2032,
+        "phase": "retirement",
+        "deflator": 1.1596934182128902,
+        "people": [
+          {
+            "personId": "person-1",
+            "age": 66,
+            "alive": true,
+            "retired": true,
+            "baseSalary": 0,
+            "bonus": 0,
+            "partTimeIncome": 0,
+            "eligibleCompForDeferrals": 0,
+            "eligibleCompForMatch": 0,
+            "employeeTraditional": 0,
+            "employeeRoth": 0,
+            "employerMatch": 0,
+            "employerFlat": 0
+          },
+          {
+            "personId": "person-2",
+            "age": 61,
+            "alive": true,
+            "retired": true,
+            "baseSalary": 0,
+            "bonus": 0,
+            "partTimeIncome": 0,
+            "eligibleCompForDeferrals": 0,
+            "eligibleCompForMatch": 0,
+            "employeeTraditional": 0,
+            "employeeRoth": 0,
+            "employerMatch": 0,
+            "employerFlat": 0
+          }
+        ],
+        "accounts": [
+          {
+            "accountId": "a401",
+            "start": 23271851,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 845136,
+            "withdrawals": 4329339,
+            "forfeited": 0,
+            "end": 19787648,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "b403",
+            "start": 12884157,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 467899,
+            "withdrawals": 2396882,
+            "forfeited": 0,
+            "end": 10955174,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "b403roth",
+            "start": 2710953,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 108438,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 2819391,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "taxable",
+            "start": 20101435,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 1005071,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 21106506,
+            "basisEnd": 10000000
+          },
+          {
+            "accountId": "cash",
+            "start": 2123040,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 21231,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 2144271,
+            "basisEnd": 0
+          }
+        ],
+        "flows": {
+          "contributions": 0,
+          "employerContributions": 0,
+          "feeDrag": 0,
+          "withdrawals": 6726221,
+          "forfeited": 0,
+          "spendingNeed": 8117854,
+          "spendingFunded": 8117854,
+          "shortfall": 0
+        },
+        "totals": {
+          "portfolioStart": 61091436,
+          "portfolioEnd": 56812990,
+          "byTaxTreatment": {
+            "taxDeferred": 30742822,
+            "taxFree": 2819391,
+            "taxable": 23250777
+          }
+        },
+        "real": {
+          "portfolioEnd": 48989663,
+          "spendingNeed": 7000000,
+          "grossIncome": 7000000
+        },
+        "grossIncome": 8117854,
+        "depleted": false,
+        "markers": []
+      },
+      {
+        "year": 2033,
+        "phase": "retirement",
+        "deflator": 1.1886857536682123,
+        "people": [
+          {
+            "personId": "person-1",
+            "age": 67,
+            "alive": true,
+            "retired": true,
+            "baseSalary": 0,
+            "bonus": 0,
+            "partTimeIncome": 0,
+            "eligibleCompForDeferrals": 0,
+            "eligibleCompForMatch": 0,
+            "employeeTraditional": 0,
+            "employeeRoth": 0,
+            "employerMatch": 0,
+            "employerFlat": 0
+          },
+          {
+            "personId": "person-2",
+            "age": 62,
+            "alive": true,
+            "retired": true,
+            "baseSalary": 0,
+            "bonus": 0,
+            "partTimeIncome": 0,
+            "eligibleCompForDeferrals": 0,
+            "eligibleCompForMatch": 0,
+            "employeeTraditional": 0,
+            "employeeRoth": 0,
+            "employerMatch": 0,
+            "employerFlat": 0
+          }
+        ],
+        "accounts": [
+          {
+            "accountId": "a401",
+            "start": 19787648,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 703625,
+            "withdrawals": 4437573,
+            "forfeited": 0,
+            "end": 16053700,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "b403",
+            "start": 10955174,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 389552,
+            "withdrawals": 2456804,
+            "forfeited": 0,
+            "end": 8887922,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "b403roth",
+            "start": 2819391,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 112775,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 2932166,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "taxable",
+            "start": 21106506,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 1055326,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 22161832,
+            "basisEnd": 10000000
+          },
+          {
+            "accountId": "cash",
+            "start": 2144271,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 21442,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 2165713,
+            "basisEnd": 0
+          }
+        ],
+        "flows": {
+          "contributions": 0,
+          "employerContributions": 0,
+          "feeDrag": 0,
+          "withdrawals": 6894377,
+          "forfeited": 0,
+          "spendingNeed": 8320800,
+          "spendingFunded": 8320800,
+          "shortfall": 0
+        },
+        "totals": {
+          "portfolioStart": 56812990,
+          "portfolioEnd": 52201333,
+          "byTaxTreatment": {
+            "taxDeferred": 24941622,
+            "taxFree": 2932166,
+            "taxable": 24327545
+          }
+        },
+        "real": {
+          "portfolioEnd": 43915167,
+          "spendingNeed": 7000000,
+          "grossIncome": 7000000
+        },
+        "grossIncome": 8320800,
+        "depleted": false,
+        "markers": []
+      },
+      {
+        "year": 2034,
+        "phase": "retirement",
+        "deflator": 1.2184028975099175,
+        "people": [
+          {
+            "personId": "person-1",
+            "age": 68,
+            "alive": true,
+            "retired": true,
+            "baseSalary": 0,
+            "bonus": 0,
+            "partTimeIncome": 0,
+            "eligibleCompForDeferrals": 0,
+            "eligibleCompForMatch": 0,
+            "employeeTraditional": 0,
+            "employeeRoth": 0,
+            "employerMatch": 0,
+            "employerFlat": 0
+          },
+          {
+            "personId": "person-2",
+            "age": 63,
+            "alive": true,
+            "retired": true,
+            "baseSalary": 0,
+            "bonus": 0,
+            "partTimeIncome": 0,
+            "eligibleCompForDeferrals": 0,
+            "eligibleCompForMatch": 0,
+            "employeeTraditional": 0,
+            "employeeRoth": 0,
+            "employerMatch": 0,
+            "employerFlat": 0
+          }
+        ],
+        "accounts": [
+          {
+            "accountId": "a401",
+            "start": 16053700,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 552069,
+            "withdrawals": 4548512,
+            "forfeited": 0,
+            "end": 12057257,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "b403",
+            "start": 8887922,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 305647,
+            "withdrawals": 2518225,
+            "forfeited": 0,
+            "end": 6675344,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "b403roth",
+            "start": 2932166,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 117287,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 3049453,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "taxable",
+            "start": 22161832,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 1108091,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 23269923,
+            "basisEnd": 10000000
+          },
+          {
+            "accountId": "cash",
+            "start": 2165713,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 21658,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 2187371,
+            "basisEnd": 0
+          }
+        ],
+        "flows": {
+          "contributions": 0,
+          "employerContributions": 0,
+          "feeDrag": 0,
+          "withdrawals": 7066737,
+          "forfeited": 0,
+          "spendingNeed": 8528820,
+          "spendingFunded": 8528820,
+          "shortfall": 0
+        },
+        "totals": {
+          "portfolioStart": 52201333,
+          "portfolioEnd": 47239348,
+          "byTaxTreatment": {
+            "taxDeferred": 18732601,
+            "taxFree": 3049453,
+            "taxable": 25457294
+          }
+        },
+        "real": {
+          "portfolioEnd": 38771533,
+          "spendingNeed": 7000000,
+          "grossIncome": 7000000
+        },
+        "grossIncome": 8528820,
+        "depleted": false,
+        "markers": []
+      },
+      {
+        "year": 2035,
+        "phase": "retirement",
+        "deflator": 1.2488629699476652,
+        "people": [
+          {
+            "personId": "person-1",
+            "age": 69,
+            "alive": true,
+            "retired": true,
+            "baseSalary": 0,
+            "bonus": 0,
+            "partTimeIncome": 0,
+            "eligibleCompForDeferrals": 0,
+            "eligibleCompForMatch": 0,
+            "employeeTraditional": 0,
+            "employeeRoth": 0,
+            "employerMatch": 0,
+            "employerFlat": 0
+          },
+          {
+            "personId": "person-2",
+            "age": 64,
+            "alive": true,
+            "retired": true,
+            "baseSalary": 0,
+            "bonus": 0,
+            "partTimeIncome": 0,
+            "eligibleCompForDeferrals": 0,
+            "eligibleCompForMatch": 0,
+            "employeeTraditional": 0,
+            "employeeRoth": 0,
+            "employerMatch": 0,
+            "employerFlat": 0
+          }
+        ],
+        "accounts": [
+          {
+            "accountId": "a401",
+            "start": 12057257,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 389960,
+            "withdrawals": 4662225,
+            "forfeited": 0,
+            "end": 7784992,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "b403",
+            "start": 6675344,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 215896,
+            "withdrawals": 2581180,
+            "forfeited": 0,
+            "end": 4310060,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "b403roth",
+            "start": 3049453,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 121978,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 3171431,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "taxable",
+            "start": 23269923,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 1163496,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 24433419,
+            "basisEnd": 10000000
+          },
+          {
+            "accountId": "cash",
+            "start": 2187371,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 21873,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 2209244,
+            "basisEnd": 0
+          }
+        ],
+        "flows": {
+          "contributions": 0,
+          "employerContributions": 0,
+          "feeDrag": 0,
+          "withdrawals": 7243405,
+          "forfeited": 0,
+          "spendingNeed": 8742041,
+          "spendingFunded": 8742041,
+          "shortfall": 0
+        },
+        "totals": {
+          "portfolioStart": 47239348,
+          "portfolioEnd": 41909146,
+          "byTaxTreatment": {
+            "taxDeferred": 12095052,
+            "taxFree": 3171431,
+            "taxable": 26642663
+          }
+        },
+        "real": {
+          "portfolioEnd": 33557842,
+          "spendingNeed": 7000000,
+          "grossIncome": 7000000
+        },
+        "grossIncome": 8742041,
+        "depleted": false,
+        "markers": []
+      },
+      {
+        "year": 2036,
+        "phase": "retirement",
+        "deflator": 1.2800845441963566,
+        "people": [
+          {
+            "personId": "person-1",
+            "age": 70,
+            "alive": true,
+            "retired": true,
+            "baseSalary": 0,
+            "bonus": 0,
+            "partTimeIncome": 0,
+            "eligibleCompForDeferrals": 0,
+            "eligibleCompForMatch": 0,
+            "employeeTraditional": 0,
+            "employeeRoth": 0,
+            "employerMatch": 0,
+            "employerFlat": 0
+          },
+          {
+            "personId": "person-2",
+            "age": 65,
+            "alive": true,
+            "retired": true,
+            "baseSalary": 0,
+            "bonus": 0,
+            "partTimeIncome": 0,
+            "eligibleCompForDeferrals": 0,
+            "eligibleCompForMatch": 0,
+            "employeeTraditional": 0,
+            "employeeRoth": 0,
+            "employerMatch": 0,
+            "employerFlat": 0
+          }
+        ],
+        "accounts": [
+          {
+            "accountId": "a401",
+            "start": 7784992,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 216762,
+            "withdrawals": 4778781,
+            "forfeited": 0,
+            "end": 3222973,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "b403",
+            "start": 4310060,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 120007,
+            "withdrawals": 2645710,
+            "forfeited": 0,
+            "end": 1784357,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "b403roth",
+            "start": 3171431,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 126857,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 3298288,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "taxable",
+            "start": 24433419,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 1221671,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 25655090,
+            "basisEnd": 10000000
+          },
+          {
+            "accountId": "cash",
+            "start": 2209244,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 22093,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 2231337,
+            "basisEnd": 0
+          }
+        ],
+        "flows": {
+          "contributions": 0,
+          "employerContributions": 0,
+          "feeDrag": 0,
+          "withdrawals": 7424491,
+          "forfeited": 0,
+          "spendingNeed": 8960592,
+          "spendingFunded": 8960592,
+          "shortfall": 0
+        },
+        "totals": {
+          "portfolioStart": 41909146,
+          "portfolioEnd": 36192045,
+          "byTaxTreatment": {
+            "taxDeferred": 5007330,
+            "taxFree": 3298288,
+            "taxable": 27886427
+          }
+        },
+        "real": {
+          "portfolioEnd": 28273168,
+          "spendingNeed": 7000000,
+          "grossIncome": 7000000
+        },
+        "grossIncome": 8960592,
+        "depleted": false,
+        "markers": []
+      },
+      {
+        "year": 2037,
+        "phase": "retirement",
+        "deflator": 1.3120866578012655,
+        "people": [
+          {
+            "personId": "person-1",
+            "age": 71,
+            "alive": false,
+            "retired": true,
+            "baseSalary": 0,
+            "bonus": 0,
+            "partTimeIncome": 0,
+            "eligibleCompForDeferrals": 0,
+            "eligibleCompForMatch": 0,
+            "employeeTraditional": 0,
+            "employeeRoth": 0,
+            "employerMatch": 0,
+            "employerFlat": 0
+          },
+          {
+            "personId": "person-2",
+            "age": 66,
+            "alive": true,
+            "retired": true,
+            "baseSalary": 0,
+            "bonus": 0,
+            "partTimeIncome": 0,
+            "eligibleCompForDeferrals": 0,
+            "eligibleCompForMatch": 0,
+            "employeeTraditional": 0,
+            "employeeRoth": 0,
+            "employerMatch": 0,
+            "employerFlat": 0
+          }
+        ],
+        "accounts": [
+          {
+            "accountId": "a401",
+            "start": 3222973,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 63827,
+            "withdrawals": 3286800,
+            "forfeited": 0,
+            "end": 0,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "b403",
+            "start": 1784357,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 35337,
+            "withdrawals": 1819694,
+            "forfeited": 0,
+            "end": 0,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "b403roth",
+            "start": 3298288,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 131932,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 3430220,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "taxable",
+            "start": 25655090,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 1276306,
+            "withdrawals": 261142,
+            "forfeited": 0,
+            "end": 26670254,
+            "basisEnd": 9900663
+          },
+          {
+            "accountId": "cash",
+            "start": 2231337,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 11129,
+            "withdrawals": 2242466,
+            "forfeited": 0,
+            "end": 0,
+            "basisEnd": 0
+          }
+        ],
+        "flows": {
+          "contributions": 0,
+          "employerContributions": 0,
+          "feeDrag": 0,
+          "withdrawals": 7610102,
+          "forfeited": 0,
+          "spendingNeed": 9184607,
+          "spendingFunded": 9184607,
+          "shortfall": 0
+        },
+        "totals": {
+          "portfolioStart": 36192045,
+          "portfolioEnd": 30100474,
+          "byTaxTreatment": {
+            "taxDeferred": 0,
+            "taxFree": 3430220,
+            "taxable": 26670254
+          }
+        },
+        "real": {
+          "portfolioEnd": 22940919,
+          "spendingNeed": 7000000,
+          "grossIncome": 7000000
+        },
+        "grossIncome": 9184607,
+        "depleted": false,
+        "markers": ["firstDeath"]
+      },
+      {
+        "year": 2038,
+        "phase": "retirement",
+        "deflator": 1.344888824246297,
+        "people": [
+          {
+            "personId": "person-1",
+            "age": 72,
+            "alive": false,
+            "retired": true,
+            "baseSalary": 0,
+            "bonus": 0,
+            "partTimeIncome": 0,
+            "eligibleCompForDeferrals": 0,
+            "eligibleCompForMatch": 0,
+            "employeeTraditional": 0,
+            "employeeRoth": 0,
+            "employerMatch": 0,
+            "employerFlat": 0
+          },
+          {
+            "personId": "person-2",
+            "age": 67,
+            "alive": true,
+            "retired": true,
+            "baseSalary": 0,
+            "bonus": 0,
+            "partTimeIncome": 0,
+            "eligibleCompForDeferrals": 0,
+            "eligibleCompForMatch": 0,
+            "employeeTraditional": 0,
+            "employeeRoth": 0,
+            "employerMatch": 0,
+            "employerFlat": 0
+          }
+        ],
+        "accounts": [
+          {
+            "accountId": "a401",
+            "start": 0,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 0,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 0,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "b403",
+            "start": 0,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 0,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 0,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "b403roth",
+            "start": 3430220,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 137209,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 3567429,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "taxable",
+            "start": 26670254,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 1140882,
+            "withdrawals": 7800355,
+            "forfeited": 0,
+            "end": 20010781,
+            "basisEnd": 7074763
+          },
+          {
+            "accountId": "cash",
+            "start": 0,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 0,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 0,
+            "basisEnd": 0
+          }
+        ],
+        "flows": {
+          "contributions": 0,
+          "employerContributions": 0,
+          "feeDrag": 0,
+          "withdrawals": 7800355,
+          "forfeited": 0,
+          "spendingNeed": 9414222,
+          "spendingFunded": 9414222,
+          "shortfall": 0
+        },
+        "totals": {
+          "portfolioStart": 30100474,
+          "portfolioEnd": 23578210,
+          "byTaxTreatment": {
+            "taxDeferred": 0,
+            "taxFree": 3567429,
+            "taxable": 20010781
+          }
+        },
+        "real": {
+          "portfolioEnd": 17531716,
+          "spendingNeed": 7000000,
+          "grossIncome": 7000000
+        },
+        "grossIncome": 9414222,
+        "depleted": false,
+        "markers": []
+      },
+      {
+        "year": 2039,
+        "phase": "retirement",
+        "deflator": 1.3785110448524545,
+        "people": [
+          {
+            "personId": "person-1",
+            "age": 73,
+            "alive": false,
+            "retired": true,
+            "baseSalary": 0,
+            "bonus": 0,
+            "partTimeIncome": 0,
+            "eligibleCompForDeferrals": 0,
+            "eligibleCompForMatch": 0,
+            "employeeTraditional": 0,
+            "employeeRoth": 0,
+            "employerMatch": 0,
+            "employerFlat": 0
+          },
+          {
+            "personId": "person-2",
+            "age": 68,
+            "alive": true,
+            "retired": true,
+            "baseSalary": 0,
+            "bonus": 0,
+            "partTimeIncome": 0,
+            "eligibleCompForDeferrals": 0,
+            "eligibleCompForMatch": 0,
+            "employeeTraditional": 0,
+            "employeeRoth": 0,
+            "employerMatch": 0,
+            "employerFlat": 0
+          }
+        ],
+        "accounts": [
+          {
+            "accountId": "a401",
+            "start": 0,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 0,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 0,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "b403",
+            "start": 0,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 0,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 0,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "b403roth",
+            "start": 3567429,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 142697,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 3710126,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "taxable",
+            "start": 20010781,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 803093,
+            "withdrawals": 7995364,
+            "forfeited": 0,
+            "end": 12818510,
+            "basisEnd": 4316146
+          },
+          {
+            "accountId": "cash",
+            "start": 0,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 0,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 0,
+            "basisEnd": 0
+          }
+        ],
+        "flows": {
+          "contributions": 0,
+          "employerContributions": 0,
+          "feeDrag": 0,
+          "withdrawals": 7995364,
+          "forfeited": 0,
+          "spendingNeed": 9649577,
+          "spendingFunded": 9649577,
+          "shortfall": 0
+        },
+        "totals": {
+          "portfolioStart": 23578210,
+          "portfolioEnd": 16528636,
+          "byTaxTreatment": {
+            "taxDeferred": 0,
+            "taxFree": 3710126,
+            "taxable": 12818510
+          }
+        },
+        "real": {
+          "portfolioEnd": 11990209,
+          "spendingNeed": 7000000,
+          "grossIncome": 7000000
+        },
+        "grossIncome": 9649577,
+        "depleted": false,
+        "markers": []
+      },
+      {
+        "year": 2040,
+        "phase": "retirement",
+        "deflator": 1.4129738209737657,
+        "people": [
+          {
+            "personId": "person-1",
+            "age": 74,
+            "alive": false,
+            "retired": true,
+            "baseSalary": 0,
+            "bonus": 0,
+            "partTimeIncome": 0,
+            "eligibleCompForDeferrals": 0,
+            "eligibleCompForMatch": 0,
+            "employeeTraditional": 0,
+            "employeeRoth": 0,
+            "employerMatch": 0,
+            "employerFlat": 0
+          },
+          {
+            "personId": "person-2",
+            "age": 69,
+            "alive": true,
+            "retired": true,
+            "baseSalary": 0,
+            "bonus": 0,
+            "partTimeIncome": 0,
+            "eligibleCompForDeferrals": 0,
+            "eligibleCompForMatch": 0,
+            "employeeTraditional": 0,
+            "employeeRoth": 0,
+            "employerMatch": 0,
+            "employerFlat": 0
+          }
+        ],
+        "accounts": [
+          {
+            "accountId": "a401",
+            "start": 0,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 0,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 0,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "b403",
+            "start": 0,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 0,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 0,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "b403roth",
+            "start": 3710126,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 148405,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 3858531,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "taxable",
+            "start": 12818510,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 438543,
+            "withdrawals": 8195248,
+            "forfeited": 0,
+            "end": 5061805,
+            "basisEnd": 1623210
+          },
+          {
+            "accountId": "cash",
+            "start": 0,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 0,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 0,
+            "basisEnd": 0
+          }
+        ],
+        "flows": {
+          "contributions": 0,
+          "employerContributions": 0,
+          "feeDrag": 0,
+          "withdrawals": 8195248,
+          "forfeited": 0,
+          "spendingNeed": 9890817,
+          "spendingFunded": 9890817,
+          "shortfall": 0
+        },
+        "totals": {
+          "portfolioStart": 16528636,
+          "portfolioEnd": 8920336,
+          "byTaxTreatment": {
+            "taxDeferred": 0,
+            "taxFree": 3858531,
+            "taxable": 5061805
+          }
+        },
+        "real": {
+          "portfolioEnd": 6313164,
+          "spendingNeed": 7000000,
+          "grossIncome": 7000000
+        },
+        "grossIncome": 9890817,
+        "depleted": false,
+        "markers": []
+      },
+      {
+        "year": 2041,
+        "phase": "retirement",
+        "deflator": 1.4482981664981096,
+        "people": [
+          {
+            "personId": "person-1",
+            "age": 75,
+            "alive": false,
+            "retired": true,
+            "baseSalary": 0,
+            "bonus": 0,
+            "partTimeIncome": 0,
+            "eligibleCompForDeferrals": 0,
+            "eligibleCompForMatch": 0,
+            "employeeTraditional": 0,
+            "employeeRoth": 0,
+            "employerMatch": 0,
+            "employerFlat": 0
+          },
+          {
+            "personId": "person-2",
+            "age": 70,
+            "alive": true,
+            "retired": true,
+            "baseSalary": 0,
+            "bonus": 0,
+            "partTimeIncome": 0,
+            "eligibleCompForDeferrals": 0,
+            "eligibleCompForMatch": 0,
+            "employeeTraditional": 0,
+            "employeeRoth": 0,
+            "employerMatch": 0,
+            "employerFlat": 0
+          }
+        ],
+        "accounts": [
+          {
+            "accountId": "a401",
+            "start": 0,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 0,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 0,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "b403",
+            "start": 0,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 0,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 0,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "b403roth",
+            "start": 3858531,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 76414,
+            "withdrawals": 3934945,
+            "forfeited": 0,
+            "end": 0,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "taxable",
+            "start": 5061805,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 125001,
+            "withdrawals": 5186806,
+            "forfeited": 0,
+            "end": 0,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "cash",
+            "start": 0,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 0,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 0,
+            "basisEnd": 0
+          }
+        ],
+        "flows": {
+          "contributions": 0,
+          "employerContributions": 0,
+          "feeDrag": 0,
+          "withdrawals": 9121751,
+          "forfeited": 0,
+          "spendingNeed": 10138087,
+          "spendingFunded": 9121751,
+          "shortfall": 1016336
+        },
+        "totals": {
+          "portfolioStart": 8920336,
+          "portfolioEnd": 0,
+          "byTaxTreatment": {
+            "taxDeferred": 0,
+            "taxFree": 0,
+            "taxable": 0
+          }
+        },
+        "real": {
+          "portfolioEnd": 0,
+          "spendingNeed": 7000000,
+          "grossIncome": 6298255
+        },
+        "grossIncome": 9121751,
+        "depleted": true,
+        "markers": ["depletion"]
+      },
+      {
+        "year": 2042,
+        "phase": "retirement",
+        "deflator": 1.4845056206605622,
+        "people": [
+          {
+            "personId": "person-1",
+            "age": 76,
+            "alive": false,
+            "retired": true,
+            "baseSalary": 0,
+            "bonus": 0,
+            "partTimeIncome": 0,
+            "eligibleCompForDeferrals": 0,
+            "eligibleCompForMatch": 0,
+            "employeeTraditional": 0,
+            "employeeRoth": 0,
+            "employerMatch": 0,
+            "employerFlat": 0
+          },
+          {
+            "personId": "person-2",
+            "age": 71,
+            "alive": true,
+            "retired": true,
+            "baseSalary": 0,
+            "bonus": 0,
+            "partTimeIncome": 0,
+            "eligibleCompForDeferrals": 0,
+            "eligibleCompForMatch": 0,
+            "employeeTraditional": 0,
+            "employeeRoth": 0,
+            "employerMatch": 0,
+            "employerFlat": 0
+          }
+        ],
+        "accounts": [
+          {
+            "accountId": "a401",
+            "start": 0,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 0,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 0,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "b403",
+            "start": 0,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 0,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 0,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "b403roth",
+            "start": 0,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 0,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 0,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "taxable",
+            "start": 0,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 0,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 0,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "cash",
+            "start": 0,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 0,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 0,
+            "basisEnd": 0
+          }
+        ],
+        "flows": {
+          "contributions": 0,
+          "employerContributions": 0,
+          "feeDrag": 0,
+          "withdrawals": 0,
+          "forfeited": 0,
+          "spendingNeed": 10391539,
+          "spendingFunded": 0,
+          "shortfall": 10391539
+        },
+        "totals": {
+          "portfolioStart": 0,
+          "portfolioEnd": 0,
+          "byTaxTreatment": {
+            "taxDeferred": 0,
+            "taxFree": 0,
+            "taxable": 0
+          }
+        },
+        "real": {
+          "portfolioEnd": 0,
+          "spendingNeed": 7000000,
+          "grossIncome": 0
+        },
+        "grossIncome": 0,
+        "depleted": true,
+        "markers": []
+      },
+      {
+        "year": 2043,
+        "phase": "retirement",
+        "deflator": 1.521618261177076,
+        "people": [
+          {
+            "personId": "person-1",
+            "age": 77,
+            "alive": false,
+            "retired": true,
+            "baseSalary": 0,
+            "bonus": 0,
+            "partTimeIncome": 0,
+            "eligibleCompForDeferrals": 0,
+            "eligibleCompForMatch": 0,
+            "employeeTraditional": 0,
+            "employeeRoth": 0,
+            "employerMatch": 0,
+            "employerFlat": 0
+          },
+          {
+            "personId": "person-2",
+            "age": 72,
+            "alive": true,
+            "retired": true,
+            "baseSalary": 0,
+            "bonus": 0,
+            "partTimeIncome": 0,
+            "eligibleCompForDeferrals": 0,
+            "eligibleCompForMatch": 0,
+            "employeeTraditional": 0,
+            "employeeRoth": 0,
+            "employerMatch": 0,
+            "employerFlat": 0
+          }
+        ],
+        "accounts": [
+          {
+            "accountId": "a401",
+            "start": 0,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 0,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 0,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "b403",
+            "start": 0,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 0,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 0,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "b403roth",
+            "start": 0,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 0,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 0,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "taxable",
+            "start": 0,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 0,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 0,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "cash",
+            "start": 0,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 0,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 0,
+            "basisEnd": 0
+          }
+        ],
+        "flows": {
+          "contributions": 0,
+          "employerContributions": 0,
+          "feeDrag": 0,
+          "withdrawals": 0,
+          "forfeited": 0,
+          "spendingNeed": 10651328,
+          "spendingFunded": 0,
+          "shortfall": 10651328
+        },
+        "totals": {
+          "portfolioStart": 0,
+          "portfolioEnd": 0,
+          "byTaxTreatment": {
+            "taxDeferred": 0,
+            "taxFree": 0,
+            "taxable": 0
+          }
+        },
+        "real": {
+          "portfolioEnd": 0,
+          "spendingNeed": 7000000,
+          "grossIncome": 0
+        },
+        "grossIncome": 0,
+        "depleted": true,
+        "markers": []
+      },
+      {
+        "year": 2044,
+        "phase": "retirement",
+        "deflator": 1.5596587177065029,
+        "people": [
+          {
+            "personId": "person-1",
+            "age": 78,
+            "alive": false,
+            "retired": true,
+            "baseSalary": 0,
+            "bonus": 0,
+            "partTimeIncome": 0,
+            "eligibleCompForDeferrals": 0,
+            "eligibleCompForMatch": 0,
+            "employeeTraditional": 0,
+            "employeeRoth": 0,
+            "employerMatch": 0,
+            "employerFlat": 0
+          },
+          {
+            "personId": "person-2",
+            "age": 73,
+            "alive": true,
+            "retired": true,
+            "baseSalary": 0,
+            "bonus": 0,
+            "partTimeIncome": 0,
+            "eligibleCompForDeferrals": 0,
+            "eligibleCompForMatch": 0,
+            "employeeTraditional": 0,
+            "employeeRoth": 0,
+            "employerMatch": 0,
+            "employerFlat": 0
+          }
+        ],
+        "accounts": [
+          {
+            "accountId": "a401",
+            "start": 0,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 0,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 0,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "b403",
+            "start": 0,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 0,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 0,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "b403roth",
+            "start": 0,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 0,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 0,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "taxable",
+            "start": 0,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 0,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 0,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "cash",
+            "start": 0,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 0,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 0,
+            "basisEnd": 0
+          }
+        ],
+        "flows": {
+          "contributions": 0,
+          "employerContributions": 0,
+          "feeDrag": 0,
+          "withdrawals": 0,
+          "forfeited": 0,
+          "spendingNeed": 10917611,
+          "spendingFunded": 0,
+          "shortfall": 10917611
+        },
+        "totals": {
+          "portfolioStart": 0,
+          "portfolioEnd": 0,
+          "byTaxTreatment": {
+            "taxDeferred": 0,
+            "taxFree": 0,
+            "taxable": 0
+          }
+        },
+        "real": {
+          "portfolioEnd": 0,
+          "spendingNeed": 7000000,
+          "grossIncome": 0
+        },
+        "grossIncome": 0,
+        "depleted": true,
+        "markers": []
+      },
+      {
+        "year": 2045,
+        "phase": "retirement",
+        "deflator": 1.5986501856491653,
+        "people": [
+          {
+            "personId": "person-1",
+            "age": 79,
+            "alive": false,
+            "retired": true,
+            "baseSalary": 0,
+            "bonus": 0,
+            "partTimeIncome": 0,
+            "eligibleCompForDeferrals": 0,
+            "eligibleCompForMatch": 0,
+            "employeeTraditional": 0,
+            "employeeRoth": 0,
+            "employerMatch": 0,
+            "employerFlat": 0
+          },
+          {
+            "personId": "person-2",
+            "age": 74,
+            "alive": true,
+            "retired": true,
+            "baseSalary": 0,
+            "bonus": 0,
+            "partTimeIncome": 0,
+            "eligibleCompForDeferrals": 0,
+            "eligibleCompForMatch": 0,
+            "employeeTraditional": 0,
+            "employeeRoth": 0,
+            "employerMatch": 0,
+            "employerFlat": 0
+          }
+        ],
+        "accounts": [
+          {
+            "accountId": "a401",
+            "start": 0,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 0,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 0,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "b403",
+            "start": 0,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 0,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 0,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "b403roth",
+            "start": 0,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 0,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 0,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "taxable",
+            "start": 0,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 0,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 0,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "cash",
+            "start": 0,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 0,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 0,
+            "basisEnd": 0
+          }
+        ],
+        "flows": {
+          "contributions": 0,
+          "employerContributions": 0,
+          "feeDrag": 0,
+          "withdrawals": 0,
+          "forfeited": 0,
+          "spendingNeed": 11190551,
+          "spendingFunded": 0,
+          "shortfall": 11190551
+        },
+        "totals": {
+          "portfolioStart": 0,
+          "portfolioEnd": 0,
+          "byTaxTreatment": {
+            "taxDeferred": 0,
+            "taxFree": 0,
+            "taxable": 0
+          }
+        },
+        "real": {
+          "portfolioEnd": 0,
+          "spendingNeed": 7000000,
+          "grossIncome": 0
+        },
+        "grossIncome": 0,
+        "depleted": true,
+        "markers": []
+      },
+      {
+        "year": 2046,
+        "phase": "retirement",
+        "deflator": 1.6386164402903942,
+        "people": [
+          {
+            "personId": "person-1",
+            "age": 80,
+            "alive": false,
+            "retired": true,
+            "baseSalary": 0,
+            "bonus": 0,
+            "partTimeIncome": 0,
+            "eligibleCompForDeferrals": 0,
+            "eligibleCompForMatch": 0,
+            "employeeTraditional": 0,
+            "employeeRoth": 0,
+            "employerMatch": 0,
+            "employerFlat": 0
+          },
+          {
+            "personId": "person-2",
+            "age": 75,
+            "alive": true,
+            "retired": true,
+            "baseSalary": 0,
+            "bonus": 0,
+            "partTimeIncome": 0,
+            "eligibleCompForDeferrals": 0,
+            "eligibleCompForMatch": 0,
+            "employeeTraditional": 0,
+            "employeeRoth": 0,
+            "employerMatch": 0,
+            "employerFlat": 0
+          }
+        ],
+        "accounts": [
+          {
+            "accountId": "a401",
+            "start": 0,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 0,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 0,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "b403",
+            "start": 0,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 0,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 0,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "b403roth",
+            "start": 0,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 0,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 0,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "taxable",
+            "start": 0,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 0,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 0,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "cash",
+            "start": 0,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 0,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 0,
+            "basisEnd": 0
+          }
+        ],
+        "flows": {
+          "contributions": 0,
+          "employerContributions": 0,
+          "feeDrag": 0,
+          "withdrawals": 0,
+          "forfeited": 0,
+          "spendingNeed": 11470315,
+          "spendingFunded": 0,
+          "shortfall": 11470315
+        },
+        "totals": {
+          "portfolioStart": 0,
+          "portfolioEnd": 0,
+          "byTaxTreatment": {
+            "taxDeferred": 0,
+            "taxFree": 0,
+            "taxable": 0
+          }
+        },
+        "real": {
+          "portfolioEnd": 0,
+          "spendingNeed": 7000000,
+          "grossIncome": 0
+        },
+        "grossIncome": 0,
+        "depleted": true,
+        "markers": []
+      },
+      {
+        "year": 2047,
+        "phase": "retirement",
+        "deflator": 1.679581851297654,
+        "people": [
+          {
+            "personId": "person-1",
+            "age": 81,
+            "alive": false,
+            "retired": true,
+            "baseSalary": 0,
+            "bonus": 0,
+            "partTimeIncome": 0,
+            "eligibleCompForDeferrals": 0,
+            "eligibleCompForMatch": 0,
+            "employeeTraditional": 0,
+            "employeeRoth": 0,
+            "employerMatch": 0,
+            "employerFlat": 0
+          },
+          {
+            "personId": "person-2",
+            "age": 76,
+            "alive": true,
+            "retired": true,
+            "baseSalary": 0,
+            "bonus": 0,
+            "partTimeIncome": 0,
+            "eligibleCompForDeferrals": 0,
+            "eligibleCompForMatch": 0,
+            "employeeTraditional": 0,
+            "employeeRoth": 0,
+            "employerMatch": 0,
+            "employerFlat": 0
+          }
+        ],
+        "accounts": [
+          {
+            "accountId": "a401",
+            "start": 0,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 0,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 0,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "b403",
+            "start": 0,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 0,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 0,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "b403roth",
+            "start": 0,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 0,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 0,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "taxable",
+            "start": 0,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 0,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 0,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "cash",
+            "start": 0,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 0,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 0,
+            "basisEnd": 0
+          }
+        ],
+        "flows": {
+          "contributions": 0,
+          "employerContributions": 0,
+          "feeDrag": 0,
+          "withdrawals": 0,
+          "forfeited": 0,
+          "spendingNeed": 11757073,
+          "spendingFunded": 0,
+          "shortfall": 11757073
+        },
+        "totals": {
+          "portfolioStart": 0,
+          "portfolioEnd": 0,
+          "byTaxTreatment": {
+            "taxDeferred": 0,
+            "taxFree": 0,
+            "taxable": 0
+          }
+        },
+        "real": {
+          "portfolioEnd": 0,
+          "spendingNeed": 7000000,
+          "grossIncome": 0
+        },
+        "grossIncome": 0,
+        "depleted": true,
+        "markers": []
+      },
+      {
+        "year": 2048,
+        "phase": "retirement",
+        "deflator": 1.721571397580095,
+        "people": [
+          {
+            "personId": "person-1",
+            "age": 82,
+            "alive": false,
+            "retired": true,
+            "baseSalary": 0,
+            "bonus": 0,
+            "partTimeIncome": 0,
+            "eligibleCompForDeferrals": 0,
+            "eligibleCompForMatch": 0,
+            "employeeTraditional": 0,
+            "employeeRoth": 0,
+            "employerMatch": 0,
+            "employerFlat": 0
+          },
+          {
+            "personId": "person-2",
+            "age": 77,
+            "alive": true,
+            "retired": true,
+            "baseSalary": 0,
+            "bonus": 0,
+            "partTimeIncome": 0,
+            "eligibleCompForDeferrals": 0,
+            "eligibleCompForMatch": 0,
+            "employeeTraditional": 0,
+            "employeeRoth": 0,
+            "employerMatch": 0,
+            "employerFlat": 0
+          }
+        ],
+        "accounts": [
+          {
+            "accountId": "a401",
+            "start": 0,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 0,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 0,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "b403",
+            "start": 0,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 0,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 0,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "b403roth",
+            "start": 0,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 0,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 0,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "taxable",
+            "start": 0,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 0,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 0,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "cash",
+            "start": 0,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 0,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 0,
+            "basisEnd": 0
+          }
+        ],
+        "flows": {
+          "contributions": 0,
+          "employerContributions": 0,
+          "feeDrag": 0,
+          "withdrawals": 0,
+          "forfeited": 0,
+          "spendingNeed": 12051000,
+          "spendingFunded": 0,
+          "shortfall": 12051000
+        },
+        "totals": {
+          "portfolioStart": 0,
+          "portfolioEnd": 0,
+          "byTaxTreatment": {
+            "taxDeferred": 0,
+            "taxFree": 0,
+            "taxable": 0
+          }
+        },
+        "real": {
+          "portfolioEnd": 0,
+          "spendingNeed": 7000000,
+          "grossIncome": 0
+        },
+        "grossIncome": 0,
+        "depleted": true,
+        "markers": []
+      },
+      {
+        "year": 2049,
+        "phase": "retirement",
+        "deflator": 1.7646106825195973,
+        "people": [
+          {
+            "personId": "person-1",
+            "age": 83,
+            "alive": false,
+            "retired": true,
+            "baseSalary": 0,
+            "bonus": 0,
+            "partTimeIncome": 0,
+            "eligibleCompForDeferrals": 0,
+            "eligibleCompForMatch": 0,
+            "employeeTraditional": 0,
+            "employeeRoth": 0,
+            "employerMatch": 0,
+            "employerFlat": 0
+          },
+          {
+            "personId": "person-2",
+            "age": 78,
+            "alive": true,
+            "retired": true,
+            "baseSalary": 0,
+            "bonus": 0,
+            "partTimeIncome": 0,
+            "eligibleCompForDeferrals": 0,
+            "eligibleCompForMatch": 0,
+            "employeeTraditional": 0,
+            "employeeRoth": 0,
+            "employerMatch": 0,
+            "employerFlat": 0
+          }
+        ],
+        "accounts": [
+          {
+            "accountId": "a401",
+            "start": 0,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 0,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 0,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "b403",
+            "start": 0,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 0,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 0,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "b403roth",
+            "start": 0,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 0,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 0,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "taxable",
+            "start": 0,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 0,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 0,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "cash",
+            "start": 0,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 0,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 0,
+            "basisEnd": 0
+          }
+        ],
+        "flows": {
+          "contributions": 0,
+          "employerContributions": 0,
+          "feeDrag": 0,
+          "withdrawals": 0,
+          "forfeited": 0,
+          "spendingNeed": 12352275,
+          "spendingFunded": 0,
+          "shortfall": 12352275
+        },
+        "totals": {
+          "portfolioStart": 0,
+          "portfolioEnd": 0,
+          "byTaxTreatment": {
+            "taxDeferred": 0,
+            "taxFree": 0,
+            "taxable": 0
+          }
+        },
+        "real": {
+          "portfolioEnd": 0,
+          "spendingNeed": 7000000,
+          "grossIncome": 0
+        },
+        "grossIncome": 0,
+        "depleted": true,
+        "markers": []
+      },
+      {
+        "year": 2050,
+        "phase": "retirement",
+        "deflator": 1.8087259495825871,
+        "people": [
+          {
+            "personId": "person-1",
+            "age": 84,
+            "alive": false,
+            "retired": true,
+            "baseSalary": 0,
+            "bonus": 0,
+            "partTimeIncome": 0,
+            "eligibleCompForDeferrals": 0,
+            "eligibleCompForMatch": 0,
+            "employeeTraditional": 0,
+            "employeeRoth": 0,
+            "employerMatch": 0,
+            "employerFlat": 0
+          },
+          {
+            "personId": "person-2",
+            "age": 79,
+            "alive": true,
+            "retired": true,
+            "baseSalary": 0,
+            "bonus": 0,
+            "partTimeIncome": 0,
+            "eligibleCompForDeferrals": 0,
+            "eligibleCompForMatch": 0,
+            "employeeTraditional": 0,
+            "employeeRoth": 0,
+            "employerMatch": 0,
+            "employerFlat": 0
+          }
+        ],
+        "accounts": [
+          {
+            "accountId": "a401",
+            "start": 0,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 0,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 0,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "b403",
+            "start": 0,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 0,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 0,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "b403roth",
+            "start": 0,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 0,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 0,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "taxable",
+            "start": 0,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 0,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 0,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "cash",
+            "start": 0,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 0,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 0,
+            "basisEnd": 0
+          }
+        ],
+        "flows": {
+          "contributions": 0,
+          "employerContributions": 0,
+          "feeDrag": 0,
+          "withdrawals": 0,
+          "forfeited": 0,
+          "spendingNeed": 12661082,
+          "spendingFunded": 0,
+          "shortfall": 12661082
+        },
+        "totals": {
+          "portfolioStart": 0,
+          "portfolioEnd": 0,
+          "byTaxTreatment": {
+            "taxDeferred": 0,
+            "taxFree": 0,
+            "taxable": 0
+          }
+        },
+        "real": {
+          "portfolioEnd": 0,
+          "spendingNeed": 7000000,
+          "grossIncome": 0
+        },
+        "grossIncome": 0,
+        "depleted": true,
+        "markers": []
+      },
+      {
+        "year": 2051,
+        "phase": "retirement",
+        "deflator": 1.8539440983221516,
+        "people": [
+          {
+            "personId": "person-1",
+            "age": 85,
+            "alive": false,
+            "retired": true,
+            "baseSalary": 0,
+            "bonus": 0,
+            "partTimeIncome": 0,
+            "eligibleCompForDeferrals": 0,
+            "eligibleCompForMatch": 0,
+            "employeeTraditional": 0,
+            "employeeRoth": 0,
+            "employerMatch": 0,
+            "employerFlat": 0
+          },
+          {
+            "personId": "person-2",
+            "age": 80,
+            "alive": true,
+            "retired": true,
+            "baseSalary": 0,
+            "bonus": 0,
+            "partTimeIncome": 0,
+            "eligibleCompForDeferrals": 0,
+            "eligibleCompForMatch": 0,
+            "employeeTraditional": 0,
+            "employeeRoth": 0,
+            "employerMatch": 0,
+            "employerFlat": 0
+          }
+        ],
+        "accounts": [
+          {
+            "accountId": "a401",
+            "start": 0,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 0,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 0,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "b403",
+            "start": 0,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 0,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 0,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "b403roth",
+            "start": 0,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 0,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 0,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "taxable",
+            "start": 0,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 0,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 0,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "cash",
+            "start": 0,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 0,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 0,
+            "basisEnd": 0
+          }
+        ],
+        "flows": {
+          "contributions": 0,
+          "employerContributions": 0,
+          "feeDrag": 0,
+          "withdrawals": 0,
+          "forfeited": 0,
+          "spendingNeed": 12977609,
+          "spendingFunded": 0,
+          "shortfall": 12977609
+        },
+        "totals": {
+          "portfolioStart": 0,
+          "portfolioEnd": 0,
+          "byTaxTreatment": {
+            "taxDeferred": 0,
+            "taxFree": 0,
+            "taxable": 0
+          }
+        },
+        "real": {
+          "portfolioEnd": 0,
+          "spendingNeed": 7000000,
+          "grossIncome": 0
+        },
+        "grossIncome": 0,
+        "depleted": true,
+        "markers": []
+      },
+      {
+        "year": 2052,
+        "phase": "retirement",
+        "deflator": 1.9002927007802053,
+        "people": [
+          {
+            "personId": "person-1",
+            "age": 86,
+            "alive": false,
+            "retired": true,
+            "baseSalary": 0,
+            "bonus": 0,
+            "partTimeIncome": 0,
+            "eligibleCompForDeferrals": 0,
+            "eligibleCompForMatch": 0,
+            "employeeTraditional": 0,
+            "employeeRoth": 0,
+            "employerMatch": 0,
+            "employerFlat": 0
+          },
+          {
+            "personId": "person-2",
+            "age": 81,
+            "alive": true,
+            "retired": true,
+            "baseSalary": 0,
+            "bonus": 0,
+            "partTimeIncome": 0,
+            "eligibleCompForDeferrals": 0,
+            "eligibleCompForMatch": 0,
+            "employeeTraditional": 0,
+            "employeeRoth": 0,
+            "employerMatch": 0,
+            "employerFlat": 0
+          }
+        ],
+        "accounts": [
+          {
+            "accountId": "a401",
+            "start": 0,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 0,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 0,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "b403",
+            "start": 0,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 0,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 0,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "b403roth",
+            "start": 0,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 0,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 0,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "taxable",
+            "start": 0,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 0,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 0,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "cash",
+            "start": 0,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 0,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 0,
+            "basisEnd": 0
+          }
+        ],
+        "flows": {
+          "contributions": 0,
+          "employerContributions": 0,
+          "feeDrag": 0,
+          "withdrawals": 0,
+          "forfeited": 0,
+          "spendingNeed": 13302049,
+          "spendingFunded": 0,
+          "shortfall": 13302049
+        },
+        "totals": {
+          "portfolioStart": 0,
+          "portfolioEnd": 0,
+          "byTaxTreatment": {
+            "taxDeferred": 0,
+            "taxFree": 0,
+            "taxable": 0
+          }
+        },
+        "real": {
+          "portfolioEnd": 0,
+          "spendingNeed": 7000000,
+          "grossIncome": 0
+        },
+        "grossIncome": 0,
+        "depleted": true,
+        "markers": []
+      },
+      {
+        "year": 2053,
+        "phase": "retirement",
+        "deflator": 1.9478000182997102,
+        "people": [
+          {
+            "personId": "person-1",
+            "age": 87,
+            "alive": false,
+            "retired": true,
+            "baseSalary": 0,
+            "bonus": 0,
+            "partTimeIncome": 0,
+            "eligibleCompForDeferrals": 0,
+            "eligibleCompForMatch": 0,
+            "employeeTraditional": 0,
+            "employeeRoth": 0,
+            "employerMatch": 0,
+            "employerFlat": 0
+          },
+          {
+            "personId": "person-2",
+            "age": 82,
+            "alive": true,
+            "retired": true,
+            "baseSalary": 0,
+            "bonus": 0,
+            "partTimeIncome": 0,
+            "eligibleCompForDeferrals": 0,
+            "eligibleCompForMatch": 0,
+            "employeeTraditional": 0,
+            "employeeRoth": 0,
+            "employerMatch": 0,
+            "employerFlat": 0
+          }
+        ],
+        "accounts": [
+          {
+            "accountId": "a401",
+            "start": 0,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 0,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 0,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "b403",
+            "start": 0,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 0,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 0,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "b403roth",
+            "start": 0,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 0,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 0,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "taxable",
+            "start": 0,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 0,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 0,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "cash",
+            "start": 0,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 0,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 0,
+            "basisEnd": 0
+          }
+        ],
+        "flows": {
+          "contributions": 0,
+          "employerContributions": 0,
+          "feeDrag": 0,
+          "withdrawals": 0,
+          "forfeited": 0,
+          "spendingNeed": 13634600,
+          "spendingFunded": 0,
+          "shortfall": 13634600
+        },
+        "totals": {
+          "portfolioStart": 0,
+          "portfolioEnd": 0,
+          "byTaxTreatment": {
+            "taxDeferred": 0,
+            "taxFree": 0,
+            "taxable": 0
+          }
+        },
+        "real": {
+          "portfolioEnd": 0,
+          "spendingNeed": 7000000,
+          "grossIncome": 0
+        },
+        "grossIncome": 0,
+        "depleted": true,
+        "markers": []
+      },
+      {
+        "year": 2054,
+        "phase": "retirement",
+        "deflator": 1.9964950187572028,
+        "people": [
+          {
+            "personId": "person-1",
+            "age": 88,
+            "alive": false,
+            "retired": true,
+            "baseSalary": 0,
+            "bonus": 0,
+            "partTimeIncome": 0,
+            "eligibleCompForDeferrals": 0,
+            "eligibleCompForMatch": 0,
+            "employeeTraditional": 0,
+            "employeeRoth": 0,
+            "employerMatch": 0,
+            "employerFlat": 0
+          },
+          {
+            "personId": "person-2",
+            "age": 83,
+            "alive": true,
+            "retired": true,
+            "baseSalary": 0,
+            "bonus": 0,
+            "partTimeIncome": 0,
+            "eligibleCompForDeferrals": 0,
+            "eligibleCompForMatch": 0,
+            "employeeTraditional": 0,
+            "employeeRoth": 0,
+            "employerMatch": 0,
+            "employerFlat": 0
+          }
+        ],
+        "accounts": [
+          {
+            "accountId": "a401",
+            "start": 0,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 0,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 0,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "b403",
+            "start": 0,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 0,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 0,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "b403roth",
+            "start": 0,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 0,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 0,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "taxable",
+            "start": 0,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 0,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 0,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "cash",
+            "start": 0,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 0,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 0,
+            "basisEnd": 0
+          }
+        ],
+        "flows": {
+          "contributions": 0,
+          "employerContributions": 0,
+          "feeDrag": 0,
+          "withdrawals": 0,
+          "forfeited": 0,
+          "spendingNeed": 13975465,
+          "spendingFunded": 0,
+          "shortfall": 13975465
+        },
+        "totals": {
+          "portfolioStart": 0,
+          "portfolioEnd": 0,
+          "byTaxTreatment": {
+            "taxDeferred": 0,
+            "taxFree": 0,
+            "taxable": 0
+          }
+        },
+        "real": {
+          "portfolioEnd": 0,
+          "spendingNeed": 7000000,
+          "grossIncome": 0
+        },
+        "grossIncome": 0,
+        "depleted": true,
+        "markers": []
+      },
+      {
+        "year": 2055,
+        "phase": "retirement",
+        "deflator": 2.0464073942261325,
+        "people": [
+          {
+            "personId": "person-1",
+            "age": 89,
+            "alive": false,
+            "retired": true,
+            "baseSalary": 0,
+            "bonus": 0,
+            "partTimeIncome": 0,
+            "eligibleCompForDeferrals": 0,
+            "eligibleCompForMatch": 0,
+            "employeeTraditional": 0,
+            "employeeRoth": 0,
+            "employerMatch": 0,
+            "employerFlat": 0
+          },
+          {
+            "personId": "person-2",
+            "age": 84,
+            "alive": true,
+            "retired": true,
+            "baseSalary": 0,
+            "bonus": 0,
+            "partTimeIncome": 0,
+            "eligibleCompForDeferrals": 0,
+            "eligibleCompForMatch": 0,
+            "employeeTraditional": 0,
+            "employeeRoth": 0,
+            "employerMatch": 0,
+            "employerFlat": 0
+          }
+        ],
+        "accounts": [
+          {
+            "accountId": "a401",
+            "start": 0,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 0,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 0,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "b403",
+            "start": 0,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 0,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 0,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "b403roth",
+            "start": 0,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 0,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 0,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "taxable",
+            "start": 0,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 0,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 0,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "cash",
+            "start": 0,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 0,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 0,
+            "basisEnd": 0
+          }
+        ],
+        "flows": {
+          "contributions": 0,
+          "employerContributions": 0,
+          "feeDrag": 0,
+          "withdrawals": 0,
+          "forfeited": 0,
+          "spendingNeed": 14324852,
+          "spendingFunded": 0,
+          "shortfall": 14324852
+        },
+        "totals": {
+          "portfolioStart": 0,
+          "portfolioEnd": 0,
+          "byTaxTreatment": {
+            "taxDeferred": 0,
+            "taxFree": 0,
+            "taxable": 0
+          }
+        },
+        "real": {
+          "portfolioEnd": 0,
+          "spendingNeed": 7000000,
+          "grossIncome": 0
+        },
+        "grossIncome": 0,
+        "depleted": true,
+        "markers": []
+      },
+      {
+        "year": 2056,
+        "phase": "retirement",
+        "deflator": 2.097567579081786,
+        "people": [
+          {
+            "personId": "person-1",
+            "age": 90,
+            "alive": false,
+            "retired": true,
+            "baseSalary": 0,
+            "bonus": 0,
+            "partTimeIncome": 0,
+            "eligibleCompForDeferrals": 0,
+            "eligibleCompForMatch": 0,
+            "employeeTraditional": 0,
+            "employeeRoth": 0,
+            "employerMatch": 0,
+            "employerFlat": 0
+          },
+          {
+            "personId": "person-2",
+            "age": 85,
+            "alive": true,
+            "retired": true,
+            "baseSalary": 0,
+            "bonus": 0,
+            "partTimeIncome": 0,
+            "eligibleCompForDeferrals": 0,
+            "eligibleCompForMatch": 0,
+            "employeeTraditional": 0,
+            "employeeRoth": 0,
+            "employerMatch": 0,
+            "employerFlat": 0
+          }
+        ],
+        "accounts": [
+          {
+            "accountId": "a401",
+            "start": 0,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 0,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 0,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "b403",
+            "start": 0,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 0,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 0,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "b403roth",
+            "start": 0,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 0,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 0,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "taxable",
+            "start": 0,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 0,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 0,
+            "basisEnd": 0
+          },
+          {
+            "accountId": "cash",
+            "start": 0,
+            "contributions": 0,
+            "employerContributions": 0,
+            "feeDrag": 0,
+            "growthNet": 0,
+            "withdrawals": 0,
+            "forfeited": 0,
+            "end": 0,
+            "basisEnd": 0
+          }
+        ],
+        "flows": {
+          "contributions": 0,
+          "employerContributions": 0,
+          "feeDrag": 0,
+          "withdrawals": 0,
+          "forfeited": 0,
+          "spendingNeed": 14682973,
+          "spendingFunded": 0,
+          "shortfall": 14682973
+        },
+        "totals": {
+          "portfolioStart": 0,
+          "portfolioEnd": 0,
+          "byTaxTreatment": {
+            "taxDeferred": 0,
+            "taxFree": 0,
+            "taxable": 0
+          }
+        },
+        "real": {
+          "portfolioEnd": 0,
+          "spendingNeed": 7000000,
+          "grossIncome": 0
+        },
+        "grossIncome": 0,
+        "depleted": true,
+        "markers": []
+      }
+    ],
+    "summary": {
+      "firstYear": 2026,
+      "lastYear": 2056,
+      "retirementYear": 2031,
+      "firstDeathYear": 2037,
+      "depletionYear": 2041,
+      "depletionAge": 75,
+      "endingBalance": 0,
+      "endingBalanceReal": 0,
+      "infeasibleYears": [],
+      "deterministicSuccess": false
+    },
+    "warnings": []
+  }
+}

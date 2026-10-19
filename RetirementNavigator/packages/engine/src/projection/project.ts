@@ -278,13 +278,14 @@ export function projectHousehold(
       const leftover = Math.max(0, earned + otherIncome - spendingNeed);
       if (leftover < scheduledTotal - 0.005) {
         const k = leftover / scheduledTotal;
-        for (const [id, v] of scheduled) scheduled.set(id, v * k);
+        // Contribution amounts are whole cents (§1.3); the scaled amounts are rounded too.
+        for (const [id, v] of scheduled) scheduled.set(id, toCents(v * k) / 100);
         warnings.push({
           code: 'retirementContributionsReduced',
           year,
           message: `In ${year}, scheduled contributions are reduced to ${usd(leftover)}: in retirement they are funded only from earned and other income left after spending.`,
         });
-        scheduledTotal = leftover;
+        scheduledTotal = [...scheduled.values()].reduce((x, y) => x + y, 0);
       }
     }
     for (const [id, v] of scheduled) add(contrib, id, v);
@@ -373,6 +374,7 @@ export function projectHousehold(
     const byTreatment = { taxDeferred: 0, taxFree: 0, taxable: 0 };
     let portfolioStart = 0;
     let portfolioEnd = 0;
+    let portfolioEndFloat = 0;
     for (const state of states.values()) {
       const id = state.account.id;
       const f = factors.get(id);
@@ -398,6 +400,7 @@ export function projectHousehold(
         state.unvested = state.unvested * f.net.gS + (employer.get(id) ?? 0) * f.net.gC;
       }
       state.balance = E;
+      portfolioEndFloat += E;
 
       const start = toCents(S);
       const contributions = toCents(C);
@@ -483,7 +486,8 @@ export function projectHousehold(
         },
       },
       real: {
-        portfolioEnd: toCents(portfolioEnd / 100 / deflator),
+        // Real values divide the unrounded float by the deflator, then round once (§1.3).
+        portfolioEnd: toCents(portfolioEndFloat / deflator),
         spendingNeed: toCents(spendingNeed / deflator),
         grossIncome: toCents(grossIncome / deflator),
         netIncome: netIncome === null ? null : toCents(netIncome / 100 / deflator),

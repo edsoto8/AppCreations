@@ -147,7 +147,7 @@ export type YearRow = z.infer<typeof YearRowSchema>;
 export const ProjectionSummarySchema = z.object({
   firstYear: CalendarYearSchema,
   lastYear: CalendarYearSchema,
-  /** First year with no living person drawing salary. Null if already retired at year 1 (=firstYear). */
+  /** First retirement-phase year: every living person is retired (firstYear if already retired). */
   retirementYear: CalendarYearSchema,
   firstDeathYear: CalendarYearSchema.nullable(),
   depletionYear: CalendarYearSchema.nullable(),

@@ -41,6 +41,18 @@ the current salary are year-1 nominal, which is the same as today's dollars.
   cents, so the reconciling item cannot hide an error. `feeDrag = round(fee_float)` and
   `growthGross = growthNet + feeDrag`.
 - Year t+1 `start` equals year t `end` in cents (the float64 balance carries forward unrounded).
+- **Contribution amounts are whole cents.** They are payment amounts, and the limit functions work
+  in cents. This covers each plan's traditional and Roth deferrals, the match (computed on eligible
+  pay and total deferral in cents), the flat employer contribution, each scheduled amount (including
+  the retirement-phase scale-down), and a routed surplus. They are rounded once, when determined.
+  Balances, growth and withdrawals stay float64.
+- Real values divide the **unrounded** float by the deflator, then round once (for example
+  `real.portfolioEnd = round(Σ float balances / P_t)`). Accumulation-year `real.netIncome` divides
+  the net pay cents, because net pay is itself a cents output of the tax step.
+- Household flow totals (`flows.contributions`, `employerContributions`, `feeDrag`, `growthNet`,
+  `withdrawals`, `forfeited`) are sums of the per-account cents, so they reconcile with the account
+  rows. `spendingNeed`, `spendingFunded` and `shortfall` round the float figures once, so in a fully
+  funded year `flows.withdrawals` and `spendingFunded` can differ by a cent.
 - `toFixed` is never used for logic.
 
 ### 1.4 Time axis and ages
@@ -56,7 +68,13 @@ the current salary are year-1 nominal, which is the same as today's dollars.
   horizon.
 - Already-retired user: if `retirementAge ≤ age(Y_1)`, the person is retired from year 1.
 - Household **phase** for year t is `retirement` once every living person is retired; otherwise it
-  is `accumulation`.
+  is `accumulation`. `summary.retirementYear` is the first retirement-phase year (year 1 for an
+  already-retired household).
+- Years after a person's `stopAge` but before their retirement age are accumulation years with no
+  salary and no withdrawals. Spending is current spending, assumed funded from pay, with any gap
+  shown by the infeasible flag when taxes are verified.
+- The horizon ends at the longer life, so the `secondDeath` marker never appears (it is reserved
+  in the contract).
 
 ### 1.5 Timing within a year
 - Contributions are made evenly through the year: the year's contributions earn a half-year of
@@ -78,8 +96,10 @@ the current salary are year-1 nominal, which is the same as today's dollars.
   `ρ/(12ρ_m)` is 1 when ρ = 0. For monthly modes a non-negative year-end balance implies every
   month-end balance is non-negative (a negative balance stays negative under a net outflow), so the
   year-end condition is the cap. Gross growth uses the same factors with the gross rate r.
-- If every annual return is ≥ 0, then `E_conservative ≤ E_default` (because `(1+ρ) ≥ (1+ρ)^½`). With
-  negative-return years the ordering is not guaranteed, and the tests do not assert it.
+- If every annual **net** rate ρ (after fees and drag) is ≥ 0, then `E_conservative ≤ E_default`
+  (because `(1+ρ) ≥ (1+ρ)^½`). A 0% gross return with an expense ratio has ρ < 0, which reverses the
+  ordering. In years with a negative net rate the ordering is not guaranteed, and the tests do not
+  assert it.
 
 ### 1.6 Monthly mode [M3]
 Deterministic forecast only. `ρ_m = (1+ρ)^{1/12} − 1`. Each month, the balance grows by `ρ_m`, then
@@ -390,8 +410,10 @@ Accumulation-phase years make no withdrawals: spending is funded from pay (§3.8
 |---|---|
 | taxableFirst | cash → taxable → traditional → Roth → HSA (non-medical) |
 | traditionalFirst | traditional → cash → taxable → Roth → HSA |
-| rothLast | cash, taxable and traditional pro rata by balance → HSA → Roth |
-| proportional | all accounts pro rata by balance |
+| rothLast | cash, taxable and traditional pro rata by available balance → HSA → Roth |
+| proportional | all accounts pro rata by available balance |
+
+"Available balance" is each account's withdrawal cap for the year (§1.5).
 | bracketFill | traditional up to the top of the target bracket's taxable income → cash → taxable → Roth → HSA |
 
 ### 7.4 Roth and HSA withdrawals
