@@ -62,6 +62,14 @@ export function indexRateFor(household: Household): NominalRate {
   return indexing.mode === 'inflation' ? household.assumptions.inflation : indexing.rate;
 }
 
+type WorkplaceYear = Omit<
+  PersonPreviewRow,
+  'year' | 'age' | 'compensation' | 'totalSaved' | 'savingsRate' | 'warnings'
+> & {
+  /** Per plan (in plan order): contributions after limits; null when a limit is unverified. */
+  capped: (CappedContributions | null)[];
+};
+
 function workplaceYear(
   person: Person,
   comp: CompensationFloat,
@@ -70,7 +78,7 @@ function workplaceYear(
   priorYearFicaWages: Cents | null,
   access: RuleAccess,
   warnings: EngineWarning[],
-): Omit<PersonPreviewRow, 'year' | 'age' | 'compensation' | 'totalSaved' | 'savingsRate' | 'warnings'> {
+): WorkplaceYear {
   const plans = person.workplacePlans;
   const employment = person.employment;
   let requestedTraditional = 0;
@@ -78,6 +86,7 @@ function workplaceYear(
   let total: CappedContributions | null = ZERO_CAPPED;
   let aggregated = 0;
   const planRows: PersonPreviewRow['plans'] = [];
+  const capped: (CappedContributions | null)[] = [];
   let firstMatch = computeMatch(
     plans[0]?.match ?? {
       tiers: [],
@@ -129,7 +138,14 @@ function workplaceYear(
       matchBeforeLimits: breakdown,
     });
 
-    if (!comp.working || total === null) return;
+    if (!comp.working) {
+      capped.push(ZERO_CAPPED);
+      return;
+    }
+    if (total === null) {
+      capped.push(null);
+      return;
+    }
     const result = capContributions(
       {
         year: comp.year,
@@ -147,8 +163,10 @@ function workplaceYear(
     if (result.status !== 'ok') {
       if (result.status === 'unverified') access.absorb(result.missing);
       total = null;
+      capped.push(null);
       return;
     }
+    capped.push(result.value);
     for (const w of result.warnings) warnings.push({ ...w, personId: person.id });
     if (plan.planType !== '457b') aggregated += result.value.traditional + result.value.roth;
     total = addCapped(total, result.value);
@@ -161,6 +179,7 @@ function workplaceYear(
     matchBeforeLimits: firstMatch,
     plans: planRows,
     contributions: total,
+    capped,
     vestedFractionEndOfYear: firstPlan
       ? vestedFraction(firstPlan.match.vesting, firstPlan.match.yearsOfServiceAtStart + t)
       : 1,
@@ -185,133 +204,154 @@ function otherIncomeFor(household: Household, year: number, t: number): { gross:
   return { gross, taxable };
 }
 
-export function previewAccumulation(
-  household: Household,
-  ctx: EngineContext,
-  years: number,
-): EngineResult<AccumulationPreview> {
-  if (!Number.isInteger(years) || years < 1 || years > 60) {
-    return { status: 'invalid', issues: [{ path: ['years'], message: 'Years must be between 1 and 60' }] };
-  }
+/** One year of the accumulation slice, shared by the preview and the projection. */
+export interface AccumulationYear {
+  /** Keyed by person id. */
+  people: Map<string, PersonPreviewRow>;
+  cashFlow: CashFlowPreviewRow;
+  /** Per person and plan (plan order): contributions after limits, or null when a limit is unverified. */
+  planCapped: Map<string, (CappedContributions | null)[]>;
+  /** Float64 dollars for the projection (spending, gross pay and other income). */
+  float: { grossPay: number; otherIncome: number; spending: number; anyWorking: boolean };
+}
+
+export interface AccumulationSetup {
+  firstYear: number;
+  paths: Map<string, CompensationFloat[]>;
+  access: RuleAccess;
+}
+
+export function accumulationSetup(household: Household, ctx: EngineContext, years: number): AccumulationSetup {
   const firstYear = ctx.currentYear;
   const inflation = household.assumptions.inflation;
-  const access = new RuleAccess(firstYear);
-  const paths = new Map(household.people.map((p) => [p.id, compensationPathFloat(p, firstYear, years, inflation)]));
-  const peopleRows = new Map<string, PersonPreviewRow[]>(household.people.map((p) => [p.id, []]));
-  const cashFlow: CashFlowPreviewRow[] = [];
+  return {
+    firstYear,
+    paths: new Map(household.people.map((p) => [p.id, compensationPathFloat(p, firstYear, years, inflation)])),
+    access: new RuleAccess(firstYear),
+  };
+}
 
-  for (let t = 1; t <= years; t++) {
-    const year = firstYear + t - 1;
-    const rules = resolveRules(ctx.rules, {
-      anchorYear: household.assumptions.rules.anchorYear,
-      targetYear: year,
-      indexRate: indexRateFor(household),
-    });
-    const states = new Map<string, PersonYearInput>();
-    const yearWarnings: EngineWarning[] = [];
+export function accumulationYear(
+  household: Household,
+  setup: AccumulationSetup,
+  t: number,
+  rules: ResolvedYearRules,
+): AccumulationYear {
+  const { firstYear, paths, access } = setup;
+  const inflation = household.assumptions.inflation;
+  const year = firstYear + t - 1;
+  const states = new Map<string, PersonYearInput>();
+  const yearWarnings: EngineWarning[] = [];
+  const people = new Map<string, PersonPreviewRow>();
+  const planCapped = new Map<string, (CappedContributions | null)[]>();
 
-    for (const person of household.people) {
-      const comp = paths.get(person.id)?.[t - 1];
-      if (!comp) continue;
-      const warnings: EngineWarning[] = [];
-      const prior = paths.get(person.id)?.[t - 2];
-      const priorWages =
-        t === 1
-          ? (person.employment?.priorYearFicaWages ?? null)
-          : prior
-            ? toCents(prior.baseSalary + prior.bonus + prior.partTimeIncome)
-            : null;
-      const wp = workplaceYear(person, comp, t, rules, priorWages, access, warnings);
-      const totalComp = comp.baseSalary + comp.bonus + comp.partTimeIncome;
-      const c = wp.contributions;
-      const totalSaved = c === null ? null : c.traditional + c.roth + c.employerMatch + c.employerFlat;
-      states.set(person.id, { person, comp, contributions: c });
-      peopleRows.get(person.id)?.push({
+  for (const person of household.people) {
+    const comp = paths.get(person.id)?.[t - 1];
+    if (!comp) continue;
+    const warnings: EngineWarning[] = [];
+    const prior = paths.get(person.id)?.[t - 2];
+    const priorWages =
+      t === 1
+        ? (person.employment?.priorYearFicaWages ?? null)
+        : prior
+          ? toCents(prior.baseSalary + prior.bonus + prior.partTimeIncome)
+          : null;
+    const { capped, ...wp } = workplaceYear(person, comp, t, rules, priorWages, access, warnings);
+    planCapped.set(person.id, capped);
+    const totalComp = comp.baseSalary + comp.bonus + comp.partTimeIncome;
+    const c = wp.contributions;
+    const totalSaved = c === null ? null : c.traditional + c.roth + c.employerMatch + c.employerFlat;
+    states.set(person.id, { person, comp, contributions: c });
+    people.set(person.id, {
+      year,
+      age: comp.age,
+      compensation: {
         year,
         age: comp.age,
-        compensation: {
-          year,
-          age: comp.age,
-          working: comp.working,
-          baseSalary: toCents(comp.baseSalary),
-          bonus: toCents(comp.bonus),
-          partTimeIncome: toCents(comp.partTimeIncome),
-          totalCompensation: toCents(totalComp),
-          eligibleCompForDeferrals: toCents(comp.eligibleForDeferrals),
-          eligibleCompForMatch: toCents(comp.eligibleForMatch),
-          nominalRaise: comp.nominalRaise,
-          realRaise: comp.realRaise,
-        },
-        ...wp,
-        totalSaved: totalSaved === null ? null : asCents(totalSaved),
-        savingsRate: totalSaved === null || totalComp <= 0 ? null : totalSaved / 100 / totalComp,
-        warnings,
-      });
-      yearWarnings.push(...warnings);
-    }
+        working: comp.working,
+        baseSalary: toCents(comp.baseSalary),
+        bonus: toCents(comp.bonus),
+        partTimeIncome: toCents(comp.partTimeIncome),
+        totalCompensation: toCents(totalComp),
+        eligibleCompForDeferrals: toCents(comp.eligibleForDeferrals),
+        eligibleCompForMatch: toCents(comp.eligibleForMatch),
+        nominalRaise: comp.nominalRaise,
+        realRaise: comp.realRaise,
+      },
+      ...wp,
+      totalSaved: totalSaved === null ? null : asCents(totalSaved),
+      savingsRate: totalSaved === null || totalComp <= 0 ? null : totalSaved / 100 / totalComp,
+      warnings,
+    });
+    yearWarnings.push(...warnings);
+  }
 
-    // Household cash flow.
-    const scheduled = scheduledContributions(household, t, year, firstYear, states, rules, access, yearWarnings);
-    // Pre-tax HSA dollars must be known to estimate income tax.
-    const hsaPreTax = scheduled.hsaPreTax;
-    const other = otherIncomeFor(household, year, t);
-    let grossPay = 0;
-    let workplaceEmployee: number | null = 0;
-    let preTax = 0;
-    const wagesByPerson: Cents[] = [];
-    const ages: number[] = [];
-    let anyWorking = false;
-    for (const s of states.values()) {
-      const pay = s.comp.baseSalary + s.comp.bonus + s.comp.partTimeIncome;
-      grossPay += pay;
-      wagesByPerson.push(toCents(pay));
-      ages.push(s.comp.age);
-      anyWorking ||= s.comp.age < s.person.retirementAge;
-      if (s.contributions === null) workplaceEmployee = null;
-      else if (workplaceEmployee !== null) {
-        workplaceEmployee += (s.contributions.traditional + s.contributions.roth) / 100;
-        preTax += s.contributions.traditional / 100;
-      }
+  // Household cash flow.
+  const scheduled = scheduledContributions(household, t, year, firstYear, states, rules, access, yearWarnings);
+  // Pre-tax HSA dollars must be known to estimate income tax.
+  const hsaPreTax = scheduled.hsaPreTax;
+  const other = otherIncomeFor(household, year, t);
+  let grossPay = 0;
+  let workplaceEmployee: number | null = 0;
+  let preTax = 0;
+  const wagesByPerson: Cents[] = [];
+  const ages: number[] = [];
+  let anyWorking = false;
+  for (const s of states.values()) {
+    const pay = s.comp.baseSalary + s.comp.bonus + s.comp.partTimeIncome;
+    grossPay += pay;
+    wagesByPerson.push(toCents(pay));
+    ages.push(s.comp.age);
+    anyWorking ||= s.comp.age < s.person.retirementAge;
+    if (s.contributions === null) workplaceEmployee = null;
+    else if (workplaceEmployee !== null) {
+      workplaceEmployee += (s.contributions.traditional + s.contributions.roth) / 100;
+      preTax += s.contributions.traditional / 100;
     }
-    const spendingToday = anyWorking
-      ? household.spending.currentAnnualSpending
-      : household.spending.retirementAnnualSpending;
-    const spending = (spendingToday / 100) * priceIndex(inflation, t);
+  }
+  const spendingToday = anyWorking
+    ? household.spending.currentAnnualSpending
+    : household.spending.retirementAnnualSpending;
+  const spending = (spendingToday / 100) * priceIndex(inflation, t);
 
-    let taxes: TaxBreakdown | null = null;
-    if (workplaceEmployee !== null && hsaPreTax !== null) {
-      const taxResult = computeTax(
-        {
-          filingStatus: household.filingStatus,
-          ages,
-          wages: toCents(grossPay),
-          wagesByPerson,
-          otherOrdinaryIncome: toCents(other.taxable),
-          socialSecurityBenefits: 0 as Cents,
-          longTermCapitalGains: 0 as Cents,
-          // SIMPLIFICATION: HSA contributions are treated as pre-tax for income tax (FICA on gross wages).
-          preTaxDeductions: toCents(preTax + hsaPreTax),
-          stateTaxRate: household.assumptions.stateTaxRate as Fraction,
-        },
-        rules,
-      );
-      if (taxResult.status === 'unverified') access.absorb(taxResult.missing);
-      else if (taxResult.status === 'ok') taxes = taxResult.value;
-    }
+  let taxes: TaxBreakdown | null = null;
+  if (workplaceEmployee !== null && hsaPreTax !== null) {
+    const taxResult = computeTax(
+      {
+        filingStatus: household.filingStatus,
+        ages,
+        wages: toCents(grossPay),
+        wagesByPerson,
+        otherOrdinaryIncome: toCents(other.taxable),
+        socialSecurityBenefits: 0 as Cents,
+        longTermCapitalGains: 0 as Cents,
+        // SIMPLIFICATION: HSA contributions are treated as pre-tax for income tax (FICA on gross wages).
+        preTaxDeductions: toCents(preTax + hsaPreTax),
+        stateTaxRate: household.assumptions.stateTaxRate as Fraction,
+      },
+      rules,
+    );
+    if (taxResult.status === 'unverified') access.absorb(taxResult.missing);
+    else if (taxResult.status === 'ok') taxes = taxResult.value;
+  }
 
-    const contributions =
-      workplaceEmployee === null || scheduled.total === null ? null : workplaceEmployee + scheduled.total;
-    const netPay = taxes === null ? null : grossPay + other.gross - taxes.totalTax / 100;
-    const surplus = netPay === null || contributions === null ? null : netPay - contributions - spending;
-    const infeasible = surplus === null || !anyWorking ? null : surplus < -0.005;
-    if (infeasible) {
-      yearWarnings.push({
-        code: 'savingsPlanInfeasible',
-        year,
-        message: `In ${year}, estimated take-home pay does not cover the planned contributions plus spending (shortfall $${Math.round(-(surplus ?? 0)).toLocaleString('en-US')}).`,
-      });
-    }
-    cashFlow.push({
+  const contributions =
+    workplaceEmployee === null || scheduled.total === null ? null : workplaceEmployee + scheduled.total;
+  const netPay = taxes === null ? null : grossPay + other.gross - taxes.totalTax / 100;
+  const surplus = netPay === null || contributions === null ? null : netPay - contributions - spending;
+  const infeasible = surplus === null || !anyWorking ? null : surplus < -0.005;
+  if (infeasible) {
+    yearWarnings.push({
+      code: 'savingsPlanInfeasible',
+      year,
+      message: `In ${year}, estimated take-home pay does not cover the planned contributions plus spending (shortfall $${Math.round(-(surplus ?? 0)).toLocaleString('en-US')}).`,
+    });
+  }
+  return {
+    people,
+    planCapped,
+    float: { grossPay, otherIncome: other.gross, spending, anyWorking },
+    cashFlow: {
       year,
       grossPay: toCents(grossPay + other.gross),
       taxes,
@@ -323,10 +363,36 @@ export function previewAccumulation(
       warnings: yearWarnings,
       scheduled: scheduled.byAccount,
       rothIra: scheduled.rothIra,
-    });
-  }
+    },
+  };
+}
 
-  const unverifiedDetails: UnverifiedDetail[] = access.missing;
+/** Rules in force for projection year `year` under the household's anchor and indexing settings. */
+export function rulesForYear(household: Household, ctx: EngineContext, year: number): ResolvedYearRules {
+  return resolveRules(ctx.rules, {
+    anchorYear: household.assumptions.rules.anchorYear,
+    targetYear: year,
+    indexRate: indexRateFor(household),
+  });
+}
+
+export function previewAccumulation(
+  household: Household,
+  ctx: EngineContext,
+  years: number,
+): EngineResult<AccumulationPreview> {
+  if (!Number.isInteger(years) || years < 1 || years > 60) {
+    return { status: 'invalid', issues: [{ path: ['years'], message: 'Years must be between 1 and 60' }] };
+  }
+  const setup = accumulationSetup(household, ctx, years);
+  const peopleRows = new Map<string, PersonPreviewRow[]>(household.people.map((p) => [p.id, []]));
+  const cashFlow: CashFlowPreviewRow[] = [];
+  for (let t = 1; t <= years; t++) {
+    const y = accumulationYear(household, setup, t, rulesForYear(household, ctx, setup.firstYear + t - 1));
+    for (const [personId, row] of y.people) peopleRows.get(personId)?.push(row);
+    cashFlow.push(y.cashFlow);
+  }
+  const unverifiedDetails: UnverifiedDetail[] = setup.access.missing;
   return {
     status: 'ok',
     value: {

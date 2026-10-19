@@ -48,10 +48,11 @@ export const AccountYearSchema = z.object({
   /** Fee shadow figure: growthNet = growthGross - feeDrag. */
   feeDrag: C,
   growthNet: C,
+  /** Money leaving the account: spending withdrawals plus any forfeiture (see `forfeited`). */
   withdrawals: C,
   /** Of `withdrawals`, the required minimum distribution. */
   rmd: C,
-  /** Unvested employer money forfeited at separation (counted inside withdrawals = 0; shown separately). */
+  /** Of `withdrawals`, unvested employer money forfeited at separation (taken at the start of the year). */
   forfeited: C,
   end: C,
   /** Taxable: cost basis at year end. Roth IRA: contribution basis at year end. Otherwise 0. */
@@ -95,7 +96,12 @@ export const YearRowSchema = z.object({
     growthGross: C,
     feeDrag: C,
     growthNet: C,
+    /** Spending withdrawals (excludes forfeitures). */
     withdrawals: C,
+    /** Unvested employer money forfeited at separation. */
+    forfeited: C,
+    /** Accumulation-phase surplus added to the surplus account. */
+    surplusRouted: C,
     socialSecurity: C,
     pensions: C,
     otherIncome: C,
@@ -108,11 +114,13 @@ export const YearRowSchema = z.object({
     shortfall: C,
   }),
   cashFlow: z.object({
-    netPay: C,
+    /** Null when a tax rule it needs is unverified (taxes are never filled in). */
+    netPay: C.nullable(),
     employeeContributions: C,
-    /** netPay - employee contributions - spending (accumulation phase). Negative => infeasible. */
-    surplus: C,
-    infeasible: z.boolean(),
+    /** netPay - employee contributions - spending (accumulation phase). Negative => infeasible. Null when unknown. */
+    surplus: C.nullable(),
+    /** Null when unknown (taxes unverified) or in the retirement phase. */
+    infeasible: z.boolean().nullable(),
   }),
   tax: TaxYearDetailSchema.nullable(),
   totals: z.object({
@@ -124,10 +132,12 @@ export const YearRowSchema = z.object({
     portfolioEnd: C,
     spendingNeed: C,
     grossIncome: C,
-    netIncome: C,
+    netIncome: C.nullable(),
   }),
+  /** Earned income + other income (+ spending withdrawals in the retirement phase), before taxes. */
   grossIncome: C,
-  netIncome: C,
+  /** grossIncome − taxes; null when taxes are not computed (unverified rules, or retirement-phase taxes before M4). */
+  netIncome: C.nullable(),
   depleted: z.boolean(),
   /** Events in this year for chart markers. */
   markers: z.array(z.enum(['retirement', 'firstDeath', 'secondDeath', 'depletion'])),
@@ -156,7 +166,10 @@ export const ProjectionResultSchema = z.object({
   granularity: z.enum(['annual', 'monthly']),
   rows: z.array(YearRowSchema),
   summary: ProjectionSummarySchema,
-  /** Rule-dependent steps that were skipped because a needed rule value is null. */
+  /**
+   * Rule-dependent steps that were skipped because a needed rule value is null (for example
+   * `workplaceLimits`: contributions are as elected, before limits). Dependent figures are labeled.
+   */
   excludedFeatures: z.array(z.string()),
   /** Rules that were null and the features they block (outputs depending on these are not shown as numbers). */
   unverified: z.array(z.object({ key: z.string(), reason: z.string(), features: z.array(z.string()) })),

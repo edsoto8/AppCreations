@@ -163,6 +163,8 @@ describe('ProjectionResult and Insight contracts', () => {
           'feeDrag',
           'growthNet',
           'withdrawals',
+          'forfeited',
+          'surplusRouted',
           'socialSecurity',
           'pensions',
           'otherIncome',

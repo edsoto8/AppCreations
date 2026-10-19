@@ -27,7 +27,10 @@ export type WarningCode =
   | 'ssEstimateIllustrative'
   | 'rulesProjected'
   | 'healthcarePreMedicareUserEntered'
-  | 'orphanedScenarioOp';
+  | 'orphanedScenarioOp'
+  | 'featureNotModeled'
+  | 'withdrawalStrategyFallback'
+  | 'retirementContributionsReduced';
 
 export interface EngineWarning {
   code: WarningCode;

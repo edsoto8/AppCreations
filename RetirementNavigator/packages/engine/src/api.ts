@@ -18,7 +18,7 @@ import type { Insight } from './domain/insight';
 import type { ExportBundle } from './domain/documents';
 import type { ValidationIssue } from './domain/results';
 
-export const CONTRACT_VERSION = '1.3.0';
+export { CONTRACT_VERSION } from './contractVersion';
 
 export class NotImplementedError extends Error {
   constructor(fn: string) {
@@ -413,19 +413,44 @@ export interface ProjectionOptions {
 /**
  * Deterministic year-by-year projection (annual or monthly per assumptions.granularity).
  * Returns `ok` even when some rules are null: dependent steps are excluded and listed in
- * `excludedFeatures` / `unverified`, and the UI must not present dependent outputs as numbers.
- * Returns `invalid` when the household fails schema validation.
+ * `excludedFeatures` / `unverified` (for example, contributions as elected before unverified
+ * limits), and the UI labels every dependent figure. Figures that would need a null rule value
+ * directly (taxes, net pay) are null. Returns `invalid` when the household fails schema validation.
+ * Implemented in M3 (projection/project.ts).
  */
-export function projectHousehold(
-  household: Household,
-  ctx: EngineContext,
-  options?: ProjectionOptions,
-): EngineResult<ProjectionResult> {
-  void household;
-  void ctx;
-  void options;
-  throw new NotImplementedError('projectHousehold');
+export { projectHousehold } from './projection/project';
+
+/** Dashboard cards (docs/financial-model.md §8): each with its dollar, tax and year basis. */
+export interface DashboardCards {
+  people: { personId: string; name: string; currentAge: number; retirementAge: number; yearsToRetirement: number }[];
+  /** Σ account balances at the start of year 1 (nominal = today's dollars), gross of taxes. */
+  currentSavings: Cents;
+  /** First retirement-phase year (every living person retired). */
+  firstRetirementYear: CalendarYear;
+  /** Portfolio at the start of the first retirement year, gross. */
+  savingsAtRetirement: { nominal: Cents; real: Cents };
+  /** Income in the first retirement year / 12; `taxBasis` says whether taxes were subtracted. */
+  monthlyRetirementIncome: { nominal: Cents; real: Cents; taxBasis: 'net' | 'beforeTaxes' };
+  /** Spending need in the first retirement year / 12 (a net, after-tax need). */
+  monthlyRetirementSpending: { nominal: Cents; real: Cents };
+  /** monthlyRetirementIncome − monthlyRetirementSpending. */
+  monthlySurplus: { nominal: Cents; real: Cents; taxBasis: 'net' | 'beforeTaxes' };
+  longevity:
+    { kind: 'lastsThroughPlanningAge'; planningAge: number } | { kind: 'depletes'; year: CalendarYear; age: number };
+  /** Labeled heuristic: on track = baseline and pessimistic succeed; borderline = baseline only; at risk = baseline fails. */
+  readiness: { status: 'onTrack' | 'borderline' | 'atRisk'; baselineSuccess: boolean; pessimisticSuccess: boolean };
 }
+
+export interface DashboardResult {
+  baseline: ProjectionResult;
+  /** Reruns with the household's fixed return offsets (not confidence intervals). */
+  optimistic: ProjectionResult;
+  pessimistic: ProjectionResult;
+  cards: DashboardCards;
+}
+
+/** Baseline, optimistic and pessimistic projections plus the dashboard cards. Implemented in M3. */
+export { computeDashboard } from './projection/dashboard';
 
 // =============================================================================================
 // Scenarios and optimizer (module: scenario/)

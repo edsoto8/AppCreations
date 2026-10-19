@@ -66,6 +66,18 @@ the current salary are year-1 nominal, which is the same as today's dollars.
 - Annual account update for net rate `ρ` (see §4):
   - mid-year withdrawals: `E = S(1+ρ) + (C − W)(1+ρ)^½`
   - start-of-year withdrawals: `E = (S − W)(1+ρ) + C(1+ρ)^½`
+- Every timing mode is linear in the flows, `E = g_S·S + g_C·C − g_W·W` (`projection/accounts.ts`):
+
+  | Mode | g_S | g_C | g_W | Withdrawal cap |
+  |---|---|---|---|---|
+  | annual, mid-year | 1+ρ | (1+ρ)^½ | (1+ρ)^½ | `(g_S·S + g_C·C)/g_W` (E ≥ 0) |
+  | annual, start of year | 1+ρ | (1+ρ)^½ | 1+ρ | `S` (cannot exceed the start balance) |
+  | monthly, end of month | 1+ρ | ρ/(12ρ_m) | ρ/(12ρ_m) | `(g_S·S + g_C·C)/g_W` |
+  | monthly, start of month | 1+ρ | ρ/(12ρ_m) | ρ/(12ρ_m)·(1+ρ_m) | `(g_S·S + g_C·C)/g_W` |
+
+  `ρ/(12ρ_m)` is 1 when ρ = 0. For monthly modes a non-negative year-end balance implies every
+  month-end balance is non-negative (a negative balance stays negative under a net outflow), so the
+  year-end condition is the cap. Gross growth uses the same factors with the gross rate r.
 - If every annual return is ≥ 0, then `E_conservative ≤ E_default` (because `(1+ρ) ≥ (1+ρ)^½`). With
   negative-return years the ordering is not guaranteed, and the tests do not assert it.
 
@@ -78,10 +90,30 @@ Deterministic forecast only. `ρ_m = (1+ρ)^{1/12} − 1`. Each month, the balan
   `E_m = S(1+ρ) + (C − W)·((1+ρ) − 1)/(12ρ_m)`. The documented difference per year is
   `|(C − W)|·|ρ/(12ρ_m) − 1|`, which is about 3.2% of the annual net flow at ρ = 7%.
 - Compared with the default mid-year annual timing, the difference per year is
-  `|(C − W)|·|(1+ρ)^½ − ρ/(12ρ_m)|`. For |ρ| ≤ 15% this is below 0.6% of the year's net flow (the
-  exact table will be computed and tested in M3).
+  `|(C − W)|·|(1+ρ)^½ − ρ/(12ρ_m)|`, as a share of the year's net flow (tested):
+
+  | ρ | −15% | −10% | −5% | 3% | 5% | 7% | 10% | 15% |
+  |---|---|---|---|---|---|---|---|---|
+  | vs mid-year annual | 0.73% | 0.46% | 0.22% | 0.12% | 0.20% | 0.27% | 0.38% | 0.54% |
+  | vs end-of-period annual | 7.08% | 4.67% | 2.31% | 1.37% | 2.27% | 3.17% | 4.50% | 6.70% |
+
+  So for |ρ| ≤ 15% monthly and default annual results differ by less than 0.75% of each year's net
+  flow; balances alone (no flows) are identical (test tolerance ≤ 1 cent per year).
 
 ---
+
+### 1.7 Unverified rules in the forecast (owner decision, 2026-10-19)
+While rule values are unverified, the forecast is still shown, **with the dependent steps left out
+and labeled**, never with a filled-in value:
+- Workplace limits unverified (`workplaceLimits`): contributions are **as elected, before limits**
+  (requested deferrals and the match on them). This can overstate savings for people above the
+  limits.
+- IRA/HSA limits or Roth eligibility unverified: a dollar or percent schedule contributes the
+  requested amount; "maximum allowed" contributes nothing (its amount is the unknown limit).
+- Taxes unverified (`federalIncomeTax`, `payrollTax`): net pay, surplus, the infeasible flag and net
+  income are **null**; no surplus is routed.
+- `ProjectionResult.excludedFeatures` lists every skipped feature, `unverified` lists the rule keys,
+  and the UI shows a persistent banner plus a badge on each dependent card and chart.
 
 ## 2. Rules resolution [M2, final]
 - Values are `Verified<T>`, each `verified`, `unverified` (null plus `unverifiedReason`), or
@@ -231,21 +263,68 @@ Deterministic forecast only. `ρ_m = (1+ρ)^{1/12} − 1`. Each month, the balan
   spending once everyone is retired.
 - In years with someone working, `surplus < 0` flags the plan **infeasible** with a warning. Balances
   still assume the plan is carried out, and the shortfall is shown, not hidden.
-- If `surplus > 0`, it goes to the chosen account (default: spent). Routing happens in the
-  projection (M3); the M2 preview only reports the surplus.
+- If `surplus > 0`, it goes to the chosen account (default: spent) as a mid-year contribution
+  (`flows.surplusRouted`; a taxable account's basis rises by the same amount). A negative surplus
+  is not withdrawn from savings; the year is listed in `summary.infeasibleYears`.
 - Every figure that needs an unverified rule (limits, taxes) is null and labeled in the UI.
 
 ## 4. Accounts, growth and fees [M3]
 - Expected return precedence: `account.expectedReturn`, then the allocation-implied
-  `Σ w_k·g_k^CMA`, then the phase assumption (pre- or post-retirement).
+  `Σ w_k·g_k^CMA`, then the phase assumption (pre- or post-retirement, by the **household** phase of
+  that year). Then the deterministic offset is added (§9). The applied return is floored at −99%.
 - Fee drag: net rate `ρ = (1+r)(1−f) − 1`, where f is the expense ratio. The gross figure uses r, and
   `feeDrag = growthGross − growthNet`.
 - Taxable accounts: `ρ = (1+r)(1−f) − 1 − drag`, where drag is the user's tax-drag percentage points
   (default 0).
-- Market shock (scenario D): the given returns replace r for every account in those years.
+- Market shock (scenario D): the given returns replace r for every account in those years (the
+  offset still applies).
 - Taxable basis: contributions add basis 1:1. A withdrawal W reduces basis pro rata,
   `basis' = basis·(1 − W/balance)`, and the realized gain is `W·(1 − basis/balance)`.
-- Roth IRA: withdrawals come from contribution basis first, then earnings (§7.4).
+  In the projection the "balance" for that ratio is the account's withdrawal cap (the amount
+  available that year), so `basis' = (basis + C)·(1 − W/cap)`.
+- Roth IRA: withdrawals come from contribution basis first, then earnings (§7.4):
+  `basis' = max(0, basis + C − W)`.
+- Contributions route to accounts as follows:
+  - workplace traditional deferrals go to the plan's traditional account;
+  - Roth deferrals go to its Roth account;
+  - employer match and flat go to the match destination (the Roth account if `matchDestination` is
+    Roth, else the traditional account);
+  - scheduled amounts go to their own account;
+  - a routed surplus goes to the surplus account.
+- **Vesting and forfeiture:** employer money also accrues in an unvested sub-ledger of the match
+  destination account, `u' = u·g_S + employer·g_C`, starting from `unvestedEmployerBalance`.
+  - Separation is the start of the first projection year in which the owner has no salary
+    (including year 1).
+  - Years of service at separation = `yearsOfServiceAtStart` + projection years worked.
+  - The forfeiture is `F = min(balance, u·(1 − v(years of service)))`, taken at the start of that
+    year before growth. It is included in the account's `withdrawals` and shown in `forfeited` and
+    `flows.forfeited`. Household `flows.withdrawals` counts spending withdrawals only.
+- Tax treatment for allocation view (b): tax-deferred = workplace traditional, traditional IRA,
+  "other" tax-deferred; tax-free = workplace Roth, Roth IRA, HSA, "other" tax-free; taxable =
+  taxable brokerage, cash, "other" taxable. HSA is shown as tax-free (qualified medical use).
+
+### 4.1 Retirement-phase cash flow (M3: simple withdrawals, before taxes)
+For each retirement-phase year:
+1. `need = retirementAnnualSpending · P_t`.
+2. Cash income `I = earned (part-time) + other income`, before taxes.
+3. Scheduled contributions are funded only from `max(0, I − need)`, and are scaled down if that is
+   smaller (warning `retirementContributionsReduced`).
+4. Withdrawal need `W = max(0, need + contributions − I)`, before taxes. It is drawn by the
+   strategy's order (§7.3). Within one group, accounts are drawn pro rata by their caps; no account
+   goes below its cap (§1.5). `bracketFill` needs the tax model, so it falls back to taxableFirst
+   with a warning until M4.
+5. Any unfunded part is the shortfall (`spendingFunded = need − shortfall`). The first year with a
+   shortfall above half a cent is the depletion year, with a `portfolioDepleted` warning.
+6. `grossIncome = I + funded withdrawals`. `netIncome` is null until the M4 tax model (retirement
+   taxes, RMDs, SS, pensions, one-time events, spending steps, glide, healthcare and the survivor
+   reduction all arrive in M4 and are listed as `featureNotModeled` warnings while they are not
+   modeled).
+
+Accumulation-phase years make no withdrawals: spending is funded from pay (§3.8). Their
+`grossIncome` is wages plus other income, and `netIncome = netPay` (null when taxes are unverified).
+
+- **Deterministic success:** no depletion year, and the real ending balance ≥
+  `minimumEndingBalance` (today's dollars).
 
 ## 5. Spending [M4]
 - Accumulation years: `spend_t = currentAnnualSpending · P_t`.
@@ -367,9 +446,9 @@ Deterministic forecast only. `ρ_m = (1+ρ)^{1/12} − 1`. Each month, the balan
 | Years to retirement | `max(0, retirementAge − currentAge)` | — | — | — |
 | Current savings | Σ account balances | nominal = today's | gross (pre-tax balances) | start of year 1 |
 | Projected savings at retirement | `portfolioStart` in the first retirement year | toggle | gross | first retirement year, start |
-| Projected monthly retirement income | `netIncome/12` | toggle | net of estimated taxes | first retirement year |
+| Projected monthly retirement income | `netIncome/12`, or `grossIncome/12` labeled "before taxes" while netIncome is null (all of M3) | toggle | net, or before taxes (labeled) | first retirement year |
 | Estimated monthly retirement spending | `spendingNeed/12` | toggle | net need | first retirement year |
-| Surplus / shortfall | income − spending (monthly) | toggle | net | first retirement year |
+| Surplus / shortfall | income − spending (monthly) | toggle | same basis as income | first retirement year |
 | Portfolio longevity | depletion age, or "lasts through planning age" | — | — | — |
 | Readiness | heuristic, below | — | — | — |
 
@@ -379,12 +458,20 @@ Readiness (a labeled heuristic):
 - **At risk**: the baseline fails.
 - From M6, Monte Carlo success ≥ 85% / 70–85% / < 70% is shown alongside, with its assumptions.
 
-Cards whose inputs depend on an excluded (unverified) feature display "Unverified rule", not a number.
+- "First retirement year" is the first year in which every living person is retired; for an
+  already-retired household it is year 1.
+- Real values divide by that year's deflator `P_t`. Monthly figures are the annual cents ÷ 12,
+  rounded half to even.
+- Cards that depend on an excluded (unverified) feature carry its label, for example "before plan
+  limits" or "before taxes" (§1.7). A figure that needs a null rule directly (net pay) is not shown
+  as a number.
+- Implemented in `projection/dashboard.ts` (`computeDashboard`); tests in
+  `projection/project.test.ts`.
 
 ## 9. Optimistic / baseline / pessimistic lines [M3]
 These rerun the projection with `returnOffset` set to +optimistic, 0 and +pessimistic (default
 ±2 percentage points) on every account's nominal return. They are fixed return offsets, not
-confidence intervals.
+confidence intervals. Everything else (contributions, spending, inflation) is unchanged.
 
 ## 10. Scenarios [M5]
 - Diff ops `set | unset | add`, keyed by `(collection, id)`, are applied in order to a deep copy of the
