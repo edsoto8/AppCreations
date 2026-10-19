@@ -37,10 +37,12 @@ test.describe('M7b data, insights and print', () => {
     await expect(page).toHaveURL(/#\/welcome/);
 
     await page.goto(appUrl('/data'));
+    await expect(page.getByRole('heading', { level: 1, name: 'Data & Privacy' })).toBeVisible({ timeout: 15_000 });
     await page.getByLabel('Export file (.json)').setInputFiles(exportPath);
-    await page.getByRole('button', { name: 'Replace all data' }).click();
+    await page.getByRole('button', { name: 'Replace all data' }).click({ timeout: 15_000 });
+    await expect(page.getByText(/^Imported \d+ profile/).first()).toBeVisible({ timeout: 15_000 });
     await page.goto(appUrl('/'));
-    await expect(page.getByRole('heading', { level: 1, name: 'Dashboard' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: 'Dashboard' })).toBeVisible({ timeout: 15_000 });
     expect(outbound()).toEqual([]);
     expect(errors()).toEqual([]);
   });

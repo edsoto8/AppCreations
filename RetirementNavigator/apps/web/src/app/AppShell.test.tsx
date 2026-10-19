@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router';
 import { AppRoutes } from './App';
@@ -23,9 +23,9 @@ describe('AppShell', () => {
     expect(screen.getByText(DISCLAIMER_TEXT)).toBeInTheDocument();
   });
 
-  it('builds every section: no placeholder remains (the calculators were the last, M7a)', () => {
+  it('builds every section: no placeholder remains (the calculators were the last, M7a)', async () => {
     renderAt('/calculators');
-    expect(screen.getByRole('heading', { level: 1, name: 'Calculators' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 1, name: 'Calculators' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Roth vs traditional/ })).toHaveAttribute(
       'href',
       '/calculators?c=rothVsTraditional',
@@ -44,8 +44,8 @@ describe('AppShell', () => {
     renderAt('/');
     const nav = screen.getByRole('navigation', { name: 'Main' });
     await user.click(within(nav).getByRole('link', { name: 'Data & Privacy' }));
-    expect(screen.getByRole('heading', { level: 1, name: 'Data & Privacy' })).toBeInTheDocument();
-    expect(screen.getByText(/not encrypted/)).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 1, name: 'Data & Privacy' })).toBeInTheDocument();
+    expect(await screen.findByText(/not encrypted/)).toBeInTheDocument();
     expect(within(nav).getByRole('link', { name: 'Data & Privacy' })).toHaveAttribute('aria-current', 'page');
   });
 
@@ -70,7 +70,7 @@ describe('AppShell', () => {
     await user.click(screen.getByRole('button', { name: 'Open navigation' }));
     const dialog = screen.getByRole('dialog');
     await user.click(within(dialog).getByRole('link', { name: 'Accounts' }));
-    expect(screen.getByRole('heading', { level: 1, name: 'Accounts' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 1, name: 'Accounts' })).toBeInTheDocument();
   });
 
   it('skip link focuses the main content without navigating', async () => {
@@ -78,7 +78,7 @@ describe('AppShell', () => {
     renderAt('/accounts');
     await user.click(screen.getByRole('link', { name: 'Skip to content' }));
     expect(document.getElementById('main')).toHaveFocus();
-    expect(screen.getByRole('heading', { level: 1, name: 'Accounts' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 1, name: 'Accounts' })).toBeInTheDocument();
   });
 
   it('sets the document title per route', async () => {
@@ -86,7 +86,8 @@ describe('AppShell', () => {
     renderAt('/');
     expect(document.title).toBe('Dashboard · Retirement Navigator');
     await user.click(within(screen.getByRole('navigation', { name: 'Main' })).getByRole('link', { name: 'HSA' }));
-    expect(document.title).toBe('HSA · Retirement Navigator');
+    // Navigation is a transition: the title changes once the (code-split) page has loaded.
+    await waitFor(() => expect(document.title).toBe('HSA · Retirement Navigator'));
     expect(document.getElementById('main')).toHaveFocus();
   });
 

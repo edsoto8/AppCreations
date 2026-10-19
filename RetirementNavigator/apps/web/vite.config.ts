@@ -30,6 +30,15 @@ export default defineConfig({
     // Never inline assets as data: URIs (the CSP allows only same-origin fonts and images).
     assetsInlineLimit: 0,
     sourcemap: false,
+    rollupOptions: {
+      output: {
+        // Zod and the app's jitless switch share one chunk, so the switch runs as soon as Zod loads,
+        // before any schema is used by the (code-split) pages or the engine. Otherwise Zod's JIT probe
+        // (`Function('')`) runs first and the CSP reports it.
+        manualChunks: (id: string) =>
+          /[\\/]node_modules[\\/](\.pnpm[\\/])?zod/.test(id) || id.endsWith('/src/zodConfig.ts') ? 'zod' : undefined,
+      },
+    },
   },
   worker: { format: 'es' },
   test: {
