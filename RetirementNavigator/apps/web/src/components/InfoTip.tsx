@@ -8,7 +8,7 @@ export function InfoTip({ term, children }: { term: string; children: React.Reac
       <PopoverTrigger
         type="button"
         aria-label={`About ${term}`}
-        className="inline-flex size-5 items-center justify-center rounded-full text-muted-foreground hover:text-foreground"
+        className="inline-flex size-6 items-center justify-center rounded-full text-muted-foreground hover:text-foreground"
       >
         <Info aria-hidden="true" className="size-3.5" />
       </PopoverTrigger>

@@ -367,3 +367,33 @@ describe('previewAccumulation (more branches)', () => {
     expect(p.unverified.map((u) => u.key)).toEqual(expect.arrayContaining(['2026:ira.limit', '2026:hsa.selfOnly']));
   });
 });
+
+describe('previewAccumulation per-plan rows', () => {
+  it('reports each plan’s requested deferral rate and pre-limit match', () => {
+    const p = preview(build({}));
+    const plan = p.people[0]!.rows[0]!.plans[0]!;
+    expect(plan).toMatchObject({ planId: 'plan-1', requestedTraditional: dollars(6_000), requestedRoth: 0 });
+    expect(plan.deferralRate).toBeCloseTo(0.06, 12);
+    expect(plan.matchBeforeLimits.match).toBe(dollars(4_000));
+  });
+});
+
+describe('previewAccumulation scheduled contributions', () => {
+  it('reports each account’s request and allowed amount, and subtracts HSA contributions from MAGI', () => {
+    const roth = { ...ROTH_IRA, contribution: { amount: { kind: 'maxAllowed' } } };
+    // Salary 107,000, 401(k) 6% = 6,420; HSA 4,000 (capped from 5,000).
+    // MAGI = 107,000 − 6,420 − 4,000 = 96,580 < 100,000 → full 7,000 Roth IRA.
+    const p = preview(build({ accounts: [roth, HSA], employment: { baseSalary: dollars(107_000) } }));
+    expect(p.cashFlow[0]!.scheduled).toEqual(
+      expect.arrayContaining([
+        { accountId: 'hsa', requested: dollars(5_000), allowed: dollars(4_000) },
+        { accountId: 'roth', requested: null, allowed: dollars(7_000) },
+      ]),
+    );
+  });
+
+  it('marks allowed amounts null when limits are unverified', () => {
+    const p = preview(build({ accounts: [HSA] }), 1, realCtx);
+    expect(p.cashFlow[0]!.scheduled).toEqual([{ accountId: 'hsa', requested: dollars(5_000), allowed: null }]);
+  });
+});

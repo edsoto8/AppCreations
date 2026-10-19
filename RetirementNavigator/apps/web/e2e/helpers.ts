@@ -30,3 +30,16 @@ export async function expectNoAxeViolations(page: Page): Promise<void> {
   );
   expect(summary).toEqual([]);
 }
+
+/** The year is pinned for reproducible E2E runs (the UI reads `?year=`; the engine never reads the clock). */
+export const E2E_YEAR = 2026;
+export const appUrl = (path: string) => `/?year=${E2E_YEAR}#${path}`;
+
+/** Finish first-run onboarding with a sample profile (index into the sample cards). */
+export async function onboardWithSample(page: Page, sampleIndex = 1): Promise<void> {
+  await page.goto(appUrl('/welcome'));
+  await page.getByRole('button', { name: 'Use this sample' }).nth(sampleIndex).click();
+  await expect(page.getByRole('region', { name: /10-year income and savings preview/ }).first()).toBeVisible();
+  await page.getByRole('button', { name: /Finish setup/ }).click();
+  await expect(page.getByRole('heading', { level: 1, name: 'Profile' })).toBeVisible();
+}

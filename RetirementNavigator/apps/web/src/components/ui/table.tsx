@@ -4,7 +4,7 @@ import { cn } from '@/lib/utils';
 /** Horizontally scrollable on small screens without scrolling the page. Focusable for keyboard scrolling. */
 export function Table({ className, label, ...props }: React.ComponentProps<'table'> & { label: string }) {
   return (
-    <div className="w-full overflow-x-auto rounded-md border" role="region" aria-label={label} tabIndex={0}>
+    <div className="relative w-full overflow-x-auto rounded-md border" role="region" aria-label={label} tabIndex={0}>
       <table className={cn('w-full caption-bottom text-sm tabular-nums', className)} {...props} />
     </div>
   );

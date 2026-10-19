@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { NAV_ITEMS } from '../src/app/navigation';
 import { CSP } from '../csp';
-import { expectNoAxeViolations, trackConsoleErrors, trackOutboundRequests } from './helpers';
+import { appUrl, expectNoAxeViolations, onboardWithSample, trackConsoleErrors, trackOutboundRequests } from './helpers';
 
 test.describe('app shell', () => {
   test('serves the production CSP before any script', async ({ page }) => {
@@ -23,13 +23,16 @@ test.describe('app shell', () => {
   }) => {
     const outbound = trackOutboundRequests(page);
     const errors = trackConsoleErrors(page);
-    await page.goto('/');
+    await onboardWithSample(page);
     for (const item of NAV_ITEMS) {
       if (isMobile) {
         await page.getByRole('button', { name: 'Open navigation' }).click();
-        await page.getByRole('dialog').getByRole('link', { name: item.label }).click();
+        await page.getByRole('dialog').getByRole('link', { name: item.label, exact: true }).click();
       } else {
-        await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: item.label }).click();
+        await page
+          .getByRole('navigation', { name: 'Main' })
+          .getByRole('link', { name: item.label, exact: true })
+          .click();
       }
       await expect(page.getByRole('heading', { level: 1, name: item.label })).toBeVisible();
       await expectNoAxeViolations(page);
@@ -51,7 +54,9 @@ test.describe('app shell', () => {
 
   test('is keyboard navigable from the skip link without changing route', async ({ page, isMobile }) => {
     test.skip(isMobile, 'keyboard flow checked on desktop');
-    await page.goto('/#/accounts');
+    await onboardWithSample(page);
+    await page.goto(appUrl('/accounts'));
+    await page.reload(); // a same-document hash navigation keeps focus; start from a fresh load
     await expect(page.getByRole('heading', { level: 1, name: 'Accounts' })).toBeVisible();
     await page.keyboard.press('Tab');
     const skip = page.getByRole('link', { name: 'Skip to content' });
@@ -64,9 +69,10 @@ test.describe('app shell', () => {
 
   test('sets a page title per route and moves focus to the content on navigation', async ({ page, isMobile }) => {
     test.skip(isMobile, 'checked on desktop');
-    await page.goto('/');
+    await onboardWithSample(page);
+    await page.goto(appUrl('/'));
     await expect(page).toHaveTitle('Dashboard · Retirement Navigator');
-    await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Accounts' }).click();
+    await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Accounts', exact: true }).click();
     await expect(page).toHaveTitle('Accounts · Retirement Navigator');
     await expect(page.locator('#main')).toBeFocused();
   });

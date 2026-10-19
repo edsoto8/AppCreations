@@ -64,21 +64,19 @@ function cloneHousehold(source: Household, name: string): Household {
 }
 
 export const useProfileStore = create<ProfileState>((set, get) => {
+  // Settings change rarely and gate navigation (onboarding), so they are written immediately.
   const saveSettings = () => {
     if (!repository) return;
     const { activeId, onboardingComplete, dollarBasis } = get();
-    const repo = repository;
-    schedule('settings', () =>
-      repo.put({
-        kind: 'settings',
-        schemaVersion: 1,
-        id: 'settings',
-        updatedAt: now(),
-        activeProfileId: activeId,
-        onboardingComplete,
-        dollarBasis,
-      }),
-    );
+    void repository.put({
+      kind: 'settings',
+      schemaVersion: 1,
+      id: 'settings',
+      updatedAt: now(),
+      activeProfileId: activeId,
+      onboardingComplete,
+      dollarBasis,
+    });
   };
   const saveProfile = (doc: ProfileDoc) => {
     if (!repository) return;

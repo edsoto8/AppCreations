@@ -7,9 +7,10 @@ export function formatCents(cents: number, opts: { exact?: boolean } = {}): stri
   return (opts.exact ? usd2 : usd0).format(cents / 100);
 }
 
+/** Percent with up to `digits` decimals, trailing zeros trimmed (0.025 → "2.5%", 0.03 → "3%"). */
 export function formatPercent(rate: number, digits = 1): string {
-  const pct = rate * 100;
-  return `${Number.isInteger(pct) ? pct.toFixed(0) : pct.toFixed(digits)}%`;
+  const rounded = Number((rate * 100).toFixed(digits));
+  return `${rounded === 0 ? 0 : rounded}%`;
 }
 
 /** Plain dollars for inputs (no currency symbol), e.g. "62,000". */

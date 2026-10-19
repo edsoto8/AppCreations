@@ -95,6 +95,7 @@ function workplaceYear(
   let requestedRoth = 0;
   let total: CappedContributions | null = ZERO_CAPPED;
   let aggregated = 0;
+  const planRows: PersonPreviewRow['plans'] = [];
   let firstMatch = computeMatch(
     plans[0]?.match ?? {
       tiers: [],
@@ -138,6 +139,13 @@ function workplaceYear(
     const matchPay = comp.working ? comp.eligibleForMatch : 0;
     const breakdown = computeMatch(plan.match, toCents(matchPay), toCents(trad + roth));
     if (index === 0) firstMatch = breakdown;
+    planRows.push({
+      planId: plan.id,
+      requestedTraditional: toCents(trad),
+      requestedRoth: toCents(roth),
+      deferralRate: matchPay > 0 ? (trad + roth) / matchPay : 0,
+      matchBeforeLimits: breakdown,
+    });
 
     if (!comp.working || total === null) return;
     const result = capContributions(
@@ -168,6 +176,7 @@ function workplaceYear(
     requestedTraditional: toCents(requestedTraditional),
     requestedRoth: toCents(requestedRoth),
     matchBeforeLimits: firstMatch,
+    plans: planRows,
     contributions: total,
     vestedFractionEndOfYear: firstPlan
       ? vestedFraction(firstPlan.match.vesting, firstPlan.match.yearsOfServiceAtStart + t)
@@ -186,6 +195,7 @@ interface ScheduledResult {
   /** Total scheduled contributions this year, or null if a needed limit is unverified. */
   total: number | null;
   hsaPreTax: number;
+  byAccount: CashFlowPreviewRow['scheduled'];
 }
 
 function scheduledContributions(
@@ -202,6 +212,8 @@ function scheduledContributions(
   let total = 0;
   let hsaPreTax = 0;
   let unknown = false;
+  const byAccount: CashFlowPreviewRow['scheduled'] = [];
+  const hsaByOwner = new Map<string, number>();
   const iraRoom = new Map<string, { initial: number; remaining: number } | null>();
 
   const householdMagi = (): number => {
@@ -211,14 +223,16 @@ function scheduledContributions(
         salary: toCents(s.comp.baseSalary),
         bonus: toCents(s.comp.bonus),
         traditionalDeferrals: s.contributions?.traditional ?? (0 as Cents),
-        hsaContributions: 0 as Cents,
+        hsaContributions: toCents(hsaByOwner.get(s.person.id) ?? 0),
         otherIncome: toCents(s.comp.partTimeIncome),
       });
     }
     return magi;
   };
 
-  for (const account of household.accounts) {
+  // HSAs first: their contributions reduce the MAGI used for Roth IRA eligibility.
+  const ordered = [...household.accounts].sort((a, b) => Number(b.type === 'hsa') - Number(a.type === 'hsa'));
+  for (const account of ordered) {
     if (account.type === 'workplaceTraditional' || account.type === 'workplaceRoth') continue;
     const schedule = account.contribution;
     const state = people.get(account.ownerId);
@@ -251,14 +265,22 @@ function scheduledContributions(
       householdMagi,
       year,
     );
+    byAccount.push({
+      accountId: account.id,
+      requested: wanted === 'max' ? null : toCents(wanted),
+      allowed: amount === null ? null : toCents(amount),
+    });
     if (amount === null) {
       unknown = true;
       continue;
     }
     total += amount;
-    if (account.type === 'hsa') hsaPreTax += amount;
+    if (account.type === 'hsa') {
+      hsaPreTax += amount;
+      hsaByOwner.set(account.ownerId, (hsaByOwner.get(account.ownerId) ?? 0) + amount);
+    }
   }
-  return { total: unknown ? null : total, hsaPreTax };
+  return { total: unknown ? null : total, hsaPreTax, byAccount };
 }
 
 function limitAccount(
@@ -492,6 +514,7 @@ export function previewAccumulation(
       surplus: surplus === null ? null : toCents(surplus),
       infeasible,
       warnings: yearWarnings,
+      scheduled: scheduled.byAccount,
     });
   }
 

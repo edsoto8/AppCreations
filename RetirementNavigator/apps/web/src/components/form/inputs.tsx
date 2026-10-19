@@ -138,7 +138,7 @@ export function PercentSlider({
   return (
     <div className="flex items-center gap-3">
       <Slider
-        aria-label={label}
+        aria-label={`${label} (slider)`}
         className="flex-1"
         min={min}
         max={max}

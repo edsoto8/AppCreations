@@ -113,8 +113,9 @@ export function SelectField<T extends FieldValues>({
   name,
   disabled,
   options,
+  numeric = false,
   ...chrome
-}: BaseProps<T> & { options: readonly { value: string; label: string }[] }) {
+}: BaseProps<T> & { options: readonly { value: string; label: string }[]; numeric?: boolean }) {
   const { field, fieldState } = useController({ control, name });
   return (
     <Field {...chrome} error={fieldState.error?.message}>
@@ -122,8 +123,8 @@ export function SelectField<T extends FieldValues>({
         <NativeSelect
           {...a}
           disabled={disabled}
-          value={(field.value as string | undefined) ?? ''}
-          onChange={(e) => field.onChange(e.target.value)}
+          value={field.value === undefined || field.value === null ? '' : String(field.value)}
+          onChange={(e) => field.onChange(numeric ? Number(e.target.value) : e.target.value)}
         >
           {options.map((o) => (
             <option key={o.value} value={o.value}>

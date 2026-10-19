@@ -153,6 +153,15 @@ export interface PersonPreviewRow {
   requestedRoth: Cents;
   /** Employer match on the requested deferrals before limits (always available; no rules needed). */
   matchBeforeLimits: MatchBreakdown;
+  /** Per workplace plan: requested deferrals (dollars and % of pay) and the pre-limit match readout. */
+  plans: {
+    planId: string;
+    requestedTraditional: Cents;
+    requestedRoth: Cents;
+    /** Requested employee deferral as a share of eligible pay for the match. */
+    deferralRate: number;
+    matchBeforeLimits: MatchBreakdown;
+  }[];
   /** Workplace contributions after limits, summed over the person's plans; null if a limit is unverified. */
   contributions: CappedContributions | null;
   /** Employee + employer after limits; null if unverified. */
@@ -178,6 +187,11 @@ export interface CashFlowPreviewRow {
   infeasible: boolean | null;
   /** Household-level warnings for the year (IRA/HSA caps, infeasible plan) plus each person's warnings. */
   warnings: EngineWarning[];
+  /**
+   * Scheduled (non-workplace) contributions per account this year: what the schedule asks for
+   * (`requested`; null means "maximum allowed") and what is allowed after limits (null if unverified).
+   */
+  scheduled: { accountId: string; requested: Cents | null; allowed: Cents | null }[];
 }
 
 export interface AccumulationPreview {

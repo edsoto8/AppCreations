@@ -32,8 +32,11 @@ export function useHouseholdForm(household: Household) {
         formState: { values: true },
         callback: ({ values }) => {
           const parsed = HouseholdSchema.safeParse(values);
-          if (parsed.success) update(parsed.data);
-          else void form.trigger();
+          if (parsed.success) {
+            // Cross-field errors live on other fields; a valid household clears them all.
+            form.clearErrors();
+            update(parsed.data);
+          } else void form.trigger();
         },
       }),
     [form, update],
