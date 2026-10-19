@@ -21,7 +21,7 @@ export function UnverifiedNotice({ missing, feature }: { missing: readonly Unver
     <Alert variant="attention">
       <ShieldAlert aria-hidden="true" />
       <div className="flex flex-col gap-1">
-        <p className="font-medium">{feature} is unavailable: rule values are unverified</p>
+        <p className="font-medium">Not available yet: {feature} (rule values are unverified)</p>
         <p className="text-muted-foreground">
           This needs {missing.length} regulatory value{missing.length === 1 ? '' : 's'} that could not be verified
           against an official source yet (

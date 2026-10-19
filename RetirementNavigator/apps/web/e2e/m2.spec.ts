@@ -35,8 +35,10 @@ test.describe('M2 flows', () => {
       page.getByText(/capture \$1,920 of a possible \$3,840, leaving \$1,920 per year unclaimed/),
     ).toBeVisible();
     // Limits and taxes depend on unverified rule values: labeled, never filled in.
-    await expect(page.getByText('Contribution limits is unavailable: rule values are unverified')).toBeVisible();
-    await expect(page.getByText('The take-home pay check is unavailable: rule values are unverified')).toBeVisible();
+    await expect(page.getByText('Not available yet: contribution limits (rule values are unverified)')).toBeVisible();
+    await expect(
+      page.getByText('Not available yet: the take-home pay check (rule values are unverified)'),
+    ).toBeVisible();
     await page.getByLabel('Annual base salary', { exact: true }).fill('120,000');
     const preview = page.getByRole('region', { name: /10-year income and savings preview/ });
     await expect(preview.getByRole('row').nth(1)).toContainText('$120,000');

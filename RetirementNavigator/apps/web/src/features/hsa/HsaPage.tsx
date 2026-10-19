@@ -219,7 +219,7 @@ function HsaReadout({ hsa }: { hsa: ReturnType<typeof hsaThisYear> }) {
           <UnverifiedValue />
           <span>allowed</span>
         </p>
-        <UnverifiedNotice missing={limit.missing} feature="The HSA contribution limit" />
+        <UnverifiedNotice missing={limit.missing} feature="the HSA contribution limit" />
       </div>
     );
   }

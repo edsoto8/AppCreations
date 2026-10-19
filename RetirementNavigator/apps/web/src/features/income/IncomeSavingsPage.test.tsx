@@ -20,8 +20,8 @@ describe('IncomeSavingsPage', () => {
     // $96,000 salary in year 1.
     expect(within(table).getAllByText('$96,000').length).toBeGreaterThan(0);
     expect(screen.getByText(/to capture\s+the full match/)).toBeInTheDocument();
-    expect(screen.getByText(/Contribution limits is unavailable/)).toBeInTheDocument();
-    expect(screen.getByText(/The take-home pay check is unavailable/)).toBeInTheDocument();
+    expect(screen.getByText(/Not available yet: contribution limits/)).toBeInTheDocument();
+    expect(screen.getByText(/Not available yet: the take-home pay check/)).toBeInTheDocument();
   });
 
   it('updates the store and the preview when the salary changes', async () => {

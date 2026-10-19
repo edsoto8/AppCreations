@@ -33,7 +33,7 @@ describe('HsaPage', () => {
     expect(screen.getByLabelText('HDHP coverage type')).toHaveValue('family');
     expect(screen.getByText('$5,000 per year, flat')).toBeInTheDocument();
     expect(
-      screen.getByText('The HSA contribution limit is unavailable: rule values are unverified'),
+      screen.getByText('Not available yet: the HSA contribution limit (rule values are unverified)'),
     ).toBeInTheDocument();
     expect(readout()).toHaveTextContent('HSA this year:$5,000ofUnverified ruleallowed');
     expect(readout().textContent?.match(/\$/g)).toHaveLength(1);
@@ -90,7 +90,7 @@ describe('HsaPage', () => {
     const added = activeHousehold().accounts.find((a) => a.type === 'hsa');
     expect(added).toMatchObject({ balance: 250_000, hdhpAttested: true, coverage: 'selfOnly', ownerId: 'pat' });
     expect(
-      screen.getByText('The HSA contribution limit is unavailable: rule values are unverified'),
+      screen.getByText('Not available yet: the HSA contribution limit (rule values are unverified)'),
     ).toBeInTheDocument();
   });
 });

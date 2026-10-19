@@ -37,7 +37,9 @@ describe('RothIraPage', () => {
     expect(within(table).getByText('$41,000')).toBeInTheDocument();
     expect(within(table).getByText('$30,000')).toBeInTheDocument();
 
-    expect(screen.getByText('Roth IRA eligibility is unavailable: rule values are unverified')).toBeInTheDocument();
+    expect(
+      screen.getByText('Not available yet: Roth IRA eligibility (rule values are unverified)'),
+    ).toBeInTheDocument();
     const readout = screen.getByText('Roth IRA this year:').parentElement;
     if (!readout) throw new Error('readout missing');
     // $250 a month planned; the allowed amount is an "Unverified rule" badge, not a number.

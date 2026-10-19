@@ -46,7 +46,7 @@ export function SavingsPreview({
         </div>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
-        {limitsUnverified ? <UnverifiedNotice missing={workplaceMissing} feature="Contribution limits" /> : null}
+        {limitsUnverified ? <UnverifiedNotice missing={workplaceMissing} feature="contribution limits" /> : null}
         <Table label={`10-year income and savings preview for ${personName}`}>
           <TableHeader>
             <TableRow>
@@ -139,7 +139,7 @@ export function CashFlowCheck({ preview, inflation }: { preview: AccumulationPre
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
-        {taxMissing.length > 0 ? <UnverifiedNotice missing={taxMissing} feature="The take-home pay check" /> : null}
+        {taxMissing.length > 0 ? <UnverifiedNotice missing={taxMissing} feature="the take-home pay check" /> : null}
         {infeasible.length > 0 ? (
           <Alert variant="destructive">
             <AlertTriangle aria-hidden="true" />
