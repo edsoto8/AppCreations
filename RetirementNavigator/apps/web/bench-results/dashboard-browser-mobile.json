@@ -1,0 +1,51 @@
+{
+  "measuredOn": {
+    "cpu": "Intel(R) Xeon(R) Processor @ 2.10GHz",
+    "cores": 4,
+    "browser": "headless Chromium (Playwright)"
+  },
+  "target": "computeDashboard < 100 ms (typical profile)",
+  "note": "User Timing measure rn:dashboard around computeDashboard (3 projections). Throttled runs are emulated, not a real phone.",
+  "results": [
+    {
+      "project": "mobile",
+      "cpuThrottling": "4× (emulated phone)",
+      "profile": "Early career",
+      "rules": "bundled (before taxes)",
+      "recalculations": 15,
+      "medianMs": 24.9,
+      "p95Ms": 49.4,
+      "maxMs": 49.4
+    },
+    {
+      "project": "mobile",
+      "cpuThrottling": "4× (emulated phone)",
+      "profile": "Mid-career couple",
+      "rules": "bundled (before taxes)",
+      "recalculations": 15,
+      "medianMs": 36.8,
+      "p95Ms": 67.2,
+      "maxMs": 67.2
+    },
+    {
+      "project": "mobile",
+      "cpuThrottling": "4× (emulated phone)",
+      "profile": "Near retirement",
+      "rules": "bundled (before taxes)",
+      "recalculations": 15,
+      "medianMs": 19.6,
+      "p95Ms": 78.5,
+      "maxMs": 78.5
+    },
+    {
+      "project": "mobile",
+      "cpuThrottling": "4× (emulated phone)",
+      "profile": "High earner",
+      "rules": "bundled (before taxes)",
+      "recalculations": 15,
+      "medianMs": 24.4,
+      "p95Ms": 40.3,
+      "maxMs": 40.3
+    }
+  ]
+}

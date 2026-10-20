@@ -10,6 +10,7 @@ import { UnverifiedNotice } from '@/components/UnverifiedNotice';
 import { Alert } from '@/components/ui/alert';
 import { useEngineContext } from '@/hooks/useEngine';
 import { useProfileStore } from '@/state/profileStore';
+import { timed } from '@/lib/timing';
 import { AllocationCharts } from './AllocationCharts';
 import { useMonteCarloStore } from '@/features/monte-carlo/runStore';
 import { sameHousehold } from '@/features/monte-carlo/viewModel';
@@ -88,7 +89,7 @@ function DashboardBody({ household }: { household: Household }) {
   const basis = useProfileStore((s) => s.dollarBasis);
   // Typing on another page commits often; deferring keeps the dashboard responsive while it recomputes.
   const deferred = useDeferredValue(household);
-  const result = useMemo(() => computeDashboard(deferred, ctx), [deferred, ctx]);
+  const result = useMemo(() => timed('rn:dashboard', () => computeDashboard(deferred, ctx)), [deferred, ctx]);
   const mcRun = useMonteCarloStore(
     useShallow((s) => ({
       status: s.status,

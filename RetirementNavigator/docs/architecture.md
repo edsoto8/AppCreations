@@ -38,7 +38,8 @@ RetirementNavigator/
    - Measured (`pnpm bench`, 4-core Xeon 2.1 GHz, after the M6 optimizations): median 2–8 ms, p95
      ≤ 13 ms per full dashboard recalculation for the sample profiles (annual and monthly, both rule
      sets).
-   - That is far under the 100 ms target (an estimated ≈ 50 ms at 4× phone throttling, not measured), so it runs on the
+   - In the browser (production build, `e2e/perf-dashboard.spec.ts`): median 5–8 ms unthrottled and
+     20–37 ms (max 78.5 ms) at emulated 4× phone throttling. That is under the 100 ms target, so it runs on the
      main thread inside `useMemo`, with `useDeferredValue` to keep typing responsive; no forecast
      worker is needed.
 4. View models convert between today's and nominal dollars (`real = nominal / deflator`) for cards,
@@ -54,9 +55,11 @@ RetirementNavigator/
    - Each worker prepares a run once (`prepareMonteCarlo`) and runs sub-chunks with
      `runPreparedChunk`; paths share return-independent work through the projection cache.
    - Without `Worker` (tests, or a browser without workers) an in-process executor runs the same calls.
-6. **Code splitting:** every page except the dashboard and onboarding is a lazy route chunk behind a
-   loading status (entry bundle 317 kB instead of 1.58 MB). Zod and the app's jitless switch are one
-   chunk, so the switch runs before any schema use (the CSP forbids Zod's JIT probe).
+6. **Code splitting:** every page except the dashboard is a lazy route chunk behind a loading status
+   and a `PageErrorBoundary` (a failed chunk load shows a Reload button). The dashboard is the landing
+   page and needs the charts and the engine, so about 1.15 MB of JS (356 kB gzip) still loads at
+   start, against one 1.58 MB bundle before splitting (figures in STATUS). Zod and the app's jitless
+   switch are one chunk, so the switch runs before any schema use (the CSP forbids Zod's JIT probe).
 
 ## State shape
 - `profiles: Record<id, ProfileDoc>`, `activeProfileId`.

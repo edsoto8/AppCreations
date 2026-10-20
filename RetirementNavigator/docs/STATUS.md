@@ -38,7 +38,10 @@ Next: owner actions only — make the rule sources reachable and review `docs/ru
 | No-outbound-requests test passes | Every E2E flow asserts zero requests outside the app origin (shell, onboarding, dashboard, retirement income, scenarios, Monte Carlo with workers, calculators, export/import/delete-all, accounts); the production CSP (`connect-src 'none'`) is checked before any script | pass |
 | Coverage targets met | Engine 99.5% lines, 91.3% branches (threshold 90% each, enforced in `pnpm verify`); web 92.1% lines, 74.4% branches (no threshold set) | pass |
 | Validation report filed | `docs/validation-report.md`: a fresh-context QA pass that read only the docs, tests, reference and public contract ran 252 black-box checks through the public API: 245 pass, 1 discrepancy, 6 ambiguities. All resolved (below). | pass |
-| + `pnpm verify` green | engine 687 tests, web 248, reference 43 fixtures, build, 48 E2E | pass |
+| + `pnpm verify` green | engine 687 tests, web 250, reference 43 fixtures, build, 48 E2E | pass |
+| + Dashboard recalculation < 100 ms, browser and emulated phone | `e2e/perf-dashboard.spec.ts` (`pnpm --filter @rn/web bench:browser`) reads the User Timing measure the dashboard records around `computeDashboard`, 15 recalculations per sample profile in the production build. Desktop (unthrottled): median 4.8–8.2 ms, max 21.2 ms. **Emulated phone (4× CPU throttling, not a real device):** median 19.6–36.8 ms, max 78.5 ms. Results in `apps/web/bench-results/dashboard-browser-{desktop,mobile}.json`. | pass |
+| + Dependency audit | `pnpm audit:deps` (`pnpm audit --prod`) and a full `pnpm audit`: no known vulnerabilities (2026-10-20) | pass |
+| + A failed page load does not blank the app | Every lazy route sits in `PageErrorBoundary`: a failed chunk load or a render error shows an alert with a Reload button (`PageErrorBoundary.test.tsx`) | pass |
 
 ### Validation findings and resolution
 | # | Finding | Resolution |
@@ -50,8 +53,13 @@ Next: owner actions only — make the rule sources reachable and review `docs/ru
 | — | Coverage gaps noted: Monte Carlo variance/correlation per account, gross-up iterates on non-convergence, reference-unsupported paths, external IRS/SSA examples | Recorded; the IRS/SSA examples wait on sources (R-sourcing) |
 
 ### Bundle (after route-level code splitting)
-Entry JS 317 kB (96 kB gzip), down from 1,576 kB; page chunks load on first visit (largest shared
-chunks: charts 350 kB, engine 304 kB); Monte Carlo worker 205 kB; CSS 42 kB.
+- **JS loaded at start** (the entry chunk plus the 24 chunks it preloads, as listed in the built
+  `index.html`): **1,150 kB (356 kB gzip)**, down from one 1,576 kB bundle before splitting (about
+  27% less). The landing page is the dashboard, which needs the charts, the engine and the stores, so
+  most of the code still loads at start; the split moves the other pages out.
+- All JS together: 1,810 kB (560 kB gzip). Largest chunks: charts and tables 350 kB, entry 288 kB,
+  engine 211 kB; the Monte Carlo worker 205 kB; CSS 43 kB (9 kB gzip).
+- Every other page, onboarding included, is a chunk loaded on first visit.
 
 ## M6 gate evidence
 | Gate | Evidence | Result |
@@ -182,7 +190,7 @@ of benefits as ½ instead of reading the rule; it now reads `tier1` (§6).
 | Golden fixtures match the Python reference and external worked examples within $0.01 per year | `reference/ref.py` (independent; written from the docs by a QA pass that did not read the engine source), 19 fixtures, `golden.test.ts` at 1-cent tolerance. **Every figure matches exactly** (also checked at 0 cents). External worked examples: annuity-due table ä(10, 5%) = 8.1078; $100/month at 0.5%/month for 10 years = $16,387.93; PVIFA(0.5%, 240) × 1.005 = $140,278.68. | pass |
 | Zero-return and annuity closed-form cases exact | `project.test.ts`: zero return/zero inflation depletion exact to the cent, FV of mid-year contributions exact, level and growing annuities within 2 cents of a rounded-up starting balance (cent rounding of the input) | pass |
 | + Conservative ≤ default on paths with every net rate ≥ 0; never negative; monotonic contributions; offset ordering | property tests (1,000 / 1,000 / 500 / 500 runs) | pass |
-| + Dashboard recalculation < 100 ms | `pnpm bench` (Node 22, 4-core Xeon 2.1 GHz; Node, not a browser): median 4.8–31.1 ms, p95 ≤ 46.9 ms, max 70.6 ms per `computeDashboard` (3 projections). Runs on the main thread; phone throttling is re-checked in M8. | pass |
+| + Dashboard recalculation < 100 ms | `pnpm bench` (Node 22, 4-core Xeon 2.1 GHz; Node, not a browser): median 4.8–31.1 ms, p95 ≤ 46.9 ms, max 70.6 ms per `computeDashboard` (3 projections). Runs on the main thread; the browser and emulated-phone measurement is in the M8 gate evidence. | pass |
 | + `pnpm verify` green (now includes `pnpm reference`) | typecheck, lint, format, unit (engine + web), reference check, build, E2E | pass |
 
 ### M3 test results (2026-10-19, this container)
@@ -284,8 +292,8 @@ of benefits as ½ instead of reading the rule; it now reads `tier1` (§6).
   the `Agent` tool reported "Agent type 'code-reviewer' not found". Project agents load at session
   start from the session's working directory. Fix: start a new session from `RetirementNavigator/`,
   or ask for the definitions to be mirrored to the repo-root `.claude/`.
-- **R4:** Benchmarks run on a 4-core cloud container. Phone numbers will come from emulated
-  (throttled) runs.
+- **R4:** Benchmarks ran on a 4-core cloud container. Phone numbers come from emulated (4× throttled)
+  runs and are labeled as emulated; no real laptop or phone was measured.
 - **R5:** Until rules are verified, the forecast's contributions are before plan limits (savings
   may be overstated for high savers) and retirement is before taxes, with no statement-based Social
   Security, spousal/survivor amounts or RMDs. Entered Social Security (`atClaimAge`), pensions and
@@ -411,9 +419,9 @@ No open findings.
 | 1.5.0 | 2026-10-19 | From the M3 review: `DashboardCards.longevity` (depletes) gains a required `personId`; the `summary.depletionAge` and `retirementYear` comments are corrected to their definitions. No stored documents are affected. |
 | 1.6.0 | 2026-10-19 | M4, **not purely additive**: new SS source kind `atClaimAge`; new required flows `rmd`, `hsaMedical`, `reinvested`; warning code `oneTimeInflowSpent`; M4 functions implemented and re-exported. Stored profiles gain no required field (the new source kind is optional input). |
 | 1.7.0 | 2026-10-19 | M4 validation: lump-sum and inflow destination types are checked, duplicate earnings years rejected (stricter; a stored profile violating these fails validation with a clear message). |
-| 1.10.0 | 2026-10-19 | Additive: the 15 calculators and their schemas/result types, `CALCULATORS`, `runCalculator`; `prepareMonteCarlo`, `runPreparedChunk`, `PreparedMonteCarlo`; `impliedArithmeticMeans`, `monteCarloReadiness`; `computeInsights` implemented. `OptimizerResult` gains a required `monteCarloPaths` (callers that build it must set it; the app only reads it). No stored documents change. |
-| 1.9.0 | 2026-10-19 | From the M5 review and M6/M7b engine work. **Stricter:** scenario paths reject prototype keys, and a `set` on a field that does not exist is an orphaned `invalidPath` op (stored scenarios with such ops now show them as not applied). **Changed signature:** `summarizeMonteCarlo(chunks, config, household, firstYear)` (it needs the capital-market assumptions; it was a stub). Additive: `presetDrift`, `marketShockTotal`, `runMonteCarloChunk`, `isPositiveSemiDefinite`, `allocationByAssetClass`, `sequenceRiskIllustration`, `toCsv` options for display names and `csvCell`, `exportJson`, `importJson`, `MAX_IMPORT_CHARS`; presets record `currentYear` in `presetParams`; the optimizer's Monte Carlo criterion. No stored documents change shape. |
 | 1.8.0 | 2026-10-19 | M5 `compareScenarios` (dashboards per scenario plus an after-tax ending balance that stays null while taxes are unverified). From the M4 review: warning codes `oneTimeOutflowUnfunded`, `excessIncomeSpent`; shared destination helpers `canReceiveTaxableMoney` and `canReceiveLumpSum`, and an "other" account must be taxed as taxable to receive surplus, inflows or a non-rollover lump sum (stricter). |
+| 1.9.0 | 2026-10-19 | From the M5 review and M6/M7b engine work. **Stricter:** scenario paths reject prototype keys, and a `set` on a field that does not exist is an orphaned `invalidPath` op (stored scenarios with such ops now show them as not applied). **Changed signature:** `summarizeMonteCarlo(chunks, config, household, firstYear)` (it needs the capital-market assumptions; it was a stub). Additive: `presetDrift`, `marketShockTotal`, `runMonteCarloChunk`, `isPositiveSemiDefinite`, `allocationByAssetClass`, `sequenceRiskIllustration`, `toCsv` options for display names and `csvCell`, `exportJson`, `importJson`, `MAX_IMPORT_CHARS`; presets record `currentYear` in `presetParams`; the optimizer's Monte Carlo criterion. No stored documents change shape. |
+| 1.10.0 | 2026-10-19 | Additive: the 15 calculators and their schemas/result types, `CALCULATORS`, `runCalculator`; `prepareMonteCarlo`, `runPreparedChunk`, `PreparedMonteCarlo`; `impliedArithmeticMeans`, `monteCarloReadiness`; `computeInsights` implemented. `OptimizerResult` gains a required `monteCarloPaths` (callers that build it must set it; the app only reads it). No stored documents change. |
 
 ## Traceability (BRIEF §5 → milestone)
 | Feature | Milestone |
@@ -451,13 +459,6 @@ No open findings.
     one-time events, spending plan, gross-to-net) and the dashboard notes.
 - **Done in M5:** the scenario engine (diffs, presets A–G, drift, optimizer, comparison) and the
   Scenarios page (list, editor, compare view with chart and table, optimizer), persisted per profile.
-- **M6 so far:** the Monte Carlo engine, the optimizer's Monte Carlo criterion, the sequence
-  illustration, allocation (c) data, and `pnpm bench` results in
-  `packages/engine/bench/results/montecarlo.json` (single Node thread on this 2.1 GHz container:
-  0.87 ms per path before taxes, 1.32 ms with taxes and gross-up; 10,000 paths × 60 years projected at
-  2.3 s and 3.4 s over 4 workers — the taxed case is over the 3 s laptop target on this hardware; a
-  browser measurement with real workers follows with the M6 UI).
-- **M7b so far:** CSV export and JSON export/import in the engine.
 - **To tag M2 (`m2-accumulation`), unchanged:**
   1. Make irs.gov, ssa.gov and federalregister.gov reachable (environment network settings, likely
      in a new session).
@@ -481,14 +482,21 @@ No open findings.
 - **Tags:** the session's git proxy refuses tag pushes (HTTP 403); branch pushes work.
   `m1-foundation`, `m3-forecasting`, `m4-retirement-income`, `m5-scenarios`, `m6-monte-carlo`,
   `m7a-calculators`, `m7b-insights-io` and `m8-quality` exist locally only. To publish from a
-  clone, recreate them on the commits titled "fix(RetirementNavigator): resolve M1 review findings;
-  start M2 rules data", "fix(RetirementNavigator): resolve M3 review findings" and
-  "docs(RetirementNavigator): M4 status, statutory constants, fixture policy", for example
-  `git tag -a m4-retirement-income <commit> -m "M4 Retirement income" && git push origin m4-retirement-income`.
+  clone, recreate each on the commit with this title:
+  - `m1-foundation`: "fix(RetirementNavigator): resolve M1 review findings; start M2 rules data"
+  - `m3-forecasting`: "fix(RetirementNavigator): resolve M3 review findings"
+  - `m4-retirement-income`: "docs(RetirementNavigator): M4 status, statutory constants, fixture policy"
+  - `m5-scenarios`: "docs(RetirementNavigator): M5 status, review findings, contract 1.9.0"
+  - `m6-monte-carlo`: "docs(RetirementNavigator): M6, M7a, M7b status, gate evidence, performance and review findings"
+  - `m7a-calculators` and `m7b-insights-io`: "docs(RetirementNavigator): M7 review findings"
+  - `m8-quality`: "docs(RetirementNavigator): M8 final sweep fixes and STATUS"
+
+  For example `git tag -a m4-retirement-income <commit> -m "M4 Retirement income" && git push origin m4-retirement-income`.
 - **Open risks:**
   - rule sourcing (blocked);
   - agent discovery (R3);
   - tag publishing (above);
   - before-limits and before-taxes readings (R5);
   - bracket-fill overshoot, `Gaps.take`, statutory constants (R7–R9);
-  - bundle size (to code-split in M8).
+  - Monte Carlo speed: the laptop target is missed on this container and the phone figure is a
+    projection (M6 performance).

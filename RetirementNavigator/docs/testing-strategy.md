@@ -104,4 +104,6 @@ separate scripts.
 ## `pnpm verify`
 typecheck → lint → format check → unit tests with coverage (engine, web) → Python reference check →
 build → E2E — all green before any milestone tag. `pnpm bench` and `pnpm --filter @rn/web
-bench:browser` record performance.
+bench:browser` record performance (Monte Carlo, and dashboard recalculation read from the
+`rn:dashboard` User Timing measure, unthrottled and at emulated 4× phone throttling).
+`pnpm audit:deps` checks production dependencies for known vulnerabilities.

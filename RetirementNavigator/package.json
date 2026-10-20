@@ -19,7 +19,8 @@
     "e2e": "pnpm --filter @rn/web e2e",
     "verify": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm test && pnpm reference && pnpm build && pnpm e2e",
     "bench": "pnpm --filter @rn/engine bench",
-    "reference": "python3 packages/engine/reference/ref.py --check"
+    "reference": "python3 packages/engine/reference/ref.py --check",
+    "audit:deps": "pnpm audit --prod"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

@@ -7,11 +7,13 @@ import { PageErrorBoundary } from '@/components/PageErrorBoundary';
 import { PlaceholderPage } from '@/features/placeholder/PlaceholderPage';
 import { NotFoundPage } from '@/features/placeholder/NotFoundPage';
 import { DashboardPage } from '@/features/dashboard/DashboardPage';
-import { OnboardingPage } from '@/features/onboarding/OnboardingPage';
 import { useProfileStore } from '@/state/profileStore';
 import { getRepository } from '@/storage/instance';
 
-/** Pages other than the dashboard load on first visit (route-level code splitting, M8 performance). */
+/** Pages other than the dashboard (onboarding included) load on first visit (route-level code splitting, M8 performance). */
+const OnboardingPage = lazy(() =>
+  import('@/features/onboarding/OnboardingPage').then((m) => ({ default: m.OnboardingPage })),
+);
 const DataPage = lazy(() => import('@/features/data/DataPage').then((m) => ({ default: m.DataPage })));
 const ProfilePage = lazy(() => import('@/features/profile/ProfilePage').then((m) => ({ default: m.ProfilePage })));
 const IncomeSavingsPage = lazy(() =>
@@ -95,7 +97,16 @@ export function AppRoutes() {
             />
           );
         })}
-        <Route path="/welcome" element={<OnboardingPage />} />
+        <Route
+          path="/welcome"
+          element={
+            <PageErrorBoundary resetKey="/welcome">
+              <Suspense fallback={<PageLoading />}>
+                <OnboardingPage />
+              </Suspense>
+            </PageErrorBoundary>
+          }
+        />
         <Route
           path="/print"
           element={
