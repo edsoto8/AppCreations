@@ -170,6 +170,10 @@ def _lights(coll):
     _light(coll, "Light_Shaft_L", "SPOT", (-3.5, 7.5, 9.0), (0.3, 0.0, 0.0), 5000, (0.75, 0.85, 1.0), 0.15, 20, 0.25)
     _light(coll, "Light_Shaft_R", "SPOT", (4.5, 8.0, 8.5), (0.0, -0.5, 0.0), 3500, (1.0, 0.85, 0.65), 0.15, 16, 0.25)
     _light(coll, "Light_Kicker", "SPOT", (0.0, -3.5, -0.1), (0.0, 0.0, 1.0), 300, (1.0, 0.9, 0.8), 0.3, 40, 0.6)
+    # neutral fill used only by the side reference camera (its +X flank otherwise sees just the warm rim)
+    ref = _light(coll, "Light_RefSide", "AREA", (9.0, -3.0, 4.0), (0, 0, 2.0), 900, (0.95, 0.97, 1.0), (4.0, 4.0))
+    ref["only_for"] = "cam_side"
+    ref.hide_render = True
 
 
 def _haze(coll, M):
@@ -273,6 +277,8 @@ def render_all(root_dir, mode, samples=0, only=(), ctx=None):
         ortho = cam.data.type == "ORTHO"
         for ob in [o for o in bpy.data.objects if o.name == "Scene_Haze" or o.name.startswith("Scene_Crate_")]:
             ob.hide_render = ortho          # reference views: no fog, no background clutter
+        for ob in [o for o in bpy.data.objects if o.get("only_for")]:
+            ob.hide_render = ob["only_for"] != name
         t0 = time.time()
         path = qc.render_view(cam, os.path.join(outdir, cam["output"]))
         timings[name] = round(time.time() - t0, 1)
@@ -280,6 +286,8 @@ def render_all(root_dir, mode, samples=0, only=(), ctx=None):
     rig.set_pose(rg, "Neutral")
     for ob in [o for o in bpy.data.objects if o.name == "Scene_Haze" or o.name.startswith("Scene_Crate_")]:
         ob.hide_render = False
+    for ob in [o for o in bpy.data.objects if o.get("only_for")]:
+        ob.hide_render = True
     with open(os.path.join(outdir, "timings.txt"), "a") as f:
         f.write(f"{time.strftime('%Y-%m-%d %H:%M:%S')} mode={mode} samples={samples} {timings}\n")
     return timings

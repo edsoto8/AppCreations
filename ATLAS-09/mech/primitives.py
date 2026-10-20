@@ -786,7 +786,7 @@ def _gn_rivet_row(ng):
     L = ng.links.new
     L(gi.outputs["Count"], line.inputs["Count"])
     L(gi.outputs["Start"], line.inputs["Start Location"])
-    L(gi.outputs["End"], line.inputs["Offset"])
+    L(gi.outputs["End"], line.inputs["Offset"])     # in END_POINTS mode this socket is the absolute end point
     L(gi.outputs["Rivet"], oi.inputs["Object"])
     L(line.outputs["Mesh"], inst.inputs["Points"])
     L(oi.outputs["Geometry"], inst.inputs["Instance"])
@@ -896,7 +896,7 @@ def gn_rivet_row(kit, ob, start, end, count, size=0.01, rotation=(0.0, 0.0, 0.0)
             ob.data.materials.append(kit.M["bolt"])
         m = ob.modifiers.new("GN_RivetRow", "NODES")
         m.node_group = ng
-        _set_inputs(m, ng, {"Start": Vector(start), "End": Vector(end) - Vector(start), "Count": count,
+        _set_inputs(m, ng, {"Start": Vector(start), "End": Vector(end), "Count": count,
                             "Size": size, "Rotation": Vector(rotation), "Rivet": src})
         ob["gn_rivets"] = ob.get("gn_rivets", 0) + count
         return m

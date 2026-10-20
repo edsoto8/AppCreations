@@ -85,7 +85,7 @@ def validate(ctx):
     for n in floating:
         U.log("FLOAT", "not connected to the structure", n)
     out = {"mesh_checked": mesh_rep["checked"], "mesh_problems": len(mesh_rep["problems"]),
-           "floating": floating, "objects_robot": len(robot)}
+           "floating": floating, "objects_robot": len(robot), "gn_instances_off_host": U.gn_instance_check()}
     if ctx.get("rig"):
         from . import rig
         out["intersections"] = rig.intersection_report(ctx)

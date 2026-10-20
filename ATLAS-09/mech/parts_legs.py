@@ -205,7 +205,7 @@ def _leg_m9(kit, pre):
     for nm in (f"{pre}_Foot_SolePads", f"{pre}_Foot_HeelBumper", f"{pre}_Toe_Outer_Pad", f"{pre}_Toe_Inner_Pad"):
         P.add_subsurf(c[nm], 1, 2)
     for nm in (f"{pre}_Shin_Rail_Outer", f"{pre}_Shin_Rail_Inner"):
-        P.gn_rivet_row(kit, c[nm], (0.0, -0.112, 0.20), (0.0, -0.112, -0.20), 6, 0.007, (1.5708, 0, 0))
+        P.gn_rivet_row(kit, c[nm], (0.0, -0.112, 0.12), (0.0, -0.112, -0.12), 5, 0.007, (1.5708, 0, 0))
 
 
 def _leg_armor(kit, pre, s, bn, Mt, Lt, Ms, Ls, Mf, toe_y0, ms):

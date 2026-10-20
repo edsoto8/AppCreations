@@ -348,6 +348,36 @@ def validate_meshes(objs, label="", allow_open=()):
     return {"checked": checked, "problems": problems}
 
 
+def gn_instance_check(tol=0.02):
+    """Every Geometry-Nodes instance must sit on its host object: its position has to fall inside the
+    host's own (pre-modifier) world bounding box grown by ``tol``. Returns a list of offenders."""
+    dg = bpy.context.evaluated_depsgraph_get()
+    boxes = {}
+    bad = []
+    for inst in dg.object_instances:
+        if not inst.is_instance or inst.parent is None:
+            continue
+        host = inst.parent.original
+        if host.type != "MESH":
+            continue
+        if host.name not in boxes:
+            # bound_box reflects the evaluated geometry (instances included), so use the raw mesh
+            mw = host.matrix_world
+            pts = [mw @ v.co for v in host.data.vertices]
+            if not pts:
+                continue
+            boxes[host.name] = (Vector((min(q.x for q in pts), min(q.y for q in pts), min(q.z for q in pts))),
+                                Vector((max(q.x for q in pts), max(q.y for q in pts), max(q.z for q in pts))))
+        lo, hi = boxes[host.name]
+        p = inst.matrix_world.translation
+        if any(p[i] < lo[i] - tol or p[i] > hi[i] + tol for i in range(3)):
+            bad.append(host.name)
+    out = sorted(set(bad))
+    for n in out:
+        log("GNCHK", f"{bad.count(n)} instance(s) outside the host bounds", n)
+    return out
+
+
 def world_aabb(ob):
     mw = ob.matrix_world
     pts = [mw @ Vector(c) for c in ob.bound_box]

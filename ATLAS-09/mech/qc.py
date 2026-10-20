@@ -13,7 +13,7 @@ QC_VIEWS = [
     # name, location, target, lens (0 = ortho with given scale)
     ("front", (0, -14, 2.1), (0, 0, 2.1), 0, 7.2),
     ("side", (14, 0, 2.1), (0, 0, 2.1), 0, 7.2),
-    ("back", (0, 8.6, 2.1), (0, 0, 2.1), 0, 7.2),        # inside the hangar's back wall
+    ("back", (0, 7.9, 2.1), (0, 0, 2.1), 0, 7.2),        # in front of the hangar's back-wall columns
     ("three_quarter", (-5.2, -6.4, 3.0), (0, 0, 2.0), 40, 0),
     ("top", (0.01, -0.3, 12), (0, -0.3, 2.0), 0, 4.0),
     ("close_torso", (1.6, -3.0, 3.55), (0.1, 0.0, 3.1), 45, 0),
@@ -112,14 +112,14 @@ def contact_sheet(out_path, views=None, tile=(480, 300), samples=24, cams=None):
     tmp = os.path.join(os.path.dirname(out_path), "_tiles")
     os.makedirs(tmp, exist_ok=True)
     tiles = []
-    haze = bpy.data.objects.get("Scene_Haze")
+    clutter = [o for o in bpy.data.objects if o.name == "Scene_Haze" or o.name.startswith("Scene_Crate_")]
     for v in views:
-        if haze is not None:
-            haze.hide_render = cams[v].data.type == "ORTHO"
+        for o in clutter:
+            o.hide_render = cams[v].data.type == "ORTHO"     # ortho views: no fog, no background clutter
         p = render_view(cams[v], os.path.join(tmp, f"{v}.png"))
         tiles.append((v, p))
-    if haze is not None:
-        haze.hide_render = False
+    for o in clutter:
+        o.hide_render = False
     cols = 4
     rows = math.ceil(len(tiles) / cols)
     sheet = Image.new("RGB", (cols * tile[0], rows * tile[1]), (20, 20, 20))
