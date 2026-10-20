@@ -24,15 +24,15 @@ How to run: `cd ATLAS-09 && /opt/bpyenv/bin/python generate_mech.py --help`
 | # | Milestone | Status |
 |---|---|---|
 | 0 | Environment check | done |
-| 1 | Proportions and mechanical skeleton | in progress |
-| 2 | Major structural components | todo |
-| 3 | Articulated joints and hydraulic systems | todo |
-| 4 | Armor plating and detailed mechanical components | todo |
-| 5 | Cables, fasteners, sensors, surface details | todo |
-| 6 | Materials and procedural textures | todo |
-| 7 | Rigging and demonstration poses | todo |
-| 8 | Presentation scene and final renders | todo |
-| 9 | Inspect renders, fix defects, improve | todo |
+| 1 | Proportions and mechanical skeleton | done |
+| 2 | Major structural components | done |
+| 3 | Articulated joints and hydraulic systems | done |
+| 4 | Armor plating and detailed mechanical components | done |
+| 5 | Cables, fasteners, sensors, surface details | done |
+| 6 | Materials and procedural textures | done |
+| 7 | Rigging and demonstration poses | done |
+| 8 | Presentation scene and final renders | done |
+| 9 | Inspect renders, fix defects, improve | done |
 
 ## Milestone log
 
@@ -236,7 +236,13 @@ intersections (8 subsystem pairs × Neutral and Demo) → all 0; build log has n
 3. QC contact sheet: the back QC camera still sat behind the wall columns → moved in front of them; crates are hidden
    for ortho QC tiles too.
 
-**Final pass 3** = the delivered renders; per-frame times are in `renders/timings.txt`.
+**Final pass 3** = the delivered renders. The hero rendered in 1182 s. Then the session's worker process was restarted,
+which killed the render job, so the pass-2 frames still on disk had the rivet bug. The other five
+(three-quarter, torso-head, leg-hydraulics, front, side) were re-rendered with `--only` in 640 / 582 / 629 / 575 / 576 s
+(faster container after the restart). After that, each frame was committed and pushed as soon as it landed. All six were
+opened and inspected: rivets sit on their panels, the head top and antenna are in frame, and the side reference is
+neutrally lit. Final re-verification of the saved .blend: 1,254 objects (one more than before: `Light_RefSide`), 0 mesh
+problems, 0 floating, 0 GN instances off host, 0 intersections, `IDEMPOTENT True`.
 
 ## Unfinished, degraded or deviating items (final summary)
 

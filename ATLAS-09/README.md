@@ -53,7 +53,9 @@ Fixed seed 9009: all procedural wear, noise offsets and per-part variation are r
 The brief asked for 128–256 final samples. On this 4-core CPU a 1080p frame costs about 9.5 s per sample (64 samples = 907 s),
 so 128 samples would take about 24 min per frame. To respect the ~20-minute CPU cap, **samples were reduced to 96 (72 for
 `cam_torso_head` and `cam_leg_hydraulics`, whose depth of field costs about 25% more per sample) and resolution was kept
-at 1920×1080**. Delivered frames took about 16–20 min each. Per-frame times are in `renders/timings.txt`.
+at 1920×1080**. The delivered hero took 19.7 min. The session's worker restarted mid-pass, and the other five frames
+were re-rendered after the restart in 9.6–10.7 min each (the restarted container was faster). Per-frame times are in
+`renders/timings.txt`.
 
 ## Project layout
 
