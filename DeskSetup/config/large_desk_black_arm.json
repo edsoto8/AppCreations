@@ -1,0 +1,13 @@
+{
+  "_comment": "A 72 x 30 in desk with a black arm and a space-gray laptop, keyboard shifted left, monitor raised by hand.",
+  "desk": {"width_in": 72, "depth_in": 30},
+  "monitor": {"bottom_above_desk_mm": 260, "tilt_deg": 8},
+  "arm": {"finish": "black"},
+  "laptop": {"finish": "space_gray"},
+  "keyboard": {"x_mm": -60},
+  "mat": {"width_mm": 900},
+  "cameras": [
+    {"name": "front", "location_mm": [0, -3000, 1250]},
+    {"name": "wide", "location_mm": [-1600, -2600, 1500], "target_mm": [0, 0, 900], "lens_mm": 35, "fstop": 8}
+  ]
+}

@@ -1,0 +1,7 @@
+{
+  "_comment": "Every setting can be overridden here; omitted settings keep the defaults in desksetup/config.py. This file restates the headline defaults.",
+  "desk": {"width_in": 60, "depth_in": 30, "height_in": 29},
+  "monitor": {"diagonal_in": 27, "bottom_above_desk_mm": null, "tilt_deg": null, "face_from_back_edge_mm": 150},
+  "laptop": {"lid_angle_deg": 112, "finish": "silver"},
+  "arm": {"finish": "silver"}
+}

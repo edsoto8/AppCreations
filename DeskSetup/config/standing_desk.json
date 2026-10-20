@@ -1,0 +1,11 @@
+{
+  "_comment": "Standing height: desk at 42 in, eyes at 1600 mm. The solver re-poses the monitor and arm.",
+  "desk": {"height_in": 42},
+  "ergonomics": {"eye_height_mm": 1600},
+  "cameras": [
+    {"name": "front", "location_mm": [0, -2650, 1560], "target_mm": [0, 60, 1290]},
+    {"name": "side", "location_mm": [2750, 30, 1450], "target_mm": [0, 30, 1200]},
+    {"name": "overhead", "location_mm": [0, 20, 3200], "target_mm": [0, 20, 1067], "lens_mm": 40},
+    {"name": "three_quarter", "location_mm": [1850, -2150, 1720], "target_mm": [-60, 60, 1260]}
+  ]
+}

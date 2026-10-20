@@ -1,0 +1,21 @@
+[project]
+name = "desksetup"
+version = "1.0.0"
+description = "Procedural, photoreal minimalist desk setup for Blender (Cycles), built with the Python API"
+requires-python = "==3.13.*"
+dependencies = ["bpy==5.2.2"]
+
+[project.optional-dependencies]
+test = ["pytest>=8"]
+
+[tool.ruff]
+line-length = 130
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP"]
+ignore = ["B905"]  # zip() over a list and its tail is intentional
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
