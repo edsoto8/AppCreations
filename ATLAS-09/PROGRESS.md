@@ -180,3 +180,56 @@ QC (`renders/preview/*.png` at 640×360) defects → fixes:
    samples the bevel-normal noise made the ×14 edge mask fire everywhere and every painted surface rendered as
    bare worn metal (beige). Finals use **96 samples** (about 15–18 min per frame) to stay within the about 20-minute cap.
 
+### Milestone 9: inspect renders, fix defects, improve (done)
+
+**Final pass 1** (96 samples, 1920×1080) took 1230 / 1191 / 1439 / 1536 / 977 / 932 s
+(hero / three-quarter / torso-head / leg-hydraulics / front / side). Every PNG was opened and inspected.
+
+Defects found in pass 1 → fixes:
+1. Painted steel read mid-grey/beige under the strong area lights, which flattened contrast with the yellow armor →
+   steel_dark 0.10→0.055, armor_dark 0.055→0.035, joint steel 0.085→0.05.
+2. The power-core blue clipped to near-white (emission 18) → 7, with a more saturated blue.
+3. `three_quarter.png` clipped the antenna tip; `torso_head.png` cut off the lidar dome and antennas → lens and aim adjusted.
+4. `side.png` was washed out by the warm right rim light striking the flank and had a crate cluttering the background →
+   rim light moved further behind; crates and haze hidden for the orthographic reference cameras.
+5. The DOF close-ups (torso-head 1439 s, leg-hydraulics 1536 s) went over the ~20-minute cap → those cameras now use 0.75× samples
+   (72) via `scene.SAMPLE_SCALE`.
+6. QC contact sheet inside the full scene: the back QC camera sat behind the hangar wall (black tile) and the ortho tiles
+   looked through the haze → back camera moved inside the hangar; haze hidden for ortho QC tiles.
+
+Earlier M9 improvements (before pass 1), from reviewing the M8 previews:
+- **Geometry Nodes** (the brief asked for them "where useful"): two node groups built in Python, `ATLAS_GN_RivetRow`
+  (Mesh Line → Instance on Points) and `ATLAS_GN_Tread` (grid → alternating ±45° lozenges). They put 77 instanced rivets
+  on the power pack, chest floor, pelvis and shin rails, plus anti-slip tread on both foot insteps. Blender 5.2 changed the
+  modifier-input API (`mod[identifier]` → `mod.properties.inputs.<id>.value`). The first attempt failed for every
+  modifier (logged as `GN` errors); `_set_inputs` now supports both APIs.
+- **Subdivision Surface** on rubber sole pads, toe pads, heel bumpers and gripper pads.
+- Exoskeletal **chest frame posts** following the hull taper on both rear corners (the "internal structural frame" was
+  barely visible before).
+- Demo pose reworked twice for a readable hero silhouette (gripper first bunched up beside the head): drill arm thrust
+  forward, gripper low and forward, head tracking the drill.
+- Hazard band stripes fixed on all platform faces; floor stencil enlarged.
+
+**Final validation** (`build_report.json`, milestone 9): 597 meshes checked → 0 problems; connectivity → 0 floating;
+intersections (8 subsystem pairs × Neutral and Demo) → all 0; build log has no Boolean, GN or mesh errors;
+27 bones, 1,128 objects bone-parented, 64 cable hooks.
+
+**Final pass 2**: see `renders/timings.txt` for the per-frame times of the delivered renders.
+
+## Unfinished, degraded or deviating items (final summary)
+
+- **Final samples reduced to 96 (72 for the two DOF close-ups)** instead of the requested 128–256: CPU-only rendering
+  (4 cores, no GPU) costs about 12–25 min per 1080p frame at these settings. Resolution was kept at 1920×1080.
+- **EEVEE unavailable** (no `libEGL.so.1` in the container), so every preview and QC pass used Cycles CPU at low samples.
+- **No `blender` binary**: the pip `bpy` 5.2.2 module was used. `generate_mech.py` also accepts `blender -b --python … --`
+  but that path was not exercised here.
+- **Leg IK is sagittal only**: the Demo stance changes hip/knee/ankle pitch and pelvis height; there is no hip yaw/roll
+  in the poses (the rig supports them, the IK helper does not solve them).
+- **Cable hooks** bend each joint-crossing hose at one shared midpoint; there is no slack simulation. Under large
+  rotations a hose can straighten or kink.
+- **Bevel-node edge mask needs 4 samples**: at fewer, noise turns every painted surface into worn bare metal, so it
+  remains one of the main render costs.
+- **Hip drum etc. are not collision-tested against armor at extreme angles**: the intersection test covers the
+  Neutral and Demo poses only.
+- Repo note: `git init` was not needed (the project lives inside the existing `AppCreations` repo, branch
+  `claude/atlas-09-mech`).

@@ -53,6 +53,7 @@ def run(args, root_dir):
     if not args.no_validate:
         report.update(validate(ctx))
     report["counts"] = qc.count_report()
+    report["categories"], report["gn_rivets"] = qc.category_report()
     report["log"] = U.LOG
     rep_path = os.path.join(root_dir, "build_report.json")
     with open(rep_path, "w") as f:

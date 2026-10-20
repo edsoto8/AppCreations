@@ -13,7 +13,7 @@ QC_VIEWS = [
     # name, location, target, lens (0 = ortho with given scale)
     ("front", (0, -14, 2.1), (0, 0, 2.1), 0, 7.2),
     ("side", (14, 0, 2.1), (0, 0, 2.1), 0, 7.2),
-    ("back", (0, 14, 2.1), (0, 0, 2.1), 0, 7.2),
+    ("back", (0, 8.6, 2.1), (0, 0, 2.1), 0, 7.2),        # inside the hangar's back wall
     ("three_quarter", (-5.2, -6.4, 3.0), (0, 0, 2.0), 40, 0),
     ("top", (0.01, -0.3, 12), (0, -0.3, 2.0), 0, 4.0),
     ("close_torso", (1.6, -3.0, 3.55), (0.1, 0.0, 3.1), 45, 0),
@@ -112,9 +112,14 @@ def contact_sheet(out_path, views=None, tile=(480, 300), samples=24, cams=None):
     tmp = os.path.join(os.path.dirname(out_path), "_tiles")
     os.makedirs(tmp, exist_ok=True)
     tiles = []
+    haze = bpy.data.objects.get("Scene_Haze")
     for v in views:
+        if haze is not None:
+            haze.hide_render = cams[v].data.type == "ORTHO"
         p = render_view(cams[v], os.path.join(tmp, f"{v}.png"))
         tiles.append((v, p))
+    if haze is not None:
+        haze.hide_render = False
     cols = 4
     rows = math.ceil(len(tiles) / cols)
     sheet = Image.new("RGB", (cols * tile[0], rows * tile[1]), (20, 20, 20))
@@ -175,3 +180,46 @@ def count_report():
         rep[c.name.replace(U.ROOT_COLL + "_", "")] = {"parts": len(objs) - fast, "fasteners": fast,
                                                        "total": len(objs)}
     return rep
+
+
+CATEGORIES = [
+    ("Cables & hoses", ("Cable_",)),
+    ("Hydraulics", ("_Cylinder", "_Rod", "_Spring", "Actuator", "Shock", "Manifold", "HydraulicPump", "_Mount",
+                    "Outrigger", "_Lever", "QuickConnect", "CouplerPins")),
+    ("Joints, bearings & gears", ("Drum", "RingGear", "EndCaps", "GreaseRing", "Hinge", "Lugs", "Bearing", "Knuckle",
+                                  "Pinion", "GearTrain", "Yoke", "Flange", "Collar_", "Wrist_Collar", "Socket",
+                                  "NeckMount", "MotorHousing", "DriveMotor")),
+    ("Sensors & lights", ("Lens", "CamPod", "Lidar", "Antenna", "LED", "LightBar", "Optic", "SensorBay", "Core_")),
+    ("Cooling & exhaust", ("Fan_", "Vent", "Radiator", "CoolingFins", "Exhaust", "HeatSink", "SlotCutter")),
+    ("Labels & surface detail", ("Label", "Weld", "AccessPanel", "Gauge", "HazardStrip")),
+    ("Armor plating", ("Armor", "Pauldron", "Tasset", "Collar", "Guard", "TopDeck", "Abdomen", "Cap")),
+]
+
+
+def category_of(ob):
+    if ob.get("fastener"):
+        return "Fasteners (linked duplicates)"
+    for cat, keys in CATEGORIES:
+        if any(k in ob.name for k in keys):
+            return cat
+    return "Structure & tools"
+
+
+def category_report():
+    """{subsystem: {category: count}} for visible robot objects, plus GN-instanced rivets."""
+    root = bpy.data.collections.get(U.ROOT_COLL)
+    rep = {}
+    rivets = 0
+    for c in root.children:
+        sub = c.name.replace(U.ROOT_COLL + "_", "")
+        if sub in ("Scene", "QC", "Rig"):
+            continue
+        d = {}
+        for o in c.all_objects:
+            if o.type not in {"MESH", "CURVE", "FONT"} or o.hide_render:
+                continue
+            k = category_of(o)
+            d[k] = d.get(k, 0) + 1
+            rivets += int(o.get("gn_rivets", 0))
+        rep[sub] = d
+    return rep, rivets

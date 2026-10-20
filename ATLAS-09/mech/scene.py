@@ -20,8 +20,8 @@ FLOOR_Z = -PLAT_H
 # name: (location, target, lens or ortho scale, f-stop (0 = no DOF), pose, output file)
 CAMERAS = {
     "cam_hero":            ((2.9, -7.3, 0.55), (0.1, -0.2, 2.0), 30, 5.6, "Demo", "hero.png"),
-    "cam_three_quarter":   ((-6.4, -6.6, 3.3), (0.0, 0.0, 1.95), 42, 6.3, "Neutral", "three_quarter.png"),
-    "cam_torso_head":      ((1.55, -3.3, 3.85), (0.05, -0.1, 3.3), 55, 2.8, "Neutral", "torso_head.png"),
+    "cam_three_quarter":   ((-6.4, -6.6, 3.3), (0.0, 0.0, 2.05), 38, 6.3, "Neutral", "three_quarter.png"),
+    "cam_torso_head":      ((1.6, -3.5, 3.95), (0.05, -0.1, 3.42), 50, 2.8, "Neutral", "torso_head.png"),
     "cam_leg_hydraulics":  ((2.55, -2.45, 0.95), (0.55, -0.1, 0.95), 42, 3.5, "Demo", "leg_hydraulics.png"),
     "cam_front":           ((0.0, -25.0, 2.2), (0.0, 0.0, 2.2), -8.6, 0, "Neutral", "front.png"),
     "cam_side":            ((25.0, 0.0, 2.2), (0.0, 0.0, 2.2), -8.6, 0, "Neutral", "side.png"),
@@ -165,7 +165,7 @@ def _lights(coll):
     _light(coll, "Light_Key", "AREA", (-4.8, -6.2, 6.8), (0, 0, 2.2), 1300, (1.0, 0.95, 0.88), (3.0, 2.0))
     _light(coll, "Light_Fill", "AREA", (6.5, -5.0, 2.2), (0, 0, 1.8), 140, (0.85, 0.9, 1.0), (4.0, 3.0))
     _light(coll, "Light_Rim_L", "AREA", (-4.2, 5.2, 5.0), (0, 0, 2.6), 3200, (0.55, 0.75, 1.0), (1.0, 3.0))
-    _light(coll, "Light_Rim_R", "AREA", (4.6, 4.6, 3.6), (0, 0, 1.8), 2800, (1.0, 0.75, 0.45), (1.0, 3.0))
+    _light(coll, "Light_Rim_R", "AREA", (3.4, 6.2, 3.8), (0, 0, 1.8), 2600, (1.0, 0.75, 0.45), (1.0, 3.0))
     _light(coll, "Light_Top", "AREA", (0.0, -0.5, 8.5), (0, 0, 0), 120, (1.0, 1.0, 1.0), (2.0, 2.0))
     _light(coll, "Light_Shaft_L", "SPOT", (-3.5, 7.5, 9.0), (0.3, 0.0, 0.0), 5000, (0.75, 0.85, 1.0), 0.15, 20, 0.25)
     _light(coll, "Light_Shaft_R", "SPOT", (4.5, 8.0, 8.5), (0.0, -0.5, 0.0), 3500, (1.0, 0.85, 0.65), 0.15, 16, 0.25)
@@ -251,6 +251,10 @@ def final_settings(samples=128):
     sc.render.film_transparent = False
 
 
+# DOF close-ups cost about 25% more per sample; scale their samples to stay near the 20-minute cap
+SAMPLE_SCALE = {"cam_torso_head": 0.75, "cam_leg_hydraulics": 0.75}
+
+
 def render_all(root_dir, mode, samples=0, only=(), ctx=None):
     from . import rig
     cams = (ctx or {}).get("cameras") or {o.name: o for o in bpy.data.objects if o.name in CAMERAS}
@@ -262,18 +266,20 @@ def render_all(root_dir, mode, samples=0, only=(), ctx=None):
         if only and name not in only:
             continue
         if mode == "final":
-            final_settings(samples or 128)
+            final_settings(int((samples or 96) * SAMPLE_SCALE.get(name, 1.0)))
         else:
             qc.render_settings(samples=samples or 32, res=(640, 360))
         rig.set_pose(rg, cam["pose"])
-        haze = bpy.data.objects.get("Scene_Haze")
-        if haze is not None:
-            haze.hide_render = cam.data.type == "ORTHO"       # reference views stay crisp
+        ortho = cam.data.type == "ORTHO"
+        for ob in [o for o in bpy.data.objects if o.name == "Scene_Haze" or o.name.startswith("Scene_Crate_")]:
+            ob.hide_render = ortho          # reference views: no fog, no background clutter
         t0 = time.time()
         path = qc.render_view(cam, os.path.join(outdir, cam["output"]))
         timings[name] = round(time.time() - t0, 1)
         print(f"RENDERED {name} -> {path} in {timings[name]} s (pose {cam['pose']})", flush=True)
     rig.set_pose(rg, "Neutral")
+    for ob in [o for o in bpy.data.objects if o.name == "Scene_Haze" or o.name.startswith("Scene_Crate_")]:
+        ob.hide_render = False
     with open(os.path.join(outdir, "timings.txt"), "a") as f:
         f.write(f"{time.strftime('%Y-%m-%d %H:%M:%S')} mode={mode} samples={samples} {timings}\n")
     return timings

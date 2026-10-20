@@ -513,11 +513,11 @@ def build_pbr():
     P = lambda k, *a, **kw: painted(f"M_{k}", *a, **kw)
     mats = {
         "armor": P("armor", (0.90, 0.47, 0.008), wear=1.0, grime=1.0),
-        "armor_dark": P("armor_dark", (0.055, 0.058, 0.062), metal=(0.5, 0.5, 0.52), wear=1.0, grime=0.8,
+        "armor_dark": P("armor_dark", (0.035, 0.037, 0.040), metal=(0.5, 0.5, 0.52), wear=1.0, grime=0.8,
                         paint_rough=0.5),
-        "steel_dark": P("steel_dark", (0.10, 0.104, 0.11), metal=(0.55, 0.55, 0.56), wear=0.9, grime=1.2,
+        "steel_dark": P("steel_dark", (0.055, 0.058, 0.062), metal=(0.55, 0.55, 0.56), wear=0.9, grime=1.2,
                         paint_rough=0.38, paint_metal=0.35, scratch=0.35),
-        "steel_joint": P("steel_joint", (0.085, 0.088, 0.092), wear=1.2, grime=2.0, paint_rough=0.35,
+        "steel_joint": P("steel_joint", (0.05, 0.052, 0.055), wear=1.2, grime=2.0, paint_rough=0.35,
                          paint_metal=0.4, grime_col=(0.02, 0.016, 0.01)),
         "spring": P("spring", (0.42, 0.025, 0.01), wear=0.8, grime=0.9, paint_rough=0.3),
         "decal_white": P("decal_white", (0.80, 0.80, 0.77), wear=0.6, grime=0.6, scratch=0.3, tint_var=0.0),
@@ -530,7 +530,7 @@ def build_pbr():
         "cable_orange": plastic("M_cable_orange", (0.85, 0.22, 0.015)),
         "cable_red": plastic("M_cable_red", (0.45, 0.02, 0.015)),
         "carbon": carbon(),
-        "emit_blue": emissive("M_emit_blue", (0.12, 0.55, 1.0), 18.0),
+        "emit_blue": emissive("M_emit_blue", (0.04, 0.42, 1.0), 7.0),
         "emit_amber": emissive("M_emit_amber", (1.0, 0.42, 0.05), 10.0),
         "led_red": emissive("M_led_red", (1.0, 0.04, 0.02), 14.0, 0.05),
         "led_green": emissive("M_led_green", (0.15, 1.0, 0.25), 12.0, 0.05),
