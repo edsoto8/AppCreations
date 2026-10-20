@@ -73,6 +73,10 @@ def purge_generated():
         ob = bpy.data.objects.get(name)
         if ob is not None and "bone" not in ob:
             bpy.data.objects.remove(ob, do_unlink=True)
+    # Actions are kept alive by fake users, so the orphan purge alone would leave them behind.
+    for act in list(bpy.data.actions):
+        if act.get("atlas09") or act.name.split(".")[0] in ("Neutral", "Demo"):
+            bpy.data.actions.remove(act)
     default = bpy.data.collections.get("Collection")
     if default is not None and not default.all_objects:
         bpy.data.collections.remove(default)

@@ -214,6 +214,13 @@ Earlier M9 improvements (before pass 1), from reviewing the M8 previews:
 intersections (8 subsystem pairs × Neutral and Demo) → all 0; build log has no Boolean, GN or mesh errors;
 27 bones, 1,128 objects bone-parented, 64 cable hooks.
 
+**Deliverable verification** (headless reopen of `ATLAS-09.blend`, then two rebuilds *inside* that file): 1,253 objects,
+641 meshes, 30 materials, 62 curves, 1,120 visible robot objects (477 fasteners), armature `ATLAS-09_Rig`, actions
+`Demo` + `Neutral`, cameras cam_front/cam_hero/cam_leg_hydraulics/cam_side/cam_three_quarter/cam_torso_head.
+- **Bug found by this check**: each rerun added `Demo.001`, `Neutral.001` and so on, because the actions carry fake users and
+  survive the orphan purge. Fixed: generated actions are tagged `atlas09` and deleted in `purge_generated`.
+  The re-check after the fix gives identical counts on all three passes (`IDEMPOTENT True`).
+
 **Final pass 2**: see `renders/timings.txt` for the per-frame times of the delivered renders.
 
 ## Unfinished, degraded or deviating items (final summary)

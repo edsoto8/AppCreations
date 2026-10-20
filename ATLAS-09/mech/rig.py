@@ -199,6 +199,7 @@ def _make_actions(rig):
     for name in ("Neutral", "Demo"):
         act = bpy.data.actions.new(name)
         act.use_fake_user = True
+        act["atlas09"] = True
         arm.animation_data.action = act
         frames = ((1, pose_values(name)),) if name == "Neutral" else ((1, neutral), (FRAME_END, pose_values(name)))
         for fr, vals in frames:
