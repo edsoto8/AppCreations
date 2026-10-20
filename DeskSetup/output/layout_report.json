@@ -1,0 +1,15 @@
+{
+  "report": {
+    "viewing_distance_mm": 775.2,
+    "gaze_down_to_screen_center_deg": 4.9,
+    "screen_top_above_eye_mm": 100.8,
+    "monitor_tilt_deg": 4.9,
+    "monitor_bottom_above_desk_mm": 229.4,
+    "lid_top_above_desk_mm": 211.4,
+    "lid_to_monitor_clearance_mm": 18.0,
+    "keyboard_from_desk_edge_mm": 89.0,
+    "arm_pole_height_mm": 261.1,
+    "arm_gas_spring_angle_deg": 27.3
+  },
+  "warnings": []
+}
