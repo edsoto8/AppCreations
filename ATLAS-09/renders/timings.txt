@@ -1,1 +1,2 @@
-2026-10-19 21:38:40 mode=final samples=64 {'cam_hero': 907.0}
+2026-10-19 23:59:33 mode=final samples=96 {'cam_hero': 1230.5, 'cam_three_quarter': 1190.5, 'cam_torso_head': 1438.6, 'cam_leg_hydraulics': 1535.6, 'cam_front': 977.1, 'cam_side': 932.0}
+2026-10-20 01:53:12 mode=final samples=96 {'cam_hero': 1180.7, 'cam_three_quarter': 1127.6, 'cam_torso_head': 1022.5, 'cam_leg_hydraulics': 1154.5, 'cam_front': 994.3, 'cam_side': 958.7}

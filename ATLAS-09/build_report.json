@@ -1,6 +1,33 @@
 {
  "milestone": 9,
  "blender": "5.2.2 LTS",
+ "mesh_checked": 597,
+ "mesh_problems": 0,
+ "floating": [],
+ "objects_robot": 1134,
+ "gn_instances_off_host": [],
+ "intersections": {
+  "Neutral": {
+   "LegL_lower~LegR_lower": 0,
+   "ThighL~ThighR": 0,
+   "ArmL_lower~Torso": 0,
+   "ArmR_lower~Torso": 0,
+   "ArmL_lower~ThighL": 0,
+   "ArmR_lower~ThighR": 0,
+   "ArmL_lower~LegL_lower": 0,
+   "ArmR_lower~LegR_lower": 0
+  },
+  "Demo": {
+   "LegL_lower~LegR_lower": 0,
+   "ThighL~ThighR": 0,
+   "ArmL_lower~Torso": 0,
+   "ArmR_lower~Torso": 0,
+   "ArmL_lower~ThighL": 0,
+   "ArmR_lower~ThighR": 0,
+   "ArmL_lower~LegL_lower": 0,
+   "ArmR_lower~LegR_lower": 0
+  }
+ },
  "counts": {
   "Torso": {
    "parts": 145,
@@ -43,6 +70,73 @@
    "total": 44
   }
  },
+ "categories": {
+  "Torso": {
+   "Structure & tools": 11,
+   "Joints, bearings & gears": 24,
+   "Fasteners (linked duplicates)": 128,
+   "Hydraulics": 16,
+   "Armor plating": 19,
+   "Cooling & exhaust": 20,
+   "Sensors & lights": 9,
+   "Labels & surface detail": 16,
+   "Cables & hoses": 30
+  },
+  "Head": {
+   "Structure & tools": 3,
+   "Sensors & lights": 29,
+   "Joints, bearings & gears": 9,
+   "Fasteners (linked duplicates)": 35,
+   "Hydraulics": 4,
+   "Armor plating": 4,
+   "Cooling & exhaust": 5,
+   "Labels & surface detail": 1,
+   "Cables & hoses": 15
+  },
+  "Leg_L": {
+   "Structure & tools": 19,
+   "Joints, bearings & gears": 31,
+   "Fasteners (linked duplicates)": 93,
+   "Hydraulics": 37,
+   "Armor plating": 22,
+   "Cooling & exhaust": 1,
+   "Labels & surface detail": 7,
+   "Sensors & lights": 1,
+   "Cables & hoses": 12
+  },
+  "Arm_L": {
+   "Joints, bearings & gears": 21,
+   "Structure & tools": 19,
+   "Hydraulics": 20,
+   "Fasteners (linked duplicates)": 64,
+   "Armor plating": 9,
+   "Labels & surface detail": 4,
+   "Sensors & lights": 1,
+   "Cables & hoses": 12
+  },
+  "Leg_R": {
+   "Structure & tools": 19,
+   "Joints, bearings & gears": 31,
+   "Fasteners (linked duplicates)": 93,
+   "Hydraulics": 37,
+   "Armor plating": 22,
+   "Cooling & exhaust": 1,
+   "Labels & surface detail": 7,
+   "Sensors & lights": 1,
+   "Cables & hoses": 12
+  },
+  "Arm_R": {
+   "Joints, bearings & gears": 21,
+   "Structure & tools": 17,
+   "Armor plating": 10,
+   "Fasteners (linked duplicates)": 64,
+   "Hydraulics": 14,
+   "Labels & surface detail": 4,
+   "Sensors & lights": 1,
+   "Cables & hoses": 15
+  }
+ },
+ "gn_rivets": 73,
  "log": [
   {
    "kind": "RIG",
@@ -51,7 +145,7 @@
   },
   {
    "kind": "INFO",
-   "msg": "build to milestone 9 took 3.9s",
+   "msg": "build to milestone 9 took 4.0s",
    "obj": null
   }
  ]

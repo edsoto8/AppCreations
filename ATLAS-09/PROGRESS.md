@@ -199,8 +199,9 @@ Defects found in pass 1 → fixes:
 
 Earlier M9 improvements (before pass 1), from reviewing the M8 previews:
 - **Geometry Nodes** (the brief asked for them "where useful"): two node groups built in Python, `ATLAS_GN_RivetRow`
-  (Mesh Line → Instance on Points) and `ATLAS_GN_Tread` (grid → alternating ±45° lozenges). They put 77 instanced rivets
-  on the power pack, chest floor, pelvis and shin rails, plus anti-slip tread on both foot insteps. Blender 5.2 changed the
+  (Mesh Line → Instance on Points) and `ATLAS_GN_Tread` (grid → alternating ±45° lozenges). They put instanced rivets
+  on the power pack, chest floor, pelvis and shin rails (73 after the pass-2 fix below), plus anti-slip tread on both
+  foot insteps. Blender 5.2 changed the
   modifier-input API (`mod[identifier]` → `mod.properties.inputs.<id>.value`). The first attempt failed for every
   modifier (logged as `GN` errors); `_set_inputs` now supports both APIs.
 - **Subdivision Surface** on rubber sole pads, toe pads, heel bumpers and gripper pads.
@@ -210,7 +211,8 @@ Earlier M9 improvements (before pass 1), from reviewing the M8 previews:
   forward, gripper low and forward, head tracking the drill.
 - Hazard band stripes fixed on all platform faces; floor stencil enlarged.
 
-**Final validation** (`build_report.json`, milestone 9): 597 meshes checked → 0 problems; connectivity → 0 floating;
+**Final validation** (`build_report.json`, milestone 9): 597 meshes checked → 0 problems; GN instances off host → 0;
+connectivity → 0 floating;
 intersections (8 subsystem pairs × Neutral and Demo) → all 0; build log has no Boolean, GN or mesh errors;
 27 bones, 1,128 objects bone-parented, 64 cable hooks.
 
@@ -221,7 +223,20 @@ intersections (8 subsystem pairs × Neutral and Demo) → all 0; build log has n
   survive the orphan purge. Fixed: generated actions are tagged `atlas09` and deleted in `purge_generated`.
   The re-check after the fix gives identical counts on all three passes (`IDEMPOTENT True`).
 
-**Final pass 2**: see `renders/timings.txt` for the per-frame times of the delivered renders.
+**Final pass 2** (1181 / 1128 / 1023 / 1155 / 994 / 959 s, all within the cap) was inspected frame by frame:
+1. `front.png` showed a row of rivets floating in the air beside the waist. **Root cause**: in Mesh Line's END_POINTS
+   mode the socket named "Offset" is the *absolute end point*. I passed end − start, so rows on the chest floor, pelvis,
+   power pack and shin rails ran off their panels. None of the automated checks caught it, because the rivets are part of
+   each panel's evaluated mesh (closed shells, inside the object's own bounds). Fixed the input, and **added
+   `utils.gn_instance_check`** (every GN instance must lie inside its host's raw-mesh bounds + 2 cm). It flags all 7
+   affected panels on the pass-2 file and reports 0 after the fix. Its first post-fix run also caught the shin-rail rows
+   (±0.20 m) overhanging the 0.29 m rails; they are now shortened to ±0.12 m. GN rivets: 73.
+2. `side.png` still had a warm/beige cast: the +X flank is lit only by the warm rim → added `Light_RefSide`, a neutral
+   fill that switches on only for `cam_side` (lights tagged `only_for`).
+3. QC contact sheet: the back QC camera still sat behind the wall columns → moved in front of them; crates are hidden
+   for ortho QC tiles too.
+
+**Final pass 3** = the delivered renders; per-frame times are in `renders/timings.txt`.
 
 ## Unfinished, degraded or deviating items (final summary)
 

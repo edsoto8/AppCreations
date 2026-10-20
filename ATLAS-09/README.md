@@ -48,11 +48,12 @@ Fixed seed 9009: all procedural wear, noise offsets and per-part variation are r
 | RAM | 15 GiB |
 | EEVEE | Not available headless here (`libEGL.so.1` missing). Previews also use Cycles. |
 | Previews / QC | Cycles CPU, 640×360 (sheets 8×480×300), 16–32 samples, OpenImageDenoise |
-| Finals | Cycles CPU, 1920×1080, **96 samples** (adaptive, threshold 0.015), OIDN, AgX Medium-High Contrast |
+| Finals | Cycles CPU, 1920×1080, **96 samples** (72 for the two depth-of-field close-ups), adaptive threshold 0.015, OIDN, AgX Medium-High Contrast |
 
 The brief asked for 128–256 final samples. On this 4-core CPU a 1080p frame costs about 9.5 s per sample (64 samples = 907 s),
-so 128 samples would take about 24 min per frame. To respect the ~20-minute CPU cap, **samples were reduced to 96 and resolution was
-kept at 1920×1080**. Per-frame times are in `renders/timings.txt`.
+so 128 samples would take about 24 min per frame. To respect the ~20-minute CPU cap, **samples were reduced to 96 (72 for
+`cam_torso_head` and `cam_leg_hydraulics`, whose depth of field costs about 25% more per sample) and resolution was kept
+at 1920×1080**. Delivered frames took about 16–20 min each. Per-frame times are in `renders/timings.txt`.
 
 ## Project layout
 
@@ -124,6 +125,8 @@ analytic sagittal 2-bone IK, so both feet stay flat while the pelvis drops and a
 
 - Mesh validity on every evaluated mesh: non-manifold edges, zero-area faces, loose geometry → **0 problems**
   across 597 meshes.
+- Geometry Nodes instances must sit on their host panel (instance position inside the host's raw-mesh bounds)
+  → **0 off-host instances**.
 - Connectivity: AABB-touch graph flood-filled from the ground contacts (sole and toe pads) → **0 floating parts**.
 - Unintended intersections: BVH triangle overlap between lower legs L/R, thighs L/R, and lower arms vs torso,
   thighs and shins, **in both Neutral and Demo** → **0 overlaps**.
@@ -132,7 +135,7 @@ analytic sagittal 2-bone IK, so both feet stay flat while the pelvis drops and a
 ## Object count by subsystem
 
 Visible, individually modelled robot objects in the final build (environment excluded). Fasteners are linked
-duplicates of shared meshes and are counted separately. 77 further rivets are Geometry Nodes instances and are not
+duplicates of shared meshes and are counted separately. 73 further rivets are Geometry Nodes instances and are not
 counted as objects.
 
 | Subsystem | Structure & tools | Armor | Joints, bearings & gears | Hydraulics | Cables & hoses | Sensors & lights | Cooling & exhaust | Labels & detail | **Parts** | Fasteners | **Total** |
