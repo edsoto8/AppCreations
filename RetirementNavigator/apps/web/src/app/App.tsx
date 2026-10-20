@@ -3,6 +3,7 @@ import { HashRouter, Navigate, Route, Routes, useLocation } from 'react-router';
 import { Loader2 } from 'lucide-react';
 import { AppShell } from './AppShell';
 import { NAV_ITEMS } from './navigation';
+import { PageErrorBoundary } from '@/components/PageErrorBoundary';
 import { PlaceholderPage } from '@/features/placeholder/PlaceholderPage';
 import { NotFoundPage } from '@/features/placeholder/NotFoundPage';
 import { DashboardPage } from '@/features/dashboard/DashboardPage';
@@ -86,7 +87,9 @@ export function AppRoutes() {
               path={item.path}
               element={
                 <OnboardingGate>
-                  <Suspense fallback={<PageLoading />}>{page ? page() : <PlaceholderPage item={item} />}</Suspense>
+                  <PageErrorBoundary resetKey={item.path}>
+                    <Suspense fallback={<PageLoading />}>{page ? page() : <PlaceholderPage item={item} />}</Suspense>
+                  </PageErrorBoundary>
                 </OnboardingGate>
               }
             />
@@ -97,9 +100,11 @@ export function AppRoutes() {
           path="/print"
           element={
             <OnboardingGate>
-              <Suspense fallback={<PageLoading />}>
-                <PrintSummaryPage />
-              </Suspense>
+              <PageErrorBoundary resetKey="/print">
+                <Suspense fallback={<PageLoading />}>
+                  <PrintSummaryPage />
+                </Suspense>
+              </PageErrorBoundary>
             </OnboardingGate>
           }
         />
