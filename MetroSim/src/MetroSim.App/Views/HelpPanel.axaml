@@ -1,0 +1,23 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="MetroSim.App.Views.HelpPanel">
+  <ScrollViewer VerticalScrollBarVisibility="Auto">
+    <StackPanel Spacing="10" Margin="0,6,0,8">
+      <TextBlock Text="Getting started" Classes="heading" />
+      <TextBlock TextWrapping="Wrap" FontSize="12"
+                 Text="1. Drag a street (1) or avenue (2) from the map edge into open land. 2. Paint residential (5), commercial (6) and industrial (7) zones next to the road. 3. Build a coal plant (C) or wind turbines (T), and a water pump (P) on a shore or a water tower (O). Power reaches buildings within two tiles of each other; water flows along roads. 4. Unpause (Space). Homes grow, citizens commute, and you collect taxes at midnight. Add a landfill (L), fire station (F) and clinic (H) as the city grows." />
+      <TextBlock Text="Camera" Classes="heading" />
+      <TextBlock FontSize="12" TextWrapping="Wrap"
+                 Text="Pan: right- or middle-drag, WASD or arrow keys. Zoom: mouse wheel (around the cursor) or + / -." />
+      <TextBlock Text="Tools" Classes="heading" />
+      <TextBlock FontSize="12" TextWrapping="Wrap"
+                 Text="Q or Esc select/inspect · 1 street · 2 avenue · 3 power line · 4 or B bulldoze · 5 residential · 6 commercial · 7 industrial · 8 dezone · C coal plant · T wind turbine · P water pump · O water tower · L landfill · I incinerator · F fire station · H clinic. Roads and lines: drag an L-shaped path. Zones and bulldozing: drag a rectangle. Buildings: a ghost follows the cursor, click to place. The label shows the cost before you commit; right-click or Esc cancels a drag." />
+      <TextBlock Text="Overlays" Classes="heading" />
+      <TextBlock FontSize="12" TextWrapping="Wrap"
+                 Text="Shift+1 traffic · Shift+2 electricity · Shift+3 water · Shift+4 zoning · Shift+5 occupancy · Shift+6 land value · Shift+7 pollution · Shift+8 garbage · Shift+9 fire coverage · Shift+0 health coverage · ` (backtick) none. Pressing the active overlay's key again turns it off." />
+      <TextBlock Text="Time and files" Classes="heading" />
+      <TextBlock FontSize="12" TextWrapping="Wrap"
+                 Text="Space pause/resume · Ctrl+1..4 speed 1x/2x/3x/max · Ctrl+N new game · Ctrl+S save · Ctrl+Shift+S save as · Ctrl+O load · F5 quick save · F9 quick load. Panels: F1 help · F2 budget · F3 city · F4 traffic · F6 performance · F7 events · F8 inspector." />
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

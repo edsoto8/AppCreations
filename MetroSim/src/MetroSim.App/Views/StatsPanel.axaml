@@ -1,0 +1,23 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:MetroSim.App.ViewModels"
+             xmlns:c="using:MetroSim.App.Controls"
+             x:Class="MetroSim.App.Views.StatsPanel"
+             x:DataType="vm:StatsPanelViewModel"
+             x:Name="Root">
+  <ScrollViewer VerticalScrollBarVisibility="Auto">
+    <StackPanel Spacing="8" Margin="0,4,0,8">
+      <c:LineChart Height="190" Series="{Binding Chart}" Title="{Binding #Root.ChartTitle}" />
+      <ItemsControl ItemsSource="{Binding Lines}">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="vm:StatLine">
+            <Grid ColumnDefinitions="140,*" Margin="0,2">
+              <TextBlock Text="{Binding Label}" Classes="caption" VerticalAlignment="Top" Margin="0,1,0,0" />
+              <TextBlock Grid.Column="1" Text="{Binding Value}" Classes.warning="{Binding Warning}" TextWrapping="Wrap" />
+            </Grid>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>
