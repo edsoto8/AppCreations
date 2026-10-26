@@ -41,6 +41,26 @@ public sealed class CitizenTests
     }
 
     [Fact]
+    public void CommuteLongerThanShift_StillEndsWithTripHome()
+    {
+        var (sim, home, work) = Commute();
+        var c = sim.Resident(home);
+        sim.Employ(c, work, workStart: 8 * 60);
+        sim.RunUntilMinute(8 * 60);
+        Assert.Equal(CitizenState.ToWork, c.State);
+        // Make the shift end before the 42-minute trip does: the citizen reaches work after it ended.
+        c.ActivityEnd = sim.Tick + 30;
+        while (c.State == CitizenState.ToWork)
+        {
+            sim.Step();
+        }
+
+        Assert.Equal(CitizenState.AtWork, c.State);
+        sim.Step();
+        Assert.Equal(CitizenState.ToHome, c.State);
+    }
+
+    [Fact]
     public void JobMatching_EmploysWorkingAgeAdultsOnlyInReach()
     {
         var (sim, home, work) = Commute();
@@ -120,6 +140,8 @@ public sealed class CitizenTests
     public void Daily_AgeingRetiresWorkers()
     {
         var (sim, home, work) = Commute();
+        // A well-served home, so the citizen is content and stays for the whole year.
+        home.Powered = home.Watered = home.CoveredByHealth = home.CoveredByFire = true;
         var c = sim.Resident(home, Citizen.RetirementAge - 1);
         sim.Employ(c, work);
         for (int day = 0; day < Simulation.DaysPerYear; day++)
@@ -127,10 +149,10 @@ public sealed class CitizenTests
             sim.CitizenSystem.Daily(day);
         }
 
-        if (sim.Citizens[c.Id] is { } still)
-        {
-            Assert.Equal(Citizen.RetirementAge, still.Age);
-            Assert.Equal(0, still.JobId);
-        }
+        var still = sim.Citizens[c.Id];
+        Assert.NotNull(still);
+        Assert.Equal(Citizen.RetirementAge, still!.Age);
+        Assert.Equal(0, still.JobId);
+        Assert.Equal(0, work.Workers);
     }
 }

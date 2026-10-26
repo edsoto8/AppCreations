@@ -72,7 +72,7 @@ _The desktop app section is completed with the app milestone; see PROGRESS.md._
 
 ## Tests
 
-`tests/MetroSim.Tests` (xUnit v3 + CsCheck), 137 tests:
+`tests/MetroSim.Tests` (xUnit v3 + CsCheck), 157 tests:
 
 - **Unit:** RNG (PCG reference vectors), noise, heap, terrain, pathfinding, commands and costs, economy
   formulas, utilities, services, traffic, citizens.
@@ -88,7 +88,9 @@ _The desktop app section is completed with the app milestone; see PROGRESS.md._
   continuation after a snapshot mid-commute, before the hour, at midnight, and through a save file.
 - **Save/load:** round trip, summary, atomic overwrite, plus rejection of flipped bytes, consistently
   tampered chunks, missing chunks, newer formats, foreign SQLite files, random bytes, truncation and
-  missing files.
+  missing files. "Hostile" saves with re-sealed checksums are rejected by validation: huge entity
+  headers, overlapping free lists, absurd ticks, invalid commands, non-canonical encodings,
+  inconsistent occupancy and malformed metadata.
 - **Stress** (`Category=Stress`): 20,000 citizens commuting for a full day, a 30-day demo city
   checked daily, and a 100-day accounting drift check.
 
@@ -109,6 +111,9 @@ _The desktop app section is completed with the app milestone; see PROGRESS.md._
 - **Very dense cities.** At 40k citizens on 224x224, the network gridlocks and ticks take ~13 ms. See
   the roadmap.
 - **The auto-mayor is a simple script for demos and benchmarks**, not an AI opponent.
+- **Save integrity checks catch corruption, not deliberate forgery.** Checksums are unkeyed SHA-256, so
+  an edited file whose hashes were recomputed and whose contents stay consistent still loads. `verify`
+  replays the city from its seed and detects that.
 
 ## Roadmap (prioritised)
 

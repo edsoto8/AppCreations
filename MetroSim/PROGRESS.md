@@ -20,7 +20,7 @@ command or test that verified it.
 | M3 | Test suite: unit, property-based, integration, replay, save/load, stress | done (137 tests) |
 | M4 | Avalonia app: map, tools, overlays, dashboards, save/load (Graphics Engineer agent) | in progress |
 | M5 | Benchmarks + profiling-driven optimisation | done for the simulation; rendering FPS pending M4 |
-| M6 | Independent code review, fixes, docs, limitations, roadmap | pending |
+| M6 | Independent code review, fixes, docs, limitations, roadmap | core review done and fixed; app review pending |
 
 ## M1 notes
 
@@ -66,3 +66,37 @@ command or test that verified it.
   - the synthetic stress city now uses the game's own job matching (the stride assignment produced
     80-minute commutes even at 5k citizens and gridlock at 20k).
 - Results: `docs/BENCHMARKS.md`.
+
+## M6 notes: independent review of Core, Persistence and CLI
+
+A read-only reviewer agent tried to break the design claims with throwaway programs. It confirmed
+11 issues; all are fixed with regression tests (`dotnet test tests/MetroSim.Tests` → 157 passed):
+
+1. A fire truck was lost forever when a burning building was removed while the truck was on site.
+   `RemoveBuildings` now sends it home. `Invariants` now checks that `TrucksOut` equals the trucks
+   actually out.
+2. A reused id made a new station inherit the removed station's trucks, and shops inherit visitors.
+   Removal now clears every reference to the removed ids.
+3. Malformed saves could escape `Load` as `IOException`, `OverflowException`, `InvalidCastException`
+   or `FormatException`. All are now mapped to `SaveGameException`; metadata uses `TryParse`, and
+   column types, `user_version` and format ≤ 0 are checked.
+4. A hostile entity-table header could force multi-GB allocations. Headers are now bounded by the
+   bytes remaining.
+5. Undefined enum values in commands were accepted, crashing the hourly tick or producing unloadable
+   saves. They are rejected in `CommandProcessor` and `CommandCodec`.
+6. Routing settings were not saved, so `demo --weight 100 --save` failed `verify`. They are now
+   serialized and applied by `ReplayVerifier`.
+7. A free list overlapping live ids loaded and then corrupted entities. `EntityStore.Restore` now
+   requires disjoint, covering ids, and loads check citizen/building/vehicle cross-references.
+8. An absurd tick loaded and overflowed `Day`. The tick is capped and `Day` is checked.
+9. Bulldozing 4,187 buildings scanned all citizens per building (241 ms). Removal is now batched:
+   32 ms measured.
+10. `Daily_AgeingRetiresWorkers` asserted nothing (its citizen had always moved out). Fixed. Added a
+    property test that snapshots mid-session and continues, and a test for the post-load fingerprint.
+11. A commute longer than the 8-hour shift left the citizen at work for a day. The shift now ends at
+    a saved tick.
+
+Also: the CLI reports `SaveGameException` cleanly (exit 1), and `ARCHITECTURE.md` numbers were synced
+with the code. Not changed: integrity hashes are unkeyed SHA-256, so a deliberate edit that also
+recomputes hashes and stays consistent still loads. `verify` (replay) detects it. Documented in the
+README.

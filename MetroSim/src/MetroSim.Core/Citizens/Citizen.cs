@@ -37,7 +37,7 @@ public sealed class Citizen : IEntity
 
     public int ShopId { get; set; }
 
-    /// <summary>Tick at which the current shop visit ends.</summary>
+    /// <summary>Tick at which the current shift or shop visit ends.</summary>
     public long ActivityEnd { get; set; }
 
     /// <summary>Vehicle or pedestrian id while travelling, else 0.</summary>

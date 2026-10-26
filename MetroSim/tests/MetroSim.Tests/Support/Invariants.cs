@@ -52,6 +52,12 @@ internal static class Invariants
 
             if (b.Kind == BuildingKind.FireStation)
             {
+                // Every truck a station counts as out is a real truck: driving out, on a fire, or driving back.
+                int out_ = sim.Traffic.Vehicles.Count(v => v.Kind == VehicleKind.FireTruck
+                        && ((v.Purpose == TripPurpose.FireCall && v.OriginBuildingId == b.Id)
+                            || (v.Purpose == TripPurpose.FireReturn && v.TargetBuildingId == b.Id)))
+                    + sim.Buildings.Count(o => o.IsBurning && o.FireTruckId == -1 && o.FireStationId == b.Id);
+                Assert.Equal(out_, b.TrucksOut);
                 Assert.InRange(b.TrucksOut, 0, b.Spec.Vehicles);
             }
 

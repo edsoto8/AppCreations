@@ -6,6 +6,7 @@ using MetroSim.Core.Citizens;
 using MetroSim.Core.Economy;
 using MetroSim.Core.Engine;
 using MetroSim.Core.Mathematics;
+using MetroSim.Core.Roads;
 using MetroSim.Core.Traffic;
 using MetroSim.Core.World;
 
@@ -24,6 +25,9 @@ public sealed class SaveFormatException(string message) : Exception(message);
 public static class SimulationSerializer
 {
     public const int CurrentChunkVersion = 1;
+
+    /// <summary>About 2,000 in-game years; also keeps <see cref="Simulation.Day"/> within an int.</summary>
+    public const long MaxTick = 1_000_000L * Simulation.TicksPerDay;
 
     public static readonly string[] ChunkOrder =
         ["world", "rng", "buildings", "citizens", "traffic", "economy", "stats", "commands"];
@@ -94,6 +98,7 @@ public static class SimulationSerializer
             ReadEconomy(Reader(byName["economy"]), sim.Budget);
             ReadStats(Reader(byName["stats"]), sim);
             ReadCommands(Reader(byName["commands"]), sim.CommandLog);
+            ValidateReferences(sim);
             sim.Traffic.RebuildOccupancy();
             map.TouchTerrain();
             map.TouchRoads();
@@ -102,6 +107,18 @@ public static class SimulationSerializer
         catch (EndOfStreamException)
         {
             throw new SaveFormatException("Save data is truncated.");
+        }
+        catch (IOException ex)
+        {
+            throw new SaveFormatException($"Save data is malformed: {ex.Message}");
+        }
+        catch (FormatException ex)
+        {
+            throw new SaveFormatException($"Save data is malformed: {ex.Message}");
+        }
+        catch (OverflowException)
+        {
+            throw new SaveFormatException("Save data is malformed: a value is out of range.");
         }
         catch (ArgumentException ex)
         {
@@ -180,7 +197,7 @@ public static class SimulationSerializer
 
         int waterLevel = r.ReadInt32();
         long tick = r.ReadInt64();
-        if (tick < 0)
+        if (tick < 0 || tick > MaxTick)
         {
             throw new SaveFormatException("Invalid tick.");
         }
@@ -249,7 +266,10 @@ public static class SimulationSerializer
     {
         int highWater = r.ReadInt32();
         int freeCount = r.ReadInt32();
-        if (highWater < 1 || freeCount < 0 || freeCount > highWater)
+        // Every live record and every free id takes at least 4 bytes, so a header can never claim more
+        // entries than the chunk has bytes left; this bounds allocations for hostile input.
+        long remaining = r.BaseStream.Length - r.BaseStream.Position;
+        if (highWater < 1 || freeCount < 0 || freeCount > highWater || highWater - 1L > remaining / 4)
         {
             throw new SaveFormatException("Invalid entity table header.");
         }
@@ -265,7 +285,7 @@ public static class SimulationSerializer
         }
 
         int count = r.ReadInt32();
-        if (count < 0 || count + freeCount != highWater - 1)
+        if (count < 0 || (long)count + freeCount != highWater - 1L)
         {
             throw new SaveFormatException("Entity table counts do not add up.");
         }
@@ -329,7 +349,7 @@ public static class SimulationSerializer
     {
         var (highWater, free, count) = ReadStoreHeader(r);
         var map = sim.Map;
-        var items = new List<Building>(count);
+        var items = new List<Building>(Math.Min(count, 4096));
         for (int i = 0; i < count; i++)
         {
             var b = new Building
@@ -420,7 +440,7 @@ public static class SimulationSerializer
     private static void ReadCitizens(BinaryReader r, EntityStore<Citizen> store)
     {
         var (highWater, free, count) = ReadStoreHeader(r);
-        var items = new List<Citizen>(count);
+        var items = new List<Citizen>(Math.Min(count, 4096));
         for (int i = 0; i < count; i++)
         {
             items.Add(new Citizen
@@ -454,6 +474,9 @@ public static class SimulationSerializer
         w.Write(traffic.RerouteCooldownTicks);
         w.Write(traffic.RerouteBudgetPerTick);
         w.Write(traffic.WalkMaxTiles);
+        w.Write(traffic.RerouteNodeLimit);
+        w.Write(traffic.Pathfinder.NodeLimit);
+        w.Write(traffic.Pathfinder.HeuristicWeightPercent);
         WriteStoreHeader(w, traffic.Vehicles);
         foreach (var v in traffic.Vehicles)
         {
@@ -503,9 +526,19 @@ public static class SimulationSerializer
         traffic.RerouteCooldownTicks = r.ReadInt32();
         traffic.RerouteBudgetPerTick = r.ReadInt32();
         traffic.WalkMaxTiles = r.ReadInt32();
+        traffic.RerouteNodeLimit = r.ReadInt32();
+        traffic.Pathfinder.NodeLimit = r.ReadInt32();
+        traffic.Pathfinder.HeuristicWeightPercent = r.ReadInt32();
+        if (traffic.RerouteAfterTicks < 1 || traffic.RerouteCooldownTicks < 0 || traffic.RerouteBudgetPerTick < 0
+            || traffic.WalkMaxTiles < 0 || traffic.RerouteNodeLimit < 1 || traffic.Pathfinder.NodeLimit < 1
+            || traffic.Pathfinder.HeuristicWeightPercent is < 100 or > 1000)
+        {
+            throw new SaveFormatException("Invalid traffic settings.");
+        }
+
         var (highWater, free, count) = ReadStoreHeader(r);
         int tiles = traffic.VolumeThisHour.Length;
-        var items = new List<Vehicle>(count);
+        var items = new List<Vehicle>(Math.Min(count, 4096));
         for (int i = 0; i < count; i++)
         {
             var v = new Vehicle
@@ -782,7 +815,7 @@ public static class SimulationSerializer
     private static void ReadCommands(BinaryReader r, List<LoggedCommand> log)
     {
         int count = r.ReadInt32();
-        if (count < 0)
+        if (count < 0 || count > (r.BaseStream.Length - r.BaseStream.Position) / 9)
         {
             throw new SaveFormatException("Invalid command log length.");
         }
@@ -791,6 +824,73 @@ public static class SimulationSerializer
         for (int i = 0; i < count; i++)
         {
             log.Add(new LoggedCommand(r.ReadInt64(), CommandCodec.Read(r)));
+        }
+    }
+
+    // ---- cross-reference validation ----
+
+    /// <summary>
+    /// Rejects saves whose entities disagree with each other (a checksum only proves the bytes are the
+    /// ones written, not that they describe a consistent city).
+    /// </summary>
+    private static void ValidateReferences(Simulation sim)
+    {
+        var residents = new Dictionary<int, int>();
+        var workers = new Dictionary<int, int>();
+        foreach (var c in sim.Citizens)
+        {
+            if (sim.Buildings[c.HomeId] is not { Kind: BuildingKind.Residential })
+            {
+                throw new SaveFormatException($"Citizen {c.Id} has no valid home.");
+            }
+
+            residents[c.HomeId] = residents.GetValueOrDefault(c.HomeId) + 1;
+            if (c.JobId != 0)
+            {
+                if (sim.Buildings[c.JobId] is not { Kind: BuildingKind.Commercial or BuildingKind.Industrial })
+                {
+                    throw new SaveFormatException($"Citizen {c.Id} has an invalid workplace.");
+                }
+
+                workers[c.JobId] = workers.GetValueOrDefault(c.JobId) + 1;
+            }
+
+            if (c.VehicleId != 0 && sim.Traffic.Vehicles[c.VehicleId]?.CitizenId != c.Id)
+            {
+                throw new SaveFormatException($"Citizen {c.Id} refers to a vehicle that is not theirs.");
+            }
+
+            if (c.Age is < 0 or > 200 || c.WorkStart is < 0 or >= Simulation.TicksPerDay
+                || c.ShopMinute is < -1 or >= Simulation.TicksPerDay)
+            {
+                throw new SaveFormatException($"Citizen {c.Id} has out-of-range values.");
+            }
+        }
+
+        foreach (var b in sim.Buildings)
+        {
+            if (b.Residents != residents.GetValueOrDefault(b.Id) || b.Workers != workers.GetValueOrDefault(b.Id))
+            {
+                throw new SaveFormatException($"Building {b.Id} occupancy does not match its citizens.");
+            }
+
+            if (b.TrucksOut < 0 || b.TrucksOut > b.Spec.Vehicles)
+            {
+                throw new SaveFormatException($"Building {b.Id} has an invalid truck count.");
+            }
+        }
+
+        foreach (var v in sim.Traffic.Vehicles)
+        {
+            if (v.CitizenId != 0 && sim.Citizens[v.CitizenId]?.VehicleId != v.Id)
+            {
+                throw new SaveFormatException($"Vehicle {v.Id} belongs to no citizen.");
+            }
+
+            if (sim.Map.Roads[v.CurrentTile] == RoadType.None || v.Progress is < 0 or > RoadSpecs.MilliTile)
+            {
+                throw new SaveFormatException($"Vehicle {v.Id} is off the road.");
+            }
         }
     }
 

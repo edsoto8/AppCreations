@@ -76,19 +76,46 @@ public sealed class EntityStore<T> : IEnumerable<T> where T : class, IEntity
     System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => ((IEnumerable<T>)this).GetEnumerator();
 
     /// <summary>Restores exact slot layout (used by the deserializer).</summary>
+    /// <exception cref="ArgumentException">Ids overlap, repeat, or do not cover 1..highWater-1 exactly.</exception>
     internal void Restore(int highWater, IEnumerable<T> items, IEnumerable<int> freeIds)
     {
-        _slots = new T?[Math.Max(64, highWater + 1)];
-        HighWater = highWater;
-        Count = 0;
+        var slots = new T?[Math.Max(64, highWater + 1)];
+        var seen = new bool[highWater];
+        int count = 0;
         foreach (var item in items)
         {
-            _slots[item.Id] = item;
-            Count++;
+            if (item.Id < 1 || item.Id >= highWater || seen[item.Id])
+            {
+                throw new ArgumentException($"duplicate or out-of-range id {item.Id}");
+            }
+
+            seen[item.Id] = true;
+            slots[item.Id] = item;
+            count++;
         }
 
+        var free = new List<int>();
+        foreach (int id in freeIds)
+        {
+            if (id < 1 || id >= highWater || seen[id])
+            {
+                throw new ArgumentException($"free id {id} is live, repeated or out of range");
+            }
+
+            seen[id] = true;
+            free.Add(id);
+        }
+
+        if (count + free.Count != highWater - 1)
+        {
+            throw new ArgumentException("ids do not cover the table");
+        }
+
+        _slots = slots;
+        HighWater = highWater;
+        Count = count;
         _free.Clear();
-        _free.AddRange(freeIds);
+        _free.AddRange(free);
     }
 
     public struct Enumerator(EntityStore<T> store)

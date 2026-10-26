@@ -179,6 +179,30 @@ public sealed class PropertyTests
             }
         }, iter: 40);
 
+    /// <summary>Snapshot at a random point of a random session; both copies then play the rest identically.</summary>
+    [Fact]
+    public void SnapshotMidSession_ContinuesIdentically() =>
+        Gen.Select(CommandGenerators.Session(size: 40), Gen.Int[0, 29]).Sample((session, cut) =>
+        {
+            var sim = Simulation.Create(new MapSettings { Width = 40, Height = 40, Seed = session.Seed });
+            Simulation? copy = null;
+            for (int i = 0; i < session.Steps.Count; i++)
+            {
+                if (i == Math.Min(cut, session.Steps.Count - 1))
+                {
+                    copy = SimulationSerializer.Deserialize(SimulationSerializer.Serialize(sim));
+                }
+
+                foreach (var target in copy is null ? [sim] : new[] { sim, copy })
+                {
+                    target.Execute(session.Steps[i].Command);
+                    target.Run(session.Steps[i].TicksAfter);
+                }
+            }
+
+            Assert.Equal(sim.ComputeStateHash(), copy!.ComputeStateHash());
+        }, iter: 25);
+
     /// <summary>Serialize → deserialize → serialize is the identity, for any reachable state.</summary>
     [Fact]
     public void Serialization_RoundTripsAnyReachableState() =>

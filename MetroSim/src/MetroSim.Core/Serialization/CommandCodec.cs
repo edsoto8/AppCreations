@@ -54,6 +54,17 @@ public static class CommandCodec
 
     public static GameCommand Read(BinaryReader r)
     {
+        var command = ReadUnchecked(r);
+        if (!CommandProcessor.IsWellFormed(command))
+        {
+            throw new SaveFormatException("The command log contains an invalid command.");
+        }
+
+        return command;
+    }
+
+    private static GameCommand ReadUnchecked(BinaryReader r)
+    {
         byte tag = r.ReadByte();
         switch (tag)
         {

@@ -313,7 +313,7 @@ internal sealed class ServiceSystem
         }
     }
 
-    private void ReturnTruck(int stationId, int fromTile, long tick)
+    internal void ReturnTruck(int stationId, int fromTile, long tick)
     {
         var station = _sim.Buildings[stationId];
         if (station is null || station.Kind != BuildingKind.FireStation)

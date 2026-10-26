@@ -13,3 +13,8 @@ catch (ArgumentException ex)
     Console.Error.WriteLine($"error: {ex.Message}");
     return 2;
 }
+catch (MetroSim.Persistence.SaveGameException ex)
+{
+    Console.Error.WriteLine($"error: {ex.Message}");
+    return 1;
+}

@@ -12,9 +12,12 @@ public sealed record ReplayResult(bool Matches, string ExpectedHash, string Repl
 /// </summary>
 public static class ReplayVerifier
 {
-    public static ReplayResult Replay(MapSettings settings, IReadOnlyList<LoggedCommand> log, long targetTick, string expectedHash)
+    /// <param name="configure">Applies tuning that is saved but not part of <see cref="MapSettings"/> (routing settings).</param>
+    public static ReplayResult Replay(MapSettings settings, IReadOnlyList<LoggedCommand> log, long targetTick, string expectedHash,
+        Action<Simulation>? configure = null)
     {
         var sim = Simulation.Create(settings);
+        configure?.Invoke(sim);
         int next = 0;
         int failed = 0;
         while (true)
@@ -41,6 +44,18 @@ public static class ReplayVerifier
         return new ReplayResult(string.Equals(hash, expectedHash, StringComparison.Ordinal), expectedHash, hash, next, failed);
     }
 
+    /// <summary>Replays a city with the routing settings it was recorded with (they are fixed for a game's lifetime).</summary>
     public static ReplayResult Replay(Simulation recorded) =>
-        Replay(recorded.Settings, recorded.CommandLog, recorded.Tick, recorded.ComputeStateHash());
+        Replay(recorded.Settings, recorded.CommandLog, recorded.Tick, recorded.ComputeStateHash(), sim =>
+        {
+            var from = recorded.Traffic;
+            var to = sim.Traffic;
+            to.RerouteAfterTicks = from.RerouteAfterTicks;
+            to.RerouteCooldownTicks = from.RerouteCooldownTicks;
+            to.RerouteBudgetPerTick = from.RerouteBudgetPerTick;
+            to.WalkMaxTiles = from.WalkMaxTiles;
+            to.RerouteNodeLimit = from.RerouteNodeLimit;
+            to.Pathfinder.NodeLimit = from.Pathfinder.NodeLimit;
+            to.Pathfinder.HeuristicWeightPercent = from.Pathfinder.HeuristicWeightPercent;
+        });
 }

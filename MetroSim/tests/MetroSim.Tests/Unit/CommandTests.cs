@@ -190,6 +190,19 @@ public sealed class CommandTests
     }
 
     [Fact]
+    public void Commands_WithUndefinedEnumValues_AreRejected()
+    {
+        var sim = TestWorld.Flat(32);
+        sim.Road(2, 4, 20, 4);
+        Assert.False(sim.Execute(new ZoneCommand(2, 3, 8, 3, (ZoneType)9)).Success);
+        Assert.False(sim.Execute(new BuildRoadCommand(2, 6, 8, 6, (RoadType)7)).Success);
+        Assert.False(sim.Execute(new PlaceBuildingCommand((BuildingKind)42, 5, 8)).Success);
+        Assert.False(sim.Execute(new SetTaxCommand((ZoneType)9, 5)).Success);
+        Assert.Single(sim.CommandLog);
+        sim.RunHours(2);
+    }
+
+    [Fact]
     public void FailedCommands_AreNotLogged()
     {
         var sim = TestWorld.Flat(32);

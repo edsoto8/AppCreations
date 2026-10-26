@@ -114,6 +114,10 @@ public static class SaveGameStore
         {
             throw new SaveGameException($"Could not write the save file: {ex.Message}", ex);
         }
+        catch (UnauthorizedAccessException ex)
+        {
+            throw new SaveGameException($"Could not write the save file: {ex.Message}", ex);
+        }
         finally
         {
             if (File.Exists(temp))
@@ -165,6 +169,8 @@ public static class SaveGameStore
                 throw new SaveGameException("This file is not a MetroSim save.");
             }
 
+            long userVersion = Scalar(connection, "PRAGMA user_version;");
+
             using (var check = connection.CreateCommand())
             {
                 check.CommandText = "PRAGMA quick_check;";
@@ -186,23 +192,34 @@ public static class SaveGameStore
                 }
             }
 
-            int format = int.Parse(Get(meta, "format_version"), CultureInfo.InvariantCulture);
+            long format = Number(meta, "format_version");
             if (format > FormatVersion)
             {
                 throw new SaveGameException($"This save was made by a newer version (format {format}); this build reads up to format {FormatVersion}.");
             }
 
+            if (format < 1 || format != userVersion)
+            {
+                throw new SaveGameException("The save's format version is damaged.");
+            }
+
+            if (!DateTime.TryParse(Get(meta, "saved_utc"), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var saved)
+                || !ulong.TryParse(Get(meta, "seed"), NumberStyles.None, CultureInfo.InvariantCulture, out ulong seed))
+            {
+                throw new SaveGameException("The save's metadata is damaged.");
+            }
+
             var summary = new SaveSummary(
                 full,
-                format,
+                (int)format,
                 Get(meta, "city_name"),
-                ulong.Parse(Get(meta, "seed"), CultureInfo.InvariantCulture),
-                int.Parse(Get(meta, "map_width"), CultureInfo.InvariantCulture),
-                int.Parse(Get(meta, "map_height"), CultureInfo.InvariantCulture),
-                long.Parse(Get(meta, "tick"), CultureInfo.InvariantCulture),
-                int.Parse(Get(meta, "population"), CultureInfo.InvariantCulture),
-                long.Parse(Get(meta, "money"), CultureInfo.InvariantCulture),
-                DateTime.Parse(Get(meta, "saved_utc"), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind),
+                seed,
+                (int)Number(meta, "map_width", int.MaxValue),
+                (int)Number(meta, "map_height", int.MaxValue),
+                Number(meta, "tick"),
+                (int)Number(meta, "population", int.MaxValue),
+                Number(meta, "money", long.MaxValue, allowNegative: true),
+                saved,
                 Get(meta, "state_hash"));
 
             var chunks = new List<SaveChunk>();
@@ -213,8 +230,21 @@ public static class SaveGameStore
                 using var reader = cmd.ExecuteReader();
                 while (reader.Read())
                 {
+                    if (reader.GetFieldType(0) != typeof(string) || reader.GetFieldType(1) != typeof(long)
+                        || reader.GetFieldType(2) != typeof(long) || reader.GetFieldType(3) != typeof(string)
+                        || reader.GetFieldType(4) != typeof(byte[]))
+                    {
+                        throw new SaveGameException("The save is damaged: a chunk has the wrong column types.");
+                    }
+
                     string name = reader.GetString(0);
-                    int version = reader.GetInt32(1);
+                    long rawVersion = reader.GetInt64(1);
+                    if (rawVersion is < 1 or > int.MaxValue)
+                    {
+                        throw new SaveGameException($"The save is damaged: chunk '{name}' has an invalid version.");
+                    }
+
+                    int version = (int)rawVersion;
                     long length = reader.GetInt64(2);
                     string sha = reader.GetString(3);
                     byte[] data = (byte[])reader["data"];
@@ -247,6 +277,17 @@ public static class SaveGameStore
         {
             throw new SaveGameException($"The save's metadata is damaged: {ex.Message}", ex);
         }
+    }
+
+    private static long Number(Dictionary<string, string> meta, string key, long max = long.MaxValue, bool allowNegative = false)
+    {
+        var style = allowNegative ? NumberStyles.AllowLeadingSign : NumberStyles.None;
+        if (!long.TryParse(Get(meta, key), style, CultureInfo.InvariantCulture, out long value) || value > max || (!allowNegative && value < 0))
+        {
+            throw new SaveGameException($"The save's metadata is damaged ('{key}').");
+        }
+
+        return value;
     }
 
     private static string Get(Dictionary<string, string> meta, string key) =>

@@ -62,7 +62,7 @@ that runs headlessly; rendering, input and persistence are separate layers on to
 ## Time and scale
 
 - 1 tick = 1 in-game minute; 1440 ticks per day; `DaysPerYear = 12` (citizens age one year every 12 days).
-- Speeds: paused, 1x = 30 ticks/s, 2x = 120 ticks/s, 3x = 480 ticks/s, plus an uncapped "max" mode.
+- Speeds: paused, 1x = 12 ticks/s, 2x = 48 ticks/s, 3x = 192 ticks/s, plus an uncapped "max" mode.
 - Hourly work (every 60 ticks): demand, zone growth, migration, job matching, pollution and land value,
   coverage. Every 10 ticks: power and water allocation. Daily (midnight): budget, satisfaction,
   ageing/births/deaths, garbage, fires starting, abandonment, levelling up.
@@ -80,16 +80,18 @@ cost); over rock costs 2x. `RoadGraph` derives the connected-component labels an
 mask (3+ road neighbours) lazily. `Pathfinder` is A* on road tiles with reusable generation-stamped
 buffers and a binary heap with insertion-order tie-breaking (deterministic). Edge cost = the expected
 time to cross the next tile at its current congestion, plus an intersection delay. The heuristic is
-Manhattan distance times the fastest free-flow tile time, so it stays admissible.
+Manhattan distance times the fastest free-flow tile time (admissible), weighted by 1.25: weighted A*
+returns routes at most 25% costlier than optimal and expands about a third fewer nodes
+(`docs/BENCHMARKS.md`).
 
 ### Traffic (`Traffic/`)
 Each road tile has four directional lanes (N/E/S/W of travel), each with a vehicle capacity
-(Street 2, Avenue 4). A vehicle advances `speed` milli-tiles per tick. Speed drops linearly with
+(Street 3, Avenue 5). A vehicle advances `speed` milli-tiles per tick. Speed drops linearly with
 lane occupancy, down to 35% of free flow. A vehicle may only enter the next lane if that lane has
-room, and an intersection admits a limited number of vehicles per tick (Street 1, Avenue 2, which
+room, and an intersection admits a limited number of vehicles per tick (Street 4, Avenue 6, which
 acts like signals). Queues and spill-back therefore emerge from demand alone. A vehicle that has
-waited `RerouteAfterTicks` re-plans from its current tile with live congestion costs (budgeted per
-tick). Removing a road under a route triggers re-planning; if no route remains the trip is aborted.
+waited `RerouteAfterTicks` re-plans from its current tile with live congestion costs (32 per tick,
+60-tick cooldown, 4,000-node cap). Removing a road under a route triggers re-planning; if no route remains the trip is aborted.
 Short trips (≤ 6 tiles) are walked: pedestrians use the same paths but no lane capacity.
 Metrics: active vehicles, trips completed per hour, mean trip time vs free-flow time (travel time
 index), per-tile hourly volume (traffic overlay), average commute minutes.
@@ -104,8 +106,9 @@ Population changes through migration (move-in driven by residential demand; move
 satisfaction or long unemployment), births and deaths.
 
 ### Buildings and zoning (`Buildings/`)
-Players paint Residential/Commercial/Industrial zones on buildable tiles within 2 tiles of a road.
-Hourly growth spawns buildings on candidate zoned tiles, in proportion to demand; construction takes
+Players paint Residential/Commercial/Industrial zones on any buildable tile; only zoned tiles within
+2 tiles of a road develop. Hourly growth spawns buildings on those candidate tiles, in proportion to
+demand; construction takes
 a few hours. Buildings level up (1–3, more capacity) after sustained good conditions and land value,
 and are abandoned after sustained lack of road access, power, water, garbage collection or workers.
 Abandoned buildings collapse after a few days, freeing the tile to regrow. Service buildings come from

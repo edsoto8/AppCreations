@@ -72,7 +72,7 @@ public sealed class Simulation : ITripListener
     public long Tick { get; internal set; }
 
     /// <summary>0-based day in progress.</summary>
-    public int Day => (int)(Tick / TicksPerDay);
+    public int Day => checked((int)(Tick / TicksPerDay));
 
     public int MinuteOfDay => (int)(Tick % TicksPerDay);
 

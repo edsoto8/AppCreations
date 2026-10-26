@@ -37,6 +37,7 @@ internal sealed class CitizenSystem
                 case CitizenState.AtHome:
                     if (c.JobId != 0 && minute == c.WorkStart)
                     {
+                        c.ActivityEnd = tick + Citizen.WorkMinutes;
                         StartTrip(c, TripPurpose.ToWork, c.HomeId, c.JobId, tick);
                     }
                     else if (minute == c.ShopMinute)
@@ -47,7 +48,9 @@ internal sealed class CitizenSystem
 
                     break;
                 case CitizenState.AtWork:
-                    if (minute == (c.WorkStart + Citizen.WorkMinutes) % Simulation.TicksPerDay)
+                    // The shift ends a fixed time after leaving home, so even a commute longer than the
+                    // shift ends with a trip home rather than a day at work.
+                    if (tick >= c.ActivityEnd)
                     {
                         StartTrip(c, TripPurpose.ToHome, c.JobId, c.HomeId, tick);
                     }
@@ -364,9 +367,13 @@ internal sealed class CitizenSystem
                 QuitJob(c);
             }
 
-            if (c.State == CitizenState.AtShop && isAffected(c.ShopId))
+            if (c.ShopId != 0 && isAffected(c.ShopId))
             {
-                c.State = CitizenState.AtHome;
+                c.ShopId = 0;
+                if (c.State == CitizenState.AtShop)
+                {
+                    c.State = CitizenState.AtHome;
+                }
             }
         }
     }

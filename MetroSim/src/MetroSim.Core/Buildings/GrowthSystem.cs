@@ -96,14 +96,64 @@ internal sealed class GrowthSystem
     }
 
     /// <summary>Removes a building, evicting residents and workers. Zoning on its tiles stays.</summary>
-    public void RemoveBuilding(Building b)
+    public void RemoveBuilding(Building b) => RemoveBuildings([b]);
+
+    /// <summary>
+    /// Removes buildings in one pass (one citizen scan however many are removed). A fire truck working on
+    /// a removed building goes home, and every reference to a removed id is cleared so an id reused by a
+    /// later building cannot inherit trucks, visitors or trips.
+    /// </summary>
+    public void RemoveBuildings(IReadOnlyCollection<Building> removed)
     {
+        if (removed.Count == 0)
+        {
+            return;
+        }
+
         EnsureFlags();
         Array.Clear(_flagged);
-        _flagged[b.Id] = true;
-        _sim.CitizenSystem.Evict(id => id < _flagged.Length && _flagged[id]);
-        ClearTiles(b);
-        _sim.Buildings.Remove(b.Id);
+        foreach (var b in removed)
+        {
+            _flagged[b.Id] = true;
+        }
+
+        bool Flagged(int id) => id > 0 && id < _flagged.Length && _flagged[id];
+        foreach (var b in removed)
+        {
+            if (b.IsBurning && b.FireTruckId == -1)
+            {
+                _sim.Services.ReturnTruck(b.FireStationId, b.AccessTile, _sim.Tick);
+            }
+        }
+
+        _sim.CitizenSystem.Evict(Flagged);
+        foreach (var v in _sim.Traffic.Vehicles)
+        {
+            if (Flagged(v.OriginBuildingId))
+            {
+                v.OriginBuildingId = 0;
+            }
+
+            if (Flagged(v.TargetBuildingId))
+            {
+                v.TargetBuildingId = 0;
+            }
+        }
+
+        foreach (var b in removed)
+        {
+            ClearTiles(b);
+            _sim.Buildings.Remove(b.Id);
+        }
+
+        foreach (var other in _sim.Buildings)
+        {
+            if (Flagged(other.FireStationId))
+            {
+                other.FireStationId = 0;
+            }
+        }
+
         _sim.Map.Touch();
         _sim.TouchBuildings();
     }
@@ -231,10 +281,7 @@ internal sealed class GrowthSystem
             _sim.TouchBuildings();
         }
 
-        foreach (var b in collapsed)
-        {
-            RemoveBuilding(b);
-        }
+        RemoveBuildings(collapsed);
     }
 
     private void SpawnZone(ZoneType zone, int demand)

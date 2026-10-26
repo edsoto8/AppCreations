@@ -85,6 +85,57 @@ public sealed class ServiceTests
     }
 
     [Fact]
+    public void BulldozingABuildingWhileATruckIsOnSite_SendsTheTruckHome()
+    {
+        var sim = TestWorld.Flat(64);
+        sim.Road(1, 10, 62, 10);
+        var station = sim.Finished(BuildingKind.FireStation, 2, 8);
+        for (int round = 0; round < 4; round++)
+        {
+            var house = sim.Finished(BuildingKind.Residential, 20 + round, 9);
+            sim.Services.RecomputeCoverage();
+            ServiceSystem.Ignite(house);
+            for (int i = 0; i < 300 && house.FireTruckId != -1; i++)
+            {
+                sim.Step();
+            }
+
+            Assert.Equal(-1, house.FireTruckId);
+            Assert.True(sim.Execute(new BulldozeCommand(house.X, house.Y, house.X, house.Y)).Success);
+            Invariants.Check(sim);
+            sim.Run(200);
+            Assert.Equal(0, station.TrucksOut);
+        }
+    }
+
+    [Fact]
+    public void ReplacingAStation_NewStationDoesNotInheritOldTrucks()
+    {
+        var sim = TestWorld.Flat(64);
+        sim.Road(1, 10, 62, 10);
+        var a = sim.Finished(BuildingKind.FireStation, 2, 8);
+        var house = sim.Finished(BuildingKind.Residential, 25, 9);
+        sim.Services.RecomputeCoverage();
+        ServiceSystem.Ignite(house);
+        for (int i = 0; i < 30 && a.TrucksOut == 0; i++)
+        {
+            sim.Step();
+        }
+
+        Assert.Equal(1, a.TrucksOut);
+        Assert.True(sim.Execute(new BulldozeCommand(2, 8, 3, 9)).Success);
+        Assert.True(sim.Execute(new PlaceBuildingCommand(BuildingKind.FireStation, 2, 8)).Success);
+        var b = sim.Buildings[a.Id]!;
+        Assert.Equal(BuildingKind.FireStation, b.Kind);
+        Assert.Equal(0, b.TrucksOut);
+        for (int i = 0; i < 400; i++)
+        {
+            sim.Step();
+            Invariants.Check(sim);
+        }
+    }
+
+    [Fact]
     public void Fire_UncoveredBuilding_BurnsDown()
     {
         var sim = TestWorld.Flat(40);

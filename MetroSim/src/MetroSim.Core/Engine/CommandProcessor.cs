@@ -11,7 +11,9 @@ internal sealed class CommandProcessor
 
     public CommandProcessor(Simulation sim) => _sim = sim;
 
-    public CommandResult Apply(GameCommand command, bool dryRun) => command switch
+    public CommandResult Apply(GameCommand command, bool dryRun) => !IsWellFormed(command)
+        ? CommandResult.Fail("Invalid command.")
+        : command switch
     {
         BuildRoadCommand c => BuildRoad(c, dryRun),
         BuildPowerLineCommand c => BuildPowerLine(c, dryRun),
@@ -23,6 +25,17 @@ internal sealed class CommandProcessor
     };
 
     private CityMap Map => _sim.Map;
+
+    /// <summary>Rejects out-of-range enum values (from code or a hostile command log) before any rule runs.</summary>
+    public static bool IsWellFormed(GameCommand command) => command switch
+    {
+        BuildRoadCommand c => Enum.IsDefined(c.Type),
+        ZoneCommand c => Enum.IsDefined(c.Zone),
+        PlaceBuildingCommand c => Enum.IsDefined(c.Kind),
+        SetTaxCommand c => Enum.IsDefined(c.Zone),
+        BuildPowerLineCommand or BulldozeCommand => true,
+        _ => false,
+    };
 
     private CommandResult BuildRoad(BuildRoadCommand c, bool dryRun)
     {
@@ -176,10 +189,7 @@ internal sealed class CommandProcessor
 
         if (!dryRun)
         {
-            foreach (int id in buildings)
-            {
-                _sim.Growth.RemoveBuilding(_sim.Buildings[id]!);
-            }
+            _sim.Growth.RemoveBuildings(buildings.Select(id => _sim.Buildings[id]!).ToList());
 
             foreach (int t in lines)
             {
@@ -252,10 +262,7 @@ internal sealed class CommandProcessor
 
         if (!dryRun)
         {
-            foreach (int id in demolish)
-            {
-                _sim.Growth.RemoveBuilding(_sim.Buildings[id]!);
-            }
+            _sim.Growth.RemoveBuildings(demolish.Select(id => _sim.Buildings[id]!).ToList());
 
             foreach (int t in tiles)
             {
@@ -332,10 +339,7 @@ internal sealed class CommandProcessor
 
         if (!dryRun)
         {
-            foreach (int id in replaced)
-            {
-                _sim.Growth.RemoveBuilding(_sim.Buildings[id]!);
-            }
+            _sim.Growth.RemoveBuildings(replaced.Select(id => _sim.Buildings[id]!).ToList());
 
             _sim.Growth.CreateBuilding(c.Kind, c.X, c.Y);
             _sim.Budget.ChargeConstruction(cost);
