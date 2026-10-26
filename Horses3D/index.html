@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Horse Meadow</title>
+  <style>
+    :root {
+      --panel: rgba(255, 255, 255, 0.82);
+      --text: #1f2a1c;
+      --muted: #5b6656;
+      --accent: #7a4425;
+      --accent-text: #ffffff;
+      --border: rgba(31, 42, 28, 0.12);
+    }
+    @media (prefers-color-scheme: dark) {
+      :root:not([data-theme="light"]) {
+        --panel: rgba(24, 28, 22, 0.8);
+        --text: #eef2ea;
+        --muted: #a9b3a3;
+        --accent: #d6ac62;
+        --accent-text: #1d1b1e;
+        --border: rgba(238, 242, 234, 0.14);
+      }
+    }
+    :root[data-theme="dark"] {
+      --panel: rgba(24, 28, 22, 0.8);
+      --text: #eef2ea;
+      --muted: #a9b3a3;
+      --accent: #d6ac62;
+      --accent-text: #1d1b1e;
+      --border: rgba(238, 242, 234, 0.14);
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; overflow: hidden; background: #dcecf5; }
+    body { font: 14px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; color: var(--text); }
+    #scene { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+    .panel {
+      position: fixed;
+      background: var(--panel);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px 14px;
+    }
+    #controls { top: 16px; left: 16px; max-width: calc(100% - 32px); }
+    h1 { margin: 0 0 2px; font-size: 18px; }
+    .sub { margin: 0 0 10px; color: var(--muted); font-size: 12px; }
+    .row { display: flex; flex-wrap: wrap; gap: 6px; }
+    button {
+      font: inherit;
+      color: var(--text);
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 5px 12px;
+      cursor: pointer;
+    }
+    button:hover { border-color: var(--accent); }
+    button.active { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+    button:disabled { opacity: 0.45; cursor: default; }
+    #chips { bottom: 16px; left: 16px; right: 16px; display: flex; flex-wrap: wrap; gap: 6px; padding: 10px; }
+    .chip { display: inline-flex; align-items: center; gap: 6px; }
+    .swatch { width: 12px; height: 12px; border-radius: 50%; border: 1px solid var(--border); }
+    #card { top: 16px; right: 16px; min-width: 160px; }
+    #card .name { font-weight: 600; font-size: 16px; }
+    #card .coat, #card .hint { color: var(--muted); font-size: 12px; }
+    #card .gait { margin-top: 4px; }
+    @media (max-width: 640px) {
+      #card { top: auto; bottom: 120px; right: 16px; }
+      .sub { display: none; }
+    }
+  </style>
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+<body>
+  <canvas id="scene"></canvas>
+
+  <section id="controls" class="panel">
+    <h1>Horse Meadow</h1>
+    <p class="sub">Drag to orbit · scroll to zoom · click a horse to follow it</p>
+    <div class="row">
+      <button data-mode="roam" class="active">Roam</button>
+      <button data-mode="graze">Graze</button>
+      <button data-mode="gallop">Gallop</button>
+      <button id="add">+ Add horse</button>
+    </div>
+  </section>
+
+  <section id="card" class="panel" hidden>
+    <div class="name"></div>
+    <div class="coat"></div>
+    <div class="gait"></div>
+    <div class="hint">Esc or click empty ground to stop following</div>
+  </section>
+
+  <nav id="chips" class="panel" aria-label="Horses"></nav>
+
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>
