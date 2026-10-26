@@ -1,13 +1,13 @@
 namespace MetroSim.Core.Mathematics;
 
 /// <summary>
-/// Binary min-heap of (priority, value) with insertion-order tie-breaking, so equal priorities pop in a
-/// deterministic order. Reusable: <see cref="Clear"/> keeps the allocated storage.
+/// Binary min-heap of (key, value). Equal keys pop in insertion order, so the order is deterministic
+/// and independent of heap internals. Reusable: <see cref="Clear"/> keeps the allocated storage.
 /// </summary>
 public sealed class MinHeap
 {
-    private (long Key, int Value)[] _items = new (long, int)[256];
-    private long _sequence;
+    private Entry[] _items = new Entry[256];
+    private int _sequence;
 
     public int Count { get; private set; }
 
@@ -17,20 +17,19 @@ public sealed class MinHeap
         _sequence = 0;
     }
 
-    public void Push(int priority, int value)
+    public void Push(long key, int value)
     {
         if (Count == _items.Length)
         {
             Array.Resize(ref _items, _items.Length * 2);
         }
 
-        // Priority in the high 32 bits, insertion sequence in the low 32: one comparison orders both.
-        long key = ((long)priority << 32) | (uint)_sequence++;
+        var entry = new Entry(key, _sequence++, value);
         int i = Count++;
         while (i > 0)
         {
             int parent = (i - 1) >> 1;
-            if (_items[parent].Key <= key)
+            if (!Less(entry, _items[parent]))
             {
                 break;
             }
@@ -39,10 +38,10 @@ public sealed class MinHeap
             i = parent;
         }
 
-        _items[i] = (key, value);
+        _items[i] = entry;
     }
 
-    public int Pop(out int priority)
+    public int Pop(out long key)
     {
         var top = _items[0];
         var last = _items[--Count];
@@ -55,12 +54,12 @@ public sealed class MinHeap
                 break;
             }
 
-            if (child + 1 < Count && _items[child + 1].Key < _items[child].Key)
+            if (child + 1 < Count && Less(_items[child + 1], _items[child]))
             {
                 child++;
             }
 
-            if (_items[child].Key >= last.Key)
+            if (!Less(_items[child], last))
             {
                 break;
             }
@@ -74,7 +73,11 @@ public sealed class MinHeap
             _items[i] = last;
         }
 
-        priority = (int)(top.Key >> 32);
+        key = top.Key;
         return top.Value;
     }
+
+    private static bool Less(in Entry a, in Entry b) => a.Key < b.Key || (a.Key == b.Key && a.Sequence < b.Sequence);
+
+    private readonly record struct Entry(long Key, int Sequence, int Value);
 }

@@ -58,9 +58,12 @@ public sealed class TrafficSystem : IRoadCostModel
 
     public int RerouteAfterTicks { get; set; } = 8;
 
-    public int RerouteCooldownTicks { get; set; } = 30;
+    public int RerouteCooldownTicks { get; set; } = 60;
 
-    public int RerouteBudgetPerTick { get; set; } = 64;
+    public int RerouteBudgetPerTick { get; set; } = 32;
+
+    /// <summary>Node cap for re-planning searches; a jammed driver looks for a nearby way out, not a new tour.</summary>
+    public int RerouteNodeLimit { get; set; } = 4_000;
 
     /// <summary>Trips this short (in road tiles) are walked.</summary>
     public int WalkMaxTiles { get; set; } = 6;
@@ -391,7 +394,10 @@ public sealed class TrafficSystem : IRoadCostModel
             return false;
         }
 
+        int limit = Pathfinder.NodeLimit;
+        Pathfinder.NodeLimit = Math.Min(limit, RerouteNodeLimit);
         var path = Pathfinder.FindPath(current, destination, this, out _);
+        Pathfinder.NodeLimit = limit;
         if (path is null)
         {
             return false;

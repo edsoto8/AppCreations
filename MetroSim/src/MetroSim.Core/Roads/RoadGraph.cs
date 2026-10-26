@@ -15,6 +15,7 @@ public sealed class RoadGraph
     private int _builtVersion = -1;
     private int _avenueTiles;
     private int _roadTiles;
+    private int _componentCount;
 
     public RoadGraph(CityMap map)
     {
@@ -42,7 +43,14 @@ public sealed class RoadGraph
         }
     }
 
-    public int ComponentCount { get; private set; }
+    public int ComponentCount
+    {
+        get
+        {
+            EnsureBuilt();
+            return _componentCount;
+        }
+    }
 
     public bool IsRoad(int tile) => tile >= 0 && _map.Roads[tile] != RoadType.None;
 
@@ -132,6 +140,6 @@ public sealed class RoadGraph
             }
         }
 
-        ComponentCount = label;
+        _componentCount = label;
     }
 }

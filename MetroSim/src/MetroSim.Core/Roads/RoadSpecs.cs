@@ -38,15 +38,15 @@ public static class RoadSpecs
     /// <summary>Vehicles one directional lane-tile holds before it is full.</summary>
     public static int LaneCapacity(RoadType type) => type switch
     {
-        RoadType.Avenue => 4,
-        _ => 2,
+        RoadType.Avenue => 5,
+        _ => 3,
     };
 
     /// <summary>Vehicles an intersection tile admits per tick (acts like traffic signals).</summary>
     public static int IntersectionThroughput(RoadType type) => type switch
     {
-        RoadType.Avenue => 3,
-        _ => 2,
+        RoadType.Avenue => 6,
+        _ => 4,
     };
 
     public const long PowerLineCostPerTile = 800;

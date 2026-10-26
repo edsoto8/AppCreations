@@ -49,6 +49,16 @@ public sealed class Pathfinder
     public int NodeLimit { get; set; } = 60_000;
 
     /// <summary>
+    /// Heuristic weight in percent. 100 is plain (optimal) A*; above 100 is weighted A*, which expands far
+    /// fewer nodes and returns routes at most that much costlier than the best (a realistic driver).
+    /// Default 125: on the 60-day growing demo city it expands a third fewer nodes than plain A* with
+    /// unchanged congestion and commute times, while a 25% faster avenue detour still always wins
+    /// (150 was faster still but ignored such detours). See docs/BENCHMARKS.md. Not saved; changing it
+    /// changes simulation results.
+    /// </summary>
+    public int HeuristicWeightPercent { get; set; } = 125;
+
+    /// <summary>
     /// Finds the cheapest road path from <paramref name="start"/> to <paramref name="goal"/>, both road
     /// tiles. Returns null when unreachable. The result includes both endpoints.
     /// </summary>
@@ -73,10 +83,10 @@ public sealed class Pathfinder
             int w = _map.Width;
             int gx = goal % w;
             int gy = goal / w;
-            int hScale = costs.MinimumEntryCost;
+            int hScale = costs.MinimumEntryCost * HeuristicWeightPercent / 100;
             _open.Clear();
             Touch(start, 0, -1);
-            _open.Push(Heuristic(start, gx, gy, w, hScale), start);
+            _open.Push(Key(0, Heuristic(start, gx, gy, w, hScale)), start);
             int expanded = 0;
             while (_open.Count > 0)
             {
@@ -117,7 +127,7 @@ public sealed class Pathfinder
                     if (_stamp[nb] != _generation || newCost < _cost[nb])
                     {
                         Touch(nb, newCost, current);
-                        _open.Push(newCost + Heuristic(nb, gx, gy, w, hScale), nb);
+                        _open.Push(Key(newCost, Heuristic(nb, gx, gy, w, hScale)), nb);
                     }
                 }
             }
@@ -130,6 +140,9 @@ public sealed class Pathfinder
             ElapsedTicks += Stopwatch.GetTimestamp() - began;
         }
     }
+
+    /// <summary>Orders by f = g + h, then by smaller h: among equally promising nodes, the one nearest the goal.</summary>
+    private static long Key(int g, int h) => ((long)(g + h) << 31) | (uint)h;
 
     private static int Heuristic(int tile, int gx, int gy, int width, int scale) =>
         (Math.Abs(tile % width - gx) + Math.Abs(tile / width - gy)) * scale;

@@ -16,6 +16,9 @@ internal sealed class ServiceSystem
     public const int CommercialFireOdds = 19_200;
     public const int IndustrialFireOdds = 9_600;
 
+    /// <summary>A badly burning building ignites each neighbour with odds 1 in this, every 30 ticks.</summary>
+    public const int SpreadOdds = 40;
+
     private readonly Simulation _sim;
 
     public ServiceSystem(Simulation sim)
@@ -203,7 +206,7 @@ internal sealed class ServiceSystem
                 continue;
             }
 
-            if (b.FireDamage > 40 && tick % 30 == 0)
+            if (b.FireDamage > 60 && tick % 30 == 0)
             {
                 SpreadFire(b);
             }
@@ -349,7 +352,7 @@ internal sealed class ServiceSystem
 
                 int id = map.BuildingAt[map.Index(x, y)];
                 if (id != 0 && _sim.Buildings[id] is { } nb && nb.Kind.IsZoned() && nb.IsOperating && !nb.IsBurning
-                    && rng.Chance(1, 10))
+                    && rng.Chance(1, SpreadOdds))
                 {
                     Ignite(nb);
                     _sim.AddEvent(EventSeverity.Warning, "Fire is spreading!", map.Index(x, y));

@@ -62,7 +62,7 @@ public static class ZoneLevels
     private static readonly int[] IndustrialWater = [8, 12, 18];
 
     /// <summary>Land value required to grow into each level.</summary>
-    public static readonly int[] LandValueForLevel = [0, 90, 140];
+    public static readonly int[] LandValueForLevel = [0, 75, 105];
 
     /// <summary>Residents for residential buildings, jobs for commercial and industrial.</summary>
     public static int Capacity(BuildingKind kind, int level) => kind switch

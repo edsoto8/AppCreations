@@ -1,3 +1,4 @@
+using MetroSim.Core.Buildings;
 using MetroSim.Core.Engine;
 
 namespace MetroSim.Cli;
@@ -34,6 +35,22 @@ internal static class Report
         Console.WriteLine($"Population {s.Population} (children {s.Children}, working age {s.WorkingAge}, seniors {s.Seniors})");
         Console.WriteLine($"Births {s.TotalBirths}, deaths {s.TotalDeaths}, moved in {s.TotalMovedIn}, moved out {s.TotalMovedOut}");
         Console.WriteLine($"Trips started {m.TripsStarted}, completed {m.TripsCompleted}, aborted {m.TripsAborted}, reroutes {m.Reroutes}");
+        var kinds = new SortedDictionary<string, int>(StringComparer.Ordinal);
+        var levels = new int[4];
+        foreach (var b in sim.Buildings)
+        {
+            if (b.Kind.IsZoned())
+            {
+                levels[b.Level]++;
+            }
+            else
+            {
+                kinds[b.Spec.Name] = kinds.GetValueOrDefault(b.Spec.Name) + 1;
+            }
+        }
+
+        Console.WriteLine($"Zoned buildings by level: L1 {levels[1]}, L2 {levels[2]}, L3 {levels[3]}");
+        Console.WriteLine("Services: " + string.Join(", ", kinds.Select(k => $"{k.Value} {k.Key}")));
         Console.WriteLine($"Fires extinguished {s.FiresExtinguished}, buildings burned down {s.BuildingsBurnedDown}");
         Console.WriteLine($"Garbage uncollected {s.UncollectedGarbage}, landfill {s.LandfillUsedPercent}% full");
         Console.WriteLine($"Pathfinding: {sim.Pathfinder.Searches} searches, {sim.Pathfinder.NodesExpanded} nodes expanded, " +

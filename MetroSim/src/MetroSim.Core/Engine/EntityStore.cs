@@ -10,7 +10,7 @@ public interface IEntity
 /// order and freed ids are reused LIFO; the free list is saved so that a loaded game reuses ids exactly
 /// like the uninterrupted one would.
 /// </summary>
-public sealed class EntityStore<T> where T : class, IEntity
+public sealed class EntityStore<T> : IEnumerable<T> where T : class, IEntity
 {
     private T?[] _slots = new T?[64];
     private readonly List<int> _free = [];
@@ -64,6 +64,16 @@ public sealed class EntityStore<T> where T : class, IEntity
 
     /// <summary>Live entities in id order. Allocation-free when enumerated with foreach.</summary>
     public Enumerator GetEnumerator() => new(this);
+
+    IEnumerator<T> IEnumerable<T>.GetEnumerator()
+    {
+        foreach (var item in this)
+        {
+            yield return item;
+        }
+    }
+
+    System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => ((IEnumerable<T>)this).GetEnumerator();
 
     /// <summary>Restores exact slot layout (used by the deserializer).</summary>
     internal void Restore(int highWater, IEnumerable<T> items, IEnumerable<int> freeIds)

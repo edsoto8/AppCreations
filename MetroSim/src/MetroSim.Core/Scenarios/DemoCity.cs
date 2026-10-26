@@ -4,30 +4,54 @@ using MetroSim.Core.World;
 
 namespace MetroSim.Core.Scenarios;
 
-/// <summary>Where the demo city was laid out.</summary>
+/// <summary>
+/// Where the demo city may grow: a square of up to <see cref="Blocks"/> x <see cref="Blocks"/> blocks.
+/// The layout repeats every six columns of blocks (R R C I R I), with a few unzoned reserve blocks for
+/// services.
+/// </summary>
 public sealed record DemoCityPlan(int OriginX, int OriginY, int Blocks)
 {
     public const int BlockPitch = 6;
+    public const int PatternBlocks = 6;
+    public const int CoreBlocks = 6;
 
     public int Span => Blocks * BlockPitch;
 
     /// <summary>First interior tile of block (bx, by); interiors are 5x5.</summary>
     public (int X, int Y) BlockInterior(int bx, int by) => (OriginX + bx * BlockPitch + 1, OriginY + by * BlockPitch + 1);
 
-    public bool IsReserved(int bx, int by) =>
-        (bx == Blocks - 1 && by < 2) || (bx == Blocks / 2 - 1 && (by == 0 || by == Blocks - 1));
+    public bool IsReserved(int bx, int by)
+    {
+        int px = bx % PatternBlocks;
+        int py = by % PatternBlocks;
+        return (px == 5 && py < 2) || (px == 2 && (py == 0 || py == 5));
+    }
+
+    public static ZoneType ZoneFor(int bx) => (bx % PatternBlocks) switch
+    {
+        2 => ZoneType.Commercial,
+        3 or 5 => ZoneType.Industrial,
+        _ => ZoneType.Residential,
+    };
+
+    /// <summary>Grid line k is an avenue every six lines (offset 3), otherwise a street.</summary>
+    public static RoadType LineType(int k) => k % PatternBlocks == 3 ? RoadType.Avenue : RoadType.Street;
 }
 
 /// <summary>
-/// Lays out a gridded city with commands (so it is logged and replayable): streets every six tiles,
-/// avenues through the middle, residential west, commercial centre, industry east, and unzoned
-/// reserve blocks for services. <see cref="AutoMayor"/> then keeps utilities ahead of demand.
+/// Lays out a gridded starter city with commands (so it is logged and replayable). The
+/// <see cref="AutoMayor"/> then keeps utilities ahead of demand and grows the grid outward.
 /// </summary>
 public static class DemoCity
 {
     public static DemoCityPlan Build(Simulation sim, int blocks = 6)
     {
         var map = sim.Map;
+        if (blocks < 3)
+        {
+            throw new ArgumentException("The demo city needs at least 3 blocks.");
+        }
+
         int span = blocks * DemoCityPlan.BlockPitch;
         if (span + 1 > map.Width || span + 1 > map.Height)
         {
@@ -36,37 +60,9 @@ public static class DemoCity
 
         var (ox, oy) = FindFlatRegion(map, span + 1);
         var plan = new DemoCityPlan(ox, oy, blocks);
-        int middle = blocks / 2;
-        for (int k = 0; k <= blocks; k++)
-        {
-            int offset = k * DemoCityPlan.BlockPitch;
-            var type = k == middle ? RoadType.Avenue : RoadType.Street;
-            sim.Execute(new BuildRoadCommand(ox, oy + offset, ox + span, oy + offset, type));
-            sim.Execute(new BuildRoadCommand(ox + offset, oy, ox + offset, oy + span, type));
-        }
-
-        int industrialFrom = blocks - Math.Max(1, blocks / 3);
-        int commercialFrom = industrialFrom - Math.Max(1, blocks / 6);
-        for (int by = 0; by < blocks; by++)
-        {
-            for (int bx = 0; bx < blocks; bx++)
-            {
-                if (plan.IsReserved(bx, by))
-                {
-                    continue;
-                }
-
-                var zone = bx >= industrialFrom ? ZoneType.Industrial
-                    : bx >= commercialFrom ? ZoneType.Commercial
-                    : ZoneType.Residential;
-                var (ix, iy) = plan.BlockInterior(bx, by);
-                sim.Execute(new ZoneCommand(ix, iy, ix + 4, iy + 4, zone));
-            }
-        }
-
-        var (px, py) = plan.BlockInterior(blocks - 1, 0);
-        sim.Execute(new PlaceBuildingCommand(BuildingKind.CoalPlant, px, py));
         var mayor = new AutoMayor(sim, plan);
+        mayor.BuildSquare(Math.Min(blocks, DemoCityPlan.CoreBlocks), from: 0);
+        mayor.PlaceUtility(BuildingKind.CoalPlant);
         mayor.EnsureWater();
         return plan;
     }
@@ -128,10 +124,13 @@ public static class DemoCity
 
 /// <summary>
 /// A simple scripted player: adds power, water, garbage, fire and health capacity when the city needs
-/// it and can afford it. Everything goes through <see cref="Simulation.Execute"/>.
+/// it and can afford it, and extends the street grid when zoned land runs out. Everything goes through
+/// <see cref="Simulation.Execute"/>. It keeps no state of its own (the built extent is read from the
+/// map), so a mayor can be attached to a loaded game.
 /// </summary>
 public sealed class AutoMayor
 {
+    private const long Reserve = 100_000;
     private readonly Simulation _sim;
     private readonly DemoCityPlan _plan;
 
@@ -143,53 +142,184 @@ public sealed class AutoMayor
 
     public int Actions { get; private set; }
 
-    public void Manage()
+    /// <summary>Blocks per side currently laid out (largest k whose bounding roads exist).</summary>
+    public int BuiltBlocks
     {
-        var s = _sim.Stats;
-        if (s.PowerDemand * 100 > PlannedCapacity(b => b.Spec.PowerOutput) * 85
-            && !Place(BuildingKind.CoalPlant, preferEast: true))
+        get
         {
-            // Can't afford coal yet: bridge the gap with cheap wind turbines.
-            Place(BuildingKind.WindTurbine, preferEast: false);
-        }
+            var map = _sim.Map;
+            int k = 0;
+            while (k < _plan.Blocks)
+            {
+                int x = _plan.OriginX + (k + 1) * DemoCityPlan.BlockPitch;
+                int y = _plan.OriginY + (k + 1) * DemoCityPlan.BlockPitch;
+                if (map.Roads[map.Index(x, _plan.OriginY)] == RoadType.None || map.Roads[map.Index(_plan.OriginX, y)] == RoadType.None)
+                {
+                    break;
+                }
 
-        if (s.WaterDemand * 100 > PlannedCapacity(b => b.Spec.WaterOutput) * 85)
-        {
-            EnsureWater();
-        }
+                k++;
+            }
 
-        if (s.Population > 150 && Count(BuildingKind.Landfill) == 0)
-        {
-            Place(BuildingKind.Landfill, preferEast: true);
-        }
-        else if (s.GarbageProducedPerDay * 100 > s.GarbageCapacityPerDay * 85 || s.LandfillUsedPercent > 70)
-        {
-            Place(s.LandfillUsedPercent > 50 ? BuildingKind.Incinerator : BuildingKind.Landfill, preferEast: true);
-        }
-
-        if (s.Population > 300 && Count(BuildingKind.FireStation) < 1 + s.Population / 4000)
-        {
-            Place(BuildingKind.FireStation, preferEast: false);
-        }
-
-        if (s.Population > 500 && Count(BuildingKind.Clinic) < 1 + s.Population / 5000)
-        {
-            Place(BuildingKind.Clinic, preferEast: false);
+            return k;
         }
     }
 
-    /// <summary>Builds a water pump on the nearest shore (with a connecting road), else a water tower.</summary>
-    public void EnsureWater()
+    /// <summary>Buys at most one thing per call: the most stretched utility, then services, then growth.</summary>
+    public void Manage()
     {
-        if (TryPlacePump())
+        var s = _sim.Stats;
+        double power = Ratio(s.PowerDemand, PlannedCapacity(b => b.IsComplete ? b.PowerProduced : b.Spec.PowerOutput));
+        double water = Ratio(s.WaterDemand, PlannedCapacity(b => b.IsComplete && !b.Powered ? 0 : b.Spec.WaterOutput));
+        double garbage = s.Population > 150 && Count(BuildingKind.Landfill) + Count(BuildingKind.Incinerator) == 0
+            ? double.MaxValue
+            : Ratio(s.GarbageProducedPerDay, s.GarbageCapacityPerDay + PlannedCapacity(b => b.IsComplete ? 0 : b.Spec.DailyCapacity));
+        double worst = Math.Max(power, Math.Max(water, garbage));
+        if (worst > 0.85 && BuyUtility(worst == power ? 0 : worst == water ? 1 : 2))
         {
             return;
         }
 
-        Place(BuildingKind.WaterTower, preferEast: false);
+        bool bought = (s.Population > 300 && Count(BuildingKind.FireStation) < 1 + s.Population / 3000 && PlaceUtility(BuildingKind.FireStation))
+            || (s.Population > 500 && Count(BuildingKind.Clinic) < 1 + s.Population / 4000 && PlaceUtility(BuildingKind.Clinic));
+        if (!bought)
+        {
+            // Also reached when a purchase failed for lack of space: a new ring of blocks makes room.
+            TryExpand();
+        }
     }
 
-    /// <summary>Capacity of built and under-construction buildings, so the mayor does not double-buy.</summary>
+    private bool BuyUtility(int need)
+    {
+        var s = _sim.Stats;
+        switch (need)
+        {
+            case 0:
+                // Coal when affordable; bridge an actual shortfall with cheap wind turbines.
+                return PlaceUtility(BuildingKind.CoalPlant)
+                    || (s.PowerDemand * 100 > s.PowerProduction * 95 && PlaceUtility(BuildingKind.WindTurbine));
+            case 1:
+                return EnsureWater();
+            default:
+                bool full = s.LandfillUsedPercent > 50 || Count(BuildingKind.Landfill) >= 2;
+                return PlaceUtility(full ? BuildingKind.Incinerator : BuildingKind.Landfill);
+        }
+    }
+
+    /// <summary>Builds a water pump on the nearest shore (with road and power), else a water tower.</summary>
+    public bool EnsureWater() => TryPlacePump() || PlaceUtility(BuildingKind.WaterTower);
+
+    /// <summary>Places a service building in a reserve block, else any free spot inside the city.</summary>
+    public bool PlaceUtility(BuildingKind kind)
+    {
+        var spec = BuildingCatalog.Get(kind);
+        if (_sim.Budget.Money < spec.BuildCost + Reserve)
+        {
+            return false;
+        }
+
+        bool preferEast = kind is BuildingKind.CoalPlant or BuildingKind.Landfill or BuildingKind.Incinerator;
+        foreach (var (x, y) in CandidateSpots(spec.Size, preferEast))
+        {
+            if (_sim.Execute(new PlaceBuildingCommand(kind, x, y)).Success)
+            {
+                Actions++;
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>Lays roads and zones for the blocks of a k x k square outside the existing from x from square.</summary>
+    internal void BuildSquare(int k, int from)
+    {
+        int pitch = DemoCityPlan.BlockPitch;
+        int ox = _plan.OriginX;
+        int oy = _plan.OriginY;
+        for (int line = 0; line <= k; line++)
+        {
+            var type = DemoCityPlan.LineType(line);
+            int start = line <= from ? from * pitch : 0;
+            Execute(new BuildRoadCommand(ox + start, oy + line * pitch, ox + k * pitch, oy + line * pitch, type));
+            Execute(new BuildRoadCommand(ox + line * pitch, oy + start, ox + line * pitch, oy + k * pitch, type));
+        }
+
+        for (int by = 0; by < k; by++)
+        {
+            for (int bx = 0; bx < k; bx++)
+            {
+                if ((bx < from && by < from) || _plan.IsReserved(bx, by))
+                {
+                    continue;
+                }
+
+                var (ix, iy) = _plan.BlockInterior(bx, by);
+                Execute(new ZoneCommand(ix, iy, ix + 4, iy + 4, DemoCityPlan.ZoneFor(bx)));
+            }
+        }
+    }
+
+    /// <summary>Adds a ring of blocks once almost all zoned land has been built on.</summary>
+    private void TryExpand()
+    {
+        int built = BuiltBlocks;
+        if (built >= _plan.Blocks || !ZonedLandNearlyFull())
+        {
+            return;
+        }
+
+        long cost = 0;
+        int pitch = DemoCityPlan.BlockPitch;
+        for (int line = 0; line <= built + 1; line++)
+        {
+            int start = line <= built ? built * pitch : 0;
+            var type = DemoCityPlan.LineType(line);
+            cost += _sim.Estimate(new BuildRoadCommand(_plan.OriginX + start, _plan.OriginY + line * pitch,
+                _plan.OriginX + (built + 1) * pitch, _plan.OriginY + line * pitch, type)).Cost;
+            cost += _sim.Estimate(new BuildRoadCommand(_plan.OriginX + line * pitch, _plan.OriginY + start,
+                _plan.OriginX + line * pitch, _plan.OriginY + (built + 1) * pitch, type)).Cost;
+        }
+
+        if (_sim.Budget.Money >= cost + Reserve * 3)
+        {
+            BuildSquare(built + 1, built);
+        }
+    }
+
+    private bool ZonedLandNearlyFull()
+    {
+        var map = _sim.Map;
+        int zoned = 0;
+        int open = 0;
+        for (int t = 0; t < map.TileCount; t++)
+        {
+            if (map.Zones[t] == ZoneType.None)
+            {
+                continue;
+            }
+
+            zoned++;
+            if (map.BuildingAt[t] == 0 && map.IsBuildableLand(t) && _sim.FindAccess(t % map.Width, t / map.Width, 1) >= 0)
+            {
+                open++;
+            }
+        }
+
+        return zoned > 0 && open * 100 < zoned * 4;
+    }
+
+    private void Execute(GameCommand command)
+    {
+        if (_sim.Execute(command).Success)
+        {
+            Actions++;
+        }
+    }
+
+    private static double Ratio(int used, int capacity) => capacity <= 0 ? (used > 0 ? double.MaxValue : 0) : used / (double)capacity;
+
+    /// <summary>Operating capacity plus capacity under construction, so the mayor neither double-buys nor trusts dead plants.</summary>
     private int PlannedCapacity(Func<Building, int> output)
     {
         int total = 0;
@@ -212,35 +342,16 @@ public sealed class AutoMayor
         return n;
     }
 
-    private bool Place(BuildingKind kind, bool preferEast)
-    {
-        var spec = BuildingCatalog.Get(kind);
-        if (_sim.Budget.Money < spec.BuildCost + 200_000)
-        {
-            return false;
-        }
-
-        foreach (var (x, y) in CandidateSpots(spec.Size, preferEast))
-        {
-            if (_sim.Execute(new PlaceBuildingCommand(kind, x, y)).Success)
-            {
-                Actions++;
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    /// <summary>Reserve-block spots first, then any empty land near the city with road access.</summary>
+    /// <summary>Reserve-block spots first, then any empty land with road access inside the built city.</summary>
     private IEnumerable<(int X, int Y)> CandidateSpots(int size, bool preferEast)
     {
         var map = _sim.Map;
-        for (int by = 0; by < _plan.Blocks; by++)
+        int built = Math.Max(1, BuiltBlocks);
+        for (int by = 0; by < built; by++)
         {
-            for (int k = 0; k < _plan.Blocks; k++)
+            for (int k = 0; k < built; k++)
             {
-                int bx = preferEast ? _plan.Blocks - 1 - k : k;
+                int bx = preferEast ? built - 1 - k : k;
                 if (!_plan.IsReserved(bx, by))
                 {
                     continue;
@@ -251,7 +362,7 @@ public sealed class AutoMayor
                 {
                     for (int dx = 0; dx + size <= 5; dx++)
                     {
-                        if (IsFree(ix + dx, iy + dy, size) && GrowthSystem.FindAccess(map, ix + dx, iy + dy, size) >= 0)
+                        if (IsFree(ix + dx, iy + dy, size) && _sim.FindAccess(ix + dx, iy + dy, size) >= 0)
                         {
                             yield return (ix + dx, iy + dy);
                         }
@@ -260,12 +371,12 @@ public sealed class AutoMayor
             }
         }
 
-        int margin = 4;
-        for (int y = Math.Max(0, _plan.OriginY - margin); y < Math.Min(map.Height - size, _plan.OriginY + _plan.Span + margin); y++)
+        int extent = built * DemoCityPlan.BlockPitch;
+        for (int y = _plan.OriginY; y < Math.Min(map.Height - size, _plan.OriginY + extent); y++)
         {
-            for (int x = Math.Max(0, _plan.OriginX - margin); x < Math.Min(map.Width - size, _plan.OriginX + _plan.Span + margin); x++)
+            for (int x = _plan.OriginX; x < Math.Min(map.Width - size, _plan.OriginX + extent); x++)
             {
-                if (IsFree(x, y, size) && GrowthSystem.FindAccess(map, x, y, size) >= 0)
+                if (IsFree(x, y, size) && _sim.FindAccess(x, y, size) >= 0)
                 {
                     yield return (x, y);
                 }
@@ -296,29 +407,44 @@ public sealed class AutoMayor
         return true;
     }
 
+    /// <summary>
+    /// A pump only where it will work at once: next to water, with road access joined to the city's
+    /// network and within conduction range of the powered grid (checked read-only, without commands).
+    /// </summary>
     private bool TryPlacePump()
     {
         var map = _sim.Map;
         var spec = BuildingCatalog.Get(BuildingKind.WaterPump);
-        if (_sim.Budget.Money < spec.BuildCost + 400_000)
+        if (_sim.Budget.Money < spec.BuildCost + Reserve)
         {
             return false;
         }
 
-        int cx = _plan.OriginX + _plan.Span / 2;
-        int cy = _plan.OriginY + _plan.Span / 2;
-        int bestX = -1, bestY = -1, bestDistance = int.MaxValue;
-        for (int y = 1; y < map.Height - 2; y++)
+        int cityRoad = map.Index(_plan.OriginX, _plan.OriginY);
+        if (map.Roads[cityRoad] == RoadType.None)
         {
-            for (int x = 1; x < map.Width - 2; x++)
+            return false;
+        }
+
+        var powered = PoweredReach();
+        int extent = Math.Max(1, BuiltBlocks) * DemoCityPlan.BlockPitch;
+        int cx = _plan.OriginX + extent / 2;
+        int cy = _plan.OriginY + extent / 2;
+        int bestX = -1, bestY = -1, bestDistance = int.MaxValue;
+        for (int y = 0; y < map.Height - 1; y++)
+        {
+            for (int x = 0; x < map.Width - 1; x++)
             {
                 int distance = Math.Abs(x - cx) + Math.Abs(y - cy);
-                if (distance >= bestDistance || distance > _plan.Span + 30 || !IsFree(x, y, 2) || !TouchesWater(x, y))
+                if (distance >= bestDistance || !IsFree(x, y, 2) || !TouchesWater(x, y) || OnFutureGridLine(x, y, 2)
+                    || !NearPowered(powered, x, y, 2))
                 {
                     continue;
                 }
 
-                if (!_sim.Estimate(new PlaceBuildingCommand(BuildingKind.WaterPump, x, y)).Success)
+                int access = _sim.FindAccess(x, y, 2);
+                if (access < 0 || !_sim.Roads.Connected(access, cityRoad)
+                    || !_sim.Estimate(new PlaceBuildingCommand(BuildingKind.WaterPump, x, y)).Success)
                 {
                     continue;
                 }
@@ -329,24 +455,106 @@ public sealed class AutoMayor
             }
         }
 
-        if (bestX < 0)
-        {
-            return false;
-        }
-
-        if (GrowthSystem.FindAccess(map, bestX, bestY, 2) < 0 && !ConnectByRoad(bestX, bestY))
-        {
-            return false;
-        }
-
-        if (!_sim.Execute(new PlaceBuildingCommand(BuildingKind.WaterPump, bestX, bestY)).Success)
+        if (bestX < 0 || !_sim.Execute(new PlaceBuildingCommand(BuildingKind.WaterPump, bestX, bestY)).Success)
         {
             return false;
         }
 
         Actions++;
-        ConnectPower(bestX, bestY);
         return true;
+    }
+
+    /// <summary>Tiles of the conductor network connected to a power plant (mirrors the utility rules, read-only).</summary>
+    private bool[] PoweredReach()
+    {
+        var map = _sim.Map;
+        var reached = new bool[map.TileCount];
+        var queue = new Queue<int>();
+        foreach (var b in _sim.Buildings)
+        {
+            if (b.Spec.PowerOutput == 0)
+            {
+                continue;
+            }
+
+            for (int ty = b.Y; ty < b.Y + b.Size; ty++)
+            {
+                for (int tx = b.X; tx < b.X + b.Size; tx++)
+                {
+                    int t = map.Index(tx, ty);
+                    if (!reached[t])
+                    {
+                        reached[t] = true;
+                        queue.Enqueue(t);
+                    }
+                }
+            }
+        }
+
+        while (queue.Count > 0)
+        {
+            int t = queue.Dequeue();
+            int cx = t % map.Width;
+            int cy = t / map.Width;
+            for (int dy = -2; dy <= 2; dy++)
+            {
+                for (int dx = -2; dx <= 2; dx++)
+                {
+                    int x = cx + dx;
+                    int y = cy + dy;
+                    if (!map.InBounds(x, y))
+                    {
+                        continue;
+                    }
+
+                    int nb = map.Index(x, y);
+                    if (!reached[nb] && (map.BuildingAt[nb] != 0 || map.PowerLines[nb] || map.Zones[nb] != ZoneType.None))
+                    {
+                        reached[nb] = true;
+                        queue.Enqueue(nb);
+                    }
+                }
+            }
+        }
+
+        return reached;
+    }
+
+    private bool NearPowered(bool[] powered, int x, int y, int size)
+    {
+        var map = _sim.Map;
+        for (int ty = y - 2; ty < y + size + 2; ty++)
+        {
+            for (int tx = x - 2; tx < x + size + 2; tx++)
+            {
+                if (map.InBounds(tx, ty) && powered[map.Index(tx, ty)])
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private bool OnFutureGridLine(int x, int y, int size)
+    {
+        bool insideX = x + size > _plan.OriginX && x <= _plan.OriginX + _plan.Span;
+        bool insideY = y + size > _plan.OriginY && y <= _plan.OriginY + _plan.Span;
+        if (!insideX || !insideY)
+        {
+            return false;
+        }
+
+        for (int k = 0; k < size; k++)
+        {
+            if ((x + k - _plan.OriginX) % DemoCityPlan.BlockPitch == 0 || (y + k - _plan.OriginY) % DemoCityPlan.BlockPitch == 0)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private bool TouchesWater(int x, int y)
@@ -360,50 +568,6 @@ public sealed class AutoMayor
                 {
                     return true;
                 }
-            }
-        }
-
-        return false;
-    }
-
-    /// <summary>Power line from beside the pump to the edge of the city (pumps need electricity).</summary>
-    private void ConnectPower(int x, int y)
-    {
-        var map = _sim.Map;
-        int gx = Math.Clamp(x, _plan.OriginX + 1, _plan.OriginX + _plan.Span - 1);
-        int gy = Math.Clamp(y, _plan.OriginY + 1, _plan.OriginY + _plan.Span - 1);
-        int sx = x < gx ? x + 2 : x > gx ? x - 1 : x;
-        int sy = y < gy ? y + 2 : y > gy ? y - 1 : y;
-        if (map.InBounds(sx, sy) && (sx != gx || sy != gy)
-            && _sim.Execute(new BuildPowerLineCommand(sx, sy, gx, gy)).Success)
-        {
-            Actions++;
-        }
-    }
-
-    /// <summary>Road from beside the pump spot to the nearest point of the city grid.</summary>
-    private bool ConnectByRoad(int x, int y)
-    {
-        var map = _sim.Map;
-        // Start on a land tile directly beside the 2x2 footprint, facing the city.
-        int cx = _plan.OriginX + _plan.Span / 2;
-        int cy = _plan.OriginY + _plan.Span / 2;
-        var starts = new (int X, int Y)[] { (x, y + 2), (x, y - 1), (x + 2, y), (x - 1, y) };
-        foreach (var (sx, sy) in starts.OrderBy(s => Math.Abs(s.X - cx) + Math.Abs(s.Y - cy)))
-        {
-            if (!map.InBounds(sx, sy) || map.BuildingAt[map.Index(sx, sy)] != 0)
-            {
-                continue;
-            }
-
-            int gx = Math.Clamp(sx, _plan.OriginX, _plan.OriginX + _plan.Span);
-            int gy = Math.Clamp(sy, _plan.OriginY, _plan.OriginY + _plan.Span);
-            // Snap to the nearest grid line so the new road joins the network.
-            gx = _plan.OriginX + (int)Math.Round((gx - _plan.OriginX) / (double)DemoCityPlan.BlockPitch, MidpointRounding.ToEven) * DemoCityPlan.BlockPitch;
-            if (_sim.Execute(new BuildRoadCommand(sx, sy, gx, gy, RoadType.Street)).Success)
-            {
-                Actions++;
-                return true;
             }
         }
 

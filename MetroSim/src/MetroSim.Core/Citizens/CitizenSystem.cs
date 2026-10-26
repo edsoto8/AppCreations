@@ -294,11 +294,12 @@ internal sealed class CitizenSystem
         }
     }
 
-    public void AddCitizen(Building home, int age)
+    public Citizen AddCitizen(Building home, int age)
     {
         var c = new Citizen { HomeId = home.Id, Age = age, State = CitizenState.AtHome };
         _sim.Citizens.Add(c);
         home.Residents++;
+        return c;
     }
 
     public void RemoveCitizen(Citizen c)

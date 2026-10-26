@@ -37,6 +37,7 @@ internal static class Commands
             "run" => RunSaved(options),
             "verify" => Verify(options),
             "bench" => Benchmarks.Run(options),
+            "profile" => Benchmarks.Profile(options),
             _ => throw new ArgumentException($"Unknown command '{args[0]}'.\n{Usage}"),
         };
     }
@@ -45,6 +46,11 @@ internal static class Commands
     {
         var settings = new MapSettings { Seed = o.ULong("seed", 42), Width = o.Int("size", 128), Height = o.Int("size", 128) };
         var sim = Simulation.Create(settings);
+        if (o.String("weight") is not null)
+        {
+            sim.Pathfinder.HeuristicWeightPercent = o.Int("weight", 100);
+        }
+
         var plan = DemoCity.Build(sim, o.Int("blocks", 6));
         var mayor = new AutoMayor(sim, plan);
         Console.WriteLine($"Demo city: seed {settings.Seed}, map {settings.Width}x{settings.Height}, {plan.Blocks}x{plan.Blocks} blocks at ({plan.OriginX},{plan.OriginY}).");
