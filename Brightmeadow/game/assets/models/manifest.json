@@ -1,0 +1,436 @@
+{
+  "bramblebug": {
+    "animations": {
+      "idle": 40,
+      "walk": 16
+    },
+    "bounds_max": [
+      0.348,
+      0.8203,
+      0.4868
+    ],
+    "bounds_min": [
+      -0.348,
+      -0.0,
+      -0.46
+    ],
+    "file": "bramblebug.glb",
+    "triangles": 5628
+  },
+  "bush": {
+    "animations": {},
+    "bounds_max": [
+      0.6361,
+      0.9203,
+      0.4112
+    ],
+    "bounds_min": [
+      -0.6361,
+      0.0,
+      -0.4112
+    ],
+    "file": "bush.glb",
+    "triangles": 2448
+  },
+  "buzzpuff": {
+    "animations": {
+      "fly": 8
+    },
+    "bounds_max": [
+      0.464,
+      0.4976,
+      0.3412
+    ],
+    "bounds_min": [
+      -0.464,
+      -0.3891,
+      -0.3966
+    ],
+    "file": "buzzpuff.glb",
+    "triangles": 5560
+  },
+  "checkpoint": {
+    "animations": {},
+    "bounds_max": [
+      0.8687,
+      2.4,
+      0.2213
+    ],
+    "bounds_min": [
+      -0.2175,
+      0.0,
+      -0.2257
+    ],
+    "file": "checkpoint.glb",
+    "triangles": 1396
+  },
+  "cloud_a": {
+    "animations": {},
+    "bounds_max": [
+      3.0749,
+      0.9602,
+      1.0315
+    ],
+    "bounds_min": [
+      -3.0749,
+      -0.9602,
+      -1.0315
+    ],
+    "file": "cloud_a.glb",
+    "triangles": 2592
+  },
+  "cloud_b": {
+    "animations": {},
+    "bounds_max": [
+      2.881,
+      0.9109,
+      0.9611
+    ],
+    "bounds_min": [
+      -2.881,
+      -0.9109,
+      -0.9611
+    ],
+    "file": "cloud_b.glb",
+    "triangles": 2160
+  },
+  "coin": {
+    "animations": {},
+    "bounds_max": [
+      0.3,
+      0.3,
+      0.06
+    ],
+    "bounds_min": [
+      -0.3,
+      -0.3,
+      -0.06
+    ],
+    "file": "coin.glb",
+    "triangles": 2368
+  },
+  "explorer": {
+    "animations": {
+      "celebrate": 40,
+      "fall": 20,
+      "hurt": 12,
+      "idle": 60,
+      "jump": 10,
+      "land": 8,
+      "run": 16,
+      "walk": 24
+    },
+    "bounds_max": [
+      0.3269,
+      1.55,
+      0.259
+    ],
+    "bounds_min": [
+      -0.3269,
+      0.0004,
+      -0.366
+    ],
+    "file": "explorer.glb",
+    "triangles": 14568
+  },
+  "fence": {
+    "animations": {},
+    "bounds_max": [
+      1.0,
+      1.0141,
+      0.099
+    ],
+    "bounds_min": [
+      -1.0,
+      0.0,
+      -0.099
+    ],
+    "file": "fence.glb",
+    "triangles": 684
+  },
+  "float_cap_left": {
+    "animations": {},
+    "bounds_max": [
+      0.0,
+      0.0,
+      1.3745
+    ],
+    "bounds_min": [
+      -0.5,
+      -0.9,
+      -1.37
+    ],
+    "file": "float_cap_left.glb",
+    "triangles": 600
+  },
+  "float_cap_right": {
+    "animations": {},
+    "bounds_max": [
+      0.5,
+      0.0,
+      1.3745
+    ],
+    "bounds_min": [
+      0.0,
+      -0.9,
+      -1.37
+    ],
+    "file": "float_cap_right.glb",
+    "triangles": 600
+  },
+  "float_mid_a": {
+    "animations": {},
+    "bounds_max": [
+      0.5,
+      0.1358,
+      1.379
+    ],
+    "bounds_min": [
+      -0.5,
+      -0.9,
+      -1.37
+    ],
+    "file": "float_mid_a.glb",
+    "triangles": 942
+  },
+  "float_mid_b": {
+    "animations": {},
+    "bounds_max": [
+      0.5,
+      0.139,
+      1.3792
+    ],
+    "bounds_min": [
+      -0.5,
+      -0.9,
+      -1.37
+    ],
+    "file": "float_mid_b.glb",
+    "triangles": 942
+  },
+  "flowers": {
+    "animations": {},
+    "bounds_max": [
+      0.4486,
+      0.3918,
+      0.3814
+    ],
+    "bounds_min": [
+      -0.4486,
+      0.0,
+      -0.3814
+    ],
+    "file": "flowers.glb",
+    "triangles": 2868
+  },
+  "goal": {
+    "animations": {},
+    "bounds_max": [
+      2.2197,
+      4.4708,
+      0.2958
+    ],
+    "bounds_min": [
+      -2.2197,
+      0.0,
+      -0.2881
+    ],
+    "file": "goal.glb",
+    "triangles": 2928
+  },
+  "grass_tuft": {
+    "animations": {},
+    "bounds_max": [
+      0.1219,
+      0.3906,
+      0.0734
+    ],
+    "bounds_min": [
+      -0.1219,
+      0.0,
+      -0.0734
+    ],
+    "file": "grass_tuft.glb",
+    "triangles": 324
+  },
+  "ground_cap_left": {
+    "animations": {},
+    "bounds_max": [
+      0.0,
+      0.1314,
+      2.1222
+    ],
+    "bounds_min": [
+      -0.5,
+      -8.0,
+      -2.12
+    ],
+    "file": "ground_cap_left.glb",
+    "triangles": 986
+  },
+  "ground_cap_right": {
+    "animations": {},
+    "bounds_max": [
+      0.5,
+      0.1081,
+      2.1222
+    ],
+    "bounds_min": [
+      0.0,
+      -8.0,
+      -2.12
+    ],
+    "file": "ground_cap_right.glb",
+    "triangles": 986
+  },
+  "ground_mid_a": {
+    "animations": {},
+    "bounds_max": [
+      0.5,
+      0.1454,
+      2.1303
+    ],
+    "bounds_min": [
+      -0.5,
+      -8.0,
+      -2.12
+    ],
+    "file": "ground_mid_a.glb",
+    "triangles": 1304
+  },
+  "ground_mid_b": {
+    "animations": {},
+    "bounds_max": [
+      0.5,
+      0.144,
+      2.1311
+    ],
+    "bounds_min": [
+      -0.5,
+      -8.0,
+      -2.12
+    ],
+    "file": "ground_mid_b.glb",
+    "triangles": 1112
+  },
+  "ground_mid_c": {
+    "animations": {},
+    "bounds_max": [
+      0.5,
+      0.1315,
+      2.129
+    ],
+    "bounds_min": [
+      -0.5,
+      -8.0,
+      -2.12
+    ],
+    "file": "ground_mid_c.glb",
+    "triangles": 1400
+  },
+  "hill_a": {
+    "animations": {},
+    "bounds_max": [
+      11.9177,
+      9.3712,
+      4.2523
+    ],
+    "bounds_min": [
+      -11.9177,
+      0.0,
+      -4.2523
+    ],
+    "file": "hill_a.glb",
+    "triangles": 1548
+  },
+  "hill_b": {
+    "animations": {},
+    "bounds_max": [
+      12.0422,
+      9.3833,
+      4.2984
+    ],
+    "bounds_min": [
+      -12.0422,
+      0.0,
+      -4.2984
+    ],
+    "file": "hill_b.glb",
+    "triangles": 2520
+  },
+  "mushroom": {
+    "animations": {},
+    "bounds_max": [
+      0.4605,
+      0.6,
+      0.405
+    ],
+    "bounds_min": [
+      -0.4605,
+      0.0,
+      -0.405
+    ],
+    "file": "mushroom.glb",
+    "triangles": 1824
+  },
+  "rock": {
+    "animations": {},
+    "bounds_max": [
+      0.4858,
+      0.6243,
+      0.3483
+    ],
+    "bounds_min": [
+      -0.4858,
+      0.0,
+      -0.3483
+    ],
+    "file": "rock.glb",
+    "triangles": 600
+  },
+  "signpost": {
+    "animations": {},
+    "bounds_max": [
+      0.3958,
+      1.52,
+      0.1708
+    ],
+    "bounds_min": [
+      -0.3958,
+      0.0,
+      -0.1708
+    ],
+    "file": "signpost.glb",
+    "triangles": 616
+  },
+  "tree_pine": {
+    "animations": {},
+    "bounds_max": [
+      1.3906,
+      5.0,
+      1.3566
+    ],
+    "bounds_min": [
+      -1.3906,
+      0.0,
+      -1.3566
+    ],
+    "file": "tree_pine.glb",
+    "triangles": 1280
+  },
+  "tree_round": {
+    "animations": {},
+    "bounds_max": [
+      1.7085,
+      4.4868,
+      1.1349
+    ],
+    "bounds_min": [
+      -1.7085,
+      0.0,
+      -1.1349
+    ],
+    "file": "tree_round.glb",
+    "triangles": 2698
+  }
+}

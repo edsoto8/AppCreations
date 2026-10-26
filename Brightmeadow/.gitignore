@@ -11,3 +11,5 @@ build/
 # Scratch output from screenshot/validation runs
 tests/output/
 __pycache__/
+# Preview renders are reproducible (scripts/generate_models.sh --render); key ones live in docs/images
+assets/blender/renders/
