@@ -16,10 +16,10 @@ command or test that verified it.
 |---|---|---|
 | M0 | Environment, architecture (`docs/ARCHITECTURE.md`), solution skeleton | done |
 | M1 | Headless core vertical slice: terrain, roads, A*, traffic, citizens, zoning/growth, economy, power, water, garbage, fire, health, land value, commands, serializer, runner, demo city + auto-mayor, CLI `demo` | done |
-| M2 | Persistence (SQLite container, integrity, replay verifier) + CLI `new/run/verify` | code written, tests pending |
-| M3 | Test suite: unit, property-based, integration, replay, save/load, stress | pending |
+| M2 | Persistence (SQLite container, integrity, replay verifier) + CLI `new/run/verify` | done |
+| M3 | Test suite: unit, property-based, integration, replay, save/load, stress | done (137 tests) |
 | M4 | Avalonia app: map, tools, overlays, dashboards, save/load (Graphics Engineer agent) | in progress |
-| M5 | Benchmarks + profiling-driven optimisation | pending |
+| M5 | Benchmarks + profiling-driven optimisation | done for the simulation; rendering FPS pending M4 |
 | M6 | Independent code review, fixes, docs, limitations, roadmap | pending |
 
 ## M1 notes
@@ -35,3 +35,34 @@ command or test that verified it.
     workforce;
   - a brownout unpowered the distant water pump first and abandoned 450 buildings → services get power
     priority over zoned buildings.
+
+## M2 notes
+
+- Runtime check of the CLI (Release build): `demo --days 3 --save demo.city` → `verify demo.city` reports
+  container/chunk/fingerprint OK and "Replay: 50 commands from seed to tick 4320 -> identical state";
+  `run --load demo.city --days 2 --save demo2.city` → `verify` also replays to an identical state;
+  flipping one bit in the `buildings` chunk makes `verify` fail with "chunk 'buildings' failed its
+  checksum" (exit 1).
+
+## M3 notes
+
+- `dotnet test tests/MetroSim.Tests` → 137 passed (unit, CsCheck properties, integration, determinism,
+  save/load, stress).
+- Bugs the tests found: `RoadGraph.ComponentCount` read a stale value before the lazy rebuild (could
+  under-size the water allocation array); the auto-mayor double-bought plants/incinerators that were
+  still under construction and stalled when a purchase failed for lack of space; the commute-time test
+  was biased toward early arrivals.
+
+## M5 notes (profiling evidence)
+
+- `dotnet-trace` on `metrosim profile --citizens 20000`: pathfinding was 87% of tick time
+  (19.7 s of 22.7 s), split between trip dispatch (~40%) and congestion reroutes (~41%).
+- Changes, each measured with `profile` / `demo` before adoption:
+  - reroute policy (budget 64→32/tick, cooldown 30→60, 4,000-node cap): 20k stride workload
+    15.9 → 13.3 ms/tick; 5k 1.28 → 0.95 ms/tick;
+  - weighted A* 1.25 (plus f-then-h heap ordering): 60-day 12-block demo 34.5M → 23.1M nodes expanded,
+    pathfinding 4.5 s → 2.8 s, peak TTI and commute unchanged; 1.5 was faster still but let drivers
+    ignore a 25%-faster avenue (caught by `FindPath_PrefersFasterAvenueWithTrafficCosts`);
+  - the synthetic stress city now uses the game's own job matching (the stride assignment produced
+    80-minute commutes even at 5k citizens and gridlock at 20k).
+- Results: `docs/BENCHMARKS.md`.
