@@ -41,6 +41,19 @@ func _ready() -> void:
 	add_child(_music)
 
 
+func _exit_tree() -> void:
+	# Release playing streams before shutdown so nothing outlives the audio server.
+	if _music_tween:
+		_music_tween.kill()
+		_music_tween = null  # its callback closure holds a stream reference
+	_music.stop()
+	_music.stream = null
+	for p in _pool:
+		p.stop()
+		p.stream = null
+	_streams.clear()
+
+
 func has_sound(sound_name: String) -> bool:
 	return _streams.get(sound_name) != null
 

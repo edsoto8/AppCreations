@@ -35,9 +35,9 @@ fog_light_color = Color(0.74, 0.87, 0.98, 1)
 fog_light_energy = 1.0
 fog_density = 1.0
 fog_sky_affect = 0.0
-fog_depth_curve = 1.4
-fog_depth_begin = 26.0
-fog_depth_end = 110.0
+fog_depth_curve = 1.1
+fog_depth_begin = 16.0
+fog_depth_end = 95.0
 adjustment_enabled = true
 adjustment_saturation = 1.12
 

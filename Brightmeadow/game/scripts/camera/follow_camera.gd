@@ -4,16 +4,16 @@ extends Camera3D
 ## re-centres vertically when the player lands somewhere new (or leaves the frame), and stays
 ## inside the level's horizontal bounds.
 
-@export var distance := 15.5
-@export var height := 2.3
+@export var distance := 12.5
+@export var height := 1.9
 ## Downward tilt in degrees.
 @export var pitch_deg := 6.0
-@export var look_ahead := 2.6
+@export var look_ahead := 2.4
 @export var follow_speed_x := 5.0
 @export var follow_speed_y := 3.0
 ## While airborne, the camera only moves vertically once the player is this far from the
 ## framing line (up, down).
-@export var air_band := Vector2(3.2, 2.2)
+@export var air_band := Vector2(2.6, 1.8)
 @export var min_y := 1.2
 
 var target: Player

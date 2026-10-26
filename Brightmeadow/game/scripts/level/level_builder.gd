@@ -182,7 +182,7 @@ func _build_signs() -> void:
 		label.pixel_size = 0.0055
 		label.modulate = Color(1, 0.98, 0.92)
 		label.outline_modulate = Color(0.23, 0.16, 0.12)
-		label.position = Vector3(0, 2.75, 0.3)
+		label.position = Vector3(0, 2.3, 0.3)
 		label.double_sided = false
 		label.shaded = false
 		holder.add_child(label)

@@ -10,6 +10,11 @@ static var missing: PackedStringArray = []
 static var _cache := {}
 
 
+## Drops cached scenes (called at shutdown so no resources outlive the engine).
+static func clear_cache() -> void:
+	_cache.clear()
+
+
 static func path_for(model_name: String) -> String:
 	return MODEL_DIR + model_name + ".glb"
 

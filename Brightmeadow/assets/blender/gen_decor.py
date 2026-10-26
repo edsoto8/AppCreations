@@ -260,11 +260,10 @@ def hill(mb, humps, bumps, seed):
     surf = geom.Surface(surf_src)
     for x, sz in bumps:
         # bushes sit on the upper front slope so they break the silhouette
-        d = V((0, 0.55, -1)).normalized()
-        l, n = surf.hit(V((x, 0, 0)) - d * 40, d)      # ray aimed at (x, 0, 0)
+        l, n = surf.hit((x, -1.2, 40), (0, 0, -1))      # on the ridge, slightly in front
         if l is None:
             continue
-        b = geom.blob((sz, sz * 0.8, sz * 0.85), l + n * sz * 0.15, cuts=3)
+        b = geom.blob((sz, sz * 0.8, sz * 0.85), l + n * sz * 0.25, cuts=3)
         geom.noise_displace(b, 0.08 * sz, 1.5 / sz, seed=rng.randint(0, 999))
         mb.add(clip_floor(b), "M_GrassDark")
     surf_src.free()

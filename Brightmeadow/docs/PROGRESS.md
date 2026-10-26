@@ -37,7 +37,7 @@ download.blender.org **blocked (403)**, PyPI and npm allowed.
   handcrafted JSON layout, built at runtime by `LevelBuilder`.
 
 **Evidence (actual runs):** `godot --headless --fixed-fps 60 --path game res://tests/run_tests.tscn`
-→ 52 tests, 0 failures, including:
+→ 51 tests, 0 failures, including:
 - measured physics jump 2.31 m vs model 2.30 m; tap hop 0.89 m; walk reach 4.20 m, run 6.65 m;
 - feasibility: 45/45 surfaces reachable, goal reachable from every surface, the opening (to the
   run tutorial at x=79) beatable without running;
@@ -52,3 +52,54 @@ were 0.23 m higher than the numbers the level was designed against. The take-off
 matches `MovementModel.simulate_jump`.
 
 **Open:** models still placeholders (magenta boxes) until the Blender pipeline lands.
+
+## Phase 3 — Procedural art pipeline (done)
+
+Delegated to an asset subagent against `docs/ASSET_CONTRACT.md`, then integrated and reviewed.
+- 29 GLBs + `manifest.json` from Blender 4.5 Python (`assets/blender/`, shared `lib/` for
+  palette materials, shape helpers, rigid-skin rigging, export, render, GLB reading). Editable
+  sources in `assets/blender/source/*.blend`. Deterministic: two builds give byte-identical GLBs.
+- Explorer "Juni": 14.6k triangles, 24-bone armature, 8 animations (idle, walk, run, jump, fall,
+  land, celebrate, hurt) with squash/stretch and hair/scarf/pack follow-through. Bramblebug
+  (walk, idle) and Buzzpuff (fly) rigged and animated. Terrain pieces tile seamlessly (checked
+  numerically on the exported files).
+- `assets/blender/validate_glb.py`: **252 passed, 0 failed** (budgets, sizes, pivots, bones,
+  animation names/frames, contract child nodes, tiling cross-sections, walk surface at y=0).
+- Preview renders reviewed by eye: `docs/images/lineup.jpg`, `docs/images/explorer_poses.jpg`.
+- Commands: `scripts/generate_models.sh` (~10 s), `--render` adds previews (~6.5 min, EEVEE in
+  software).
+
+## Phase 4 — Complete level and presentation (done)
+
+- Real models replace every placeholder (integrity test: 0 placeholders, all animations/nodes
+  present). Audio: 11 SFX + 2 looping tracks wired through the `Audio` autoload.
+- Screenshots rendered with the real Forward+ renderer (lavapipe under Xvfb) and inspected.
+  Changes made from what they showed: camera moved closer (15.5 → 12.5 m) because Juni was ~12%
+  of screen height; stronger depth fog to separate background hills from the play path; sign
+  labels lowered; menu camera reframed so Juni isn't behind the buttons and signs are hidden in
+  the menu diorama.
+
+## Phase 5 — QA and refinement (done)
+
+- Independent QA review of the gameplay code (subagent, read-only) found 7 issues; all fixed
+  with regression tests where testable:
+  - **major:** pausing during the death delay skipped the life loss (unlimited lives) →
+    timers no longer run while paused, pause refused while defeated;
+  - **major:** camera swept across the level after respawning (interpolated transform lags one
+    frame after a teleport) → snap uses the real position (test fails if the fix is reverted);
+  - minor: fades fighting each other, music staying ducked after Play Again, idle-mode tweens on
+    interpolated nodes (judder at 120 Hz), results panel pivot, pause test not really pausing.
+- Shutdown log: "2 resources still in use at exit" comes from the Ogg music stream playing when
+  `--quit-after` ends the process. Stopping/clearing streams in `_exit_tree` didn't remove it; it
+  is exit-only, harmless, and filtered (only that message) in `validate.sh`.
+- Exports: `scripts/export.sh` → macOS universal `.app` zip (ad-hoc signed, not notarized) and
+  Linux x86_64. The exported Linux build boots without script errors or missing models.
+
+**Final evidence (actual run of `scripts/validate.sh`):** GLB check 252/252, audio checks all
+passed, import clean, **61/61 Godot tests**, main scene boot clean → `VALIDATION PASSED`. The
+autoplay bot finishes the level through real physics (55.7 s sim time, 31 jumps, 0 falls).
+
+**Not verified here:** running on macOS (no Mac available), real-time frame rate on GPU hardware,
+audio playback quality (no audio device; files were checked numerically), and how the game feels
+to a human. Software rendering ran at a few FPS, so screenshots show composition, not
+smoothness.

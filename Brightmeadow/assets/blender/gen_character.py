@@ -97,7 +97,7 @@ def head_shape(d):
         x *= 1 - 0.16 * k
         y *= 1 - 0.10 * k
     if y < 0:
-        y *= 0.90 + 0.06 * max(0.0, z)        # flatter face, fuller forehead
+        y *= 0.95 + 0.03 * max(0.0, z)        # slightly flatter face, fuller forehead
     else:
         y *= 1.04
     if z > 0.3:
@@ -119,16 +119,16 @@ def build_head(mb):
         eye_pts[s] = loc.copy()
         x = sfx(s)
         white = geom.blob((0.064, 0.028, 0.080), (0, 0, 0), cuts=4)
-        mb.add(white, "M_EyeWhite", bone="eye" + x, matrix=M @ Matrix.Translation((0, 0.0175, 0)))
+        mb.add(white, "M_EyeWhite", bone="eye" + x, matrix=M @ Matrix.Translation((0, 0.020, 0)))
         pupil = geom.blob((0.043, 0.016, 0.055), (0, 0, 0), cuts=3)
         mb.add(pupil, "M_EyeDark", bone="eye" + x,
-               matrix=M @ Matrix.Translation((-s * 0.006, -0.0005, -0.006)))
+               matrix=M @ Matrix.Translation((-s * 0.006, 0.002, -0.006)))
         hl = geom.blob((0.016, 0.008, 0.018), (0, 0, 0), cuts=2)
         mb.add(hl, "M_EyeWhite", bone="eye" + x,
-               matrix=M @ Matrix.Translation((s * 0.013, -0.009, 0.020)))
+               matrix=M @ Matrix.Translation((s * 0.013, -0.0065, 0.020)))
         hl2 = geom.blob((0.007, 0.005, 0.007), (0, 0, 0), cuts=1)
         mb.add(hl2, "M_EyeWhite", bone="eye" + x,
-               matrix=M @ Matrix.Translation((-s * 0.016, -0.0075, -0.022)))
+               matrix=M @ Matrix.Translation((-s * 0.016, -0.0050, -0.022)))
 
         # brows: short arched strokes
         pts = []
@@ -376,7 +376,7 @@ def build_boot(mb, s):
 
 
 def build_pack(mb, tsurf):
-    body = geom.blob((0.128, 0.078, 0.136), (0, 0.208, 0.722), cuts=4, exponent=0.6)
+    body = geom.blob((0.132, 0.080, 0.140), (0, 0.210, 0.722), cuts=4, exponent=0.68)
     mb.add(body, "M_Pack", bone="pack")
     flap = geom.blob((0.131, 0.082, 0.048), (0, 0.207, 0.835), cuts=4, exponent=0.5)
     mb.add(flap, "M_Pack", bone="pack")

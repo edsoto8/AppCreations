@@ -60,6 +60,7 @@ def save_blend(group):
     # the origin, as exported) don't pile up in the viewport.
     for i, lc in enumerate(bpy.context.view_layer.layer_collection.children):
         lc.hide_viewport = i > 0
+    bpy.context.preferences.filepaths.save_version = 0      # no .blend1 backups
     bpy.ops.wm.save_as_mainfile(filepath=path, compress=True, check_existing=False)
     for lc in bpy.context.view_layer.layer_collection.children:
         lc.hide_viewport = False

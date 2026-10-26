@@ -11,6 +11,8 @@ Buzzpuffs, collect coins, raise checkpoint flags and reach the finish arch.
 - **Font:** Fredoka, SIL Open Font License (`game/assets/fonts/OFL.txt`)
 - **Target:** macOS desktop (developed and validated on Linux; see "What was tested")
 
+![Gameplay](docs/images/level_0040.jpg)
+
 ## Play on macOS
 
 **Option A — open the project (recommended):**
@@ -99,3 +101,16 @@ the main scene. Tests (`game/tests/`):
 
 See `docs/ARCHITECTURE.md`. In short: `game/` is the Godot project, `assets/` the generators,
 `scripts/` the tooling, `docs/` the documentation (including `PROGRESS.md`, the phase log).
+
+## What was tested
+
+Automated on Linux (Ubuntu 24.04, no GPU): asset contract checks (252/252), audio checks, clean
+Godot import, 61/61 Godot tests including an autoplay bot that finishes the level through the
+real controller and physics, a clean main-scene boot, and macOS + Linux exports (the Linux build
+boots). Screenshots were rendered with the real Forward+ renderer in software and inspected
+(`docs/images/`).
+
+**Not tested:** running on a Mac, frame rate on real GPU hardware, listening to the audio (no
+sound device; levels and loop seams were checked numerically), and human playtesting of feel and
+difficulty. The 3–5 minute play-time target is a design estimate. Phase-by-phase evidence and
+known limitations are in `docs/PROGRESS.md`.

@@ -19,6 +19,10 @@ func _enter_tree() -> void:
 	InputSetup.ensure()
 
 
+func _exit_tree() -> void:
+	ModelLib.clear_cache()
+
+
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	_fade_layer = CanvasLayer.new()
