@@ -18,9 +18,9 @@ command or test that verified it.
 | M1 | Headless core vertical slice: terrain, roads, A*, traffic, citizens, zoning/growth, economy, power, water, garbage, fire, health, land value, commands, serializer, runner, demo city + auto-mayor, CLI `demo` | done |
 | M2 | Persistence (SQLite container, integrity, replay verifier) + CLI `new/run/verify` | done |
 | M3 | Test suite: unit, property-based, integration, replay, save/load, stress | done (137 tests) |
-| M4 | Avalonia app: map, tools, overlays, dashboards, save/load (Graphics Engineer agent) | in progress |
-| M5 | Benchmarks + profiling-driven optimisation | done for the simulation; rendering FPS pending M4 |
-| M6 | Independent code review, fixes, docs, limitations, roadmap | core review done and fixed; app review pending |
+| M4 | Avalonia app: map, tools, overlays, dashboards, save/load (Graphics Engineer agent) | done |
+| M5 | Benchmarks + profiling-driven optimisation | done |
+| M6 | Independent code review, fixes, docs, limitations, roadmap | done |
 
 ## M1 notes
 
@@ -100,3 +100,28 @@ Also: the CLI reports `SaveGameException` cleanly (exit 1), and `ARCHITECTURE.md
 with the code. Not changed: integrity hashes are unkeyed SHA-256, so a deliberate edit that also
 recomputes hashes and stays consistent still loads. `verify` (replay) detects it. Documented in the
 README.
+
+## M4 notes (desktop app)
+
+- Built by a Graphics Engineer agent in an isolated worktree against the public Core API, then
+  merged. After the merge (with the post-review Core): `dotnet build` gives 0 warnings;
+  `dotnet test` passes 157 core + 30 app tests.
+- Verified by me on the merged build:
+  - real Xvfb window at 51.8 FPS (1x) and 57.2 FPS at unlimited speed (9,944 ticks/s);
+  - off-screen 1600x900 rendering at 6.5 ms/frame;
+  - screenshots checked by eye (`docs/screenshots/`): city at day 10, traffic overlay, budget panel
+    with tax sliders, vehicle inspector with its route.
+- The agent's reports:
+  - a city collapse in one long max-speed run on its pre-review Core. Not reproduced afterwards:
+    `demo --seed 7` and `--seed 1234` for 330 days both stay at ~4.6–4.8k citizens with a growing
+    treasury. The fire-truck leak fixed in M6 is the likely cause.
+  - lock contention at unlimited speed (worked around in the app);
+  - the auto-mayor is unavailable after loading (its plan is not saved).
+  Both remaining items are listed in the README under limitations and roadmap.
+- Not verified: native file pickers (test fakes only), GPU rendering, and Windows/macOS runs. The CLI
+  publishes for win-x64, osx-arm64, osx-x64 and linux-arm64; that is packaging evidence, not runtime
+  evidence.
+
+## Resume point
+
+All milestones M0–M6 are done. Next work comes from the prioritised roadmap in `README.md`.

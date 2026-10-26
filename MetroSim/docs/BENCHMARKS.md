@@ -76,4 +76,29 @@ reuse against a saved congestion snapshot), not micro-tuning elsewhere.
 
 ## Rendering
 
-_Measured with the desktop app milestone; see PROGRESS.md._
+Avalonia 12 with SkiaSharp CPU rasterisation in this container (no GPU). Measured on the merged build:
+
+| Measurement | Command | Result |
+|---|---|---|
+| Real X11 window (Xvfb, 1600x900), demo city day 4 morning, 1x | `xvfb-run -a MetroSim --demo --auto-mayor --days 4.33 --speed 1 --exit-after 12` | **51.8 FPS**, map draw 5.1 ms average / 8.6 ms max |
+| Same, unlimited simulation speed | `... --speed max --exit-after 12` | **57.2 FPS** while the simulation ran at 9,944 ticks/s (day 102, 4,569 citizens) |
+| Off-screen render, 1600x900, 300 frames each, city with no overlay | `MetroSim --demo --days 4.33 --benchmark-render 300 --resolution 1600x900` | 6.5 ms/frame average, 8.4 ms p95 (154 FPS of headroom) |
+| Same, traffic overlay | (same run) | 7.4 ms/frame (135 FPS) |
+| Same, close-up at 40 px per tile | (same run) | 6.5 ms/frame (154 FPS) |
+| Same, whole map | (same run) | 4.2 ms/frame (237 FPS) |
+| Same, simulation at max speed | (same run) | 6.9 ms/frame (136 FPS) |
+| Frame snapshot on the UI thread | (same run) | 0.01–0.5 ms |
+
+The window FPS tops out near 60 because the frame timer targets 60 Hz. The off-screen numbers show
+the headroom.
+
+Rendering optimisations found by measurement (app milestone):
+- Chunk images in the platform's native pixel format draw about 10x faster than RGBA (30 ms → 6 ms
+  per frame).
+- At unlimited speed, the map refreshes from the simulation 5 times a second (immediately after a
+  player command), and changed chunks over the per-frame budget reuse their previous image for a
+  frame. This took FPS at max speed from 23 to 52.
+
+Note on garbage collection: on this software-rendered platform, Avalonia triggers a full GC about
+every other frame from its own frame buffers. The app's managed heap is about 3 MB, so each
+collection is cheap.

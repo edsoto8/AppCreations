@@ -140,12 +140,29 @@ category) shown in the finance dashboard.
 
 ## Interfaces the UI uses
 
-- `SimulationRunner`: `Speed`, `StateLock`, `Enqueue(GameCommand, Action<CommandResult>?)`, `Pause()`,
-  `MeasuredTicksPerSecond`, `TickCompleted` event.
-- `Simulation`: `Map`, `Buildings`, `Citizens`, `Traffic`, `Economy`, `Stats`, `Clock`, `Events`,
-  `Estimate(GameCommand)` (cost preview), `Execute(GameCommand)`.
+- `SimulationRunner`: `Speed`, `StateLock`, `Execute(GameCommand)` / `Estimate(GameCommand)` (each takes
+  the lock and runs between ticks), `Replace(Simulation)`, `StepNow(n)`, `HourlyHook` (auto-mayor),
+  `MeasuredTicksPerSecond`.
+- `Simulation`: `Map`, `Roads`, `Buildings`, `Citizens`, `Traffic`, `Budget`, `Demand`, `Stats`,
+  `History`, `Events`, `Tick` / `Day` / `MinuteOfDay`, `Performance`, `Pathfinder`, `ServiceCoverage`,
+  `PowerOutputOf`, `FindAccess`, `ComputeStateHash`.
 - `CityMap` layer arrays (terrain, elevation, trees, roads, zones, building ids, power lines, pollution,
-  land value), plus `MapVersion` and `TerrainVersion` counters so the renderer can rebuild cached layers.
-- `TrafficSystem.Vehicles` (tile, next tile, progress, direction, kind) for interpolated drawing;
-  `TrafficSystem.LaneLoad(tile)` and `HourlyVolume` for the traffic overlay.
-- `SaveGameStore.Save(sim, path)` / `SaveGameStore.Load(path)` in Persistence.
+  land value) and the `Version`, `TerrainVersion` and `RoadVersion` counters the renderer uses as
+  cache keys.
+- `TrafficSystem.Vehicles` (current and next tile, progress, lane, kind, purpose, path) for
+  interpolated drawing; `LaneLoadPercent(tile)`, `LaneOccupancy` and `VolumeLastHour` for the
+  traffic overlay; `Metrics` for dashboards.
+- `SaveGameStore.Save` / `Load` / `ReadSummary` in Persistence.
+
+## Rendering (MetroSim.App)
+
+- **Snapshots.** Each frame, the UI thread takes an immutable `FrameSnapshot` (vehicles, overlays,
+  dashboard numbers) under the state lock, waiting at most a few milliseconds. If the lock is busy
+  (unlimited speed), it redraws the previous snapshot.
+- **Drawing.** The compositor thread draws the snapshot through `ICustomDrawOperation` with a
+  SkiaSharp lease.
+- **Static map.** Terrain, roads and buildings are cached as 16x16-tile chunk images per zoom level
+  in the platform's native pixel format. Only chunks whose tiles changed are repainted, within a
+  per-frame time budget.
+- **Vehicles.** They are interpolated between ticks along their actual path, in the right-hand
+  lane. The map only renders continuously while something moves.

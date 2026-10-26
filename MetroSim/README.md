@@ -67,10 +67,52 @@ One tick is one in-game minute. Speeds are 1x/2x/3x = 12/48/192 ticks per second
 
 ## Playing
 
-<!-- APP-CONTROLS -->
-_The desktop app section is completed with the app milestone; see PROGRESS.md._
+![Demo city on day 10](docs/screenshots/15-demo-day10-evening.jpg)
+
+The app opens straight onto a fresh 128x128 map. `--demo --auto-mayor` starts from the scripted
+starter city instead. Other options:
+
+| Option | Effect |
+|---|---|
+| `--seed N` | Map seed |
+| `--size 64\|128\|192\|256` | Map size in tiles |
+| `--load FILE` | Open a save |
+| `--days 3.5` | Simulate ahead before showing the city; the fraction is the time of day |
+| `--speed paused\|1\|2\|3\|max` | Starting speed |
+| `--overlay traffic` | Starting overlay |
+| `--zoom N` | Starting zoom |
+| `--saves-dir DIR` | Quick-save folder |
+| `--exit-after SECONDS` | Print measured FPS and exit |
+| `--benchmark-render [FRAMES]` | Off-screen render benchmark |
+
+A typical first city: build roads (1/2), zone land beside them (5/6/7), then add a coal plant or wind
+turbines (C/T) and a water pump (P) or tower (O). Watch R/C/I demand in the top bar, buildings grow,
+and cars commute at 6–10 am. Add a landfill (L) and a fire station (F) once people move in, and use
+the traffic overlay (Shift+1) to find jams.
+
+| Area | Controls |
+|---|---|
+| Camera | Right- or middle-drag to pan, WASD/arrows to pan, mouse wheel to zoom around the cursor, `+`/`-` to zoom |
+| Tools | Q/Esc select and inspect; 1 street, 2 avenue, 3 power line, 4/B bulldoze, 5/6/7 zone R/C/I, 8 dezone |
+| Services | C coal plant, T wind turbine, P water pump, O water tower, L landfill, I incinerator, F fire station, H clinic |
+| Placing | Drag (roads, lines, zones, bulldoze) or hover (buildings) for a green/red ghost with the cost or the reason it fails. Release or click to build; right-click or Esc cancels |
+| Overlays | Shift+1…9, Shift+0: traffic, electricity, water, zoning, occupancy, land value, pollution, garbage, fire coverage, health coverage. The backtick key or the same key again turns it off |
+| Time | Space pauses; Ctrl+1–4 sets 1x/2x/3x/max |
+| Files | Ctrl+N new game, Ctrl+S save, Ctrl+Shift+S save as, Ctrl+O load, F5 quick save, F9 quick load |
+| Panels | F1 help, F2 budget (ledger, history chart, tax sliders), F3 city, F4 traffic, F6 performance (TPS, FPS, frame and tick times, memory, routing), F7 events (click to jump to the place), F8 inspector (buildings, road tiles, vehicles with their route) |
+
+More screenshots are in `docs/screenshots/`.
 
 ## Tests
+
+187 automated tests. `tests/MetroSim.App.Tests` (30 tests, Avalonia headless with real Skia rendering)
+drives the app through its view models and input paths:
+
+- start-up; road drags; zoning plus stepping to growth;
+- overlays render; save/load and quick save/load;
+- vehicles appear at commute time;
+- camera pan and zoom; command-line options;
+- frame-time measurement, with rendered frames saved as PNG.
 
 `tests/MetroSim.Tests` (xUnit v3 + CsCheck), 157 tests:
 
@@ -108,9 +150,16 @@ _The desktop app section is completed with the app milestone; see PROGRESS.md._
 - **Cross-platform determinism** is designed for (integer simulation; terrain uses only IEEE-exact
   operations) but verified only on Linux x64. Replays require the same build, because tuning
   constants are not stored in saves.
+- **App verification.** The UI was tested with Avalonia's headless platform (real Skia rendering)
+  and run in a real X11 window under Xvfb, which is software-rendered. Native Save/Load file pickers
+  are compiled but were exercised only through test fakes; F5/F9 and `--load` were run for real.
+  GPU-backed rendering on Windows and macOS was not run.
+- **Lock contention at unlimited speed.** The simulation thread re-takes the state lock back-to-back,
+  so the UI waits at most a few milliseconds and otherwise redraws the previous frame's data.
 - **Very dense cities.** At 40k citizens on 224x224, the network gridlocks and ticks take ~13 ms. See
   the roadmap.
 - **The auto-mayor is a simple script for demos and benchmarks**, not an AI opponent.
+  It needs the demo layout plan, which is not saved, so it cannot be switched on after loading a game.
 - **Save integrity checks catch corruption, not deliberate forgery.** Checksums are unkeyed SHA-256, so
   an edited file whose hashes were recomputed and whose contents stay consistent still loads. `verify`
   replays the city from its seed and detects that.
