@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>metrosim</AssemblyName>
+    <ServerGarbageCollection>false</ServerGarbageCollection>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\MetroSim.Core\MetroSim.Core.csproj" />
+    <ProjectReference Include="..\MetroSim.Persistence\MetroSim.Persistence.csproj" />
+  </ItemGroup>
+
+</Project>
