@@ -59,7 +59,7 @@ func build(level: LevelData, parent: Node3D, with_gameplay := true) -> void:
 		_build_enemies()
 		_build_checkpoints()
 		_build_goal()
-	_build_signs()
+		_build_signs()
 	_build_decor()
 	_scatter_props()
 	_build_background()

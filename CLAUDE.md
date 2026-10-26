@@ -13,6 +13,7 @@ its commands from that app's folder, not from the repo root (there is no root so
 | `SkyHop/` | Endless tap-to-flap arcade game: .NET 10 Blazor WebAssembly, pure C# game core, xUnit tests | `SkyHop/CLAUDE.md`, `SkyHop/README.md` |
 | `StepRecorder/` | Windows system-tray step recorder: .NET 10 WPF app, platform-neutral core, xUnit tests | `StepRecorder/CLAUDE.md`, `StepRecorder/README.md` |
 | `BoardFlow/` | Local-first Trello-style project board: .NET 10 Avalonia desktop app, SQLite + Dapper, Serilog, xUnit tests | `BoardFlow/CLAUDE.md`, `BoardFlow/README.md`, `BoardFlow/SPEC.md` |
+| `Brightmeadow/` | Original 2.5D platformer: Godot 4.5 + GDScript, Blender-Python-generated models, synthesised audio, headless Godot tests | `Brightmeadow/CLAUDE.md`, `Brightmeadow/README.md` |
 
 `StepRecorder-MultiModel-Spec.md` (repo root) is the authoritative spec for `StepRecorder/`. That app is
 built one milestone at a time; its `CLAUDE.md` holds the rules the spec sets for each milestone.
@@ -21,6 +22,6 @@ built one milestone at a time; its `CLAUDE.md` holds the rules the spec sets for
 
 ## Shared Conventions
 
-- Apps so far are C#/.NET. Each app's `Directory.Build.props` sets nullable, implicit usings and
+- Most apps are C#/.NET (Brightmeadow is Godot/GDScript). Each .NET app's `Directory.Build.props` sets nullable, implicit usings and
   `TreatWarningsAsErrors`. Use the same settings for new .NET apps.
 - The root `.gitignore` is the standard Visual Studio one and covers every app.

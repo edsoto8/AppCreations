@@ -14,6 +14,7 @@ var _coin_icon: HudIcon
 var _toast: Label
 var _section := ""
 var _toast_tween: Tween
+var _debug: Label
 
 
 func _ready() -> void:
@@ -59,6 +60,19 @@ func _ready() -> void:
 	_toast.modulate.a = 0.0
 	root.add_child(_toast)
 
+	_debug = UiKit.text("", 18, Color.WHITE)
+	_debug.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	_debug.add_theme_constant_override("outline_size", 6)
+	_debug.add_theme_color_override("font_outline_color", Color.BLACK)
+	_debug.position = Vector2(28, 100)
+	_debug.visible = false
+	root.add_child(_debug)
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	if event.is_action_pressed("toggle_debug"):
+		_debug.visible = not _debug.visible
+
 
 func bind(session: GameSession, data: LevelData, player: Node3D) -> void:
 	_session = session
@@ -76,6 +90,11 @@ func _process(_delta: float) -> void:
 	if _session == null:
 		return
 	_time_label.text = UiKit.format_time(_session.time_elapsed)
+	if _debug.visible and _player is Player:
+		var p := _player as Player
+		_debug.text = "pos %.2f, %.2f\nvel %.2f, %.2f\nstate %s  floor %s\n%d fps" % [
+				p.global_position.x, p.global_position.y, p.velocity.x, p.velocity.y,
+				Player.State.keys()[p.state], p.is_on_floor(), Engine.get_frames_per_second()]
 	if _player and _data:
 		var sec := _data.section_name_at(_player.global_position.x)
 		if sec != _section:

@@ -13,6 +13,7 @@ const KEYS := {
 	"restart": [KEY_R],
 	"toggle_fullscreen": [KEY_F],
 	"toggle_mute": [KEY_M],
+	"toggle_debug": [KEY_F3],
 }
 
 const PAD_BUTTONS := {

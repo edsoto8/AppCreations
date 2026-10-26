@@ -17,8 +17,8 @@ func _ready() -> void:
 	LevelBuilder.new().build(data, world, false)
 	var juni := ModelLib.instance("explorer")
 	world.add_child(juni)
-	juni.position = Vector3(6.5, 0, 0.6)
-	juni.rotation.y = -0.35
+	juni.position = Vector3(13.0, 0, 0.8)
+	juni.rotation.y = -0.45
 	var anim := ModelLib.find_animation_player(juni)
 	ModelLib.set_looping(anim, ["idle"])
 	if anim and anim.has_animation("idle"):
@@ -29,7 +29,7 @@ func _ready() -> void:
 
 func _process(delta: float) -> void:
 	_t += delta
-	camera.position = Vector3(8.5 + sin(_t * 0.12) * 1.5, 2.6 + sin(_t * 0.2) * 0.2, 11.5)
+	camera.position = Vector3(9.5 + sin(_t * 0.12) * 1.2, 2.4 + sin(_t * 0.2) * 0.2, 10.5)
 	camera.rotation = Vector3(deg_to_rad(-5.0), deg_to_rad(4.0 + sin(_t * 0.12) * 2.0), 0)
 
 
