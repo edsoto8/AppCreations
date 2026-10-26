@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#121418" />
+    <meta name="description" content="A fully procedural, animated 3D red fox built with Three.js" />
+    <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+    <title>Red Fox · Procedural 3D</title>
+  </head>
+  <body>
+    <div id="app">
+      <div id="stage"></div>
+      <div id="loader" class="loader" role="status" aria-live="polite">
+        <div class="loader-card">
+          <div class="loader-title">Sculpting the fox</div>
+          <div class="loader-bar"><div class="loader-fill" id="loader-fill"></div></div>
+          <div class="loader-stage" id="loader-stage">Starting…</div>
+        </div>
+      </div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

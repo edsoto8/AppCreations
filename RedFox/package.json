@@ -1,0 +1,26 @@
+{
+  "name": "red-fox",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Procedural, animated 3D red fox built with Three.js, TypeScript and Vite",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "three": "0.186.1"
+  },
+  "devDependencies": {
+    "@types/three": "0.186.0",
+    "typescript": "5.9.3",
+    "vite": "8.3.4",
+    "vitest": "5.0.4"
+  },
+  "engines": {
+    "node": ">=22.12"
+  }
+}
