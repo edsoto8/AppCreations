@@ -1,0 +1,13 @@
+# Local toolchain from scripts/setup_linux.sh
+.tools/
+# Godot editor cache / imported data
+game/.godot/
+game/.import/
+# Build output
+build/
+# Blender autosaves
+*.blend1
+*.blend2
+# Scratch output from screenshot/validation runs
+tests/output/
+__pycache__/

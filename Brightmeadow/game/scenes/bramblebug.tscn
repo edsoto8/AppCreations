@@ -1,0 +1,30 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/enemies/bramblebug.gd" id="1_bug"]
+
+[sub_resource type="CapsuleShape3D" id="body_shape"]
+radius = 0.36
+height = 0.8
+
+[sub_resource type="SphereShape3D" id="hit_shape"]
+radius = 0.46
+
+[node name="Bramblebug" type="CharacterBody3D"]
+collision_layer = 0
+collision_mask = 1
+script = ExtResource("1_bug")
+
+[node name="Shape" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.4, 0)
+shape = SubResource("body_shape")
+
+[node name="Hitbox" type="Area3D" parent="."]
+collision_layer = 4
+collision_mask = 0
+monitoring = false
+
+[node name="Shape" type="CollisionShape3D" parent="Hitbox"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.42, 0)
+shape = SubResource("hit_shape")
+
+[node name="Visual" type="Node3D" parent="."]

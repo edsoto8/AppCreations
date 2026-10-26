@@ -1,0 +1,52 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/player/player.gd" id="1_player"]
+[ext_resource type="Script" path="res://scripts/player/player_visual.gd" id="2_visual"]
+
+[sub_resource type="CapsuleShape3D" id="body_shape"]
+radius = 0.35
+height = 1.5
+
+[sub_resource type="CapsuleShape3D" id="sensor_shape"]
+radius = 0.42
+height = 1.6
+
+[sub_resource type="Gradient" id="shadow_grad"]
+colors = PackedColorArray(0, 0, 0, 0.55, 0, 0, 0, 0)
+
+[sub_resource type="GradientTexture2D" id="shadow_tex"]
+gradient = SubResource("shadow_grad")
+width = 128
+height = 128
+fill = 1
+fill_from = Vector2(0.5, 0.5)
+fill_to = Vector2(1, 0.5)
+
+[node name="Player" type="CharacterBody3D"]
+collision_layer = 2
+collision_mask = 1
+script = ExtResource("1_player")
+
+[node name="Shape" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.75, 0)
+shape = SubResource("body_shape")
+
+[node name="EnemySensor" type="Area3D" parent="."]
+collision_layer = 0
+collision_mask = 4
+monitorable = false
+
+[node name="Shape" type="CollisionShape3D" parent="EnemySensor"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.78, 0)
+shape = SubResource("sensor_shape")
+
+[node name="Visual" type="Node3D" parent="."]
+script = ExtResource("2_visual")
+
+[node name="BlobShadow" type="Decal" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -3.9, 0)
+size = Vector3(1.0, 8.0, 1.0)
+texture_albedo = SubResource("shadow_tex")
+upper_fade = 0.05
+lower_fade = 0.6
+cull_mask = 1

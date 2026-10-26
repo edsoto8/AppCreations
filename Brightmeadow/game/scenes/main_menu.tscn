@@ -1,0 +1,16 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/main_menu.gd" id="1_menu"]
+[ext_resource type="PackedScene" path="res://scenes/environment.tscn" id="2_env"]
+
+[node name="MainMenu" type="Node3D"]
+script = ExtResource("1_menu")
+
+[node name="Environment" parent="." instance=ExtResource("2_env")]
+
+[node name="World" type="Node3D" parent="."]
+
+[node name="Camera" type="Camera3D" parent="."]
+fov = 40.0
+far = 300.0
+current = true

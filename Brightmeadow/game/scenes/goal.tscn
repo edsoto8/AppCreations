@@ -1,0 +1,18 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/pickups/goal.gd" id="1_goal"]
+
+[sub_resource type="BoxShape3D" id="shape"]
+size = Vector3(1.2, 8, 3)
+
+[node name="Goal" type="Area3D"]
+collision_layer = 8
+collision_mask = 2
+monitorable = false
+script = ExtResource("1_goal")
+
+[node name="Shape" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 4, 0)
+shape = SubResource("shape")
+
+[node name="Visual" type="Node3D" parent="."]
