@@ -1,0 +1,91 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <Styles.Resources>
+    <SolidColorBrush x:Key="ChromeBrush" Color="#161B22" />
+    <SolidColorBrush x:Key="ChromeRaisedBrush" Color="#1F2630" />
+    <SolidColorBrush x:Key="ChromeBorderBrush" Color="#2E3742" />
+    <SolidColorBrush x:Key="ChromeHoverBrush" Color="#2A3440" />
+    <SolidColorBrush x:Key="AccentBrush" Color="#3FA7D6" />
+    <SolidColorBrush x:Key="AccentSoftBrush" Color="#1E4A60" />
+    <SolidColorBrush x:Key="TextMutedBrush" Color="#8E9AA8" />
+    <SolidColorBrush x:Key="WarningTextBrush" Color="#F0B840" />
+    <SolidColorBrush x:Key="ErrorTextBrush" Color="#F06A5A" />
+    <SolidColorBrush x:Key="ResidentialBrush" Color="#58C05A" />
+    <SolidColorBrush x:Key="CommercialBrush" Color="#4A8EE0" />
+    <SolidColorBrush x:Key="IndustrialBrush" Color="#E0B03A" />
+  </Styles.Resources>
+
+  <Style Selector="Window">
+    <Setter Property="Background" Value="{StaticResource ChromeBrush}" />
+    <Setter Property="FontSize" Value="13" />
+  </Style>
+
+  <!-- Tool and speed buttons: flat, highlighted when active. -->
+  <Style Selector="Button.tool">
+    <Setter Property="Background" Value="{StaticResource ChromeRaisedBrush}" />
+    <Setter Property="BorderBrush" Value="{StaticResource ChromeBorderBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="5" />
+    <Setter Property="Padding" Value="8,5" />
+    <Setter Property="HorizontalAlignment" Value="Stretch" />
+    <Setter Property="HorizontalContentAlignment" Value="Left" />
+    <Setter Property="Margin" Value="0,1" />
+  </Style>
+  <Style Selector="Button.tool:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{StaticResource ChromeHoverBrush}" />
+  </Style>
+  <Style Selector="Button.tool.active /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{StaticResource AccentSoftBrush}" />
+    <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}" />
+  </Style>
+  <Style Selector="Button.speed">
+    <Setter Property="Background" Value="{StaticResource ChromeRaisedBrush}" />
+    <Setter Property="BorderBrush" Value="{StaticResource ChromeBorderBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="MinWidth" Value="38" />
+    <Setter Property="Padding" Value="6,4" />
+    <Setter Property="Margin" Value="1,0" />
+    <Setter Property="HorizontalContentAlignment" Value="Center" />
+  </Style>
+  <Style Selector="Button.speed.active /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{StaticResource AccentSoftBrush}" />
+    <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}" />
+  </Style>
+  <Style Selector="Button.chrome">
+    <Setter Property="Background" Value="{StaticResource ChromeRaisedBrush}" />
+    <Setter Property="Padding" Value="9,4" />
+    <Setter Property="Margin" Value="2,0" />
+  </Style>
+
+  <Style Selector="TextBlock.group">
+    <Setter Property="Foreground" Value="{StaticResource TextMutedBrush}" />
+    <Setter Property="FontSize" Value="11" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="Margin" Value="2,8,0,2" />
+  </Style>
+  <Style Selector="TextBlock.caption">
+    <Setter Property="Foreground" Value="{StaticResource TextMutedBrush}" />
+    <Setter Property="FontSize" Value="11" />
+  </Style>
+  <Style Selector="TextBlock.value">
+    <Setter Property="FontSize" Value="16" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+  </Style>
+  <Style Selector="TextBlock.heading">
+    <Setter Property="FontSize" Value="16" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="Margin" Value="0,0,0,4" />
+  </Style>
+  <Style Selector="TextBlock.warning">
+    <Setter Property="Foreground" Value="{StaticResource WarningTextBrush}" />
+  </Style>
+  <Style Selector="TextBlock.error">
+    <Setter Property="Foreground" Value="{StaticResource ErrorTextBrush}" />
+  </Style>
+
+  <Style Selector="TabControl.panels TabItem">
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="MinHeight" Value="32" />
+    <Setter Property="Padding" Value="8,2" />
+  </Style>
+</Styles>

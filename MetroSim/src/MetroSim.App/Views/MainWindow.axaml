@@ -1,0 +1,185 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:MetroSim.App.ViewModels"
+        xmlns:c="using:MetroSim.App.Controls"
+        xmlns:r="using:MetroSim.App.Rendering"
+        xmlns:v="using:MetroSim.App.Views"
+        x:Class="MetroSim.App.Views.MainWindow"
+        x:DataType="vm:MainViewModel"
+        Title="{Binding CityName, StringFormat='MetroSim - {0}'}"
+        Width="1480" Height="900" MinWidth="1024" MinHeight="640"
+        WindowStartupLocation="CenterScreen">
+
+  <DockPanel>
+    <!-- Top bar: city, money, population, demand, date, speed, overlays, files. -->
+    <Border DockPanel.Dock="Top" Background="#10151B" BorderBrush="{StaticResource ChromeBorderBrush}" BorderThickness="0,0,0,1" Padding="10,6">
+      <Grid ColumnDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,*,Auto,Auto,Auto">
+        <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,22,0" MinWidth="150">
+          <TextBlock Text="{Binding CityName}" FontSize="15" FontWeight="Bold" />
+          <TextBlock Name="DateLabel" Text="{Binding DateText}" Classes="caption" />
+        </StackPanel>
+        <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,22,0" MinWidth="120">
+          <TextBlock Text="Treasury" Classes="caption" />
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <TextBlock Name="MoneyLabel" Text="{Binding MoneyText}" Foreground="{Binding MoneyBrush}" Classes="value" />
+            <TextBlock Text="{Binding NetText}" Foreground="{Binding NetBrush}" VerticalAlignment="Bottom" Margin="0,0,0,2" FontSize="12" />
+          </StackPanel>
+        </StackPanel>
+        <StackPanel Grid.Column="2" VerticalAlignment="Center" Margin="0,0,22,0" MinWidth="80">
+          <TextBlock Text="Population" Classes="caption" />
+          <TextBlock Name="PopulationLabel" Text="{Binding PopulationText}" Classes="value" />
+        </StackPanel>
+        <StackPanel Grid.Column="3" VerticalAlignment="Center" Margin="0,0,22,0" MinWidth="70">
+          <TextBlock Text="Jobs" Classes="caption" />
+          <TextBlock Text="{Binding JobsText}" Classes="value" />
+        </StackPanel>
+        <StackPanel Grid.Column="4" Orientation="Horizontal" VerticalAlignment="Center" Spacing="4" Margin="0,0,22,0"
+                    ToolTip.Tip="Zone demand: residential, commercial, industrial (-100..100)">
+          <StackPanel Spacing="1">
+            <c:DemandMeter Width="12" Height="30" Value="{Binding DemandResidential}" Fill="{StaticResource ResidentialBrush}" />
+            <TextBlock Text="R" FontSize="10" HorizontalAlignment="Center" />
+          </StackPanel>
+          <StackPanel Spacing="1">
+            <c:DemandMeter Width="12" Height="30" Value="{Binding DemandCommercial}" Fill="{StaticResource CommercialBrush}" />
+            <TextBlock Text="C" FontSize="10" HorizontalAlignment="Center" />
+          </StackPanel>
+          <StackPanel Spacing="1">
+            <c:DemandMeter Width="12" Height="30" Value="{Binding DemandIndustrial}" Fill="{StaticResource IndustrialBrush}" />
+            <TextBlock Text="I" FontSize="10" HorizontalAlignment="Center" />
+          </StackPanel>
+        </StackPanel>
+        <StackPanel Grid.Column="5" VerticalAlignment="Center" Margin="0,0,16,0">
+          <ItemsControl ItemsSource="{Binding Speeds}">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate>
+                <StackPanel Orientation="Horizontal" />
+              </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:SpeedOption">
+                <Button Classes="speed" Classes.active="{Binding IsActive}" Content="{Binding Label}" ToolTip.Tip="{Binding Tooltip}"
+                        Command="{Binding $parent[Window].((vm:MainViewModel)DataContext).SetSpeedCommand}"
+                        CommandParameter="{Binding Speed}" />
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+          <TextBlock Text="{Binding SpeedText}" Classes="caption" HorizontalAlignment="Center" />
+        </StackPanel>
+        <StackPanel Grid.Column="7" Orientation="Horizontal" VerticalAlignment="Center" Spacing="6" Margin="0,0,12,0">
+          <TextBlock Text="Overlay" Classes="caption" VerticalAlignment="Center" />
+          <ComboBox Name="OverlayBox" ItemsSource="{Binding Overlays}" SelectedItem="{Binding SelectedOverlay}" MinWidth="150">
+            <ComboBox.ItemTemplate>
+              <DataTemplate x:DataType="r:OverlayInfo">
+                <TextBlock>
+                  <Run Text="{Binding Title}" />
+                  <Run Text="{Binding Hotkey}" Foreground="{StaticResource TextMutedBrush}" FontSize="11" />
+                </TextBlock>
+              </DataTemplate>
+            </ComboBox.ItemTemplate>
+          </ComboBox>
+        </StackPanel>
+        <CheckBox Grid.Column="8" Content="Auto-mayor" IsVisible="{Binding AutoMayorAvailable}" IsChecked="{Binding AutoMayorEnabled}"
+                  VerticalAlignment="Center" Margin="0,0,10,0"
+                  ToolTip.Tip="Let the demo city's auto-mayor build power, water, garbage, fire and health services as needed." />
+        <StackPanel Grid.Column="9" Orientation="Horizontal" VerticalAlignment="Center">
+          <Button Classes="chrome" Content="New" Command="{Binding NewGame.OpenCommand}" ToolTip.Tip="New game (Ctrl+N)" />
+          <Button Classes="chrome" Content="Load" Command="{Binding LoadCommand}" ToolTip.Tip="Load a city (Ctrl+O). Quick load: F9" />
+          <Button Classes="chrome" Content="Save" Command="{Binding SaveCommand}" ToolTip.Tip="Save (Ctrl+S). Quick save: F5" />
+          <Button Classes="chrome" Content="Save as" Command="{Binding SaveAsCommand}" ToolTip.Tip="Save as (Ctrl+Shift+S)" />
+        </StackPanel>
+      </Grid>
+    </Border>
+
+    <!-- Status line. -->
+    <Border DockPanel.Dock="Bottom" Background="#10151B" BorderBrush="{StaticResource ChromeBorderBrush}" BorderThickness="0,1,0,0" Padding="10,4">
+      <Grid ColumnDefinitions="*,Auto,Auto">
+        <TextBlock Name="StatusLabel" Text="{Binding StatusText}" Classes.error="{Binding StatusIsError}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+        <TextBlock Grid.Column="1" Text="{Binding ToolHint}" Classes="caption" Margin="16,0" MaxWidth="560" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+        <TextBlock Grid.Column="2" Text="{Binding HoverText}" Classes="caption" MinWidth="90" TextAlignment="Right" VerticalAlignment="Center" />
+      </Grid>
+    </Border>
+
+    <!-- Tools. -->
+    <Border DockPanel.Dock="Left" Background="{StaticResource ChromeBrush}" BorderBrush="{StaticResource ChromeBorderBrush}" BorderThickness="0,0,1,0" Width="168">
+      <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <ItemsControl ItemsSource="{Binding ToolGroups}" Margin="8,2,8,8">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:ToolGroup">
+              <StackPanel>
+                <TextBlock Text="{Binding Name}" Classes="group" />
+                <ItemsControl ItemsSource="{Binding Tools}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:ToolItemViewModel">
+                      <Button Classes="tool" Classes.active="{Binding IsActive}" ToolTip.Tip="{Binding Tooltip}"
+                              Command="{Binding $parent[Window].((vm:MainViewModel)DataContext).SelectToolCommand}"
+                              CommandParameter="{Binding Kind}">
+                        <Grid ColumnDefinitions="*,Auto">
+                          <TextBlock Text="{Binding Name}" />
+                          <TextBlock Grid.Column="1" Text="{Binding Shortcut}" Classes="caption" Margin="6,0,0,0" VerticalAlignment="Center" />
+                        </Grid>
+                      </Button>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </StackPanel>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </ScrollViewer>
+    </Border>
+
+    <!-- Dashboards. -->
+    <Border DockPanel.Dock="Right" Width="400" Background="{StaticResource ChromeBrush}" BorderBrush="{StaticResource ChromeBorderBrush}" BorderThickness="1,0,0,0">
+      <TabControl Name="Panels" Classes="panels" SelectedIndex="{Binding SelectedPanel}" Padding="10,6">
+        <TabItem Header="Inspect">
+          <v:InspectorPanel DataContext="{Binding Inspector}" />
+        </TabItem>
+        <TabItem Header="Budget">
+          <v:FinancePanel DataContext="{Binding Finance}" />
+        </TabItem>
+        <TabItem Header="City">
+          <v:StatsPanel DataContext="{Binding City}" ChartTitle="Population, employment and satisfaction (hourly)" />
+        </TabItem>
+        <TabItem Header="Traffic">
+          <v:StatsPanel DataContext="{Binding Traffic}" ChartTitle="Vehicles, trips and travel time (hourly)" />
+        </TabItem>
+        <TabItem Header="Perf">
+          <v:StatsPanel DataContext="{Binding Performance}" ChartTitle="Frames and ticks per second (last 30 s)" />
+        </TabItem>
+        <TabItem Header="Events">
+          <v:EventsPanel />
+        </TabItem>
+        <TabItem Header="?">
+          <v:HelpPanel />
+        </TabItem>
+      </TabControl>
+    </Border>
+
+    <!-- Map with legend and the new-game panel on top. -->
+    <Grid>
+      <c:MapView Name="MapControl" />
+      <Border IsVisible="{Binding HasLegend}" HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="10"
+              Background="#D0141A22" CornerRadius="6" Padding="10,6" BorderBrush="{StaticResource ChromeBorderBrush}" BorderThickness="1">
+        <StackPanel Spacing="4">
+          <TextBlock Text="{Binding SelectedOverlay.Title}" FontWeight="SemiBold" />
+          <ItemsControl ItemsSource="{Binding Legend}">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate>
+                <StackPanel Orientation="Horizontal" Spacing="10" />
+              </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:LegendItem">
+                <StackPanel Orientation="Horizontal" Spacing="4">
+                  <Border Width="12" Height="12" CornerRadius="2" Background="{Binding Swatch}" VerticalAlignment="Center" />
+                  <TextBlock Text="{Binding Label}" FontSize="12" VerticalAlignment="Center" />
+                </StackPanel>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
+      </Border>
+      <v:NewGamePanel DataContext="{Binding NewGame}" IsVisible="{Binding IsOpen}" />
+    </Grid>
+  </DockPanel>
+</Window>

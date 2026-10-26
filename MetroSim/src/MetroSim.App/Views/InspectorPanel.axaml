@@ -1,0 +1,22 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:MetroSim.App.ViewModels"
+             x:Class="MetroSim.App.Views.InspectorPanel"
+             x:DataType="vm:InspectorViewModel">
+  <ScrollViewer VerticalScrollBarVisibility="Auto">
+    <StackPanel Spacing="6" Margin="0,6,0,8">
+      <TextBlock Name="InspectorTitle" Text="{Binding Title}" Classes="heading" TextWrapping="Wrap" />
+      <TextBlock Text="{Binding Subtitle}" Classes="caption" TextWrapping="Wrap" FontSize="12" />
+      <ItemsControl ItemsSource="{Binding Lines}" Margin="0,6,0,0">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="vm:StatLine">
+            <Grid ColumnDefinitions="130,*" Margin="0,2">
+              <TextBlock Text="{Binding Label}" Classes="caption" Margin="0,1,0,0" />
+              <TextBlock Grid.Column="1" Text="{Binding Value}" Classes.warning="{Binding Warning}" TextWrapping="Wrap" />
+            </Grid>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

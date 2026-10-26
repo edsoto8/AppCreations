@@ -1,0 +1,27 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:MetroSim.App.ViewModels"
+             x:Class="MetroSim.App.Views.EventsPanel"
+             x:DataType="vm:MainViewModel">
+  <DockPanel Margin="0,6,0,4">
+    <TextBlock DockPanel.Dock="Top" Text="Newest first. Click an event with a place to jump there." Classes="caption" Margin="0,0,0,6" TextWrapping="Wrap" />
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+      <ItemsControl Name="EventList" ItemsSource="{Binding Events}">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="vm:EventItem">
+            <Button Classes="tool" Margin="0,1" IsEnabled="{Binding HasLocation}"
+                    Command="{Binding $parent[UserControl].((vm:MainViewModel)DataContext).CenterOnEventCommand}" CommandParameter="{Binding}">
+              <Grid ColumnDefinitions="4,*">
+                <Border Background="{Binding SeverityBrush}" CornerRadius="2" />
+                <StackPanel Grid.Column="1" Margin="8,0,0,0">
+                  <TextBlock Text="{Binding Message}" TextWrapping="Wrap" FontSize="12" />
+                  <TextBlock Text="{Binding Time}" Classes="caption" />
+                </StackPanel>
+              </Grid>
+            </Button>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </ScrollViewer>
+  </DockPanel>
+</UserControl>

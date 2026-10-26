@@ -1,0 +1,32 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:MetroSim.App.ViewModels"
+             x:Class="MetroSim.App.Views.NewGamePanel"
+             x:DataType="vm:NewGameViewModel">
+  <Grid Background="#A0080A0E">
+    <Border HorizontalAlignment="Center" VerticalAlignment="Center" Width="420" Padding="22,18" CornerRadius="10"
+            Background="{StaticResource ChromeRaisedBrush}" BorderBrush="{StaticResource ChromeBorderBrush}" BorderThickness="1">
+      <StackPanel Spacing="12">
+        <TextBlock Text="New city" FontSize="20" FontWeight="Bold" />
+        <StackPanel Spacing="4">
+          <TextBlock Text="Seed" Classes="caption" />
+          <Grid ColumnDefinitions="*,Auto">
+            <TextBox Name="SeedBox" Text="{Binding SeedText}" />
+            <Button Grid.Column="1" Content="Random" Command="{Binding RandomSeedCommand}" Margin="6,0,0,0" />
+          </Grid>
+          <TextBlock Text="{Binding SeedError}" Classes="error" FontSize="11" IsVisible="{Binding SeedError, Converter={x:Static ObjectConverters.IsNotNull}}" />
+        </StackPanel>
+        <StackPanel Spacing="4">
+          <TextBlock Text="Map size (tiles)" Classes="caption" />
+          <ComboBox Name="SizeBox" ItemsSource="{Binding MapSizes}" SelectedItem="{Binding MapSize}" HorizontalAlignment="Stretch" />
+        </StackPanel>
+        <CheckBox Name="DemoBox" Content="Start with a demo city" IsChecked="{Binding DemoCity}" />
+        <CheckBox Content="Auto-mayor builds utilities and services for the demo city" IsChecked="{Binding AutoMayor}" IsEnabled="{Binding DemoCity}" Margin="24,0,0,0" />
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8" Margin="0,6,0,0">
+          <Button Content="Cancel" Command="{Binding CancelCommand}" />
+          <Button Name="StartButton" Content="Generate" Classes="accent" Command="{Binding StartCommand}" />
+        </StackPanel>
+      </StackPanel>
+    </Border>
+  </Grid>
+</UserControl>
