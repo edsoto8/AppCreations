@@ -91,7 +91,7 @@ func stomp() -> void:
 	Fx.burst(get_parent(), global_position + Vector3.UP * 0.4, Color(0.75, 0.55, 0.95), 14)
 	if _anim:
 		_anim.pause()
-	var tw := create_tween()
+	var tw := create_tween().set_process_mode(Tween.TWEEN_PROCESS_PHYSICS)
 	tw.tween_property(visual, "scale", Vector3(1.4, 0.25, 1.4), 0.08)
 	tw.tween_interval(0.35)
 	tw.tween_property(visual, "scale", Vector3(0.01, 0.01, 0.01), 0.15)

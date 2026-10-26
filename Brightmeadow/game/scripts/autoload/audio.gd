@@ -60,6 +60,11 @@ func play_sfx(sound_name: String, pitch_jitter := 0.0, volume_db := 0.0, pitch :
 
 func play_music(music_name: String, fade := 0.8) -> void:
 	if music_name == _music_name and _music.playing:
+		# Same track (e.g. "Play Again"): just undo any ducking.
+		if _music_tween:
+			_music_tween.kill()
+		_music_tween = create_tween()
+		_music_tween.tween_property(_music, "volume_db", music_volume_db, fade)
 		return
 	_music_name = music_name
 	var stream: AudioStream = _streams.get(music_name)

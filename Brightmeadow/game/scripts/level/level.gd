@@ -66,6 +66,9 @@ func respawn_point() -> Vector3:
 
 
 func _pause() -> void:
+	# Not while the defeat/respawn sequence runs: it owns the session state then.
+	if not player.is_alive():
+		return
 	Game.set_paused(true)
 	if get_tree().paused:
 		menus.show_pause()
@@ -93,12 +96,15 @@ func _on_goal_reached() -> void:
 	Audio.play_sfx("level_complete")
 	if Game.best_time < 0.0 or session.time_elapsed < Game.best_time:
 		Game.best_time = session.time_elapsed
-	await get_tree().create_timer(1.8).timeout
+	await get_tree().create_timer(1.8, false).timeout
 	menus.show_complete(session, Game.best_time)
 
 
 func _on_player_defeated(cause: StringName) -> void:
-	await get_tree().create_timer(0.9 if cause == &"fall" else 1.2).timeout
+	# Timers must not run while paused (create_timer defaults to process_always).
+	await get_tree().create_timer(0.9 if cause == &"fall" else 1.2, false).timeout
+	if session.state != GameSession.State.PLAYING:
+		return
 	var game_over := session.lose_life()
 	if game_over:
 		player.freeze()
@@ -107,6 +113,8 @@ func _on_player_defeated(cause: StringName) -> void:
 		menus.show_game_over(session)
 		return
 	await Game.fade_to(1.0, 0.3).finished
+	if session.state != GameSession.State.RESPAWNING:
+		return
 	player.respawn_at(respawn_point())
 	camera.snap_to_target()
 	session.respawned()

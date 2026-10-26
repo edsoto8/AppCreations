@@ -9,9 +9,10 @@ var session := GameSession.new()
 ## Best completion time this run of the game (seconds), or -1.
 var best_time := -1.0
 
-var _fade: ColorRect
+var _overlay: ColorRect
 var _fade_layer: CanvasLayer
 var _changing := false
+var _fade_tween: Tween
 
 
 func _enter_tree() -> void:
@@ -23,11 +24,11 @@ func _ready() -> void:
 	_fade_layer = CanvasLayer.new()
 	_fade_layer.layer = 100
 	add_child(_fade_layer)
-	_fade = ColorRect.new()
-	_fade.color = Color(0.1, 0.13, 0.2, 0.0)
-	_fade.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_fade.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_fade_layer.add_child(_fade)
+	_overlay = ColorRect.new()
+	_overlay.color = Color(0.1, 0.13, 0.2, 0.0)
+	_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_fade_layer.add_child(_overlay)
 
 
 func _process(delta: float) -> void:
@@ -61,10 +62,21 @@ func quit() -> void:
 
 
 ## Fades the screen to [param alpha] over [param time]; await the returned tween's finished.
+## While a scene change runs it owns the overlay: other callers get a plain timer-like tween.
 func fade_to(alpha: float, time := 0.35) -> Tween:
-	var tw := create_tween()
-	tw.tween_property(_fade, "color:a", alpha, time)
-	return tw
+	if _changing:
+		var wait := create_tween()
+		wait.tween_interval(time)
+		return wait
+	return _fade(alpha, time)
+
+
+func _fade(alpha: float, time: float) -> Tween:
+	if _fade_tween:
+		_fade_tween.kill()
+	_fade_tween = create_tween()
+	_fade_tween.tween_property(_overlay, "color:a", alpha, time)
+	return _fade_tween
 
 
 func set_paused(paused: bool) -> void:
@@ -80,10 +92,10 @@ func _change_scene(path: String) -> void:
 	if _changing:
 		return
 	_changing = true
-	await fade_to(1.0, 0.3).finished
+	await _fade(1.0, 0.3).finished
 	get_tree().paused = false
 	get_tree().change_scene_to_file(path)
 	await get_tree().process_frame
 	await get_tree().process_frame
 	_changing = false
-	fade_to(0.0, 0.4)
+	_fade(0.0, 0.4)

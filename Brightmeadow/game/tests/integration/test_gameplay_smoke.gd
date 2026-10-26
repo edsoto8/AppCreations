@@ -12,6 +12,8 @@ var session: GameSession
 
 func before_each() -> void:
 	level = LEVEL.instantiate()
+	# The runner processes ALWAYS; the level must really stop when the tree is paused.
+	level.process_mode = Node.PROCESS_MODE_PAUSABLE
 	add_child(level)
 	player = level.player
 	session = level.session
@@ -213,6 +215,42 @@ func test_reaching_goal_completes_level() -> void:
 	check_eq(player.state, Player.State.CELEBRATING, "player celebrates")
 	await _hold_for(130)
 	check(level.menus.is_open(), "results screen shown")
+
+
+func test_pause_during_death_delay_still_costs_a_life() -> void:
+	_place(57.0, 4.0)  # over the first pit
+	player.velocity = Vector3.ZERO
+	while player.is_alive():
+		await get_tree().physics_frame
+	level._pause()  # refused while defeated
+	check(not get_tree().paused, "can't pause during the defeat sequence")
+	await _hold_for(150)
+	check_eq(session.lives, GameSession.START_LIVES - 1, "life was lost")
+	check_eq(session.state, GameSession.State.PLAYING, "respawned")
+
+
+func test_respawn_camera_snaps_to_checkpoint() -> void:
+	_place(130.0, 8.0)  # die far from the start
+	player.velocity = Vector3.ZERO
+	while session.state != GameSession.State.RESPAWNING:
+		await get_tree().physics_frame
+	while session.state != GameSession.State.PLAYING:
+		await get_tree().physics_frame
+	await _hold_for(2)
+	check_near(level.camera.global_position.x, level.respawn_point().x, 4.0,
+			"camera centred near the respawn point right away")
+
+
+func test_pause_freezes_the_level() -> void:
+	var x0 := player.global_position.x
+	input.direction = 1.0
+	level._pause()
+	await _hold_for(30)
+	check_near(player.global_position.x, x0, 0.001, "player doesn't move while paused")
+	level._resume()
+	await _hold_for(10)
+	check(player.global_position.x > x0, "moves again after resume")
+	input.direction = 0.0
 
 
 func test_pause_and_resume() -> void:

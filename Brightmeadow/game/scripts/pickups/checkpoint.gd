@@ -54,7 +54,7 @@ func activate(animate := true) -> void:
 	Audio.play_sfx("checkpoint")
 	Fx.burst(get_parent(), global_position + Vector3.UP * 2.2, Color(1.0, 0.8, 0.3), 18, 0.1, 5.0)
 	if _flag:
-		var tw := create_tween()
+		var tw := create_tween().set_process_mode(Tween.TWEEN_PROCESS_PHYSICS)
 		tw.tween_property(_flag, "position:y", FLAG_HIGH, 0.6) \
 				.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BACK)
 		tw.parallel().tween_method(_set_flag_color, INACTIVE_COLOR, ACTIVE_COLOR, 0.4)

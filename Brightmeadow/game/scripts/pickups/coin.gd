@@ -43,7 +43,7 @@ func collect() -> void:
 	collected.emit(self)
 	Audio.play_sfx("coin", 0.03)
 	Fx.burst(get_parent(), global_position, Color(1.0, 0.85, 0.3), 8, 0.08, 3.0)
-	var tw := create_tween().set_parallel()
+	var tw := create_tween().set_process_mode(Tween.TWEEN_PROCESS_PHYSICS).set_parallel()
 	tw.tween_property(visual, "position:y", visual.position.y + 0.8, 0.25) \
 			.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BACK)
 	tw.tween_property(visual, "rotation:y", visual.rotation.y + TAU * 1.5, 0.25)

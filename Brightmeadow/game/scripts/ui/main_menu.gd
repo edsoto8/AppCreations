@@ -13,6 +13,7 @@ var _ui: CanvasLayer
 
 func _ready() -> void:
 	get_tree().paused = false
+	camera.physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_OFF  # moved in _process
 	var data := LevelData.load_file(LAYOUT)
 	LevelBuilder.new().build(data, world, false)
 	var juni := ModelLib.instance("explorer")

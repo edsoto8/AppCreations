@@ -32,7 +32,8 @@ func _ready() -> void:
 func snap_to_target() -> void:
 	if target == null:
 		return
-	var p := _target_pos()
+	# Not the interpolated transform: right after a teleport it still reports the old spot.
+	var p := target.global_position
 	_base_y = p.y
 	_ahead = target.facing * look_ahead * 0.5
 	_focus = Vector3(p.x + _ahead, _base_y, 0)
@@ -66,7 +67,11 @@ func _process(delta: float) -> void:
 
 
 func _target_pos() -> Vector3:
-	return target.get_global_transform_interpolated().origin
+	var p := target.get_global_transform_interpolated().origin
+	# Right after a teleport the interpolated transform lags a frame behind; ignore it then.
+	if p.distance_squared_to(target.global_position) > 4.0:
+		return target.global_position
+	return p
 
 
 func _apply() -> void:

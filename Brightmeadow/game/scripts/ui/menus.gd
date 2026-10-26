@@ -104,10 +104,13 @@ func show_complete(session: GameSession, best_time: float) -> void:
 	box.add_child(again)
 	box.add_child(UiKit.button("Main Menu", Game.goto_menu))
 	again.call_deferred("grab_focus")
-	# Pop in.
+	# Pop in from the centre (the size is only known after layout).
 	var panel := box.get_parent() as Control
+	panel.modulate.a = 0.0
+	await get_tree().process_frame
 	panel.pivot_offset = panel.size * 0.5
 	panel.scale = Vector2(0.7, 0.7)
+	panel.modulate.a = 1.0
 	create_tween().tween_property(panel, "scale", Vector2.ONE, 0.35) \
 			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
