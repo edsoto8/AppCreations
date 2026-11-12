@@ -203,9 +203,9 @@ export class MapOverlay {
         let r: number, gg: number, b: number, a: number;
         if (occ.isOccupied(idx) || c === COST_LETHAL) [r, gg, b, a] = [255, 255, 255, 230];
         else if (c === COST_UNKNOWN) [r, gg, b, a] = [8, 10, 14, 150];
-        else if (c >= COST_INSCRIBED) [r, gg, b, a] = [255, 77, 109, 110];
-        else if (c > 0) [r, gg, b, a] = [255, 150 - c * 0.4, 60, 20 + c * 0.35];
-        else [r, gg, b, a] = [70, 224, 200, 38];
+        else if (c >= COST_INSCRIBED) [r, gg, b, a] = [255, 77, 109, 85];
+        else if (c > 0) [r, gg, b, a] = [255, 170, 60, Math.min(60, c * 0.25)];
+        else [r, gg, b, a] = [70, 224, 200, 22];
         this.data[o] = r;
         this.data[o + 1] = gg;
         this.data[o + 2] = b;

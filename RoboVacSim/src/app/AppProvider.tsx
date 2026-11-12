@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { AppController } from './AppController';
 import { AppContext } from './context';
+import { useStore } from './store';
 
 /**
  * Creates the single AppController once the viewport element exists and provides it to the UI.
@@ -16,7 +17,8 @@ export function AppProvider({ children }: { children: (viewport: ReactNode) => R
     if (!host) return;
     const ctrl = new AppController(host);
     setApi(ctrl);
-    (window as unknown as { __robovac?: AppController }).__robovac = ctrl;
+    // Test/debug hooks (used by the Playwright e2e suite).
+    Object.assign(window as object, { __robovac: ctrl, __store: useStore });
     return () => {
       ctrl.dispose();
       setApi(null);

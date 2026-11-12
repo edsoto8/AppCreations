@@ -42,7 +42,7 @@ export class SensorOverlay {
     this.rayPos = new Float32Array(rays * 2 * 3);
     const rg = new THREE.BufferGeometry();
     rg.setAttribute('position', new THREE.BufferAttribute(this.rayPos, 3).setUsage(THREE.DynamicDrawUsage));
-    this.rays = new THREE.LineSegments(rg, new THREE.LineBasicMaterial({ color: '#ff4d6d', transparent: true, opacity: 0.28, depthWrite: false }));
+    this.rays = new THREE.LineSegments(rg, new THREE.LineBasicMaterial({ color: '#ff6b81', transparent: true, opacity: 0.1, depthWrite: false }));
     this.rays.frustumCulled = false;
     this.rays.renderOrder = 4;
 

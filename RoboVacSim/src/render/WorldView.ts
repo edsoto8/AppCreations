@@ -60,7 +60,8 @@ export class WorldView {
   ) {
     this.ui = ui;
     this.quality = ui.quality;
-    container.style.position = 'relative';
+    // Overlay layers are absolutely positioned inside the host; only force a containing block if needed.
+    if (getComputedStyle(container).position === 'static') container.style.position = 'relative';
     this.stage = new Stage(container);
     this.rig = new CameraRig(this.stage.camera, this.stage.renderer.domElement);
     this.house = new HouseView({ quality: ui.quality });
@@ -143,7 +144,9 @@ export class WorldView {
   }
 
   private effectiveWallMode(s: UiState): WallMode {
+    if (s.cameraMode === 'exploded') return 'hidden';
     if (s.cameraMode === 'cutaway') return 'cutaway';
+    if (['orbit', 'follow', 'dock', 'firstPerson'].includes(s.cameraMode) && s.wallMode === 'full') return 'cutaway';
     if (s.cameraMode === 'lidar' || s.cameraMode === 'topDown') return s.wallMode === 'full' ? 'cutaway' : s.wallMode;
     return s.wallMode;
   }

@@ -15,7 +15,8 @@ export class CameraRig {
   readonly controls: OrbitControls;
   mode: CameraMode = 'isometric';
   private bounds: Rect = { x: 0, y: 0, w: 10, h: 8 };
-  private transition: { fromPos: THREE.Vector3; fromTarget: THREE.Vector3; t: number; duration: number } | null = null;
+  /** Transitions are timed on the wall clock so they take the same time regardless of frame rate. */
+  private transition: { fromPos: THREE.Vector3; fromTarget: THREE.Vector3; start: number; duration: number } | null = null;
   private readonly lastRobot = new THREE.Vector3();
   private readonly tmpPos = new THREE.Vector3();
   private readonly tmpTarget = new THREE.Vector3();
@@ -62,11 +63,11 @@ export class CameraRig {
       }
       case 'orbit':
         outTarget.set(rx, 0.06, rz);
-        outPos.set(rx + 0.85, 0.62, rz + 0.95);
+        outPos.set(rx + 0.7, 1.15, rz + 0.8);
         break;
       case 'follow':
         outTarget.set(rx + fx * 0.6, 0.05, rz + fz * 0.6);
-        outPos.set(rx - fx * 1.4, 0.85, rz - fz * 1.4);
+        outPos.set(rx - fx * 1.1, 1.25, rz - fz * 1.1);
         break;
       case 'firstPerson':
         outPos.set(rx + fx * (ROBOT.radius + 0.01), ROBOT.bodyHeight - 0.012, rz + fz * (ROBOT.radius + 0.01));
@@ -83,13 +84,13 @@ export class CameraRig {
         const lz = dfx;
         const tx = dock.x + dfx * 0.25;
         const tz = dock.y + dfz * 0.25;
-        outTarget.set(tx, 0.22, tz);
-        outPos.set(tx - dfx * 1.25 + lx * 0.75, 0.75, tz - dfz * 1.25 + lz * 0.75);
+        outTarget.set(tx, 0.2, tz);
+        outPos.set(tx - dfx * 0.95 + lx * 0.55, 1.35, tz - dfz * 0.95 + lz * 0.55);
         break;
       }
       case 'exploded':
         outTarget.set(rx, 0.16, rz);
-        outPos.set(rx + 0.75, 0.62, rz + 0.8);
+        outPos.set(rx + 0.62, 0.72, rz + 0.66);
         break;
       case 'cutaway': {
         const d = fitH * 0.7;
@@ -109,13 +110,13 @@ export class CameraRig {
       this.transition = null;
       return;
     }
-    this.transition = { fromPos: this.camera.position.clone(), fromTarget: this.controls.target.clone(), t: 0, duration: 1.1 };
+    this.transition = { fromPos: this.camera.position.clone(), fromTarget: this.controls.target.clone(), start: performance.now(), duration: 1.1 };
     this.controls.enabled = false;
   }
 
   focus(x: number, z: number): void {
     const off = this.camera.position.clone().sub(this.controls.target);
-    this.transition = { fromPos: this.camera.position.clone(), fromTarget: this.controls.target.clone(), t: 0, duration: 0.8 };
+    this.transition = { fromPos: this.camera.position.clone(), fromTarget: this.controls.target.clone(), start: performance.now(), duration: 0.8 };
     this.focusGoal = { target: new THREE.Vector3(x, 0, z), pos: new THREE.Vector3(x, 0, z).add(off) };
     this.controls.enabled = false;
   }
@@ -125,8 +126,8 @@ export class CameraRig {
     const fp = this.mode === 'firstPerson';
     if (this.transition) {
       const tr = this.transition;
-      tr.t = Math.min(1, tr.t + dt / tr.duration);
-      const k = ease(tr.t);
+      const tt = Math.min(1, (performance.now() - tr.start) / 1000 / tr.duration);
+      const k = ease(tt);
       if (this.focusGoal) {
         this.tmpPos.copy(this.focusGoal.pos);
         this.tmpTarget.copy(this.focusGoal.target);
@@ -134,7 +135,7 @@ export class CameraRig {
       this.camera.position.lerpVectors(tr.fromPos, this.tmpPos, k);
       this.controls.target.lerpVectors(tr.fromTarget, this.tmpTarget, k);
       this.camera.lookAt(this.controls.target);
-      if (tr.t >= 1) {
+      if (tt >= 1) {
         this.transition = null;
         this.focusGoal = null;
         this.controls.enabled = !fp;
