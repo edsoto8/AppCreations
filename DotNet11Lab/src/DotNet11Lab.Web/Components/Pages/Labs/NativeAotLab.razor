@@ -1,7 +1,194 @@
 @page "/labs/native-aot"
+@rendermode InteractiveServer
+@using System.Globalization
+@using DotNet11Lab.Core.Labs.NativeAot
+@using DotNet11Lab.Core.Labs.Performance
 
 <LabHeader Slug="native-aot" />
 
-<Callout Kind="warn" Title="Under construction">
-    <p>This laboratory is being implemented.</p>
+<Callout Title="What is measured">
+    <p>
+        The companion CLI <code>dotnet11lab</code> (<code>src/DotNet11Lab.Cli</code>: JSON Lines statistics, sample data
+        generation and Zstandard compression) is published three ways from the same source. The scripts measure the
+        published size, launch-to-exit time of <code>dotnet11lab --startup-probe</code> and its peak memory, and write
+        <code>results/publish/latest.json</code>, which this page charts.
+    </p>
 </Callout>
+
+<section class="section">
+    <div class="section-title"><h2>Published comparison</h2><span class="muted small">results/publish/latest.json</span></div>
+    @if (_load is null)
+    {
+        <p class="muted small">Loading…</p>
+    }
+    else if (_load.Status == ResultsFileStatus.Missing)
+    {
+        <Callout Kind="warn" Title="No publish comparison yet">
+            <p>There is no file at <code>@_load.Path</code>. Nothing is shown rather than made-up numbers. Produce it from the <code>DotNet11Lab/</code> folder (Native AOT publishing takes a few minutes):</p>
+        </Callout>
+        <CodeBlock Language="shell" Title="Linux / macOS" Code="@PublishResultsStore.ProduceCommandUnix" Scroll="false" />
+        <CodeBlock Language="shell" Title="Windows (PowerShell 7)" Code="@PublishResultsStore.ProduceCommandWindows" Scroll="false" />
+    }
+    else if (_load.Status == ResultsFileStatus.Invalid)
+    {
+        <Callout Kind="danger" Title="The results file could not be read"><p class="mono small">@_load.Path</p><p>@_load.Error</p></Callout>
+    }
+    else if (_load.File is { } file)
+    {
+        var ok = file.Modes.Where(m => m.Succeeded).ToList();
+        <div class="row" style="margin-bottom:.75rem">
+            @if (file.Preliminary) { <span class="badge badge-experimental">Preliminary</span> } else { <span class="badge badge-stable">Final run</span> }
+            <span class="small muted">@file.Machine.Rid · SDK @file.Machine.Sdk · @file.Settings.StartupRuns runs per mode · generated @file.GeneratedUtc.ToString("yyyy-MM-dd HH:mm 'UTC'", CultureInfo.InvariantCulture)</span>
+        </div>
+        @if (file.Preliminary)
+        {
+            <Callout Kind="warn" Title="Preliminary numbers - do not quote">
+                <p>Produced by a validation run (for example on a machine busy with other work). Re-run the script on a quiet machine before comparing.</p>
+            </Callout>
+        }
+        <p class="small muted">Machine: @file.Machine.Processor, @file.Machine.LogicalCores logical cores, @file.Machine.Os. @file.Note</p>
+
+        <div class="grid grid-3">
+            @foreach (var m in ok)
+            {
+                <div class="card card-pad narrow-bars">
+                    <div class="row" style="justify-content:space-between;align-items:center">
+                        <h3 style="margin:0">@ModeTitle(m.Mode)</h3>
+                        @if (m.IsDynamicCodeSupported == false) { <span class="badge badge-new" title="RuntimeFeature.IsDynamicCodeSupported reported by the probe">no JIT</span> }
+                    </div>
+                    <div class="metric-value" style="margin-top:.4rem">@(m.StartupWallMs is { } w ? $"{w.Median:0.0} ms" : "n/a")</div>
+                    <div class="metric-sub">median startup (launch to exit)</div>
+                    <div class="small" style="margin-top:.5rem">
+                        Deployed: <strong>@Measure.FormatBytes(m.TotalSizeBytes ?? 0)</strong> in @m.FileCount file(s)<br />
+                        Peak working set: <strong>@Measure.FormatBytes(m.PeakWorkingSetBytes ?? 0)</strong>
+                        @if (m.MaxRssBytes is { } rss) { <br /><span>Max RSS (time -v): <strong>@Measure.FormatBytes(rss)</strong></span> }
+                    </div>
+                </div>
+            }
+        </div>
+
+        <div class="grid grid-3" style="margin-top:1rem">
+            <div class="card card-pad narrow-bars">
+                <h3>Deployed size</h3>
+                <BarChart Items="@ok.Select(m => new BarChart.Bar(ModeTitle(m.Mode), m.TotalSizeBytes ?? 0, Measure.FormatBytes(m.TotalSizeBytes ?? 0), Series(m.Mode))).ToList()" AriaLabel="Deployed size" />
+                <p class="small muted" style="margin-top:.4rem">Framework-dependent excludes the shared runtime it needs on the machine.</p>
+            </div>
+            <div class="card card-pad narrow-bars">
+                <h3>Startup (median wall-clock)</h3>
+                <BarChart Items="@ok.Where(m => m.StartupWallMs is not null).Select(m => new BarChart.Bar(ModeTitle(m.Mode), m.StartupWallMs!.Median, $"{m.StartupWallMs.Median:0.0} ms", Series(m.Mode))).ToList()" AriaLabel="Startup time" />
+                <p class="small muted" style="margin-top:.4rem">min–max: @string.Join(" · ", ok.Where(m => m.StartupWallMs is not null).Select(m => $"{ModeTitle(m.Mode)} {m.StartupWallMs!.Min:0.0}–{m.StartupWallMs.Max:0.0}"))</p>
+            </div>
+            <div class="card card-pad narrow-bars">
+                <h3>Peak working set</h3>
+                <BarChart Items="@ok.Select(m => new BarChart.Bar(ModeTitle(m.Mode), m.PeakWorkingSetBytes ?? 0, Measure.FormatBytes(m.PeakWorkingSetBytes ?? 0), Series(m.Mode))).ToList()" AriaLabel="Peak working set" />
+                <p class="small muted" style="margin-top:.4rem">Reported by the probe (<code>Process.PeakWorkingSet64</code>).</p>
+            </div>
+        </div>
+
+        <details style="margin-top:1rem">
+            <summary class="small">Full table and publish commands</summary>
+            <div class="table-wrap" style="margin-top:.5rem">
+                <table class="data">
+                    <thead><tr><th>Mode</th><th class="num">Deployed</th><th class="num">Executable</th><th class="num">Startup median</th><th class="num">Probe start→Main</th><th class="num">Peak WS</th><th>Runtime</th><th>Command</th></tr></thead>
+                    <tbody>
+                        @foreach (var m in file.Modes)
+                        {
+                            <tr class="@(m.Succeeded ? "" : "row-danger")">
+                                <td>@ModeTitle(m.Mode)</td>
+                                @if (m.Succeeded)
+                                {
+                                    <td class="num">@Measure.FormatBytes(m.TotalSizeBytes ?? 0)</td>
+                                    <td class="num">@Measure.FormatBytes(m.ExecutableSizeBytes ?? 0)</td>
+                                    <td class="num">@(m.StartupWallMs is { } w ? $"{w.Median:0.0} ms" : "-")</td>
+                                    <td class="num">@(m.StartupProbeMs is { } p ? $"{p.Median:0.0} ms" : "-")</td>
+                                    <td class="num">@Measure.FormatBytes(m.PeakWorkingSetBytes ?? 0)</td>
+                                    <td class="small">@m.Runtime</td>
+                                }
+                                else
+                                {
+                                    <td colspan="6" class="small">Failed: @m.Error</td>
+                                }
+                                <td class="mono small">@m.PublishCommand</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            <p class="small muted" style="margin-top:.4rem">"Probe start→Main" uses the OS process start time, which is coarse (clock ticks of ~10 ms on Linux); the wall-clock column is the primary startup measure. Read from <code>@_load.Path</code>.</p>
+        </details>
+    }
+</section>
+
+<section class="section">
+    <div class="section-title"><h2>The three modes</h2></div>
+    <div class="table-wrap">
+        <table class="data">
+            <thead><tr><th>Mode</th><th>Command</th><th>Target machine needs</th><th>How code runs</th><th>Trade-offs</th></tr></thead>
+            <tbody>
+                <tr><td><strong>Framework-dependent</strong></td><td class="mono small">dotnet publish -r &lt;rid&gt; --self-contained false</td><td>A matching .NET 11 runtime</td><td>IL, JIT-compiled (framework is ReadyToRun)</td><td>Smallest output, runtime patched centrally by the machine owner; startup pays for JIT and runtime load.</td></tr>
+                <tr><td><strong>Self-contained, single file</strong></td><td class="mono small">--self-contained true -p:PublishSingleFile=true</td><td>Nothing (same OS/arch)</td><td>Same as framework-dependent, bundled</td><td>One file to copy; much larger because the whole runtime ships with the app (untrimmed here). You patch the runtime by republishing.</td></tr>
+                <tr><td><strong>Native AOT</strong></td><td class="mono small">-p:PublishAot=true</td><td>Nothing (same OS/arch)</td><td>Native code compiled ahead of time; no JIT</td><td>Fast startup, low memory, small single file. Trimming is mandatory: no runtime code generation, reflection only on what is statically known, some libraries are incompatible.</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="grid grid-2" style="margin-top:1rem">
+        <CodeBlock Language="xml" Title="src/DotNet11Lab.Cli/DotNet11Lab.Cli.csproj" Scroll="false" Code="@CliCsproj" />
+        <CodeBlock Language="shell" Title="What the scripts run (current RID)" Scroll="false" Code="@PublishCommands" />
+    </div>
+
+    <Callout Kind="warn" Title="Platform restrictions">
+        <ul style="margin:0;padding-left:1.1rem">
+            <li>No cross-OS Native AOT: build Linux binaries on Linux, Windows on Windows, macOS on macOS (cross-architecture on the same OS is possible with extra setup).</li>
+            <li>Toolchains: Linux needs <code>clang</code> (or gcc) and zlib development files; macOS needs the Xcode command line tools; Windows needs Visual Studio with "Desktop development with C++".</li>
+            <li>Trimming: reflection-based <code>System.Text.Json</code>, <code>Reflection.Emit</code>, dynamic assembly loading and many reflection patterns are unavailable or produce warnings. This CLI uses a source-generated <code>JsonSerializerContext</code>, and <code>IsAotCompatible=true</code> turns any trim/AOT warning into a build error (TreatWarningsAsErrors).</li>
+            <li>.NET 11 notes (docs): Native AOT supports runtime async; native library outputs on Unix now get a <code>lib</code> prefix; optimized publish (<code>UseOptimizedPublish</code>) is opt-in per the SDK what's-new page, but a breaking-change page still describes it as the default; this lab does not depend on either.</li>
+        </ul>
+    </Callout>
+</section>
+
+<DemoPanel Title="This web app's process, right now"
+           Description="The dashboard itself is framework-dependent and JIT-compiled. These facts are read live from the running process; compare them with the CLI's --startup-probe output under Native AOT."
+           RunLabel="Refresh" OnRun="RefreshAsync">
+    <ChildContent>
+        @if (_snapshot is { } s)
+        {
+            <div class="grid grid-4">
+                <MetricTile Label="Uptime" Value="@(s.Uptime is { } u ? FormatUptime(u) : "unknown")" Sub="@(s.ProcessStartUtc is { } st ? $"started {st.ToLocalTime():HH:mm:ss}" : "start time unavailable")" />
+                <MetricTile Label="Working set" Value="@Measure.FormatBytes(s.WorkingSetBytes)" Sub="@($"peak {Measure.FormatBytes(s.PeakWorkingSetBytes)}")" />
+                <MetricTile Label="GC heap" Value="@Measure.FormatBytes(s.GcHeapBytes)" Sub="@($"committed {Measure.FormatBytes(s.GcCommittedBytes)} · gen0 {s.Gen0Collections} / gen2 {s.Gen2Collections}")" />
+                <MetricTile Label="JIT-compiled methods" Value="@s.JitCompiledMethods.ToString("N0", CultureInfo.InvariantCulture)" Sub="@($"{s.JitCompilationTime.TotalMilliseconds:N0} ms compiling · 0 under Native AOT")" />
+            </div>
+            <div class="table-wrap" style="margin-top:1rem">
+                <table class="data">
+                    <tbody>
+                        <tr><th>RuntimeFeature.IsDynamicCodeSupported</th><td class="mono">@s.IsDynamicCodeSupported</td><th>IsDynamicCodeCompiled</th><td class="mono">@s.IsDynamicCodeCompiled</td></tr>
+                        <tr><th>Runtime</th><td>@s.FrameworkDescription (@s.RuntimeIdentifier)</td><th>Loaded assemblies</th><td class="mono">@s.LoadedAssemblies</td></tr>
+                        <tr><th>GC mode</th><td>@(s.ServerGc ? "Server" : "Workstation")</td><th>Allocated since start</th><td class="mono">@Measure.FormatBytes(s.TotalAllocatedBytes)</td></tr>
+                        <tr><th>Process</th><td class="mono small" colspan="3">@s.ProcessPath · @s.ProcessorCount logical CPUs</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        }
+        <div style="margin-top:1rem"><CodeBlock Snippet="Aot.ProcessSnapshot" Title="How the snapshot is read" /></div>
+    </ChildContent>
+</DemoPanel>
+
+<section class="section">
+    <UsageGuidance>
+        <WhenToUse>
+            <ul>
+                <li>Command-line tools, serverless functions and scale-to-zero containers where startup and memory dominate.</li>
+                <li>Distributing one native file without asking users to install .NET.</li>
+                <li>Code you control end to end that can use source generators instead of reflection.</li>
+            </ul>
+        </WhenToUse>
+        <WhenToAvoid>
+            <ul>
+                <li>Apps that depend on runtime code generation, plugins loaded at run time, or reflection-heavy libraries.</li>
+                <li>Long-running services where peak throughput matters more than startup: the JIT's tiered, profile-guided code can be faster after warm-up. Measure.</li>
+                <li>When you need one build for several operating systems: AOT needs a native toolchain per OS.</li>
+            </ul>
+        </WhenToAvoid>
+    </UsageGuidance>
+</section>

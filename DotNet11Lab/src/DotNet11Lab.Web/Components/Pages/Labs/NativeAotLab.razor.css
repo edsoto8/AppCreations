@@ -1,0 +1,4 @@
+/* In narrow cards the shared .bar-row grid (label max 220px + value) leaves the 1fr track with no width. */
+.narrow-bars ::deep .bar-row {
+    grid-template-columns: minmax(70px, 38%) minmax(60px, 1fr) auto;
+}

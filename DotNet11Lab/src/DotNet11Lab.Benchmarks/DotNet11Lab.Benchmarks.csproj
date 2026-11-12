@@ -1,7 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <!--
     Multi-targets net10.0 and net11.0 so BenchmarkDotNet runs identical workloads on each runtime.
-    Does not reference DotNet11Lab.Core (net11-only, C# 15) - workloads here compile for both TFMs.
+    Does not reference DotNet11Lab.Core (net11-only, C# 15). Instead the BCL-only workload files from
+    Core/Labs/Performance are LINKED (compiled again here), so the dashboard's live measurements and these
+    benchmarks execute exactly the same source.
+    How to run: see BENCHMARKS.md (host on net11.0; jobs for .NET 10 and .NET 11 are built by BenchmarkDotNet).
   -->
   <PropertyGroup>
     <OutputType>Exe</OutputType>
@@ -10,11 +13,20 @@
     <LangVersion>latest</LangVersion>
     <Optimize>true</Optimize>
     <IsPackable>false</IsPackable>
+    <RootNamespace>DotNet11Lab.Benchmarks</RootNamespace>
+    <!-- BenchmarkDotNet needs the PDB to disassemble/diagnose; keep it next to the dll. -->
+    <DebugType>portable</DebugType>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="BenchmarkDotNet" />
   </ItemGroup>
+  <ItemGroup>
+    <Compile Include="..\DotNet11Lab.Core\Labs\Performance\Workloads\*.cs" Link="Shared\Workloads\%(Filename)%(Extension)" />
+    <Compile Include="..\DotNet11Lab.Core\Labs\Performance\BenchmarkResults.cs" Link="Shared\BenchmarkResults.cs" />
+  </ItemGroup>
   <ItemGroup Condition="'$(TargetFramework)' == 'net11.0'">
+    <!-- Lab 7: classic copy (compiled here without runtime async) vs the runtime-async assembly. -->
+    <Compile Include="..\DotNet11Lab.Core\Labs\RuntimeAsync\AsyncChainWorkloads.cs" Link="Shared\AsyncChainWorkloads.cs" />
     <ProjectReference Include="..\..\experimental\DotNet11Lab.RuntimeAsync\DotNet11Lab.RuntimeAsync.csproj" />
   </ItemGroup>
 </Project>
