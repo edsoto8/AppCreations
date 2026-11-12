@@ -2,6 +2,7 @@
   <PropertyGroup>
     <BlazorDisableThrowNavigationException>true</BlazorDisableThrowNavigationException>
     <!-- Lets AI provider keys live in user-secrets (dotnet user-secrets set "Ai:ApiKey" ...), never in source. -->
+    <EmbedLabSources>true</EmbedLabSources>
     <UserSecretsId>dotnet11lab-web-7c1e2a4b</UserSecretsId>
   </PropertyGroup>
   <ItemGroup>
