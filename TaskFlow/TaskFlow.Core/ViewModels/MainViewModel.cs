@@ -14,14 +14,18 @@ namespace TaskFlow.Core.ViewModels;
 public sealed partial class MainViewModel : ObservableObject
 {
     private readonly TaskService _tasks;
+    private readonly INavigationService _navigation;
+    private readonly IDialogService _dialogs;
     private readonly TimeProvider _time;
 
     // One item view model per task, reused across refreshes so the ListView keeps its rows.
     private readonly Dictionary<Guid, TaskItemViewModel> _itemCache = [];
 
-    public MainViewModel(TaskService tasks, TimeProvider time)
+    public MainViewModel(TaskService tasks, INavigationService navigation, IDialogService dialogs, TimeProvider time)
     {
         _tasks = tasks;
+        _navigation = navigation;
+        _dialogs = dialogs;
         _time = time;
 
         SelectedFilter = FilterChoices[0];
@@ -85,11 +89,7 @@ public sealed partial class MainViewModel : ObservableObject
     public DateOnly Today => DateOnly.FromDateTime(_time.GetLocalNow().DateTime);
 
     [RelayCommand]
-    private async Task AddTaskAsync()
-    {
-        // Milestone 3: add a placeholder task directly. Milestone 4 replaces this with the editor page.
-        await RunAsync(() => _tasks.AddAsync(new TaskDraft($"New task {TotalCount + 1}", "", null, Priority.Medium)));
-    }
+    private void AddTask() => _navigation.OpenTaskEditor(null);
 
     [RelayCommand]
     private void DismissError() => ErrorMessage = null;
@@ -97,13 +97,16 @@ public sealed partial class MainViewModel : ObservableObject
     internal Task SetCompletedAsync(TaskItemViewModel item, bool isCompleted) =>
         RunAsync(() => _tasks.SetCompletedAsync(item.Id, isCompleted));
 
-    internal void EditTask(TaskItemViewModel item)
-    {
-        // Implemented in Milestone 4.
-    }
+    internal void EditTask(TaskItemViewModel item) => _navigation.OpenTaskEditor(item.Id);
 
-    internal Task DeleteTaskAsync(TaskItemViewModel item) =>
-        RunAsync(() => _tasks.DeleteAsync(item.Id));
+    internal Task DeleteTaskAsync(TaskItemViewModel item) => RunAsync(async () =>
+    {
+        var confirmed = await _dialogs.ConfirmAsync("Delete task?", $"\"{item.Title}\" will be permanently deleted.", "Delete");
+        if (confirmed)
+        {
+            await _tasks.DeleteAsync(item.Id);
+        }
+    });
 
     partial void OnSelectedFilterChanged(Choice<TaskFilter> value) => Refresh();
 

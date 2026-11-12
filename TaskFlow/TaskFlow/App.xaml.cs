@@ -1,5 +1,6 @@
 using System;
 using Microsoft.Extensions.Logging;
+using TaskFlow.Views;
 using Uno.Resizetizer;
 
 namespace TaskFlow;
@@ -22,9 +23,6 @@ public partial class App : Application
 
     protected override async void OnLaunched(LaunchActivatedEventArgs args)
     {
-        Services = new AppServices();
-        await Services.AddSampleTasksAsync();
-
         MainWindow = new Window();
 #if DEBUG
         MainWindow.UseStudio();
@@ -42,6 +40,10 @@ public partial class App : Application
             MainWindow.Content = rootFrame;
 
             rootFrame.NavigationFailed += OnNavigationFailed;
+
+            // Services need the Frame (for navigation and dialogs), so they are created right after it.
+            Services = new AppServices(rootFrame);
+            await Services.AddSampleTasksAsync();
         }
 
         if (rootFrame.Content == null)

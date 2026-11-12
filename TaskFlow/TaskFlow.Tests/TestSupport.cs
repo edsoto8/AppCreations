@@ -34,3 +34,29 @@ public static class TestData
             CreatedAt = FixedTimeProvider.DefaultNow.AddMinutes(createdMinute),
         };
 }
+
+/// <summary>Records navigation requests instead of navigating.</summary>
+public sealed class FakeNavigation : INavigationService
+{
+    public List<Guid?> OpenedEditors { get; } = [];
+
+    public int BackCount { get; private set; }
+
+    public void OpenTaskEditor(Guid? taskId) => OpenedEditors.Add(taskId);
+
+    public void GoBack() => BackCount++;
+}
+
+/// <summary>Answers every confirmation with <see cref="Answer"/>.</summary>
+public sealed class FakeDialogs : IDialogService
+{
+    public bool Answer { get; set; } = true;
+
+    public int AskCount { get; private set; }
+
+    public Task<bool> ConfirmAsync(string title, string message, string confirmText)
+    {
+        AskCount++;
+        return Task.FromResult(Answer);
+    }
+}

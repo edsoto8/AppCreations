@@ -1,3 +1,4 @@
+using TaskFlow.Core.Logic;
 using TaskFlow.Core.Models;
 
 namespace TaskFlow.Core.Services;
@@ -25,6 +26,7 @@ public sealed class TaskService
 
     public Task<TaskItem> AddAsync(TaskDraft draft)
     {
+        TaskValidator.EnsureValid(draft);
         draft = draft.Normalized();
         var task = new TaskItem
         {
@@ -37,6 +39,19 @@ public sealed class TaskService
         _tasks.Add(task);
         OnChanged();
         return Task.FromResult(task);
+    }
+
+    public Task UpdateAsync(Guid id, TaskDraft draft)
+    {
+        TaskValidator.EnsureValid(draft);
+        draft = draft.Normalized();
+        var task = Get(id);
+        task.Title = draft.Title;
+        task.Description = draft.Description;
+        task.DueDate = draft.DueDate;
+        task.Priority = draft.Priority;
+        OnChanged();
+        return Task.CompletedTask;
     }
 
     public Task SetCompletedAsync(Guid id, bool isCompleted)

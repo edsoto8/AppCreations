@@ -9,13 +9,15 @@ namespace TaskFlow.Tests;
 public class MainViewModelTests
 {
     private readonly FixedTimeProvider _time = new();
+    private readonly FakeNavigation _navigation = new();
+    private readonly FakeDialogs _dialogs = new();
     private readonly TaskService _service;
     private readonly MainViewModel _vm;
 
     public MainViewModelTests()
     {
         _service = new TaskService(_time);
-        _vm = new MainViewModel(_service, _time);
+        _vm = new MainViewModel(_service, _navigation, _dialogs, _time);
     }
 
     [Fact]
@@ -85,5 +87,67 @@ public class MainViewModelTests
         var first = _vm.Tasks.Single();
         await _service.AddAsync(Draft("B"));
         Assert.Contains(first, _vm.Tasks);
+    }
+
+    [Fact]
+    public void AddTaskCommand_OpensEmptyEditor()
+    {
+        _vm.AddTaskCommand.Execute(null);
+        Assert.Equal([null], _navigation.OpenedEditors);
+    }
+
+    [Fact]
+    public async Task EditCommand_OpensEditorForThatTask()
+    {
+        var task = await _service.AddAsync(Draft("A"));
+        _vm.Tasks.Single().EditCommand.Execute(null);
+        Assert.Equal([task.Id], _navigation.OpenedEditors);
+    }
+
+    [Fact]
+    public async Task DeleteCommand_Confirmed_RemovesTask()
+    {
+        await _service.AddAsync(Draft("A"));
+        _dialogs.Answer = true;
+
+        await _vm.Tasks.Single().DeleteCommand.ExecuteAsync(null);
+
+        Assert.Equal(1, _dialogs.AskCount);
+        Assert.Empty(_service.Tasks);
+        Assert.Empty(_vm.Tasks);
+    }
+
+    [Fact]
+    public async Task DeleteCommand_Cancelled_KeepsTask()
+    {
+        await _service.AddAsync(Draft("A"));
+        _dialogs.Answer = false;
+
+        await _vm.Tasks.Single().DeleteCommand.ExecuteAsync(null);
+
+        Assert.Single(_service.Tasks);
+        Assert.Single(_vm.Tasks);
+    }
+
+    [Fact]
+    public async Task DueDateText_And_Overdue_UseTodaysDate()
+    {
+        await _service.AddAsync(Draft("late", due: Today.AddDays(-3)));
+        await _service.AddAsync(Draft("today", due: Today));
+
+        var late = _vm.Tasks.Single(t => t.Title == "late");
+        var today = _vm.Tasks.Single(t => t.Title == "today");
+
+        Assert.True(late.IsOverdue);
+        Assert.False(today.IsOverdue);
+        Assert.Equal("Due today", today.DueDateText);
+    }
+
+    [Fact]
+    public async Task CompletedTask_IsNeverOverdue()
+    {
+        var task = await _service.AddAsync(Draft("late", due: Today.AddDays(-3)));
+        await _service.SetCompletedAsync(task.Id, true);
+        Assert.False(_vm.Tasks.Single().IsOverdue);
     }
 }

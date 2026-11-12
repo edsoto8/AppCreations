@@ -1,4 +1,4 @@
-namespace TaskFlow;
+namespace TaskFlow.Views;
 
 /// <summary>
 /// The main screen. With MVVM the code-behind shrinks to "which view model do I show?";
@@ -11,6 +11,9 @@ public sealed partial class MainPage : Page
         // Set before InitializeComponent so the first x:Bind pass already sees it.
         ViewModel = App.Services.MainViewModel;
         this.InitializeComponent();
+
+        // Keep this page alive while the editor is open, so going back is instant and keeps the scroll position.
+        NavigationCacheMode = NavigationCacheMode.Required;
     }
 
     public MainViewModel ViewModel { get; }

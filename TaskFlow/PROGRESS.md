@@ -5,7 +5,7 @@
 | 1 | Environment and first application | Done |
 | 2 | First user interface | Done |
 | 3 | MVVM and data binding | Done |
-| 4 | Task editing and navigation | Not started |
+| 4 | Task editing and navigation | Done |
 | 5 | Local data storage | Not started |
 | 6 | UI improvements | Not started |
 | 7 | Testing and code quality | Not started |
@@ -34,3 +34,14 @@
 - App: `AppServices` composition root; `MainPage` binds with `x:Bind` (filter/sort ComboBoxes, list, commands).
 - `TaskFlow.Tests` (xUnit v3 on Microsoft.Testing.Platform): 12 tests passing.
 - Verified in the running app: complete (checkbox), delete, add, counter update, filter ComboBox opens.
+
+## Milestone 4 — Task editing and navigation
+
+- `EditTaskPage` + `EditTaskViewModel`: title, description, due date (`CalendarDatePicker`), priority, Save/Cancel,
+  Ctrl+S and Escape accelerators, inline validation messages, error `InfoBar`.
+- `TaskValidator` (title required, ≤ 100 chars; description ≤ 1000 chars), enforced again inside `TaskService`.
+- `INavigationService` (`FrameNavigationService`) and `IDialogService` (`ContentDialogService`) keep `Frame` and
+  `ContentDialog` out of view models. Delete now asks for confirmation; Cancel is the default button.
+- Views moved to `Views/`. Tests: 34 passing (editor, validator, navigation and dialog fakes).
+- Verified in the running app: empty-title error appears and clears while typing, priority via keyboard, date via
+  calendar, Ctrl+S saves and returns, delete dialog (Enter cancels, Delete confirms), Edit pre-fills, Escape cancels.

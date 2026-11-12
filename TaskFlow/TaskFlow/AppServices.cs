@@ -1,3 +1,5 @@
+using TaskFlow.Services;
+
 namespace TaskFlow;
 
 /// <summary>
@@ -6,21 +8,30 @@ namespace TaskFlow;
 /// </summary>
 public sealed class AppServices
 {
-    public AppServices()
+    public AppServices(Frame rootFrame)
     {
         Time = TimeProvider.System;
         Tasks = new TaskService(Time);
-        MainViewModel = new MainViewModel(Tasks, Time);
+        Navigation = new FrameNavigationService(rootFrame);
+        Dialogs = new ContentDialogService(() => rootFrame.XamlRoot);
+        MainViewModel = new MainViewModel(Tasks, Navigation, Dialogs, Time);
     }
 
     public TimeProvider Time { get; }
 
     public TaskService Tasks { get; }
 
+    public INavigationService Navigation { get; }
+
+    public IDialogService Dialogs { get; }
+
     /// <summary>One instance for the app's lifetime, so the main list keeps its filter and sort.</summary>
     public MainViewModel MainViewModel { get; }
 
-    /// <summary>Milestone 3: start with a few in-memory sample tasks. Milestone 5 loads them from disk instead.</summary>
+    /// <summary>A fresh editor view model each time the editor opens.</summary>
+    public EditTaskViewModel CreateEditTaskViewModel(Guid? taskId) => new(Tasks, Navigation, taskId);
+
+    /// <summary>Milestone 3/4: start with a few in-memory sample tasks. Milestone 5 loads them from disk instead.</summary>
     public async Task AddSampleTasksAsync()
     {
         var today = DateOnly.FromDateTime(DateTime.Today);

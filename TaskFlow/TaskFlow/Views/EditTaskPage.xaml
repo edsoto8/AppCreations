@@ -1,0 +1,63 @@
+<Page x:Class="TaskFlow.Views.EditTaskPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      Background="{ThemeResource ApplicationPageBackgroundThemeBrush}"
+      Loaded="Page_Loaded">
+
+  <ScrollViewer>
+    <StackPanel MaxWidth="640" Padding="24" Spacing="16" HorizontalAlignment="Stretch">
+
+      <TextBlock Text="{x:Bind ViewModel.PageTitle, Mode=OneWay}" FontSize="28" FontWeight="SemiBold" />
+
+      <InfoBar Severity="Error" IsOpen="{x:Bind ViewModel.HasError, Mode=OneWay}" IsClosable="False"
+               Message="{x:Bind ViewModel.ErrorMessage, Mode=OneWay}" />
+
+      <!-- Title. TwoWay + UpdateSourceTrigger=PropertyChanged: every keystroke updates ViewModel.Title. -->
+      <StackPanel Spacing="4">
+        <TextBox x:Name="TitleBox" Header="Title" PlaceholderText="What needs doing?"
+                 MaxLength="{x:Bind ViewModel.MaxTitleLength}"
+                 Text="{x:Bind ViewModel.Title, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+        <TextBlock Text="{x:Bind ViewModel.TitleError, Mode=OneWay}"
+                   Visibility="{x:Bind ViewModel.HasTitleError, Mode=OneWay}"
+                   Foreground="{ThemeResource SystemFillColorCriticalBrush}" FontSize="12" />
+      </StackPanel>
+
+      <StackPanel Spacing="4">
+        <TextBox Header="Description (optional)" PlaceholderText="Add details"
+                 AcceptsReturn="True" TextWrapping="Wrap" MinHeight="100"
+                 MaxLength="{x:Bind ViewModel.MaxDescriptionLength}"
+                 Text="{x:Bind ViewModel.Description, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+        <TextBlock Text="{x:Bind ViewModel.DescriptionError, Mode=OneWay}"
+                   Visibility="{x:Bind ViewModel.HasDescriptionError, Mode=OneWay}"
+                   Foreground="{ThemeResource SystemFillColorCriticalBrush}" FontSize="12" />
+      </StackPanel>
+
+      <StackPanel Orientation="Horizontal" Spacing="12">
+        <CalendarDatePicker Header="Due date (optional)" PlaceholderText="No due date" MinWidth="180"
+                            Date="{x:Bind ViewModel.DueDate, Mode=TwoWay}" />
+        <Button Content="Clear" VerticalAlignment="Bottom"
+                Command="{x:Bind ViewModel.ClearDueDateCommand}"
+                Visibility="{x:Bind ViewModel.HasDueDate, Mode=OneWay}" />
+      </StackPanel>
+
+      <ComboBox Header="Priority" MinWidth="180"
+                ItemsSource="{x:Bind ViewModel.PriorityChoices}"
+                SelectedItem="{x:Bind ViewModel.SelectedPriority, Mode=TwoWay}" />
+
+      <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,8,0,0">
+        <Button Content="{x:Bind ViewModel.SaveButtonText, Mode=OneWay}"
+                Command="{x:Bind ViewModel.SaveCommand}"
+                Style="{StaticResource AccentButtonStyle}">
+          <Button.KeyboardAccelerators>
+            <KeyboardAccelerator Modifiers="Control" Key="S" />
+          </Button.KeyboardAccelerators>
+        </Button>
+        <Button Content="Cancel" Command="{x:Bind ViewModel.CancelCommand}">
+          <Button.KeyboardAccelerators>
+            <KeyboardAccelerator Key="Escape" />
+          </Button.KeyboardAccelerators>
+        </Button>
+      </StackPanel>
+    </StackPanel>
+  </ScrollViewer>
+</Page>
