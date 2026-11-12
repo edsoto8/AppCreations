@@ -266,7 +266,7 @@ table.data tr.row-danger td:first-child { box-shadow: inset 3px 0 0 var(--danger
 .metric-sub { font-size: .78rem; color: var(--text-muted); }
 
 .bar-chart { display: flex; flex-direction: column; gap: .55rem; }
-.bar-row { display: grid; grid-template-columns: minmax(120px, 220px) 1fr minmax(80px, auto); gap: .75rem; align-items: center; font-size: .84rem; }
+.bar-row { display: grid; grid-template-columns: minmax(70px, min(220px, 38%)) minmax(60px, 1fr) auto; gap: .75rem; align-items: center; font-size: .84rem; }
 .bar-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .bar-track { background: var(--bg-sunken); border-radius: 4px; height: 18px; position: relative; overflow: hidden; }
 .bar-fill { height: 100%; border-radius: 4px; background: var(--chart-a); transition: width .4s ease; }

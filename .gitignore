@@ -426,3 +426,8 @@ FodyWeavers.xsd
 
 # Official VS Code C# Dev Kit Extension exclusion
 #*.lscache
+
+# DotNet11Lab: recorded measurement results are part of the app (the dashboard reads them);
+# the local SQLite run journal is not.
+!DotNet11Lab/results/publish/
+DotNet11Lab/**/App_Data/
