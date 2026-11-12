@@ -1,0 +1,202 @@
+@using DotNet11Lab.Core.Labs.CSharp15
+
+<section class="section" id="unions">
+    <div class="section-title"><h2>1 · Union types</h2><span class="badge badge-new">New in C# 15</span></div>
+    <p>
+        A <code>union</code> declares a value that is exactly one of a fixed list of <em>unrelated</em> types. A card processor
+        returns an approval, a decline or a pending review, and those three records share nothing. Before C# 15 we had to
+        invent a common base class (or use a library such as OneOf), and the compiler could never prove a <code>switch</code>
+        handled every outcome. With a union the case list is part of the type, so a <code>switch</code> without a discard arm
+        is exhaustive, and adding a fourth case produces a warning at every incomplete switch.
+    </p>
+    <div style="margin-top:1.25rem"><CodeCompare OldSnippet="CSharp15.LegacyPayment" NewSnippet="CSharp15.PaymentCases" /></div>
+
+    <DemoPanel Title="Run a checkout" Id="union-run" OnRun="RunPaymentAsync"
+               Description="The processor returns a PaymentResult union; the UI pattern-matches the active case.">
+        <ChildContent>
+            <div class="row">
+                <div class="field">
+                    <label for="scenario">Scenario</label>
+                    <select id="scenario" @bind="_scenarioIndex" @bind:after="LoadScenario">
+                        @for (var i = 0; i < PaymentScenarios.All.Count; i++)
+                        {
+                            <option value="@i">@PaymentScenarios.All[i].Name</option>
+                        }
+                    </select>
+                </div>
+                <div class="field">
+                    <label for="amount">Amount (USD)</label>
+                    <input id="amount" type="number" step="0.01" @bind="_amount" style="width:9rem" />
+                </div>
+                <div class="field">
+                    <label for="card">Card number</label>
+                    <input id="card" type="text" @bind="_card" style="width:13rem" maxlength="19" />
+                </div>
+            </div>
+            <p class="small muted">
+                Rules: amount ≤ 0 or card ending 0002 / 0069 → declined; amount above @PaymentProcessor.ManualReviewThreshold.ToString("N0") USD → pending review; otherwise approved.
+            </p>
+        </ChildContent>
+        <Result>
+            @if (_payment is { } p)
+            {
+                <div class="grid grid-2">
+                    <div>
+                        <div class="small muted">Matched case (C# 15 union)</div>
+                        <div style="margin:.35rem 0">
+                            @switch (p.Result.Value)
+                            {
+                                case PaymentApproved: <span class="badge badge-stable">PaymentApproved</span> break;
+                                case PaymentDeclined: <span class="badge badge-danger">PaymentDeclined</span> break;
+                                case PaymentPending: <span class="badge badge-experimental">PaymentPending</span> break;
+                            }
+                        </div>
+                        <div class="result-box">@PaymentProcessor.Describe(p.Result)</div>
+                    </div>
+                    <div>
+                        <div class="small muted">Same request through the C# 14 abstract-record version</div>
+                        <div style="margin:.35rem 0"><span class="badge badge-baseline">@p.Legacy.GetType().Name</span></div>
+                        <div class="result-box">@LegacyPaymentFormatter.Describe(p.Legacy)</div>
+                    </div>
+                </div>
+                <div class="small muted" style="margin-top:.75rem">System.Text.Json output of the union (the active case, no wrapper):</div>
+                <CodeBlock Language="json" Title="JsonSerializer.Serialize(result)" Code="@PaymentJson.Serialize(p.Result)" Scroll="false" />
+            }
+        </Result>
+    </DemoPanel>
+
+    <div class="grid grid-2" style="margin-top:1rem;align-items:start">
+        <CodeBlock Snippet="CSharp15.ProcessPayment" Title="Returning cases: implicit union conversions" />
+        <CodeBlock Snippet="CSharp15.DescribePayment" Title="Exhaustive switch, no discard arm" />
+    </div>
+
+    <DemoPanel Title="What did the compiler generate?" Id="union-facts" OnRun="InspectAsync" RunLabel="Inspect"
+               Description="Reflection over typeof(PaymentResult) at runtime, plus what default(PaymentResult) does.">
+        <Result>
+            <div class="table-wrap">
+                <table class="data">
+                    <thead><tr><th>Question</th><th>Expression evaluated</th><th>Answer</th></tr></thead>
+                    <tbody>
+                        @foreach (var f in _facts)
+                        {
+                            <tr><td>@f.Question</td><td><code>@f.Expression</code></td><td class="mono"><strong>@f.Answer</strong></td></tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            <Callout Kind="warn" Title="default(PaymentResult) through a switch with no null arm">
+                <p class="mono small">@_defaultOutcome</p>
+                <p>
+                    A union is a struct, so <code>default</code> exists and holds no case. The compiler does not force a
+                    <code>null</code> arm when every case type is non-nullable, so add one explicitly (not <code>_</code>, which
+                    would also swallow future cases).
+                </p>
+            </Callout>
+        </Result>
+    </DemoPanel>
+
+    <DemoPanel Title="Unions and System.Text.Json" Id="union-json" OnRun="ReadJsonAsync" RunLabel="Deserialize"
+               Description="Serialization writes the active case. Reading back needs a type classifier when several cases are JSON objects.">
+        <ChildContent>
+            <div class="row" style="margin-bottom:.5rem">
+                <span class="small muted">Load:</span>
+                <button type="button" class="btn btn-sm" @onclick="@(() => LoadJson(new PaymentApproved("A417305", 89.90m, "1111")))">Approved</button>
+                <button type="button" class="btn btn-sm" @onclick="@(() => LoadJson(new PaymentDeclined("D-51", "Insufficient funds")))">Declined</button>
+                <button type="button" class="btn btn-sm" @onclick="@(() => LoadJson(new PaymentPending("RV-00042", "fraud-review", TimeSpan.FromMinutes(30))))">Pending</button>
+                <button type="button" class="btn btn-sm" @onclick="@(() => _json = "{\"Status\":\"unknown\"}")">Unknown shape</button>
+            </div>
+            <textarea @bind="_json" style="min-height:80px" aria-label="JSON to deserialize"></textarea>
+        </ChildContent>
+        <Result>
+            <div class="table-wrap">
+                <table class="data">
+                    <thead><tr><th>Target type</th><th>Result</th><th>Outcome</th></tr></thead>
+                    <tbody>
+                        @foreach (var a in _attempts)
+                        {
+                            <tr class="@(a.Succeeded ? "row-ok" : "row-danger")">
+                                <td><code>@a.UnionType</code></td>
+                                <td>@if (a.Succeeded) { <span class="badge badge-stable">OK</span> } else { <span class="badge badge-danger">JsonException</span> }</td>
+                                <td class="small mono">@a.Outcome</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </Result>
+    </DemoPanel>
+    <div class="grid grid-2" style="margin-top:1rem;align-items:start">
+        <CodeBlock Snippet="CSharp15.JsonUnion" />
+        <CodeBlock Snippet="CSharp15.JsonUnionRoundTrip" />
+    </div>
+
+    <Callout Title="Practical use case">
+        <p>
+            Return types of operations with several legitimate outcomes: payment results, <code>Result&lt;T, Error&gt;</code>-style
+            APIs, command handlers that return either an event or a validation failure, and API responses that are one of
+            several DTOs (ASP.NET Core 11 describes them with OpenAPI <code>anyOf</code>).
+        </p>
+    </Callout>
+    <UsageGuidance>
+        <WhenToUse>
+            <ul>
+                <li>The set of outcomes is fixed and the case types are unrelated or come from different libraries.</li>
+                <li>You want the compiler to flag every switch when a case is added.</li>
+                <li>You serialize the result and the case shapes are distinguishable (or are different JSON token kinds).</li>
+            </ul>
+        </WhenToUse>
+        <WhenToAvoid>
+            <ul>
+                <li>The cases share behaviour or data: a closed class hierarchy (next section) models that better.</li>
+                <li>Value-type cases on a hot path: they are boxed into <code>Value</code> (use the non-boxing union pattern instead).</li>
+                <li>JSON with overlapping object shapes: deserialization throws unless you write a custom classifier.</li>
+            </ul>
+        </WhenToAvoid>
+    </UsageGuidance>
+</section>
+
+@code {
+    private sealed record PaymentRun(PaymentResult Result, LegacyPaymentResult Legacy);
+
+    private int _scenarioIndex;
+    private decimal _amount = PaymentScenarios.All[0].Request.Amount;
+    private string _card = PaymentScenarios.All[0].Request.CardNumber;
+    private PaymentRun? _payment;
+    private IReadOnlyList<UnionFact> _facts = [];
+    private string _defaultOutcome = "";
+    private string _json = PaymentJson.Serialize(new PaymentPending("RV-00042", "fraud-review", TimeSpan.FromMinutes(30)));
+    private IReadOnlyList<UnionReadAttempt> _attempts = [];
+
+    private void LoadScenario()
+    {
+        var request = PaymentScenarios.All[Math.Clamp(_scenarioIndex, 0, PaymentScenarios.All.Count - 1)].Request;
+        _amount = request.Amount;
+        _card = request.CardNumber;
+    }
+
+    private Task RunPaymentAsync(CancellationToken cancellationToken)
+    {
+        var digits = new string(_card.Where(char.IsDigit).ToArray());
+        if (digits.Length is < 4 or > 19) throw new ArgumentException("Enter a card number with 4 to 19 digits.");
+        var amount = Math.Clamp(_amount, -1_000_000m, 1_000_000m);
+        var request = new PaymentRequest($"ORD-{2000 + _scenarioIndex}", amount, digits);
+        _payment = new(PaymentProcessor.Process(request), LegacyPaymentProcessor.Process(request));
+        return Task.CompletedTask;
+    }
+
+    private Task InspectAsync(CancellationToken cancellationToken)
+    {
+        _facts = UnionInspection.Inspect();
+        _defaultOutcome = UnionInspection.DefaultWithoutNullArm();
+        return Task.CompletedTask;
+    }
+
+    private void LoadJson(PaymentResult result) => _json = PaymentJson.Serialize(result);
+
+    private Task ReadJsonAsync(CancellationToken cancellationToken)
+    {
+        if (_json.Length > 10_000) throw new ArgumentException("Keep the JSON under 10,000 characters.");
+        _attempts = [PaymentJson.ReadPlain(_json), PaymentJson.ReadClassified(_json)];
+        return Task.CompletedTask;
+    }
+}

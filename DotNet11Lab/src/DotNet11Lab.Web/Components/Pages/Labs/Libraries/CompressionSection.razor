@@ -1,0 +1,184 @@
+@using DotNet11Lab.Core.Labs.Libraries
+@using System.IO.Compression
+
+<section class="section" id="zstd">
+    <div class="section-title"><h2>1 · Zstandard compression</h2><span class="badge badge-new">New in .NET 11</span></div>
+    <p>
+        Zstandard (zstd) is now in-box in <code>System.IO.Compression</code>, next to <code>GZipStream</code> and <code>BrotliStream</code>:
+        a <code>ZstandardStream</code>, span-based <code>ZstandardEncoder</code>/<code>ZstandardDecoder</code> with static
+        <code>TryCompress</code>/<code>TryDecompress</code>, and <code>ZstandardDictionary</code> for trained dictionaries. Before .NET 11
+        zstd meant a third-party NuGet package wrapping the native library (or a managed port); the in-box choices were GZip and Brotli.
+        Zstd trades ratio for speed through one quality knob, from negative ("fast") levels up to
+        @ZstandardCompressionOptions.MaxQuality; which codec wins depends on your data and level, so measure it below.
+    </p>
+    <CodeBlock Snippet="Libraries.ZstdStream" Title="Same Stream pattern for all three codecs" />
+
+    <DemoPanel Title="Zstandard vs Brotli vs GZip on realistic data" Id="zstd-compare" OnRun="CompareAsync" Cancellable="true" RunLabel="Compress"
+               Description="Compresses and decompresses the same bytes with each codec, verifies the round trip, and times both directions.">
+        <ChildContent>
+            <div class="row">
+                <div class="field">
+                    <label for="z-kind">Data</label>
+                    <select id="z-kind" @bind="_kind">
+                        <option value="@SampleKind.JsonTransactionLog">JSON transaction log</option>
+                        <option value="@SampleKind.TextLog">Text application log</option>
+                    </select>
+                </div>
+                <div class="field"><label for="z-size">Size in KB (max @(LibrarySampleData.MaxBytes / 1024))</label><input id="z-size" type="number" @bind="_sizeKb" style="width:7rem" /></div>
+                <div class="field"><label for="z-q">Zstd quality (−7 to @ZstandardCompressionOptions.MaxQuality)</label><input id="z-q" type="number" @bind="_zstd" style="width:6rem" /></div>
+                <div class="field"><label for="b-q">Brotli quality (0–11)</label><input id="b-q" type="number" @bind="_brotli" style="width:6rem" /></div>
+                <div class="field"><label for="g-q">GZip level (0–9)</label><input id="g-q" type="number" @bind="_gzip" style="width:6rem" /></div>
+                <div class="field"><label for="z-it">Iterations (1–50)</label><input id="z-it" type="number" @bind="_iterations" style="width:5rem" /></div>
+            </div>
+            <p class="small muted">Defaults: zstd @ZstandardCompressionOptions.DefaultQuality, Brotli 4, GZip 6. High Brotli qualities on multi-MB inputs take seconds.</p>
+        </ChildContent>
+        <Result>
+            @if (_results.Count > 0)
+            {
+                <div class="table-wrap">
+                    <table class="data">
+                        <thead><tr><th>Codec</th><th class="num">Level</th><th class="num">Original</th><th class="num">Compressed</th><th class="num">Ratio</th><th class="num">Compress</th><th class="num">Decompress</th><th>Round trip</th></tr></thead>
+                        <tbody>
+                            @foreach (var r in _results)
+                            {
+                                <tr>
+                                    <td><strong>@r.Codec</strong></td>
+                                    <td class="num">@r.Level</td>
+                                    <td class="num">@Measure.FormatBytes(r.OriginalBytes)</td>
+                                    <td class="num">@Measure.FormatBytes(r.CompressedBytes)</td>
+                                    <td class="num">@r.Ratio.ToString("0.00")×</td>
+                                    <td class="num">@Measure.FormatDuration(r.Compress.MeanMicroseconds) · @r.CompressMBps.ToString("N0") MB/s</td>
+                                    <td class="num">@Measure.FormatDuration(r.Decompress.MeanMicroseconds) · @r.DecompressMBps.ToString("N0") MB/s</td>
+                                    <td>@if (r.RoundTripVerified) { <span class="badge badge-stable">✔ identical</span> } else { <span class="badge badge-danger">✘ mismatch</span> }</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+                <div class="card card-pad stack" style="margin-top:1rem">
+                    <div><div class="small muted" style="margin-bottom:.5rem">Compression ratio (higher is better)</div>
+                        <BarChart Items="@Bars(r => r.Ratio, r => r.Ratio.ToString("0.00") + "×")" AriaLabel="Compression ratio" /></div>
+                    <div><div class="small muted" style="margin-bottom:.5rem">Compress throughput, MB/s</div>
+                        <BarChart Items="@Bars(r => r.CompressMBps, r => r.CompressMBps.ToString("N0"))" AriaLabel="Compress throughput" /></div>
+                    <div><div class="small muted" style="margin-bottom:.5rem">Decompress throughput, MB/s</div>
+                        <BarChart Items="@Bars(r => r.DecompressMBps, r => r.DecompressMBps.ToString("N0"))" AriaLabel="Decompress throughput" /></div>
+                </div>
+            }
+        </Result>
+    </DemoPanel>
+
+    <div class="grid grid-2" style="margin-top:1.5rem;align-items:start">
+        <CodeBlock Snippet="Libraries.ZstdOneShot" Title="One-shot span API" />
+        <DemoPanel Title="One-shot round trip" Id="zstd-oneshot" OnRun="OneShotAsync"
+                   Description="64 KB of JSON through ZstandardEncoder.TryCompress and ZstandardDecoder.TryDecompress.">
+            <Result>
+                @if (_oneShot is { } o)
+                {
+                    <div class="grid grid-2">
+                        <MetricTile Label="Original" Value="@Measure.FormatBytes(o.OriginalBytes)" />
+                        <MetricTile Label="Compressed" Value="@Measure.FormatBytes(o.CompressedBytes)" Sub="@($"{(double)o.OriginalBytes / o.CompressedBytes:0.0}× smaller")" />
+                        <MetricTile Label="Size declared in frame" Value="@o.DeclaredContentSize.ToString("N0")" Sub="TryGetMaxDecompressedLength" />
+                        <MetricTile Label="Round trip" Value="@(o.RoundTripVerified ? "Identical" : "Mismatch")" />
+                    </div>
+                }
+            </Result>
+        </DemoPanel>
+    </div>
+
+    <div style="margin-top:1.5rem"><CodeBlock Snippet="Libraries.ZstdDictionary" Title="Training and using a dictionary" /></div>
+    <DemoPanel Title="Dictionaries for many small JSON payloads" Id="zstd-dict" OnRun="DictionaryAsync" Cancellable="true" RunLabel="Train and compress"
+               Description="Small messages (webhooks, cache entries, queue messages) compress badly on their own because each one starts with an empty history. A dictionary trained on similar messages fixes that.">
+        <ChildContent>
+            <div class="row">
+                <div class="field"><label for="d-n">Payloads (50–@ZstandardDictionaries.MaxPayloads.ToString("N0"))</label><input id="d-n" type="number" @bind="_payloads" style="width:7rem" /></div>
+                <div class="field"><label for="d-size">Max dictionary bytes (1 024–112 640)</label><input id="d-size" type="number" @bind="_dictSize" style="width:8rem" /></div>
+                <div class="field"><label for="d-q">Quality (1–@ZstandardCompressionOptions.MaxQuality)</label><input id="d-q" type="number" @bind="_dictQuality" style="width:5rem" /></div>
+            </div>
+            <p class="small muted">70 % of the payloads train the dictionary; sizes below are for the other 30 %, each compressed individually.</p>
+        </ChildContent>
+        <Result>
+            @if (_dict is { } d)
+            {
+                <div class="grid grid-4">
+                    <MetricTile Label="Test payloads" Value="@d.TestPayloads.ToString("N0")" Sub="@($"avg {d.RawBytes / Math.Max(1, d.TestPayloads)} bytes each")" />
+                    <MetricTile Label="Dictionary" Value="@Measure.FormatBytes(d.DictionaryBytes)" Sub="@($"trained on {d.TrainingSamples:N0} samples in {Measure.FormatDuration(d.TrainTime.MeanMicroseconds)}")" />
+                    <MetricTile Label="Zstd ratio" Value="@($"{(double)d.RawBytes / d.ZstdPlainBytes:0.00}× → {(double)d.RawBytes / d.ZstdDictionaryBytes:0.00}×")" Sub="without → with dictionary" />
+                    <MetricTile Label="Round trip" Value="@(d.RoundTripVerified ? "Identical" : "Mismatch")" Sub="every payload decompressed with the dictionary" />
+                </div>
+                <div class="card card-pad" style="margin-top:1rem">
+                    <div class="small muted" style="margin-bottom:.5rem">Total bytes for @d.TestPayloads.ToString("N0") individually compressed payloads (lower is better)</div>
+                    <BarChart Items="@DictionaryBars(d)" AriaLabel="Total compressed bytes" />
+                    <p class="small muted" style="margin-top:.6rem">
+                        Compress time for all test payloads: plain @Measure.FormatDuration(d.PlainCompress.MeanMicroseconds),
+                        with dictionary @Measure.FormatDuration(d.DictionaryCompress.MeanMicroseconds).
+                        Both sides must hold the same dictionary: a frame compressed with it cannot be read without it.
+                    </p>
+                </div>
+            }
+        </Result>
+    </DemoPanel>
+
+    <UsageGuidance>
+        <WhenToUse>
+            <ul>
+                <li>Logs, exports, backups and caches where speed matters as much as size (zstd decompresses very fast at every level).</li>
+                <li>Many small, similar messages: train a dictionary once, ship it with both producer and consumer.</li>
+                <li>HTTP between your own services (ASP.NET Core 11 negotiates <code>zstd</code> for response compression).</li>
+            </ul>
+        </WhenToUse>
+        <WhenToAvoid>
+            <ul>
+                <li>Browser-facing static assets where Brotli at high quality, precompressed at build time, gives the smallest files.</li>
+                <li>Interop with consumers that only read gzip/zip (older tools, some CDNs and clients).</li>
+                <li>Dictionaries for data whose shape changes often: a stale dictionary helps little and must be versioned.</li>
+            </ul>
+        </WhenToAvoid>
+    </UsageGuidance>
+</section>
+
+@code {
+    private SampleKind _kind = SampleKind.JsonTransactionLog;
+    private int _sizeKb = 1024, _zstd = ZstandardCompressionOptions.DefaultQuality, _brotli = 4, _gzip = 6, _iterations = 5;
+    private IReadOnlyList<CodecResult> _results = [];
+    private OneShotResult? _oneShot;
+    private int _payloads = 2_000, _dictSize = 16_384, _dictQuality = 3;
+    private DictionaryComparison? _dict;
+
+    private async Task CompareAsync(CancellationToken cancellationToken)
+    {
+        var settings = new CodecSettings(_zstd, _brotli, _gzip).Normalized();
+        (_zstd, _brotli, _gzip) = (settings.ZstandardQuality, settings.BrotliQuality, settings.GZipLevel);
+        _sizeKb = Math.Clamp(_sizeKb, 1, LibrarySampleData.MaxBytes / 1024);
+        // Keep large inputs responsive: at most 3 timed iterations above 4 MB.
+        _iterations = Math.Clamp(_iterations, 1, _sizeKb > 4096 ? 3 : 50);
+        var (kind, bytes, iterations) = (_kind, _sizeKb * 1024, _iterations);
+        _results = await Task.Run(() => StreamCodecs.CompareAll(LibrarySampleData.Generate(kind, bytes), settings, iterations, cancellationToken), cancellationToken);
+    }
+
+    private IReadOnlyList<BarChart.Bar> Bars(Func<CodecResult, double> value, Func<CodecResult, string> display) =>
+        _results.Select(r => new BarChart.Bar($"{r.Codec} ({r.Level})", value(r), display(r), (int)r.Codec)).ToList();
+
+    private Task OneShotAsync(CancellationToken cancellationToken)
+    {
+        _oneShot = ZstandardOneShot.RoundTrip(LibrarySampleData.Generate(SampleKind.JsonTransactionLog, 64 * 1024), ZstandardCompressionOptions.DefaultQuality);
+        return Task.CompletedTask;
+    }
+
+    private async Task DictionaryAsync(CancellationToken cancellationToken)
+    {
+        _payloads = Math.Clamp(_payloads, 50, ZstandardDictionaries.MaxPayloads);
+        _dictSize = Math.Clamp(_dictSize, 1_024, 112_640);
+        _dictQuality = Math.Clamp(_dictQuality, 1, ZstandardCompressionOptions.MaxQuality);
+        var (n, size, q) = (_payloads, _dictSize, _dictQuality);
+        _dict = await Task.Run(() => ZstandardDictionaries.Compare(n, size, q, cancellationToken), cancellationToken);
+    }
+
+    private static IReadOnlyList<BarChart.Bar> DictionaryBars(DictionaryComparison d) =>
+    [
+        new("Uncompressed", d.RawBytes, Measure.FormatBytes(d.RawBytes), 1),
+        new("GZip 6, per payload", d.GZipBytes, Measure.FormatBytes(d.GZipBytes), 1),
+        new("Brotli 4, per payload", d.BrotliBytes, Measure.FormatBytes(d.BrotliBytes), 1),
+        new("Zstd, per payload", d.ZstdPlainBytes, Measure.FormatBytes(d.ZstdPlainBytes), 0),
+        new("Zstd + dictionary", d.ZstdDictionaryBytes, Measure.FormatBytes(d.ZstdDictionaryBytes), 2),
+    ];
+}

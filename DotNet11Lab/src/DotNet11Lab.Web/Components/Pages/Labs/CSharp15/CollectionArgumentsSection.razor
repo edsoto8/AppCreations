@@ -1,0 +1,115 @@
+@using DotNet11Lab.Core.Labs.CSharp15
+
+<section class="section" id="collection-args">
+    <div class="section-title"><h2>3 · Collection expression arguments</h2><span class="badge badge-new">New in C# 15</span></div>
+    <p>
+        Collection expressions (<code>[a, b, ..rest]</code>, C# 12) could not pass constructor arguments, so as soon as you needed
+        a comparer or a capacity you went back to <code>new HashSet&lt;T&gt;(comparer)</code> and a loop. C# 15 adds a leading
+        <code>with(...)</code> element whose arguments go to the collection's constructor (or its builder's <code>Create</code> method).
+    </p>
+    <div style="margin-top:1.25rem"><CodeCompare OldSnippet="CSharp15.LegacyDedupeSkus" NewSnippet="CSharp15.DedupeSkus" /></div>
+
+    <DemoPanel Title="Deduplicate scanned SKU codes" Id="collection-dedupe" OnRun="DedupeAsync" RunLabel="Deduplicate"
+               Description="Warehouse scanners send SKUs in mixed case. A HashSet built with with(StringComparer.OrdinalIgnoreCase) folds them.">
+        <ChildContent>
+            <label for="skus">Scanned codes (comma, semicolon or newline separated)</label>
+            <textarea id="skus" @bind="_skus" style="min-height:70px"></textarea>
+        </ChildContent>
+        <Result>
+            <div class="grid grid-3">
+                <MetricTile Label="Scanned" Value="@_dedupe!.Input.Count.ToString("N0")" />
+                <MetricTile Label="Unique (ignore case)" Value="@_dedupe.Unique.Count.ToString("N0")" Sub="[with(StringComparer.OrdinalIgnoreCase), ..]" />
+                <MetricTile Label="Unique (default comparer)" Value="@_dedupe.CaseSensitiveUnique.Count.ToString("N0")" Sub="[.. input]" />
+            </div>
+            <div class="result-box" style="margin-top:.75rem">@string.Join(", ", _dedupe.Unique)</div>
+        </Result>
+    </DemoPanel>
+
+    <div style="margin-top:1.25rem"><CodeCompare OldSnippet="CSharp15.LegacyPresizedList" NewSnippet="CSharp15.PresizedList" /></div>
+
+    <DemoPanel Title="Capacity: presized vs growing" Id="collection-capacity" OnRun="CapacityAsync" Cancellable="true"
+               Description="Builds a List<decimal> from a lazy query four ways. Quick in-process measurement: warm-up, then timed iterations.">
+        <ChildContent>
+            <div class="row">
+                <div class="field"><label for="items">Items produced (max @CollectionArguments.MaxItems.ToString("N0"))</label><input id="items" type="number" @bind="_items" style="width:9rem" /></div>
+                <div class="field"><label for="hint">Capacity hint n</label><input id="hint" type="number" @bind="_hint" style="width:9rem" /></div>
+                <div class="field"><label for="iters">Iterations (max 200)</label><input id="iters" type="number" @bind="_iterations" style="width:7rem" /></div>
+            </div>
+        </ChildContent>
+        <Result>
+            <div class="table-wrap">
+                <table class="data">
+                    <thead><tr><th>Code</th><th class="num">Final Capacity</th><th class="num">Mean time / op</th><th class="num">Allocated / op</th><th class="num">Gen0 GCs</th></tr></thead>
+                    <tbody>
+                        @foreach (var v in _capacity!.Variants)
+                        {
+                            <tr>
+                                <td><code>@v.Code</code></td>
+                                <td class="num">@v.Capacity.ToString("N0")</td>
+                                <td class="num">@Measure.FormatDuration(v.Measurement.MeanMicroseconds)</td>
+                                <td class="num">@Measure.FormatBytes(v.Measurement.AllocatedBytesPerOp)</td>
+                                <td class="num">@v.Measurement.Gen0Collections</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            <div style="margin-top:1rem">
+                <div class="small muted" style="margin-bottom:.4rem">Allocated bytes per operation (lower is better)</div>
+                <BarChart Items="@(_capacity.Variants.Select(v => new BarChart.Bar(v.Code, v.Measurement.AllocatedBytesPerOp, Measure.FormatBytes(v.Measurement.AllocatedBytesPerOp), v.Code.StartsWith('[') ? 0 : 1)).ToList())"
+                          Legend="@([("C# 15 collection expression", 0), ("C# 14 constructor + Add", 1)])" AriaLabel="Allocations per variant" />
+            </div>
+            <p class="small muted" style="margin-top:.6rem">
+                <code>[.. query]</code> already avoids repeated doubling by buffering, then copying into an exact-size list.
+                <code>with(capacity: n)</code> allocates the final array once, and when <em>n</em> exceeds the item count it leaves
+                headroom for later <code>Add</code> calls. A hint smaller than the item count falls back to growth.
+            </p>
+        </Result>
+    </DemoPanel>
+
+    <Callout Kind="warn" Title="Verified by compiling: no dictionaries">
+        <p>
+            <code>Dictionary&lt;string, int&gt; d = [with(StringComparer.OrdinalIgnoreCase), new("a", 1)];</code> does not compile in C# 15
+            (CS9215: the type needs an accessible <code>Add</code> taking one argument). Collection arguments work with lists, sets and
+            builder-based types such as <code>ImmutableHashSet</code>; keep <code>new Dictionary&lt;,&gt;(comparer)</code> for maps.
+        </p>
+    </Callout>
+    <UsageGuidance>
+        <WhenToUse>
+            <ul>
+                <li>Sets or lists that need a comparer (case-insensitive codes, culture-aware names).</li>
+                <li>You know the final size (page size, batch size) of a lazy source, or will add more items afterwards.</li>
+            </ul>
+        </WhenToUse>
+        <WhenToAvoid>
+            <ul>
+                <li>The source has a known count (arrays, lists): the compiler already presizes, the hint adds nothing.</li>
+                <li>Guessing capacities: an oversized hint wastes memory for the lifetime of the list.</li>
+                <li>Dictionaries (not supported, see above).</li>
+            </ul>
+        </WhenToAvoid>
+    </UsageGuidance>
+</section>
+
+@code {
+    private string _skus = "KB-MX-01, kb-mx-01, MS-ERG-07\nms-erg-07; MN-27-4K\nCB-USBC-2M, cb-usbc-2m, KB-MX-01 , DK-TB4";
+    private SkuDedupeResult? _dedupe;
+    private int _items = 50_000, _hint = 50_000, _iterations = 20;
+    private CapacityComparison? _capacity;
+
+    private Task DedupeAsync(CancellationToken cancellationToken)
+    {
+        if (_skus.Length > 100_000) throw new ArgumentException("Keep the list under 100,000 characters.");
+        _dedupe = CollectionArguments.Dedupe(_skus);
+        return Task.CompletedTask;
+    }
+
+    private async Task CapacityAsync(CancellationToken cancellationToken)
+    {
+        _items = Math.Clamp(_items, 1, CollectionArguments.MaxItems);
+        _hint = Math.Clamp(_hint, 0, CollectionArguments.MaxItems);
+        _iterations = Math.Clamp(_iterations, 1, 200);
+        var (items, hint, iterations) = (_items, _hint, _iterations);
+        _capacity = await Task.Run(() => CollectionArguments.CompareCapacity(items, hint, iterations, cancellationToken), cancellationToken);
+    }
+}

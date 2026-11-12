@@ -1,0 +1,138 @@
+@using DotNet11Lab.Core.Labs.CSharp15
+@inject TimeProvider Clock
+
+<section class="section" id="closed">
+    <div class="section-title"><h2>2 · Closed hierarchies</h2><span class="badge badge-new">New in C# 15</span></div>
+    <p>
+        Marking a base class <code>closed</code> tells the compiler that every derived type lives in the same assembly. The
+        compiler therefore knows the complete list of subtypes and treats a <code>switch</code> that covers them all as
+        exhaustive, with no <code>_</code> arm. Unlike a union, the cases share a base type, so they can share members and data.
+        That fits state machines: an order is <em>always</em> exactly one of Draft, Submitted, Paid, Shipped or Cancelled.
+    </p>
+    <div style="margin-top:1.25rem"><CodeCompare OldSnippet="CSharp15.LegacyOrderStates" NewSnippet="CSharp15.OrderStates" /></div>
+
+    <DemoPanel Title="Order state machine" Id="closed-stepper"
+               Description="Send commands to an order. Allowed commands are highlighted; the others run too and show the rejection.">
+        <div class="grid grid-2">
+            <div>
+                <div class="small muted">Current state</div>
+                <div class="card card-pad" style="margin:.35rem 0 .75rem;display:flex;gap:.6rem;align-items:center;flex-wrap:wrap"><span class="badge @StateCss(_session.State)">@_session.State.GetType().Name</span><span class="mono small">@_session.State</span></div>
+                <div class="row" style="align-items:center">
+                    <button type="button" class="btn btn-sm @Css(nameof(AddLine))" @onclick="@(() => Send(new AddLine()))">AddLine</button>
+                    <button type="button" class="btn btn-sm @Css(nameof(Submit))" @onclick="@(() => Send(new Submit()))">Submit</button>
+                    <span class="row" style="gap:.3rem;align-items:center">
+                        <input type="number" step="0.01" @bind="_payAmount" style="width:7rem" aria-label="Payment amount" />
+                        <button type="button" class="btn btn-sm @Css(nameof(Pay))" @onclick="@(() => Send(new Pay(Math.Clamp(_payAmount, -1_000_000m, 1_000_000m))))">Pay</button>
+                    </span>
+                    <span class="row" style="gap:.3rem;align-items:center">
+                        <select @bind="_carrier" aria-label="Carrier">
+                            <option>ups</option><option>dhl</option><option>fedex</option>
+                        </select>
+                        <button type="button" class="btn btn-sm @Css(nameof(Ship))" @onclick="@(() => Send(new Ship(_carrier)))">Ship</button>
+                    </span>
+                    <button type="button" class="btn btn-sm @Css(nameof(Cancel))" @onclick="@(() => Send(new Cancel("Customer request")))">Cancel</button>
+                    <button type="button" class="btn btn-sm btn-ghost" @onclick="Reset">↺ Reset</button>
+                </div>
+                <p class="small muted" style="margin-top:.6rem">
+                    Allowed now: @(OrderStateMachine.AllowedCommands(_session.State) is { Count: > 0 } allowed ? string.Join(", ", allowed) : "nothing (terminal state)")
+                </p>
+            </div>
+            <div>
+                <div class="small muted">Transition history</div>
+                <div class="table-wrap" style="margin-top:.35rem;max-height:260px;overflow-y:auto">
+                    <table class="data">
+                        <thead><tr><th>#</th><th>Command</th><th>Outcome</th></tr></thead>
+                        <tbody>
+                            @if (_session.History.Count == 0)
+                            {
+                                <tr><td colspan="3" class="muted">No commands yet. Try Submit on the empty draft.</td></tr>
+                            }
+                            @for (var i = 0; i < _session.History.Count; i++)
+                            {
+                                var h = _session.History[i];
+                                <tr class="@(h.Accepted ? "row-ok" : "row-danger")">
+                                    <td class="num">@(i + 1)</td>
+                                    <td class="mono small">@h.Command</td>
+                                    <td class="small">@h.Outcome</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </DemoPanel>
+
+    <CodeBlock Snippet="CSharp15.Transition" Title="Transitions: nested exhaustive switches returning a union" />
+
+    <DemoPanel Title="What the compiler records" Id="closed-reflect" OnRun="InspectAsync" RunLabel="Inspect"
+               Description="Reads the attribute the compiler emits on the closed type, at runtime.">
+        <Result>
+            <div class="grid grid-3">
+                <MetricTile Label="IsAbstract" Value="@_isAbstract.ToString()" Sub="closed implies abstract" />
+                <MetricTile Label="Derived types" Value="@_derived.Count.ToString()" Sub="IsClosedTypeAttribute.DerivedTypes" />
+                <MetricTile Label="Same assembly" Value="@typeof(OrderState).Assembly.GetName().Name" Sub="where all of them must live" />
+            </div>
+            <div class="result-box" style="margin-top:.75rem">[IsClosedType(DerivedTypes = [@string.Join(", ", _derived)])] OrderState</div>
+        </Result>
+    </DemoPanel>
+
+    <Callout Kind="warn" Title="Compiler rules worth knowing">
+        <ul>
+            <li><code>closed</code> already means abstract: writing <code>closed abstract</code> is error CS9384, and it cannot be combined with <code>sealed</code> or <code>static</code>.</li>
+            <li>Derived types must be declared in the same assembly. Another project can use the type but not extend it.</li>
+            <li>It is not transitive: a non-closed intermediate class can be extended elsewhere. Mark intermediates <code>closed</code> too.</li>
+            <li>System.Text.Json can infer polymorphism from the closed list (<code>InferClosedTypePolymorphism</code>), shown in Lab 6.</li>
+        </ul>
+    </Callout>
+    <UsageGuidance>
+        <WhenToUse>
+            <ul>
+                <li>State machines and workflow steps (order, invoice, application lifecycle).</li>
+                <li>Domain events or commands whose subtypes share data such as an id or a timestamp.</li>
+                <li>Library types you want consumers to match on but not extend.</li>
+            </ul>
+        </WhenToUse>
+        <WhenToAvoid>
+            <ul>
+                <li>Plug-in style extensibility, where other assemblies must add subtypes.</li>
+                <li>Unrelated types that share nothing (a union is clearer).</li>
+                <li>Hierarchies spread across several assemblies.</li>
+            </ul>
+        </WhenToAvoid>
+    </UsageGuidance>
+</section>
+
+@code {
+    private OrderSession _session = null!;
+    private decimal _payAmount = 129.90m;
+    private string _carrier = "ups";
+    private bool _isAbstract;
+    private IReadOnlyList<string> _derived = [];
+
+    protected override void OnInitialized() => _session = new OrderSession(Clock);
+
+    private void Send(OrderCommand command)
+    {
+        if (_session.History.Count >= 200) _session.Reset();
+        _session.Execute(command);
+    }
+
+    private void Reset() => _session.Reset();
+
+    private string Css(string command) => OrderStateMachine.AllowedCommands(_session.State).Contains(command) ? "btn-primary" : "";
+
+    private static string StateCss(OrderState state) => state switch
+    {
+        Draft or Submitted => "badge-optin",
+        Paid => "badge-new",
+        Shipped => "badge-stable",
+        Cancelled => "badge-danger",
+    };
+
+    private Task InspectAsync(CancellationToken cancellationToken)
+    {
+        (_isAbstract, _derived) = OrderStateMachine.Describe(typeof(OrderState));
+        return Task.CompletedTask;
+    }
+}

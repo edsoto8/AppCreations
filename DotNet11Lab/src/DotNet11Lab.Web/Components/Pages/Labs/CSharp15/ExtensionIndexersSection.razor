@@ -1,0 +1,85 @@
+@using DotNet11Lab.Core.Labs.CSharp15
+
+<section class="section" id="extension-indexers">
+    <div class="section-title"><h2>4 · Extension indexers</h2><span class="badge badge-new">New in C# 15</span></div>
+    <p>
+        C# 14 introduced <code>extension(T receiver) { ... }</code> blocks with extension properties. C# 15 lets those blocks declare
+        indexers, so a type you do not own can get <code>order["SKU"]</code> syntax. The receiver parameter must be named, and
+        indexers can be overloaded like any other indexer.
+    </p>
+    <div style="margin-top:1.25rem"><CodeCompare OldSnippet="CSharp15.LegacyExtensionIndexer" NewSnippet="CSharp15.ExtensionIndexer" /></div>
+
+    <DemoPanel Title="Look up an order line" Id="ext-indexer" OnRun="LookupAsync" RunLabel="Look up"
+               Description="CustomerOrder has no indexer of its own; order[sku] binds to the extension indexer.">
+        <ChildContent>
+            <div class="table-wrap" style="margin-bottom:.75rem">
+                <table class="data">
+                    <thead><tr><th>SKU</th><th>Description</th><th class="num">Qty</th><th class="num">Unit price (USD)</th></tr></thead>
+                    <tbody>
+                        @foreach (var line in _order.Lines)
+                        {
+                            <tr><td class="mono">@line.Sku</td><td>@line.Description</td><td class="num">@line.Quantity</td><td class="num">@line.UnitPrice.ToString("N2")</td></tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            <div class="field">
+                <label for="sku">SKU (case-insensitive)</label>
+                <input id="sku" type="text" @bind="_sku" maxlength="40" style="width:14rem" />
+            </div>
+        </ChildContent>
+        <Result>
+            <div class="table-wrap">
+                <table class="data">
+                    <thead><tr><th>Expression</th><th>Result</th></tr></thead>
+                    <tbody>
+                        <tr><td><code>order["@_sku"]</code></td><td>@(_found?.ToString() ?? "null (no such line)")</td></tr>
+                        <tr><td><code>order.GetLine("@_sku")</code> <span class="badge badge-baseline">C# 14</span></td><td>@(_legacy?.ToString() ?? "null (no such line)")</td></tr>
+                        <tr><td><code>order[^1]</code></td><td>@_last</td></tr>
+                        <tr><td><code>pickList[1]</code></td><td>@_pick</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </Result>
+    </DemoPanel>
+
+    <Callout Kind="warn" Title="The instance indexer wins">
+        <p>
+            An extension indexer is only considered when the receiver has no applicable instance indexer. <code>PickList</code> declares
+            <code>this[int]</code>, so <code>pickList[1]</code> above returns the instance result even though an extension with the same
+            signature exists. Extensions add indexers; they never replace them.
+        </p>
+    </Callout>
+    <UsageGuidance>
+        <WhenToUse>
+            <ul>
+                <li>Natural keyed access on types you cannot change (SDK models, generated clients, interfaces like <code>IReadOnlyList&lt;T&gt;</code>).</li>
+                <li>Domain-specific lookups that read better than a method call (<code>order[sku]</code>, <code>ledger[date]</code>).</li>
+            </ul>
+        </WhenToUse>
+        <WhenToAvoid>
+            <ul>
+                <li>Expensive lookups: indexer syntax suggests O(1); a linear search over a large list surprises callers.</li>
+                <li>Types that already have an indexer with a compatible signature: the extension is silently ignored.</li>
+            </ul>
+        </WhenToAvoid>
+    </UsageGuidance>
+</section>
+
+@code {
+    private readonly CustomerOrder _order = SampleOrders.Create();
+    private readonly PickList _pickList = new(["KB-MX-01", "MN-27-4K", "DK-TB4"]);
+    private string _sku = "ms-erg-07";
+    private OrderLine? _found, _legacy;
+    private string _last = "", _pick = "";
+
+    private Task LookupAsync(CancellationToken cancellationToken)
+    {
+        _sku = (_sku ?? "").Trim();
+        _found = _order[_sku];
+        _legacy = _order.GetLine(_sku);
+        _last = _order[^1].ToString();
+        _pick = _pickList[1];
+        return Task.CompletedTask;
+    }
+}

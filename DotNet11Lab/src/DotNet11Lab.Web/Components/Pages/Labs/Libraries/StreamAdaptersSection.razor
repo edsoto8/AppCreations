@@ -1,0 +1,133 @@
+@using DotNet11Lab.Core.Labs.Libraries
+
+<section class="section" id="streams">
+    <div class="section-title"><h2>2 · Memory stream adapters</h2><span class="badge badge-new">New in .NET 11</span></div>
+    <p>
+        Many APIs only accept a <code>Stream</code> (hashing, parsers, upload clients, <code>JsonSerializer.DeserializeAsync</code>).
+        When the data is already in memory as a <code>ReadOnlyMemory&lt;byte&gt;</code> slice, a <code>string</code> or a multi-segment
+        <code>ReadOnlySequence&lt;byte&gt;</code> from a pipe, .NET 10 code usually copied it into a fresh array just to wrap it in a
+        <code>MemoryStream</code>. .NET 11 adds four adapters that read (or write) the memory in place:
+        <code>ReadOnlyMemoryStream</code>, <code>WritableMemoryStream</code>, <code>StringStream</code> and
+        <code>ReadOnlySequenceStream</code>.
+    </p>
+    <div style="margin-top:1.25rem"><CodeCompare OldSnippet="Libraries.LegacyMemoryStream" NewSnippet="Libraries.ReadOnlyMemoryStream" /></div>
+
+    <DemoPanel Title="Checksum a payload through a Stream: copy vs adapter" Id="streams-compare" OnRun="CompareAsync" Cancellable="true" RunLabel="Measure"
+               Description="SHA-256 over the same JSON payload via each route. Both routes must produce the same hash; the difference is what they allocate.">
+        <ChildContent>
+            <div class="row">
+                <div class="field"><label for="s-size">Payload KB (1–@(StreamAdapters.MaxPayloadBytes / 1024))</label><input id="s-size" type="number" @bind="_sizeKb" style="width:7rem" /></div>
+                <div class="field"><label for="s-it">Iterations (1–200)</label><input id="s-it" type="number" @bind="_iterations" style="width:6rem" /></div>
+            </div>
+        </ChildContent>
+        <Result>
+            @if (_comparisons.Count > 0)
+            {
+                <div class="table-wrap">
+                    <table class="data">
+                        <thead><tr><th>Source in memory</th><th class="num">MemoryStream + copy</th><th class="num">.NET 11 adapter</th><th class="num">Time (copy → adapter)</th><th>Same hash</th></tr></thead>
+                        <tbody>
+                            @foreach (var c in _comparisons)
+                            {
+                                <tr>
+                                    <td>@c.Scenario</td>
+                                    <td class="num">@Measure.FormatBytes(c.Previous.AllocatedBytesPerOp) / op</td>
+                                    <td class="num">@Measure.FormatBytes(c.New.AllocatedBytesPerOp) / op</td>
+                                    <td class="num">@Measure.FormatDuration(c.Previous.MeanMicroseconds) → @Measure.FormatDuration(c.New.MeanMicroseconds)</td>
+                                    <td>@if (c.SameBytes) { <span class="badge badge-stable">✔ @c.NewHash</span> } else { <span class="badge badge-danger">✘</span> }</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+                <div class="card card-pad" style="margin-top:1rem">
+                    <div class="small muted" style="margin-bottom:.5rem">Allocated per operation</div>
+                    <BarChart Items="@AllocationBars()" Legend="@([("MemoryStream + copy", 1), (".NET 11 adapter", 0)])" AriaLabel="Allocations per route" />
+                </div>
+                <p class="small muted" style="margin-top:.5rem">
+                    <code>StringStream</code> still encodes UTF-16 to UTF-8, but in small chunks while it is read instead of materializing the whole
+                    byte array. It writes no BOM/preamble even for an encoding that has one, and like <code>ReadOnlySequenceStream</code> it is
+                    forward-only (<code>CanSeek</code> is false).
+                </p>
+            }
+        </Result>
+    </DemoPanel>
+
+    <div style="margin-top:1.25rem"><CodeCompare OldSnippet="Libraries.LegacyWritableMemoryStream" NewSnippet="Libraries.WritableMemoryStream" /></div>
+    <DemoPanel Title="WritableMemoryStream: what happens at capacity?" Id="streams-writable" OnRun="WritableAsync" RunLabel="Write"
+               Description="Writes a record into a fixed window of a rented buffer. Try a record larger than the capacity.">
+        <ChildContent>
+            <div class="row">
+                <div class="field"><label for="w-cap">Capacity (bytes)</label><input id="w-cap" type="number" @bind="_capacity" style="width:7rem" /></div>
+                <div class="field"><label for="w-rec">Record size (bytes)</label><input id="w-rec" type="number" @bind="_record" style="width:7rem" /></div>
+            </div>
+        </ChildContent>
+        <Result>
+            <div class="grid grid-2">
+                <div>
+                    <div class="compare-label new">● WritableMemoryStream (.NET 11)</div>
+                    <ObservationTable Rows="_writable" />
+                </div>
+                <div>
+                    <div class="compare-label old">◌ MemoryStream over the array segment (.NET 10)</div>
+                    <ObservationTable Rows="_legacyWritable" />
+                </div>
+            </div>
+            <Callout Kind="warn" Title="Observed behaviour (verified by running)">
+                <ul>
+                    <li><code>Length</code> starts at the full capacity, not at 0, like <code>new MemoryStream(byte[])</code>. Call <code>SetLength(Position)</code> after writing if consumers rely on <code>Length</code>.</li>
+                    <li>A write that does not fit throws <code>NotSupportedException</code> and writes nothing: <code>Position</code> and the buffer are unchanged.</li>
+                    <li>Unlike <code>MemoryStream</code>, it accepts any <code>Memory&lt;byte&gt;</code>, including memory that is not array-backed.</li>
+                </ul>
+            </Callout>
+        </Result>
+    </DemoPanel>
+
+    <UsageGuidance>
+        <WhenToUse>
+            <ul>
+                <li>Handing in-memory data (pooled buffers, pipe sequences, strings) to Stream-only APIs on hot paths.</li>
+                <li>Large payloads, where the extra copy also costs a Large Object Heap allocation (≥ 85 000 bytes).</li>
+                <li>Writing into caller-provided buffers with a hard size limit.</li>
+            </ul>
+        </WhenToUse>
+        <WhenToAvoid>
+            <ul>
+                <li>The consumer needs to seek a <code>StringStream</code> or <code>ReadOnlySequenceStream</code>: both are forward-only.</li>
+                <li>The underlying memory may be returned to a pool or mutated while the stream is still being read: the adapter does not copy.</li>
+                <li>You need a growable stream: <code>WritableMemoryStream</code> never resizes.</li>
+            </ul>
+        </WhenToAvoid>
+    </UsageGuidance>
+</section>
+
+@code {
+    private int _sizeKb = 2048, _iterations = 20, _capacity = 64, _record = 100;
+    private IReadOnlyList<AdapterComparison> _comparisons = [];
+    private IReadOnlyList<StreamObservation> _writable = [], _legacyWritable = [];
+
+    private async Task CompareAsync(CancellationToken cancellationToken)
+    {
+        _sizeKb = Math.Clamp(_sizeKb, 1, StreamAdapters.MaxPayloadBytes / 1024);
+        _iterations = Math.Clamp(_iterations, 1, 200);
+        var (bytes, iterations) = (_sizeKb * 1024, _iterations);
+        _comparisons = await Task.Run(() => StreamAdapters.Compare(bytes, iterations, cancellationToken), cancellationToken);
+    }
+
+    private IReadOnlyList<BarChart.Bar> AllocationBars() => _comparisons
+        .SelectMany(c => new[]
+        {
+            new BarChart.Bar(c.Scenario + " · copy", c.Previous.AllocatedBytesPerOp, Measure.FormatBytes(c.Previous.AllocatedBytesPerOp), 1),
+            new BarChart.Bar(c.Scenario + " · adapter", c.New.AllocatedBytesPerOp, Measure.FormatBytes(c.New.AllocatedBytesPerOp), 0),
+        })
+        .ToList();
+
+    private Task WritableAsync(CancellationToken cancellationToken)
+    {
+        _capacity = Math.Clamp(_capacity, 1, 1 << 20);
+        _record = Math.Clamp(_record, 0, 1 << 20);
+        _writable = StreamAdapters.WriteIntoFixedBuffer(_capacity, _record);
+        _legacyWritable = StreamAdapters.LegacyWriteIntoFixedBuffer(_capacity, _record);
+        return Task.CompletedTask;
+    }
+}
