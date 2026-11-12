@@ -100,3 +100,27 @@ Docs: [Enumerable.FullJoin](https://learn.microsoft.com/dotnet/api/system.linq.e
 | Serilog.AspNetCore | 10.0.0 | |
 | OpenTelemetry | 1.21.0 | ASP.NET Core 11 emits activities natively. |
 | Dapper / Microsoft.Data.Sqlite | 2.1.89 / 11.0.0 | |
+
+## Behaviour discovered while building the labs
+
+Each item was confirmed by a compiler error, a test or a recorded run on .NET 11.0.0. The lab docs hold the details.
+
+| Area | Finding | Evidence |
+|---|---|---|
+| C# 15 unions | A `switch` with no `null` arm compiles without a warning and throws `SwitchExpressionException` for `default`. | Lab 1 test |
+| Collection arguments | `Dictionary<,> d = [with(comparer), ...]` → CS9215. `HashSet`, `SortedSet` and `ImmutableHashSet` accept `with(comparer)`. | Compiler |
+| Extension indexers | `List<int>["x"]` binds to an extension indexer; `"abc"[2L]` does not compile. | Compiler |
+| LINQ | `FullJoin` tuples are `(Outer, Inner)`, both nullable. Tuple `GroupJoin` returns `IGrouping<TOuter, TInner>`, not tuples. | Compiler + tests |
+| Streams | `WritableMemoryStream.Length` starts at full capacity, and a write that doesn't fit throws `NotSupportedException`. `StringStream`/`ReadOnlySequenceStream` are not seekable, and `StringStream` writes no BOM. | Lab 6 tests |
+| STJ | `EqualityComparer<T>.Create(keySelector)` takes a nullable input (`d => d?.Id`). | Compiler |
+| Minimal API validation | On a type implementing `IAsyncValidatableObject`, only `ValidateAsync` runs; the inherited sync `Validate` does not. | Lab 3 test |
+| Minimal API unions | In Development (`ThrowOnBadRequest`), a union body matching no case throws. Otherwise it returns a 400 `ValidationProblem`. | Lab 3 test |
+| OpenAPI | SSE item schemas: 3.2 writes `itemSchema`, 3.1 writes `x-oai-itemSchema`. Unions appear as `anyOf` without a discriminator in both. | Lab 3 test |
+| Blazor forms | Parameterless `EditContext.IsValidationPending()` stays false while a field-level async check is pending. Use the per-field overload. | Lab 4 bUnit test |
+| Blazor Virtualize | Analyzer BL0011 requires `ItemComparer` when `Virtualize` uses `ItemsProvider`. | Compiler |
+| Runtime async | Exception stack traces were identical in both compilation modes. Live stacks were shorter with runtime async (each method listed once). | Lab 7 recorded run |
+| BenchmarkDotNet 0.15.8 | No `CoreRuntime.Core11_0` (CS0117). `CreateForNewVersion` hits `NotImplementedException`. Worked around in `Net11Toolchain.cs`. | Compiler + run |
+| Debug builds | Async methods allocate extra in Debug (e.g. +48 B for a synchronously completing `ValueTask` call), so live numbers need `-c Release`. | Lab 5 run |
+| MEAI | `McpClientTool` derives from `AIFunction`. `FailoverChatClient`/`ReducingChatClient` are `[Experimental]` (MEAI001) and not used. | Compiler |
+| Blazor AI preview.7 | Depends on .NET 11 RC packages with advisory NU1902, so it is not referenced. | Restore |
+| `dotnet new mcpserver` | Ships in SDK 11.0.100 but pins ModelContextProtocol 2.1.0; this repo uses 2.4.0. | Template |
