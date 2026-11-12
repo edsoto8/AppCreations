@@ -1,0 +1,87 @@
+@* Interactive island #2: Virtualize over 100,000 rows with an ItemsProvider, debounced filtering and jump-to-row. *@
+@inherits TransactionExplorerBase
+
+<div class="island">
+    <RenderModeBadge Label="Explorer island" Assigned="AssignedRenderMode" />
+
+    <div class="row filters">
+        <div class="field grow">
+            <label for="vx-search">Search merchant, reference or note</label>
+            <input id="vx-search" type="search" value="@SearchText" maxlength="@TransactionQuery.MaxTextLength" placeholder="e.g. Pixel, TX-0420, refund"
+                   @oninput="async e => { SearchText = e.Value?.ToString() ?? string.Empty; await FilterChangedAsync(); }" />
+        </div>
+        <div class="field">
+            <label for="vx-category">Category</label>
+            <select id="vx-category" @onchange="async e => { Category = NullIfEmpty(e.Value); await FilterChangedAsync(); }">
+                <option value="">All</option>
+                @foreach (var c in TransactionDataset.AllCategories)
+                {
+                    <option value="@c">@c</option>
+                }
+            </select>
+        </div>
+        <div class="field">
+            <label for="vx-status">Status</label>
+            <select id="vx-status" @onchange="async e => { Status = Enum.TryParse<TransactionStatus>(e.Value?.ToString(), out var s) ? s : null; await FilterChangedAsync(); }">
+                <option value="">All</option>
+                @foreach (var s in Enum.GetValues<TransactionStatus>())
+                {
+                    <option value="@s">@s</option>
+                }
+            </select>
+        </div>
+        <div class="field">
+            <label for="vx-min">Min |amount|</label>
+            <input id="vx-min" type="number" min="0" max="100000" step="10" style="width:7rem"
+                   @onchange="async e => { MinAmount = decimal.TryParse(e.Value?.ToString(), out var m) && m > 0 ? Math.Min(m, 100_000) : null; await FilterChangedAsync(); }" />
+        </div>
+    </div>
+
+    <div class="row jump">
+        <div class="field">
+            <label for="vx-jump">Jump to row #</label>
+            <input id="vx-jump" type="number" min="1" max="@Current.Matches.Count" style="width:8rem" @bind="JumpTarget" />
+        </div>
+        <div class="field"><button type="button" class="btn btn-sm btn-primary" data-testid="jump" @onclick="JumpAsync">ScrollToItemAsync</button></div>
+        <div class="field small muted jump-msg" data-testid="jump-msg">@JumpMessage</div>
+    </div>
+
+    <VirtualizeStatsView Stats="Stats" Total="Data.Count" Matches="Current.Matches.Count" InitialIndex="InitialIndex" />
+
+    <div class="vlist" tabindex="0" data-testid="vlist">
+        <Virtualize @ref="List" TItem="Transaction" ItemsProvider="ProvideItemsAsync" ItemComparer="ById" ItemSize="46" InitialItemIndex="InitialIndex">
+            <ItemContent Context="t">
+                <div class="vrow @(t.Note is null ? "" : "has-note")" data-row="@t.Id">
+                    <span class="vid mono">#@t.Id.ToString("N0")</span>
+                    <span class="vdate mono">@t.Date.ToString("yyyy-MM-dd")</span>
+                    <span class="vmerchant"><strong>@t.Merchant</strong> <span class="muted small">@t.Category · @t.Country</span></span>
+                    <span class="vstatus"><span class="badge @StatusCss(t.Status)">@t.Status</span></span>
+                    <span class="vamount mono">@t.Amount.ToString("N2")</span>
+                    <button type="button" class="icon-btn btn-sm" title="Pin to the shared state container" @onclick="() => Pin(t)">Pin</button>
+                    @if (t.Note is not null)
+                    {
+                        <span class="vnote small muted">@t.Reference · @t.Note</span>
+                    }
+                </div>
+            </ItemContent>
+            <Placeholder>
+                <div class="vrow placeholder"><span class="muted small">loading…</span></div>
+            </Placeholder>
+            <EmptyContent>
+                <div class="vrow"><span class="muted">No transaction matches these filters.</span></div>
+            </EmptyContent>
+        </Virtualize>
+    </div>
+</div>
+
+@code {
+    private static string? NullIfEmpty(object? value) => value?.ToString() is { Length: > 0 } s ? s : null;
+
+    private static string StatusCss(TransactionStatus status) => status switch
+    {
+        TransactionStatus.Settled => "badge-stable",
+        TransactionStatus.Pending => "badge-optin",
+        TransactionStatus.Refunded => "badge-baseline",
+        _ => "badge-danger",
+    };
+}

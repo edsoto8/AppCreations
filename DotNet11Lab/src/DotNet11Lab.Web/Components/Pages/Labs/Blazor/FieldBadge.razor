@@ -1,0 +1,21 @@
+@using DotNet11Lab.Core.Labs.Blazor.Components
+
+@switch (State)
+{
+    case FieldState.Pending:
+        <span class="badge badge-optin field-state" data-state="pending"><span class="spinner"></span> checking…</span>
+        break;
+    case FieldState.Valid:
+        <span class="badge badge-stable field-state" data-state="valid">✓ valid</span>
+        break;
+    case FieldState.Invalid:
+        <span class="badge badge-danger field-state" data-state="invalid">✕ invalid</span>
+        break;
+    case FieldState.Faulted:
+        <span class="badge badge-experimental field-state" data-state="faulted">⚠ check failed</span>
+        break;
+}
+
+@code {
+    [Parameter] public FieldState State { get; set; }
+}

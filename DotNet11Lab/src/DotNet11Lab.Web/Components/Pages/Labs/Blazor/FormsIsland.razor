@@ -1,0 +1,22 @@
+@* Interactive island #1. The page around it is static SSR; this component is given @rendermode InteractiveServer. *@
+
+<div class="island">
+    <RenderModeBadge Label="Forms island" Assigned="AssignedRenderMode" />
+    <div class="grid grid-2" style="margin-top:.75rem">
+        <div class="card card-pad">
+            <div class="compare-label new">● .NET 11: async attributes in DataAnnotationsValidator</div>
+            <p class="small muted">Leave a field (or submit) and watch the per-field state from <code>EditContext.IsValidationPending</code>.
+                Lookups take @((int)AccountOptions.Latency.TotalMilliseconds) ms and stale ones are cancelled by the framework.</p>
+            <AsyncSignupForm />
+        </div>
+        <div class="card card-pad">
+            <div class="compare-label old">◌ .NET 10: manual checks in OnValidSubmit</div>
+            <p class="small muted">Only sync attributes run on change. Taken names are discovered after you press the button, one lookup at a time.</p>
+            <LegacySignupForm />
+        </div>
+    </div>
+</div>
+
+@code {
+    [Inject] private DotNet11Lab.Core.Labs.Blazor.AccountDirectoryOptions AccountOptions { get; set; } = default!;
+}

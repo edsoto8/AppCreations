@@ -1,0 +1,29 @@
+@using System.Globalization
+
+<div class="card card-pad summary" data-testid="@TestId">
+    <div class="summary-head"><strong>@Title</strong><span class="small muted">rendering now in: <b>@CurrentRenderer</b></span></div>
+    @if (Summary is null)
+    {
+        <p class="muted small"><span class="spinner"></span> loading the summary…</p>
+    }
+    else
+    {
+        <div class="grid grid-2 summary-grid">
+            <div><div class="metric-label">Transactions</div><div class="metric-value">@Summary.Transactions.ToString("N0")</div></div>
+            <div><div class="metric-label">Net volume</div><div class="metric-value">@Summary.Volume.ToString("N0", CultureInfo.InvariantCulture)</div></div>
+            <div><div class="metric-label">Disputed</div><div class="metric-value">@Summary.Disputed.ToString("N0")</div></div>
+            <div><div class="metric-label">Top category</div><div class="metric-value">@Summary.TopCategory</div></div>
+        </div>
+        <p class="small" style="margin:.6rem 0 0">
+            Data loaded while rendering in <span class="badge @(Summary.LoadedDuring == "Static" ? "badge-baseline" : "badge-optin")" data-testid="loaded-during">@Summary.LoadedDuring</span>
+            at @Summary.LoadedAt.ToString("HH:mm:ss.fff") UTC, query took @Summary.QueryMilliseconds.ToString("0") ms.
+        </p>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Title { get; set; } = "";
+    [Parameter] public DashboardSummary? Summary { get; set; }
+    [Parameter] public string CurrentRenderer { get; set; } = "";
+    [Parameter] public string? TestId { get; set; }
+}

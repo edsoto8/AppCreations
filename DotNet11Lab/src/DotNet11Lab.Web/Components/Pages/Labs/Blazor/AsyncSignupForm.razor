@@ -1,0 +1,49 @@
+@inherits AsyncSignupFormBase
+
+<EditForm EditContext="EditContext" OnValidSubmit="OnValidSubmitAsync" FormName="async-signup" class="signup" data-testid="async-form">
+    <DataAnnotationsValidator />
+
+    <div class="field">
+        <label for="as-username">Username <FieldBadge State="StateOf(() => Model.Username)" /></label>
+        <InputText id="as-username" @bind-Value="Model.Username" autocomplete="off" placeholder="try 'ada' (taken) or a new name" />
+        <ValidationMessage For="() => Model.Username" />
+    </div>
+    <div class="field">
+        <label for="as-email">Email <FieldBadge State="StateOf(() => Model.Email)" /></label>
+        <InputText id="as-email" type="email" @bind-Value="Model.Email" autocomplete="off" placeholder="grace@example.com is registered" />
+        <ValidationMessage For="() => Model.Email" />
+    </div>
+    <div class="field">
+        <label for="as-password">Password</label>
+        <InputText id="as-password" type="password" @bind-Value="Model.Password" autocomplete="new-password" />
+        <ValidationMessage For="() => Model.Password" />
+    </div>
+    <div class="field">
+        <label for="as-invite">Invite code (optional) <FieldBadge State="StateOf(() => Model.InviteCode)" /></label>
+        <InputText id="as-invite" @bind-Value="Model.InviteCode" autocomplete="off" placeholder="@InvitePlaceholder" />
+        <ValidationMessage For="() => Model.InviteCode" />
+    </div>
+
+    <div class="row">
+        <button type="submit" class="btn btn-primary btn-sm" disabled="@AnyValidationPending">
+            @if (AnyValidationPending)
+            {
+                <span class="spinner"></span><span>Validating…</span>
+            }
+            else
+            {
+                <span>Create account</span>
+            }
+        </button>
+        <button type="button" class="btn btn-sm" @onclick="Reset">Reset</button>
+        <span class="small muted">service lookups so far: @Accounts.Calls</span>
+    </div>
+    @if (Outcome is not null)
+    {
+        <div class="callout ok" style="margin-top:.75rem"><p>@Outcome</p></div>
+    }
+</EditForm>
+
+@code {
+    private const string InvitePlaceholder = "CONTOSO-2026 needs an @contoso.com email";
+}

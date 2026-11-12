@@ -1,0 +1,40 @@
+@page "/labs/blazor/quickgrid-static"
+@inject TransactionDataset Data
+
+@* No @rendermode: rendered once per request on the server (static SSR). No circuit, no WebSocket, no event handlers.
+   Sort headers and pager buttons are plain links in .NET 11, so the grid still pages and sorts. *@
+
+<PageTitle>QuickGrid (static SSR) · Blazor 11 · DotNet 11 Lab</PageTitle>
+
+<header class="lab-header">
+    <div class="lab-kicker"><a href="labs/blazor">Lab 04 · Blazor 11</a> · QuickGrid (static SSR)</div>
+    <h1>QuickGrid without interactivity</h1>
+    <p class="tagline">
+        This page has no render mode. In .NET 11 QuickGrid renders column headers and pager buttons as links carrying
+        <code>sort</code>, <code>direction</code> and <code>page</code>, so each click is an ordinary GET that the server renders, and
+        enhanced navigation swaps the new HTML in. Before .NET 11 these were buttons that did nothing without a circuit.
+    </p>
+    <RenderModeBadge Label="This page" Assigned="AssignedRenderMode" />
+    <p class="small" style="margin-top:.6rem">Interactive version with row clicks and a second grid: <a href="labs/blazor/quickgrid">QuickGrid (interactive)</a>.</p>
+</header>
+
+<section class="card card-pad">
+    <h2>@Data.Count.ToString("N0") transactions, @_pages.ItemsPerPage per page</h2>
+    <div class="grid-wrap" data-testid="static-grid">
+        <QuickGrid Items="_transactions" Pagination="_pages" Class="lab-grid">
+            <PropertyColumn Property="t => t.Id" Title="Id" IsDefaultSortColumn="true" Sortable="true" />
+            <PropertyColumn Property="t => t.Date" Title="Date" Format="yyyy-MM-dd" Sortable="true" />
+            <PropertyColumn Property="t => t.Merchant" Title="Merchant" Sortable="true" />
+            <PropertyColumn Property="t => t.Status" Title="Status" Sortable="true" />
+            <PropertyColumn Property="t => t.Amount" Title="Amount" Format="N2" Align="Align.End" Sortable="true" />
+        </QuickGrid>
+    </div>
+    <Paginator State="_pages" />
+</section>
+
+@code {
+    private readonly PaginationState _pages = new() { ItemsPerPage = 20 };
+    private IQueryable<Transaction> _transactions = default!;
+
+    protected override void OnInitialized() => _transactions = Data.Items.AsQueryable();
+}

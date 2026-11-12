@@ -1,0 +1,68 @@
+@* Interactive island #3: persistent component state across prerendering, and the circuit-scoped state container. *@
+@implements IDisposable
+@inject BlazorLabState LabState
+@inject SummaryLoader Loader
+
+<div class="island">
+    <RenderModeBadge Label="State island" Assigned="AssignedRenderMode" />
+    <div class="grid grid-2" style="margin-top:.75rem">
+        <PersistedSummaryCard />
+        <PlainSummaryCard />
+    </div>
+    <p class="small muted" style="margin-top:.6rem" data-testid="load-counters">
+        Process-wide summary loads so far: with persistence <b>@Loader.PersistedLoads</b>, without <b>@Loader.PlainLoads</b>.
+        Each page view adds 1 to the first (prerender only) and 2 to the second (prerender + interactive).
+    </p>
+
+    <div class="card card-pad" style="margin-top:1rem">
+        <div class="summary-head">
+            <strong>Circuit-scoped state container</strong>
+            <span class="small muted mono" data-testid="state-instance">BlazorLabState @LabState.InstanceId.ToString()[..8]</span>
+        </div>
+        <p class="small muted">Pin rows in the explorer or create accounts in the forms: those are other islands, but they share this circuit's scope and so this instance. A new tab gets a new instance.</p>
+        <div class="grid grid-2">
+            <div>
+                <div class="metric-label">Pinned transactions</div>
+                @if (LabState.Pinned.Count == 0)
+                {
+                    <p class="small muted">Nothing pinned yet.</p>
+                }
+                <ul class="plain-list" data-testid="pinned">
+                    @foreach (var t in LabState.Pinned)
+                    {
+                        <li class="small"><span class="mono">#@t.Id</span> @t.Merchant <span class="mono">@t.Amount.ToString("N2")</span></li>
+                    }
+                </ul>
+            </div>
+            <div>
+                <div class="metric-label">Activity</div>
+                @if (LabState.Activity.Count == 0)
+                {
+                    <p class="small muted">No activity yet.</p>
+                }
+                <ul class="plain-list" data-testid="activity">
+                    @foreach (var a in LabState.Activity)
+                    {
+                        <li class="small"><span class="mono muted">@a.At.ToString("HH:mm:ss")</span> <b>@a.Source</b> @a.Message</li>
+                    }
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    protected override void OnInitialized()
+    {
+        LabState.Changed += OnStateChanged;
+        if (RendererInfo.IsInteractive) Loader.Loaded += OnStateChanged;
+    }
+
+    private void OnStateChanged() => _ = InvokeAsync(StateHasChanged);
+
+    public void Dispose()
+    {
+        LabState.Changed -= OnStateChanged;
+        Loader.Loaded -= OnStateChanged;
+    }
+}

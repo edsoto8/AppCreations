@@ -1,0 +1,43 @@
+@inherits LegacySignupFormBase
+
+<EditForm EditContext="EditContext" OnValidSubmit="OnValidSubmitAsync" FormName="legacy-signup" class="signup" data-testid="legacy-form">
+    <DataAnnotationsValidator />
+
+    <div class="field">
+        <label for="ls-username">Username</label>
+        <InputText id="ls-username" @bind-Value="Model.Username" autocomplete="off" />
+        <ValidationMessage For="() => Model.Username" />
+    </div>
+    <div class="field">
+        <label for="ls-email">Email</label>
+        <InputText id="ls-email" type="email" @bind-Value="Model.Email" autocomplete="off" />
+        <ValidationMessage For="() => Model.Email" />
+    </div>
+    <div class="field">
+        <label for="ls-password">Password</label>
+        <InputText id="ls-password" type="password" @bind-Value="Model.Password" autocomplete="new-password" />
+        <ValidationMessage For="() => Model.Password" />
+    </div>
+    <div class="field">
+        <label for="ls-invite">Invite code (optional)</label>
+        <InputText id="ls-invite" @bind-Value="Model.InviteCode" autocomplete="off" />
+        <ValidationMessage For="() => Model.InviteCode" />
+    </div>
+    <div class="row">
+        <button type="submit" class="btn btn-sm" disabled="@Checking">
+            @if (Checking)
+            {
+                <span class="spinner"></span><span>Checking (hand-written)…</span>
+            }
+            else
+            {
+                <span>Create account</span>
+            }
+        </button>
+        <span class="small muted">no feedback until you submit</span>
+    </div>
+    @if (Outcome is not null)
+    {
+        <div class="callout ok" style="margin-top:.75rem"><p>@Outcome</p></div>
+    }
+</EditForm>
