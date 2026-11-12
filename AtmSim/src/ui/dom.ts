@@ -63,3 +63,25 @@ export function fmtTime(simMs: number): string {
   const ss = t % 60;
   return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`;
 }
+
+/**
+ * Two-step confirmation inside the page (browser dialogs such as confirm() are not available in every
+ * host): the first click arms the button and changes its label; a second click within 4 s runs the action.
+ */
+export function confirmClick(btn: HTMLElement, armedLabel: string, action: () => void): void {
+  if (btn.dataset.armed === '1') {
+    btn.dataset.armed = '';
+    btn.textContent = btn.dataset.label ?? btn.textContent;
+    action();
+    return;
+  }
+  btn.dataset.armed = '1';
+  btn.dataset.label = btn.textContent ?? '';
+  btn.textContent = armedLabel;
+  setTimeout(() => {
+    if (btn.dataset.armed === '1') {
+      btn.dataset.armed = '';
+      btn.textContent = btn.dataset.label ?? '';
+    }
+  }, 4000);
+}

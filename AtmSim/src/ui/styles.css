@@ -20,6 +20,7 @@
   font-size: 13px;
   color: var(--text);
   background: var(--bg);
+  color-scheme: dark;
 }
 
 * { box-sizing: border-box; }
@@ -28,7 +29,7 @@ button { font: inherit; color: inherit; }
 
 #app {
   display: grid;
-  height: 100vh;
+  height: 100%;
   grid-template-columns: 260px minmax(0, 1fr) 340px;
   grid-template-rows: 52px minmax(0, 1fr) auto;
   grid-template-areas:

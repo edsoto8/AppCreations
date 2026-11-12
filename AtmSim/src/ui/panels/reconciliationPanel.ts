@@ -1,6 +1,6 @@
 import type { Ctx } from '../context';
 import { formatCents } from '../../core/money';
-import { h, mount, fmtTime } from '../dom';
+import { h, mount, fmtTime, confirmClick } from '../dom';
 
 const DISCREPANCIES: Array<{ kind: 'missing-notes' | 'counter-error' | 'misloaded-note'; label: string; tip: string }> = [
   { kind: 'missing-notes', label: 'Notes missing from a cassette', tip: 'Physically remove notes without updating the counters (e.g. a miscounted replenishment).' },
@@ -102,7 +102,7 @@ export function renderReconciliation(ctx: Ctx, el: HTMLElement): void {
         'div',
         { class: 'chip-row', style: 'margin-top:8px' },
         h('button', { class: 'btn primary', id: 'close-day', onclick: () => { ctx.sys.recon.closeDay(); ctx.ui.toast('Business day closed: ending inventory becomes the new beginning inventory', 'ok'); ctx.ui.refresh(); } }, 'Close business day'),
-        h('button', { class: 'btn danger', onclick: () => { if (confirm('Reset the whole simulator to its initial training state?')) ctx.resetAll(); } }, 'Reset simulator'),
+        h('button', { class: 'btn danger', onclick: (e: Event) => confirmClick(e.currentTarget as HTMLElement, 'Click again to reset', () => ctx.resetAll()) }, 'Reset simulator'),
       ),
     ),
     h(

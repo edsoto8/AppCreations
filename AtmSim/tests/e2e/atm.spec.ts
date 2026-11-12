@@ -166,8 +166,8 @@ test('E6 reconciliation detects a discrepancy and reset restores the inventory',
   await page.locator('[data-discrepancy="missing-notes"]').click();
   await expect(page.locator('#recon-status')).toHaveAttribute('data-balanced', 'false');
   await page.screenshot({ path: 'test-results/e6-recon.png' });
-  page.once('dialog', (d) => d.accept());
   await page.locator('#btn-reset').click();
+  await page.locator('#btn-reset').click(); // in-page two-step confirmation
   await page.locator('[data-mode="reconciliation"]').click();
   await expect(page.locator('#recon-status')).toHaveAttribute('data-balanced', 'true');
   expect(errors).toEqual([]);

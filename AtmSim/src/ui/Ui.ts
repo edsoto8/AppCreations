@@ -3,7 +3,7 @@ import { MODES } from './context';
 import type { ComponentId, Card } from '../core/types';
 import { componentInfo } from '../knowledge/components';
 import { VIEW_MODES } from '../scene/ViewModes';
-import { h, mount, rafThrottle } from './dom';
+import { h, mount, rafThrottle, confirmClick } from './dom';
 import { renderDetails, renderTransaction, renderCash, renderEvents, componentList } from './panels/basicPanels';
 import { renderNetwork } from './panels/networkPanel';
 import { renderMaintenance } from './panels/maintenancePanel';
@@ -72,10 +72,8 @@ export class Ui implements UiApi {
       quality.textContent = `Quality: ${q[0].toUpperCase()}${q.slice(1)}`;
       this.toast(`Visual quality: ${q}${q === 'low' ? ' (no shadows/outlines, lower resolution)' : ''}`);
     });
-    document.getElementById('btn-reset')!.addEventListener('click', () => {
-      if (!confirm('Reset the simulator to its initial training state? Ledger, cash, faults and journals are restored.')) return;
-      ctx.resetAll();
-    });
+    const resetBtn = document.getElementById('btn-reset')!;
+    resetBtn.addEventListener('click', () => confirmClick(resetBtn, 'Click again to reset', () => ctx.resetAll()));
 
     // events that change what the panels show
     const bus = ctx.bus;
