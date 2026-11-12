@@ -145,6 +145,6 @@ head, `m4_*` reactor, `pose_*` animation frames) and the matching scenes in `che
 - Wing membranes are treated as projected energy fields: they are switched off while the wing is folded
   rather than being simulated as folding cloth.
 - The `chest` bone exists for structure but is not animated; the torso hull is rigid.
-- The animation was rendered at 768×432 with 16 samples and denoising to fit a 4-core CPU budget, so it
+- The animation was rendered at 768×432 with 12 samples and denoising to fit a 4-core CPU budget, so it
   is softer than the 1080p stills. `render_final.py anim` can re-render at any size.
 - Scale figures and hangar props are deliberately simple; modelling effort went into the dragon.
