@@ -40,6 +40,8 @@ export class Stage {
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.05;
+    // Count draw calls across all passes of a frame (composer passes would otherwise reset it).
+    this.renderer.info.autoReset = false;
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
     this.renderer.domElement.style.display = 'block';
@@ -155,6 +157,7 @@ export class Stage {
   }
 
   render(): void {
+    this.renderer.info.reset();
     if (this.composer) this.composer.render();
     else this.renderer.render(this.scene, this.camera);
   }

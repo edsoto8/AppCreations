@@ -6,3 +6,4 @@ Different App Creations for all types of Technology
 | [SkyHop](SkyHop/) | Endless tap-to-flap arcade game (Blazor WebAssembly) |
 | [StepRecorder](StepRecorder/) | Windows system-tray step recorder (WPF) |
 | [BoardFlow](BoardFlow/) | Local-first Trello-style project board (Avalonia, SQLite) |
+| [RoboVacSim](RoboVacSim/) | 3D autonomous robot-vacuum simulator with LiDAR mapping, path planning and docking (Three.js, TypeScript) |
