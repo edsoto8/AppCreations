@@ -25,10 +25,10 @@ export const ROBOT = {
   mainBrushX: -0.02,
   mainBrushWidth: 0.22,
   mainBrushLength: 0.055,
-  /** Side brush on the front-right corner. */
-  sideBrushX: 0.115,
-  sideBrushZ: -0.105,
-  sideBrushRadius: 0.075,
+  /** Side brush on the front-right corner; its bristles reach ~3 cm past the shell to sweep wall edges. */
+  sideBrushX: 0.11,
+  sideBrushZ: -0.115,
+  sideBrushRadius: 0.09,
   /** Two rotating mop pads at the rear. */
   mopX: -0.1,
   mopZ: 0.068,
