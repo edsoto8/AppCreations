@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ATM Training Simulator</title>
+    <meta name="description" content="Interactive 3D ATM training simulator — fictional bank, accounts and training currency." />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='6' y='2' width='20' height='28' rx='3' fill='%2327b4a6'/%3E%3Crect x='9' y='5' width='14' height='9' rx='1' fill='%230b1220'/%3E%3C/svg%3E" />
+  </head>
+  <body>
+    <div id="app">
+      <header id="topbar">
+        <div class="brand">
+          <span class="logo"></span>
+          <div>
+            <div class="brand-title">ATM Training Simulator</div>
+            <div class="brand-sub">Meridian Training Bank · fictional accounts &amp; training currency</div>
+          </div>
+        </div>
+        <nav id="mode-tabs" aria-label="Simulator modes"></nav>
+        <div class="top-actions">
+          <button id="btn-quality" class="ghost" title="Visual quality">Quality: High</button>
+          <button id="btn-mute" class="ghost" title="Mute / unmute sound">🔊 Sound</button>
+          <button id="btn-reset" class="ghost danger" title="Reset the simulator to its initial training state">Reset</button>
+        </div>
+      </header>
+      <aside id="left-panel" class="panel"></aside>
+      <main id="viewport">
+        <canvas id="three-canvas" tabindex="0" aria-label="3D ATM viewport"></canvas>
+        <div id="viewport-overlays"></div>
+      </main>
+      <aside id="right-panel" class="panel"></aside>
+      <footer id="timeline"></footer>
+    </div>
+    <div id="tooltip" role="tooltip"></div>
+    <script type="module" src="/src/app/main.ts"></script>
+  </body>
+</html>
