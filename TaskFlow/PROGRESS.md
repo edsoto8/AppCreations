@@ -9,7 +9,7 @@
 | 5 | Local data storage | Done |
 | 6 | UI improvements | Done |
 | 7 | Testing and code quality | Done |
-| 8 | Final review | Not started |
+| 8 | Final review | Done |
 
 ## Milestone 1 — Environment and first application
 
@@ -97,3 +97,39 @@
   serializer skips property initializers, and then collapsed into one task. They now get fresh ids.
 - Verified in the running app: forced save failure → error shown in the editor, text kept, list unchanged after
   Cancel. WebAssembly: ran in headless Chromium; add + page reload kept the task (IndexedDB).
+
+## Milestone 8 — Final review
+
+| Check | Result |
+|---|---|
+| Clean build `net10.0-desktop` Debug / Release, `net10.0-browserwasm` Debug | 0 warnings, 0 errors (warnings are errors) |
+| `dotnet test` (whole solution) | 96 passed, 0 failed, 0 skipped |
+| `dotnet format --verify-no-changes` (Core, Tests) | Clean |
+| Dependencies | Core: CommunityToolkit.Mvvm 8.4.2, Microsoft.Extensions.Logging.Abstractions 10.0.14. Tests: xunit.v3 4.0.3. App: Uno.Sdk 7.0.5 implicit packages (`UnoFeatures`: Skia only). No third-party packages. |
+| Separation of concerns | No `Microsoft.UI`, `Windows.UI`, `Uno`, `Visibility` or brush types anywhere in `TaskFlow.Core` |
+| Persistence | Verified in the running app: save, restart reload, corrupt-file backup, save failure rollback, time zones |
+| Desktop workflows (Release build) | Launched; light/dark/narrow screenshots in `docs/screenshots/` |
+
+### What was and was not verified
+
+| Verified here (Linux container) | Not verified |
+|---|---|
+| Desktop app on Linux X11 (Xvfb + openbox + D-Bus), Debug and Release | Running on a real **macOS** or **Windows** machine (same `net10.0-desktop` build; expected to work per Uno docs) |
+| Add / edit / complete / delete / filter / sort / validation / dialogs / keyboard shortcuts / theme / responsive layout, driven with `xdotool` | Screen readers (accessible names were set but not heard) |
+| JSON persistence, recovery and save-failure handling | Default data path on macOS/Windows (taken from Uno docs) |
+| WebAssembly in headless Chromium, including persistence across reload | Startup-error screen (code path not triggered) |
+| Due dates at UTC+13 and UTC−8 | XAML Hot Reload (needs an IDE + Uno account) |
+
+## Remaining work / ideas
+
+Version 1 scope is complete. Suggested follow-ups (details in LEARNING.md, "Where to go next"): search, undo
+delete, tags with a v2 file format, due-date reminders, an Android/iOS head.
+
+## Environment notes (for reproducing this build)
+
+- The container had no .NET SDK. `dot.net`/`builds.dotnet.microsoft.com` were blocked by the network policy, so
+  the SDK came from Ubuntu's `dotnet-sdk-10.0` package (10.0.115). `platform.uno` was blocked too; Uno's docs
+  were read from their source in the `unoplatform/uno` repository.
+- Ubuntu's SDK has no default NuGet feed for `dotnet new install`; the template package was downloaded from
+  nuget.org and installed from the file.
+- `dotnet workload install wasm-tools` was needed for the WebAssembly target.

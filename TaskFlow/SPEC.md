@@ -10,7 +10,7 @@ network access.
 | macOS desktop (primary) | `net10.0-desktop` | Builds; same build verified running on Linux X11. Not run on a Mac here. |
 | Windows desktop | `net10.0-desktop` | Same build; not run on Windows here. |
 | Linux desktop | `net10.0-desktop` | Built, run and exercised end to end (Xvfb + openbox). |
-| WebAssembly (optional) | `net10.0-browserwasm` | Builds; see PROGRESS.md for run status. |
+| WebAssembly (optional) | `net10.0-browserwasm` | Built and run in headless Chromium: add, save, reload verified. |
 | Android / iOS (future) | — | Not configured. All logic is in `TaskFlow.Core`, so adding heads needs no rewrite. |
 
 ## Data model

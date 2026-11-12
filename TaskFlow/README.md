@@ -9,6 +9,10 @@ learning project for Uno Platform. One C#/XAML codebase runs on **macOS, Windows
 - Saved automatically as a local JSON file; survives restarts; corrupt files are backed up, never lost
 - Light, Dark or System theme, responsive layout, keyboard shortcuts, accessible names on every button
 
+| Light | Dark | Narrow window |
+|---|---|---|
+| ![Main page, light theme](docs/screenshots/main-light.png) | ![Main page, dark theme](docs/screenshots/main-dark.png) | ![Narrow layout](docs/screenshots/main-narrow-dark.png) |
+
 New to Uno? Start with [LEARNING.md](LEARNING.md). The design is explained in [ARCHITECTURE.md](ARCHITECTURE.md),
 the feature list and acceptance criteria are in [SPEC.md](SPEC.md), and milestone status is in [PROGRESS.md](PROGRESS.md).
 
