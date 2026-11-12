@@ -1,0 +1,56 @@
+@page "/"
+@using System.Runtime.InteropServices
+
+<PageTitle>DotNet 11 Lab</PageTitle>
+
+<section class="hero">
+    <div class="lab-kicker">Interactive laboratory</div>
+    <h1>Why .NET 11 matters, one experiment at a time.</h1>
+    <p>
+        Nine labs that run real code on the runtime serving this page: C# 15 unions and closed hierarchies, LINQ
+        <code>FullJoin</code> reconciliation, async validation, Blazor virtualization, Zstandard, runtime async,
+        Native AOT and AI. Every code sample is read from the compiled assemblies, and every number is measured.
+    </p>
+    <div class="row" style="margin-top:1rem">
+        <a class="btn btn-primary" href="labs/csharp15">Start with C# 15 →</a>
+        <a class="btn" href="features">Feature matrix</a>
+    </div>
+</section>
+
+<div class="grid grid-4">
+    <MetricTile Label="Runtime" Value="@Environment.Version.ToString()" Sub="@RuntimeInformation.FrameworkDescription" />
+    <MetricTile Label="Labs" Value="@LabCatalog.Labs.Count.ToString()" Sub="interactive laboratories" />
+    <MetricTile Label="Features" Value="@AllFeatures.Count(f => f.NewInDotNet11).ToString()" Sub="new in .NET 11 / C# 15" />
+    <MetricTile Label="Experimental" Value="@AllFeatures.Count(f => f.Status == FeatureStatus.Experimental).ToString()" Sub="isolated from stable code" />
+</div>
+
+<div class="section">
+    <div class="section-title"><h2>Laboratories</h2></div>
+    <div class="grid grid-3">
+        @foreach (var lab in LabCatalog.Labs)
+        {
+            <a class="card lab-card" href="@lab.Route.TrimStart('/')">
+                <div class="lab-card-top">
+                    <span class="lab-card-icon">@lab.Icon</span>
+                    <strong>@lab.Title</strong>
+                    <span class="lab-card-num">@lab.Number.ToString("00")</span>
+                </div>
+                <p>@lab.Tagline</p>
+                <div class="feature-pills" style="margin-top:.25rem">
+                    @foreach (var group in lab.Features.GroupBy(f => f.Status))
+                    {
+                        <span class="small muted">@group.Count() ×</span><StatusBadge Status="group.Key" />
+                    }
+                </div>
+            </a>
+        }
+    </div>
+</div>
+
+<div class="section">
+    <FeatureTable />
+</div>
+
+@code {
+    private static IReadOnlyList<FeatureInfo> AllFeatures => LabCatalog.Labs.SelectMany(l => l.Features).ToList();
+}

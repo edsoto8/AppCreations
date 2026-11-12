@@ -1,0 +1,20 @@
+<Project>
+  <PropertyGroup>
+    <TargetFramework>net11.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <!-- C# 15 is the default for net11.0; pinned explicitly so the lab never silently drifts to 'preview'. -->
+    <LangVersion>15</LangVersion>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <InvariantGlobalization>false</InvariantGlobalization>
+  </PropertyGroup>
+
+  <!--
+    Projects that set EmbedLabSources=true ship their own .cs files as embedded resources so the dashboard
+    shows the exact code that runs. Snippets are delimited by '// <snippet:Id>' and '// </snippet:Id>'.
+  -->
+  <ItemGroup Condition="'$(EmbedLabSources)' == 'true'">
+    <EmbeddedResource Include="**/*.cs" Exclude="bin/**;obj/**" LogicalName="labsrc/$(MSBuildProjectName)/%(RecursiveDir)%(Filename)%(Extension)" />
+  </ItemGroup>
+</Project>

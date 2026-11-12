@@ -1,0 +1,24 @@
+<div class="section-title"><h2>Compatibility</h2><span class="muted small">What requires .NET 11, and how ready it is</span></div>
+<div class="table-wrap">
+    <table class="data">
+        <thead>
+            <tr><th>Feature</th><th>Lab</th><th>Status</th><th>New in 11</th><th>Summary</th><th>Docs</th></tr>
+        </thead>
+        <tbody>
+            @foreach (var lab in LabCatalog.Labs)
+            {
+                @foreach (var f in lab.Features)
+                {
+                    <tr>
+                        <td><strong>@f.Name</strong></td>
+                        <td><a href="@lab.Route.TrimStart('/')">@lab.Number.ToString("00") @lab.Title</a></td>
+                        <td><StatusBadge Status="f.Status" /></td>
+                        <td>@(f.NewInDotNet11 ? "✔" : "—")</td>
+                        <td class="muted">@f.Summary</td>
+                        <td><a href="@f.Docs.Url" target="_blank" rel="noopener">@f.Docs.Title ↗</a></td>
+                    </tr>
+                }
+            }
+        </tbody>
+    </table>
+</div>

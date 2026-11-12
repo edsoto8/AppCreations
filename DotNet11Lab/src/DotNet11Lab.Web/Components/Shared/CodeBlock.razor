@@ -1,0 +1,59 @@
+@using DotNet11Lab.Core.Source
+@inject SourceCatalog Sources
+
+<div class="code @(Scroll ? "scroll" : "")">
+    <div class="code-head">
+        <span class="code-title">@(Title ?? _snippet?.Id ?? Language)</span>
+        @if (_snippet is not null)
+        {
+            <span title="Embedded from the compiled assembly">@_snippet.File</span>
+        }
+        <button type="button" class="icon-btn btn-sm copy" onclick="dotnet11lab.copyCode(this)">Copy</button>
+    </div>
+    <pre><code>@if (Language == "csharp")
+{
+    @foreach (var t in _tokens)
+    {
+        if (t.Kind == TokenKind.Plain) { @t.Text } else { <span class="@Css(t.Kind)">@t.Text</span> }
+    }
+}
+else
+{
+    @_code
+}</code></pre>
+</div>
+
+@code {
+    /// <summary>Id of a snippet embedded from compiled source (preferred: guarantees shown code is real).</summary>
+    [Parameter] public string? Snippet { get; set; }
+    /// <summary>Literal code, for output such as JSON or shell commands.</summary>
+    [Parameter] public string? Code { get; set; }
+    [Parameter] public string? Title { get; set; }
+    [Parameter] public string Language { get; set; } = "csharp";
+    [Parameter] public bool Scroll { get; set; } = true;
+
+    private SourceSnippet? _snippet;
+    private string _code = "";
+    private IReadOnlyList<Token> _tokens = [];
+
+    protected override void OnParametersSet()
+    {
+        _snippet = Snippet is null ? null : Sources.Get(Snippet);
+        _code = _snippet?.Code ?? Code ?? "";
+        _tokens = Language == "csharp" ? CSharpHighlighter.Tokenize(_code) : [];
+    }
+
+    private static string Css(TokenKind kind) => kind switch
+    {
+        TokenKind.Keyword => "tk-kw",
+        TokenKind.ContextualKeyword => "tk-ckw",
+        TokenKind.Type => "tk-type",
+        TokenKind.String => "tk-str",
+        TokenKind.Comment => "tk-com",
+        TokenKind.Number => "tk-num",
+        TokenKind.Attribute => "tk-attr",
+        TokenKind.Method => "tk-method",
+        TokenKind.Preprocessor => "tk-pre",
+        _ => "",
+    };
+}

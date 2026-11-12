@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Multi-targets net10.0 and net11.0 so BenchmarkDotNet runs identical workloads on each runtime.
+    Does not reference DotNet11Lab.Core (net11-only, C# 15) - workloads here compile for both TFMs.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework></TargetFramework>
+    <TargetFrameworks>net11.0;net10.0</TargetFrameworks>
+    <LangVersion>latest</LangVersion>
+    <Optimize>true</Optimize>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="BenchmarkDotNet" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(TargetFramework)' == 'net11.0'">
+    <ProjectReference Include="..\..\experimental\DotNet11Lab.RuntimeAsync\DotNet11Lab.RuntimeAsync.csproj" />
+  </ItemGroup>
+</Project>

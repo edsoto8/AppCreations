@@ -1,0 +1,14 @@
+<div class="card metric">
+    <div class="metric-label">@Label</div>
+    <div class="metric-value">@Value</div>
+    @if (Sub is not null)
+    {
+        <div class="metric-sub">@Sub</div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Label { get; set; } = "";
+    [Parameter, EditorRequired] public string Value { get; set; } = "";
+    [Parameter] public string? Sub { get; set; }
+}

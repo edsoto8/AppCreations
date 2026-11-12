@@ -1,0 +1,28 @@
+<PageTitle>@Lab.Title · DotNet 11 Lab</PageTitle>
+
+<header class="lab-header">
+    <div class="lab-kicker">Lab @Lab.Number.ToString("00") · @Lab.Category</div>
+    <h1>@Lab.Icon @Lab.Title</h1>
+    <p class="tagline">@Lab.Tagline</p>
+    <div class="feature-pills">
+        @foreach (var f in Lab.Features)
+        {
+            <a class="badge badge-baseline" href="@f.Docs.Url" target="_blank" rel="noopener" title="@f.Summary">
+                @f.Name
+                <StatusBadge Status="f.Status" />
+                @if (f.NewInDotNet11)
+                {
+                    <span class="badge badge-new">New in 11</span>
+                }
+            </a>
+        }
+    </div>
+    @ChildContent
+</header>
+
+@code {
+    [Parameter, EditorRequired] public string Slug { get; set; } = "";
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    private LabInfo Lab => LabCatalog.Get(Slug);
+}

@@ -1,0 +1,37 @@
+@inherits LayoutComponentBase
+@using System.Runtime.InteropServices
+
+<div class="shell">
+    <aside class="sidebar">
+        <a class="brand" href="">
+            <span class="brand-mark">11</span>
+            <span>
+                <span class="brand-title">DotNet 11 Lab</span><br />
+                <span class="brand-sub">.NET 11 · C# 15 · ASP.NET Core 11</span>
+            </span>
+        </a>
+        <NavMenu />
+        <div class="sidebar-foot">
+            <div><span class="badge badge-stable">Stable</span> <span class="badge badge-optin">Opt-in</span></div>
+            <div style="margin-top:.35rem"><span class="badge badge-experimental">Experimental</span> <span class="badge badge-baseline">Baseline</span></div>
+        </div>
+    </aside>
+    <div class="main">
+        <header class="topbar">
+            <span class="chip"><span class="dot"></span>@RuntimeInformation.FrameworkDescription</span>
+            <span class="chip">@RuntimeInformation.OSDescription.Split(' ', 2)[0] · @RuntimeInformation.ProcessArchitecture</span>
+            <span class="topbar-spacer"></span>
+            <a class="chip" href="openapi/v1.json" target="_blank">OpenAPI</a>
+            <button class="icon-btn" type="button" onclick="dotnet11lab.toggleTheme()" title="Toggle light/dark theme" aria-label="Toggle theme">◐ Theme</button>
+        </header>
+        <main class="content">
+            @Body
+        </main>
+    </div>
+</div>
+
+<div id="blazor-error-ui" data-nosnippet>
+    An unhandled error has occurred.
+    <a href="." class="reload">Reload</a>
+    <span class="dismiss">🗙</span>
+</div>

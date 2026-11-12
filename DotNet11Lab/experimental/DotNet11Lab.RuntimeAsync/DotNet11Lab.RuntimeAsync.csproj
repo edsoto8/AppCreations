@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    EXPERIMENTAL / OPT-IN: Runtime Async is enabled for THIS assembly only. Roslyn then emits async methods
+    flagged MethodImplAttributes.Async (no compiler-generated IAsyncStateMachine). Nothing else in the solution
+    sets this feature. See FEATURE_MATRIX.md and LEARNING_GUIDE.md (Lab 7).
+  -->
+  <PropertyGroup>
+    <Features>$(Features);runtime-async=on</Features>
+    <EmbedLabSources>true</EmbedLabSources>
+  </PropertyGroup>
+</Project>

@@ -1,0 +1,37 @@
+@if (Legend.Count > 0)
+{
+    <div class="legend">
+        @foreach (var (name, series) in Legend)
+        {
+            <span><span class="legend-swatch bar-fill @SeriesCss(series)"></span>@name</span>
+        }
+    </div>
+}
+<div class="bar-chart" role="img" aria-label="@AriaLabel">
+    @foreach (var item in Items)
+    {
+        <div class="bar-row">
+            <span class="bar-label" title="@item.Label">@item.Label</span>
+            <span class="bar-track"><span class="bar-fill @SeriesCss(item.Series)" style="width:@Width(item.Value)%; display:block"></span></span>
+            <span class="bar-value">@item.Display</span>
+        </div>
+    }
+</div>
+
+@code {
+    public sealed record Bar(string Label, double Value, string Display, int Series = 0);
+
+    [Parameter, EditorRequired] public IReadOnlyList<Bar> Items { get; set; } = [];
+    [Parameter] public double? Max { get; set; }
+    [Parameter] public IReadOnlyList<(string Name, int Series)> Legend { get; set; } = [];
+    [Parameter] public string AriaLabel { get; set; } = "Bar chart";
+
+    private string Width(double value)
+    {
+        var max = Max ?? (Items.Count == 0 ? 1 : Items.Max(i => i.Value));
+        var pct = max <= 0 ? 0 : Math.Clamp(value / max * 100, value > 0 ? 0.5 : 0, 100);
+        return pct.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
+    }
+
+    private static string SeriesCss(int series) => series switch { 1 => "series-b", 2 => "series-c", _ => "" };
+}

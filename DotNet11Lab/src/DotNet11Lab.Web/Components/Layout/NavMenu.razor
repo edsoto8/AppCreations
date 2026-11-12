@@ -1,0 +1,17 @@
+@using DotNet11Lab.Core.Catalog
+
+<nav>
+    <NavLink class="nav-link" href="" Match="NavLinkMatch.All"><span class="nav-icon">⌂</span>Dashboard</NavLink>
+    @foreach (var group in LabCatalog.Labs.GroupBy(l => l.Category))
+    {
+        <div class="nav-group-title">@group.Key</div>
+        @foreach (var lab in group)
+        {
+            <NavLink class="nav-link" href="@lab.Route.TrimStart('/')">
+                <span class="nav-icon">@lab.Icon</span>@lab.Title<span class="nav-num">@lab.Number.ToString("00")</span>
+            </NavLink>
+        }
+    }
+    <div class="nav-group-title">Reference</div>
+    <NavLink class="nav-link" href="features"><span class="nav-icon">▦</span>Feature matrix</NavLink>
+</nav>

@@ -1,0 +1,101 @@
+@using System.Diagnostics
+@implements IDisposable
+
+<section class="card demo" id="@Id">
+    <div class="demo-head">
+        <div>
+            <h2>@Title</h2>
+            @if (Description is not null)
+            {
+                <div class="desc">@Description</div>
+            }
+        </div>
+        @if (OnRun is not null)
+        {
+            <div class="demo-actions">
+                @if (_running && Cancellable)
+                {
+                    <button type="button" class="btn btn-sm" @onclick="Cancel">Cancel</button>
+                }
+                <button type="button" class="btn btn-primary btn-sm" disabled="@(_running || Disabled)" @onclick="RunAsync">
+                    @if (_running) { <span class="spinner"></span> } else { <span>▶</span> }
+                    @RunLabel
+                </button>
+            </div>
+        }
+    </div>
+    <div class="demo-body">
+        @ChildContent
+        @if (_error is not null)
+        {
+            <div class="callout danger"><div class="callout-title">@_error.GetType().Name</div><p class="mono small">@_error.Message</p></div>
+        }
+        @if (_hasRun && Result is not null && _error is null)
+        {
+            <div class="demo-result">
+                @Result
+                <div class="result-meta">ran in @Measure.FormatDuration(_elapsed.TotalMicroseconds) · @_ranAt.ToString("HH:mm:ss")</div>
+            </div>
+        }
+    </div>
+</section>
+
+@code {
+    [Parameter, EditorRequired] public string Title { get; set; } = "";
+    [Parameter] public string? Description { get; set; }
+    [Parameter] public string? Id { get; set; }
+    [Parameter] public string RunLabel { get; set; } = "Run";
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public bool Cancellable { get; set; }
+    /// <summary>Executes the demonstration. Receives a token that is cancelled by the Cancel button or on dispose.</summary>
+    [Parameter] public Func<CancellationToken, Task>? OnRun { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    /// <summary>Rendered after a successful run.</summary>
+    [Parameter] public RenderFragment? Result { get; set; }
+
+    private bool _running, _hasRun;
+    private Exception? _error;
+    private TimeSpan _elapsed;
+    private DateTime _ranAt;
+    private CancellationTokenSource? _cts;
+
+    private async Task RunAsync()
+    {
+        if (OnRun is null) return;
+        _running = true;
+        _error = null;
+        _cts?.Dispose();
+        _cts = new CancellationTokenSource();
+        using var activity = LabTelemetry.Source.StartActivity($"demo {Title}");
+        LabTelemetry.DemoRuns.Add(1, new KeyValuePair<string, object?>("demo", Title));
+        var sw = Stopwatch.StartNew();
+        try
+        {
+            await OnRun(_cts.Token);
+            _hasRun = true;
+        }
+        catch (OperationCanceledException) when (_cts.IsCancellationRequested)
+        {
+            _error = new OperationCanceledException("The demonstration was cancelled.");
+        }
+        catch (Exception ex)
+        {
+            _error = ex;
+            activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
+        }
+        finally
+        {
+            _elapsed = sw.Elapsed;
+            _ranAt = DateTime.Now;
+            _running = false;
+        }
+    }
+
+    private void Cancel() => _cts?.Cancel();
+
+    public void Dispose()
+    {
+        _cts?.Cancel();
+        _cts?.Dispose();
+    }
+}

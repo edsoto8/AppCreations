@@ -1,0 +1,22 @@
+<div class="compare">
+    <div>
+        <div class="compare-label old">◌ @OldLabel</div>
+        <CodeBlock Snippet="@OldSnippet" Code="@OldCode" Title="@OldTitle" Language="@Language" />
+    </div>
+    <div>
+        <div class="compare-label new">● @NewLabel</div>
+        <CodeBlock Snippet="@NewSnippet" Code="@NewCode" Title="@NewTitle" Language="@Language" />
+    </div>
+</div>
+
+@code {
+    [Parameter] public string? OldSnippet { get; set; }
+    [Parameter] public string? NewSnippet { get; set; }
+    [Parameter] public string? OldCode { get; set; }
+    [Parameter] public string? NewCode { get; set; }
+    [Parameter] public string? OldTitle { get; set; }
+    [Parameter] public string? NewTitle { get; set; }
+    [Parameter] public string OldLabel { get; set; } = "Before (.NET 10 / C# 14)";
+    [Parameter] public string NewLabel { get; set; } = ".NET 11 / C# 15";
+    [Parameter] public string Language { get; set; } = "csharp";
+}

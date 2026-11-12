@@ -1,0 +1,27 @@
+<span class="badge @Css" title="@Tooltip">@Text</span>
+
+@code {
+    [Parameter, EditorRequired] public FeatureStatus Status { get; set; }
+
+    private string Css => Status switch
+    {
+        FeatureStatus.Stable => "badge-stable",
+        FeatureStatus.OptIn => "badge-optin",
+        FeatureStatus.Experimental => "badge-experimental",
+        _ => "badge-baseline",
+    };
+
+    private string Text => Status switch
+    {
+        FeatureStatus.OptIn => "Opt-in",
+        _ => Status.ToString(),
+    };
+
+    private string Tooltip => Status switch
+    {
+        FeatureStatus.Stable => "Generally available in .NET 11, no opt-in required",
+        FeatureStatus.OptIn => "Generally available but must be enabled explicitly",
+        FeatureStatus.Experimental => "Preview / experimental - isolated from the stable app",
+        _ => "Shipped before .NET 11; shown as the comparison baseline",
+    };
+}

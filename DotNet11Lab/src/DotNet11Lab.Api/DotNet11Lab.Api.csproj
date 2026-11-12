@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Minimal API surface for Lab 3. Runs standalone ('dotnet run', http://localhost:5181) and is also mapped
+    in-process by DotNet11Lab.Web under /api via AddLabApi()/MapLabApi(). Uses the plain SDK plus the ASP.NET Core
+    shared framework (rather than Microsoft.NET.Sdk.Web) so the dashboard can reference it without merging two
+    static-web-asset manifests.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <EmbedLabSources>true</EmbedLabSources>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <Using Include="Microsoft.AspNetCore.Builder" />
+    <Using Include="Microsoft.AspNetCore.Http" />
+    <Using Include="Microsoft.AspNetCore.Routing" />
+    <Using Include="Microsoft.Extensions.DependencyInjection" />
+    <Using Include="Microsoft.Extensions.Hosting" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\DotNet11Lab.Core\DotNet11Lab.Core.csproj" />
+  </ItemGroup>
+</Project>

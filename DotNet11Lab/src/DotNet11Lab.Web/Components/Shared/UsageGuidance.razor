@@ -1,0 +1,15 @@
+<div class="grid grid-2" style="margin-top:1rem">
+    <div class="callout ok" style="margin:0">
+        <div class="callout-title">Use it when</div>
+        @WhenToUse
+    </div>
+    <div class="callout warn" style="margin:0">
+        <div class="callout-title">Avoid it when</div>
+        @WhenToAvoid
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public RenderFragment WhenToUse { get; set; } = default!;
+    [Parameter, EditorRequired] public RenderFragment WhenToAvoid { get; set; } = default!;
+}

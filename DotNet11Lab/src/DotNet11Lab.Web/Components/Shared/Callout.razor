@@ -1,0 +1,14 @@
+<div class="callout @Kind">
+    @if (Title is not null)
+    {
+        <div class="callout-title">@Title</div>
+    }
+    @ChildContent
+</div>
+
+@code {
+    /// <summary>"" (info), "ok", "warn" or "danger".</summary>
+    [Parameter] public string Kind { get; set; } = "";
+    [Parameter] public string? Title { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

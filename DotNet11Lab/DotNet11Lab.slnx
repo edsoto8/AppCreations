@@ -1,0 +1,15 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/DotNet11Lab.Core/DotNet11Lab.Core.csproj" />
+    <Project Path="src/DotNet11Lab.Api/DotNet11Lab.Api.csproj" />
+    <Project Path="src/DotNet11Lab.Web/DotNet11Lab.Web.csproj" />
+    <Project Path="src/DotNet11Lab.Cli/DotNet11Lab.Cli.csproj" />
+    <Project Path="src/DotNet11Lab.Benchmarks/DotNet11Lab.Benchmarks.csproj" />
+  </Folder>
+  <Folder Name="/experimental/">
+    <Project Path="experimental/DotNet11Lab.RuntimeAsync/DotNet11Lab.RuntimeAsync.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/DotNet11Lab.Tests/DotNet11Lab.Tests.csproj" />
+  </Folder>
+</Solution>
