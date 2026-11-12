@@ -22,7 +22,9 @@ public sealed class AppServices
         var store = new JsonTaskStore(dataFilePath, loggerFactory.CreateLogger<JsonTaskStore>(), Time);
         Tasks = new TaskService(store, Time, loggerFactory.CreateLogger<TaskService>());
         Navigation = new FrameNavigationService(rootFrame);
-        Dialogs = new ContentDialogService(() => rootFrame.XamlRoot);
+        Theme = new ThemeService();
+        Theme.Attach(rootFrame);
+        Dialogs = new ContentDialogService(() => rootFrame.XamlRoot, Theme);
         MainViewModel = new MainViewModel(Tasks, Navigation, Dialogs, Time);
     }
 
@@ -35,6 +37,8 @@ public sealed class AppServices
     public INavigationService Navigation { get; }
 
     public IDialogService Dialogs { get; }
+
+    public ThemeService Theme { get; }
 
     /// <summary>One instance for the app's lifetime, so the main list keeps its filter and sort.</summary>
     public MainViewModel MainViewModel { get; }

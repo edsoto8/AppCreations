@@ -1,0 +1,31 @@
+<!--
+  Theme-aware colours. Each key is defined once per theme; {ThemeResource Key} picks the right one and updates
+  live when the theme changes. Define every key in BOTH Light and Dark: when a theme dictionary matches,
+  a missing key is NOT looked up in "Default".
+-->
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <ResourceDictionary.ThemeDictionaries>
+
+    <ResourceDictionary x:Key="Light">
+      <SolidColorBrush x:Key="PriorityHighForegroundBrush" Color="#C42B1C" />
+      <SolidColorBrush x:Key="PriorityHighBackgroundBrush" Color="#FDE7E9" />
+      <SolidColorBrush x:Key="PriorityMediumForegroundBrush" Color="#8A5100" />
+      <SolidColorBrush x:Key="PriorityMediumBackgroundBrush" Color="#FFF4CE" />
+      <SolidColorBrush x:Key="PriorityLowForegroundBrush" Color="#0F7B0F" />
+      <SolidColorBrush x:Key="PriorityLowBackgroundBrush" Color="#DFF6DD" />
+      <SolidColorBrush x:Key="MutedTextBrush" Color="#5F6368" />
+    </ResourceDictionary>
+
+    <ResourceDictionary x:Key="Dark">
+      <SolidColorBrush x:Key="PriorityHighForegroundBrush" Color="#FF99A4" />
+      <SolidColorBrush x:Key="PriorityHighBackgroundBrush" Color="#442726" />
+      <SolidColorBrush x:Key="PriorityMediumForegroundBrush" Color="#FCE100" />
+      <SolidColorBrush x:Key="PriorityMediumBackgroundBrush" Color="#433519" />
+      <SolidColorBrush x:Key="PriorityLowForegroundBrush" Color="#6CCB5F" />
+      <SolidColorBrush x:Key="PriorityLowBackgroundBrush" Color="#2B3A2A" />
+      <SolidColorBrush x:Key="MutedTextBrush" Color="#A8ABB0" />
+    </ResourceDictionary>
+
+  </ResourceDictionary.ThemeDictionaries>
+</ResourceDictionary>

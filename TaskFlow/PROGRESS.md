@@ -7,7 +7,7 @@
 | 3 | MVVM and data binding | Done |
 | 4 | Task editing and navigation | Done |
 | 5 | Local data storage | Done |
-| 6 | UI improvements | Not started |
+| 6 | UI improvements | Done |
 | 7 | Testing and code quality | Not started |
 | 8 | Final review | Not started |
 
@@ -54,8 +54,23 @@
 - `TaskService` loads at startup and saves after every change (one save at a time). If loading fails, saving is
   blocked so the unreadable file is never overwritten.
 - App: data in `ApplicationData.Current.LocalFolder` (override with `TASKFLOW_DATA_DIR`), `ILogger` from the
-  template's logger factory (Debug builds), progress-free load after the window appears, warning `InfoBar`.
+  template's logger factory (Debug builds), load runs after the window appears, warning `InfoBar`.
 - Tests: 64 passing (round trip, corrupt files, repair, IO failures, restart survival).
 - Verified in the running app: added a task and completed it → `tasks.json` written; relaunched → task reloaded;
   corrupted the file → app started with the warning and the backup file. Default Linux path:
   `~/.local/share/TaskFlow/com.taskflow.app/LocalState/TaskFlow/tasks.json`.
+
+## Milestone 6 — UI improvements
+
+- `Styles/Theme.xaml` (Light/Dark `ThemeDictionaries`: priority colours, muted text) and `Styles/Styles.xaml`
+  (text styles, card style, icon button style), merged in `App.xaml`.
+- `Controls/PriorityBadge`: reusable `UserControl` with a `Priority` dependency property and one visual state per
+  priority. `Ui.cs`: static helpers called from `x:Bind` (strikethrough, dimming, accessible labels).
+- Main page: task cards, priority badges, due/overdue chips, completion progress bar, `RadioButtons` filter,
+  empty state, `ProgressRing` while loading, closable error/warning `InfoBar`s, Ctrl+N.
+- `ThemeService`: System → Light → Dark toggle saved in `LocalSettings`; dialogs get the theme explicitly.
+- Responsive: `AdaptiveTrigger` at 720px on both pages (narrow: stacked controls, icon-only Add button).
+- Accessibility: names on icon buttons ("Edit Renew passport"), tooltips, keyboard accelerators, focus on open.
+- Verified in the running app: light and dark main page, dark dialog and editor, 420px narrow layout, empty
+  state, Ctrl+N, theme choice remembered across launches.
+- Known limitation: the dimming layer behind a dialog keeps the system theme's tint when the app theme is forced.

@@ -5,12 +5,12 @@
   <Application.Resources>
     <ResourceDictionary>
       <ResourceDictionary.MergedDictionaries>
-        <!-- Load WinUI resources -->
+        <!-- Load WinUI (Fluent) resources first, so our styles can build on them -->
         <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" />
+        <!-- TaskFlow's own colours and styles -->
+        <ResourceDictionary Source="ms-appx:///Styles/Theme.xaml" />
+        <ResourceDictionary Source="ms-appx:///Styles/Styles.xaml" />
       </ResourceDictionary.MergedDictionaries>
-
-      <!-- Add resources here -->
-
     </ResourceDictionary>
   </Application.Resources>
 

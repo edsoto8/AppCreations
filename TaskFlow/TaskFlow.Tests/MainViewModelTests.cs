@@ -140,7 +140,11 @@ public class MainViewModelTests
         var today = _vm.Tasks.Single(t => t.Title == "today");
 
         Assert.True(late.IsOverdue);
+        Assert.False(late.ShowRegularDueDate);
+        Assert.StartsWith("Overdue · ", late.OverdueText);
         Assert.False(today.IsOverdue);
+        Assert.True(today.ShowRegularDueDate);
+        Assert.Equal("", today.OverdueText);
         Assert.Equal("Due today", today.DueDateText);
     }
 

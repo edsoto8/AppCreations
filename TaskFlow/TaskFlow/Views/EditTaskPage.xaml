@@ -5,59 +5,101 @@
       Loaded="Page_Loaded">
 
   <ScrollViewer>
-    <StackPanel MaxWidth="640" Padding="24" Spacing="16" HorizontalAlignment="Stretch">
+    <Grid x:Name="Root" Padding="16">
+      <!-- Narrow by default: due date and priority stacked. Wide: side by side. -->
+      <VisualStateManager.VisualStateGroups>
+        <VisualStateGroup>
+          <VisualState x:Name="Wide">
+            <VisualState.StateTriggers>
+              <AdaptiveTrigger MinWindowWidth="720" />
+            </VisualState.StateTriggers>
+            <VisualState.Setters>
+              <Setter Target="Root.Padding" Value="32,28" />
+              <Setter Target="PriorityBox.(Grid.Row)" Value="0" />
+              <Setter Target="PriorityBox.(Grid.Column)" Value="1" />
+            </VisualState.Setters>
+          </VisualState>
+          <VisualState x:Name="Narrow">
+            <VisualState.StateTriggers>
+              <AdaptiveTrigger MinWindowWidth="0" />
+            </VisualState.StateTriggers>
+          </VisualState>
+        </VisualStateGroup>
+      </VisualStateManager.VisualStateGroups>
 
-      <TextBlock Text="{x:Bind ViewModel.PageTitle, Mode=OneWay}" FontSize="28" FontWeight="SemiBold" />
+      <StackPanel MaxWidth="640" Spacing="20">
 
-      <InfoBar Severity="Error" IsOpen="{x:Bind ViewModel.HasError, Mode=OneWay}" IsClosable="False"
-               Message="{x:Bind ViewModel.ErrorMessage, Mode=OneWay}" />
+        <!-- Header: back button + title -->
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <Button Style="{StaticResource IconButtonStyle}" Command="{x:Bind ViewModel.CancelCommand}"
+                  AutomationProperties.Name="Back" ToolTipService.ToolTip="Back (Esc)">
+            <Button.KeyboardAccelerators>
+              <KeyboardAccelerator Key="Escape" />
+            </Button.KeyboardAccelerators>
+            <FontIcon FontSize="16" Glyph="&#xE72B;" />
+          </Button>
+          <TextBlock Text="{x:Bind ViewModel.PageTitle, Mode=OneWay}" Style="{StaticResource PageTitleTextStyle}"
+                     VerticalAlignment="Center" />
+        </StackPanel>
 
-      <!-- Title. TwoWay + UpdateSourceTrigger=PropertyChanged: every keystroke updates ViewModel.Title. -->
-      <StackPanel Spacing="4">
-        <TextBox x:Name="TitleBox" Header="Title" PlaceholderText="What needs doing?"
-                 MaxLength="{x:Bind ViewModel.MaxTitleLength}"
-                 Text="{x:Bind ViewModel.Title, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-        <TextBlock Text="{x:Bind ViewModel.TitleError, Mode=OneWay}"
-                   Visibility="{x:Bind ViewModel.HasTitleError, Mode=OneWay}"
-                   Foreground="{ThemeResource SystemFillColorCriticalBrush}" FontSize="12" />
+        <InfoBar Severity="Error" IsOpen="{x:Bind ViewModel.HasError, Mode=OneWay}" IsClosable="False"
+                 Message="{x:Bind ViewModel.ErrorMessage, Mode=OneWay}" />
+
+        <!-- Title. TwoWay + UpdateSourceTrigger=PropertyChanged: every keystroke updates ViewModel.Title. -->
+        <StackPanel Spacing="4">
+          <TextBox x:Name="TitleBox" Header="Title" PlaceholderText="What needs doing?"
+                   MaxLength="{x:Bind ViewModel.MaxTitleLength}"
+                   Text="{x:Bind ViewModel.Title, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+          <TextBlock Text="{x:Bind ViewModel.TitleError, Mode=OneWay}" Style="{StaticResource FieldErrorTextStyle}"
+                     Visibility="{x:Bind ViewModel.HasTitleError, Mode=OneWay}" />
+        </StackPanel>
+
+        <StackPanel Spacing="4">
+          <TextBox Header="Description (optional)" PlaceholderText="Add details"
+                   AcceptsReturn="True" TextWrapping="Wrap" MinHeight="120"
+                   MaxLength="{x:Bind ViewModel.MaxDescriptionLength}"
+                   Text="{x:Bind ViewModel.Description, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+          <TextBlock Text="{x:Bind ViewModel.DescriptionError, Mode=OneWay}" Style="{StaticResource FieldErrorTextStyle}"
+                     Visibility="{x:Bind ViewModel.HasDescriptionError, Mode=OneWay}" />
+        </StackPanel>
+
+        <Grid ColumnSpacing="24" RowSpacing="20">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="*" />
+          </Grid.ColumnDefinitions>
+          <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+          </Grid.RowDefinitions>
+
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <CalendarDatePicker Header="Due date (optional)" PlaceholderText="No due date" MinWidth="180"
+                                Date="{x:Bind ViewModel.DueDate, Mode=TwoWay}" />
+            <Button Style="{StaticResource IconButtonStyle}" VerticalAlignment="Bottom"
+                    Command="{x:Bind ViewModel.ClearDueDateCommand}"
+                    Visibility="{x:Bind ViewModel.HasDueDate, Mode=OneWay}"
+                    AutomationProperties.Name="Clear due date" ToolTipService.ToolTip="Clear due date">
+              <FontIcon FontSize="14" Glyph="&#xE711;" />
+            </Button>
+          </StackPanel>
+
+          <ComboBox x:Name="PriorityBox" Grid.Row="1" Header="Priority" MinWidth="180"
+                    ItemsSource="{x:Bind ViewModel.PriorityChoices}"
+                    SelectedItem="{x:Bind ViewModel.SelectedPriority, Mode=TwoWay}" />
+        </Grid>
+
+        <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,8,0,0">
+          <Button Content="{x:Bind ViewModel.SaveButtonText, Mode=OneWay}"
+                  Command="{x:Bind ViewModel.SaveCommand}"
+                  Style="{StaticResource AccentButtonStyle}" ToolTipService.ToolTip="Ctrl+S">
+            <Button.KeyboardAccelerators>
+              <KeyboardAccelerator Modifiers="Control" Key="S" />
+            </Button.KeyboardAccelerators>
+          </Button>
+          <Button Content="Cancel" Command="{x:Bind ViewModel.CancelCommand}" />
+        </StackPanel>
       </StackPanel>
-
-      <StackPanel Spacing="4">
-        <TextBox Header="Description (optional)" PlaceholderText="Add details"
-                 AcceptsReturn="True" TextWrapping="Wrap" MinHeight="100"
-                 MaxLength="{x:Bind ViewModel.MaxDescriptionLength}"
-                 Text="{x:Bind ViewModel.Description, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-        <TextBlock Text="{x:Bind ViewModel.DescriptionError, Mode=OneWay}"
-                   Visibility="{x:Bind ViewModel.HasDescriptionError, Mode=OneWay}"
-                   Foreground="{ThemeResource SystemFillColorCriticalBrush}" FontSize="12" />
-      </StackPanel>
-
-      <StackPanel Orientation="Horizontal" Spacing="12">
-        <CalendarDatePicker Header="Due date (optional)" PlaceholderText="No due date" MinWidth="180"
-                            Date="{x:Bind ViewModel.DueDate, Mode=TwoWay}" />
-        <Button Content="Clear" VerticalAlignment="Bottom"
-                Command="{x:Bind ViewModel.ClearDueDateCommand}"
-                Visibility="{x:Bind ViewModel.HasDueDate, Mode=OneWay}" />
-      </StackPanel>
-
-      <ComboBox Header="Priority" MinWidth="180"
-                ItemsSource="{x:Bind ViewModel.PriorityChoices}"
-                SelectedItem="{x:Bind ViewModel.SelectedPriority, Mode=TwoWay}" />
-
-      <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,8,0,0">
-        <Button Content="{x:Bind ViewModel.SaveButtonText, Mode=OneWay}"
-                Command="{x:Bind ViewModel.SaveCommand}"
-                Style="{StaticResource AccentButtonStyle}">
-          <Button.KeyboardAccelerators>
-            <KeyboardAccelerator Modifiers="Control" Key="S" />
-          </Button.KeyboardAccelerators>
-        </Button>
-        <Button Content="Cancel" Command="{x:Bind ViewModel.CancelCommand}">
-          <Button.KeyboardAccelerators>
-            <KeyboardAccelerator Key="Escape" />
-          </Button.KeyboardAccelerators>
-        </Button>
-      </StackPanel>
-    </StackPanel>
+    </Grid>
   </ScrollViewer>
 </Page>
