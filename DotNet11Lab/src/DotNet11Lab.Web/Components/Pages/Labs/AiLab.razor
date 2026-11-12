@@ -1,7 +1,406 @@
 @page "/labs/ai"
+@rendermode InteractiveServer
+@using System.Text.Json
+@using DotNet11Lab.Core.Labs.Ai
+@using DotNet11Lab.Core.Labs.Ai.Mcp
+@using Microsoft.Extensions.AI
+@using Microsoft.Extensions.Options
+@implements IDisposable
+@inject LabAssistant Assistant
+@inject IOptions<AiOptions> AiOptionsAccessor
+@inject IWebHostEnvironment Environment
 
 <LabHeader Slug="ai" />
 
-<Callout Kind="warn" Title="Under construction">
-    <p>This laboratory is being implemented.</p>
-</Callout>
+<div class="ai-page">
+
+@* ---------------- Provider status ---------------- *@
+<section class="card card-pad ai-provider" aria-label="Active AI provider">
+    <div class="ai-provider-row">
+        <div class="ai-provider-main">
+            <div class="metric-label">Active provider</div>
+            <div class="ai-provider-name">
+                @if (UsingMock)
+                {
+                    <span>Mock (offline, deterministic)</span>
+                    <span class="badge badge-optin" title="Rule-based answers from the lab catalog. Not a language model.">not an LLM</span>
+                }
+                else
+                {
+                    <span>@Status.DisplayName</span>
+                    <span class="badge badge-stable">real model</span>
+                }
+            </div>
+            <div class="row ai-chips">
+                <span class="chip">model: @(ActiveModel ?? "(not set)")</span>
+                @if (!UsingMock && Status.EndpointHost is not null)
+                {
+                    <span class="chip">endpoint: @Status.EndpointHost</span>
+                }
+                <span class="chip"><span class="dot" style="background:@(Status.HasApiKey ? "var(--ok)" : "var(--text-muted)")"></span>API key configured: @(Status.HasApiKey ? "yes" : "no")</span>
+                <span class="chip">configured: Ai:Provider = @Status.Kind</span>
+            </div>
+        </div>
+        @if (!Status.IsMock)
+        {
+            <div class="ai-provider-actions">
+                @if (_forceMock)
+                {
+                    <button type="button" class="btn btn-sm" @onclick="() => SetForceMock(false)" disabled="@(!Status.IsUsable || _busy)">Use @Status.DisplayName again</button>
+                }
+                else
+                {
+                    <button type="button" class="btn btn-sm" @onclick="() => SetForceMock(true)" disabled="@_busy">Switch to mock for this session</button>
+                }
+            </div>
+        }
+    </div>
+    @if (Status.Problem is not null)
+    {
+        <div class="callout danger" style="margin:.75rem 0 0">
+            <div class="callout-title">@Status.DisplayName is not configured correctly</div>
+            <p>@Status.Problem</p>
+            <p class="small muted">This session uses the mock instead. Keys are read from configuration only and are never shown.</p>
+        </div>
+    }
+</section>
+
+@* ---------------- Chat ---------------- *@
+<div class="ai-layout">
+    <section class="card ai-chat" aria-label="Chat">
+        <div class="demo-head">
+            <div>
+                <h2>Lab assistant chat</h2>
+                <div class="desc">Streaming <code>IChatClient</code> with tool calling. Tool calls and results are read from the streamed <code>AIContent</code>.</div>
+            </div>
+            <div class="demo-actions">
+                <label class="small muted ai-toggle"><input type="checkbox" @bind="_useTools" disabled="@_busy" /> tools</label>
+                <button type="button" class="btn btn-sm" @onclick="Clear" disabled="@_busy">Clear</button>
+            </div>
+        </div>
+
+        <div class="ai-transcript" role="log" aria-live="polite">
+            <div class="ai-transcript-inner">
+                @if (_entries.Count == 0)
+                {
+                    <div class="ai-empty muted small">
+                        Ask about the lab's .NET 11 features, or pick a suggested prompt. With tools on, prompts mentioning
+                        <em>compress</em>, <em>reconcile</em>, <em>runtime</em>, <em>lab N</em> or <em>search</em> make the
+                        @(UsingMock ? "mock" : "model") call a tool, and <code>FunctionInvokingChatClient</code> runs it.
+                    </div>
+                }
+                @foreach (var e in _entries)
+                {
+                    @switch (e.Kind)
+                    {
+                        case EntryKind.User:
+                            <div class="ai-msg ai-user"><div class="ai-role">you</div><div class="ai-text">@e.Text</div></div>
+                            break;
+                        case EntryKind.Assistant:
+                            <div class="ai-msg ai-assistant">
+                                <div class="ai-role">@(e.Mock ? "assistant · mock" : "assistant · " + ActiveModel)</div>
+                                <div class="ai-text">@e.Text@if (_busy && ReferenceEquals(e, _entries[^1])) {<span class="ai-caret">▍</span>}</div>
+                            </div>
+                            break;
+                        case EntryKind.ToolCall:
+                            <div class="ai-tool ai-tool-call">
+                                <span class="ai-tool-tag">⚙ tool call</span>
+                                <span class="mono">@e.ToolName</span>
+                                <code class="ai-args">@e.Text</code>
+                            </div>
+                            break;
+                        case EntryKind.ToolResult:
+                            <details class="ai-tool ai-tool-result">
+                                <summary><span class="ai-tool-tag">↩ tool result</span> <span class="mono">@e.ToolName</span> <span class="muted small">(executed by FunctionInvokingChatClient)</span></summary>
+                                <pre class="result-box">@e.Text</pre>
+                            </details>
+                            break;
+                        case EntryKind.Error:
+                            <div class="callout danger ai-error">
+                                <div class="callout-title">Request failed</div>
+                                <p>@e.Text</p>
+                                @if (!UsingMock)
+                                {
+                                    <button type="button" class="btn btn-sm" @onclick="() => SetForceMock(true)">Switch to mock for this session</button>
+                                }
+                            </div>
+                            break;
+                        case EntryKind.Note:
+                            <div class="ai-note muted small">@e.Text</div>
+                            break;
+                    }
+                }
+            </div>
+        </div>
+
+        <div class="ai-suggestions">
+            @foreach (var s in Suggestions)
+            {
+                <button type="button" class="chip ai-suggestion" disabled="@_busy" @onclick="() => SendAsync(s)">@s</button>
+            }
+        </div>
+
+        <form class="ai-input" @onsubmit="() => SendAsync(_prompt)">
+            <input type="text" @bind="_prompt" @bind:event="oninput" placeholder="Ask the lab assistant…" maxlength="@MaxPromptChars" disabled="@_busy" aria-label="Prompt" />
+            @if (_busy)
+            {
+                <button type="button" class="btn" @onclick="Cancel">■ Cancel</button>
+            }
+            else
+            {
+                <button type="submit" class="btn btn-primary" disabled="@string.IsNullOrWhiteSpace(_prompt)">Send</button>
+            }
+        </form>
+    </section>
+
+    <aside class="stack ai-side">
+        <section class="card card-pad">
+            <h3 class="ai-h3">Middleware pipeline</h3>
+            <p class="small muted">Read from the <code>IChatClient</code> chain that DI built (outermost first).</p>
+            <ol class="ai-pipeline">
+                <li class="ai-stage ai-stage-app"><strong>LabAssistant</strong><span class="small muted">page → GetStreamingResponseAsync</span></li>
+                @foreach (var stage in _pipeline)
+                {
+                    <li class="ai-stage @(stage == _pipeline[^1] ? "ai-stage-provider" : "")">
+                        <strong class="mono">@stage.TypeName</strong>
+                        <span class="small muted">@stage.Detail</span>
+                    </li>
+                }
+            </ol>
+        </section>
+
+        <section class="card card-pad">
+            <h3 class="ai-h3">Tools (@Assistant.Tools.Count)</h3>
+            <p class="small muted"><code>AIFunctionFactory.Create</code> over real lab code; the JSON schema is generated from the method signature.</p>
+            <ul class="ai-tools">
+                @foreach (var tool in Assistant.Tools)
+                {
+                    <li>
+                        <span class="mono">@tool.Name</span>(<span class="mono small muted">@string.Join(", ", Parameters(tool))</span>)
+                        <div class="small muted">@tool.Description</div>
+                    </li>
+                }
+            </ul>
+        </section>
+    </aside>
+</div>
+
+@* ---------------- Structured output ---------------- *@
+<div class="section">
+    <DemoPanel Title="Structured output: GetResponseAsync&lt;FeatureSummary&gt;" Cancellable="true"
+               Description="Microsoft.Extensions.AI generates a JSON schema from a C# record, requests JSON output and deserializes the reply into the type."
+               OnRun="RunStructuredAsync" RunLabel="Extract">
+        <ChildContent>
+            <div class="row">
+                <div class="field" style="flex:1; min-width:220px">
+                    <label class="small muted" for="ai-feature">Feature to summarise</label><br />
+                    <input id="ai-feature" type="text" @bind="_featureQuery" maxlength="200" style="width:100%" />
+                </div>
+            </div>
+            <p class="small muted">Provider: @(UsingMock ? "mock (it detects the JSON response format and returns catalog data as JSON)" : Status.DisplayName)</p>
+        </ChildContent>
+        <Result>
+            @if (_summary is not null)
+            {
+                <div class="grid grid-2">
+                    <div class="table-wrap">
+                        <table class="data">
+                            <tbody>
+                                <tr><th>Feature</th><td>@_summary.Feature</td></tr>
+                                <tr><th>LabNumber</th><td>@_summary.LabNumber</td></tr>
+                                <tr><th>Status</th><td>@_summary.Status</td></tr>
+                                <tr><th>NewInDotNet11</th><td>@_summary.NewInDotNet11</td></tr>
+                                <tr><th>Summary</th><td>@_summary.Summary</td></tr>
+                                <tr><th>DocsUrl</th><td><a href="@_summary.DocsUrl" target="_blank" rel="noopener">@_summary.DocsUrl</a></td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div>
+                        <div class="small muted">Raw model output (JSON)</div>
+                        <pre class="result-box">@_summaryJson</pre>
+                    </div>
+                </div>
+            }
+            else if (_summaryJson is not null)
+            {
+                <div class="callout warn"><div class="callout-title">The reply did not match the schema</div><pre class="result-box">@_summaryJson</pre></div>
+            }
+        </Result>
+    </DemoPanel>
+    <CodeBlock Snippet="Ai.StructuredOutput" />
+</div>
+
+@* ---------------- Code ---------------- *@
+<div class="section">
+    <div class="section-title"><h2>How it is wired</h2><span class="muted small">The code below is embedded from the compiled assembly and is what this page runs</span></div>
+    <div class="tabs" role="tablist">
+        @foreach (var (key, label) in CodeTabs)
+        {
+            <button type="button" role="tab" class="tab @(_codeTab == key ? "active" : "")" aria-selected="@(_codeTab == key)" @onclick="() => _codeTab = key">@label</button>
+        }
+    </div>
+    @switch (_codeTab)
+    {
+        case "di":
+            <p class="muted small"><code>AddChatClient</code> registers an <code>IChatClient</code> and returns a <code>ChatClientBuilder</code>; <code>Use*</code> calls add middleware. A keyed mock pipeline enables the session fallback.</p>
+            <div class="grid grid-2">
+                <CodeBlock Snippet="Ai.Registration" />
+                <CodeBlock Snippet="Ai.Middleware" />
+            </div>
+            <CodeBlock Snippet="Ai.ProviderFactory" />
+            break;
+        case "mock":
+            <p class="muted small">The mock implements both <code>GetResponseAsync</code> and <code>GetStreamingResponseAsync</code>. It returns <code>FunctionCallContent</code> only for tools present in <code>ChatOptions.Tools</code>.</p>
+            <CodeBlock Snippet="Ai.MockClient" />
+            <CodeBlock Snippet="Ai.MockPlan" />
+            break;
+        case "tools":
+            <CodeBlock Snippet="Ai.Tools" />
+            <CodeBlock Snippet="Ai.ZstandardTool" />
+            break;
+        case "stream":
+            <p class="muted small">Tool calls, tool results and text all arrive as <code>AIContent</code> inside <code>ChatResponseUpdate</code>s, which is how the transcript above is drawn.</p>
+            <CodeBlock Snippet="Ai.StreamTurn" />
+            break;
+        case "before":
+            <Callout Kind="warn" Title="Previous approach: compiled, not executed">
+                <p>The left-hand code is real, compiled code against the OpenAI SDK, but this offline lab never runs it. It hard-codes one vendor's message types and re-implements the tool loop, logging and tracing by hand.</p>
+            </Callout>
+            <CodeCompare OldSnippet="Ai.PreviousDirectSdk" NewSnippet="Ai.AbstractionAsk"
+                         OldLabel="Before: provider SDK called directly" NewLabel="Now: IChatClient + middleware" />
+            break;
+    }
+</div>
+
+@* ---------------- Configure ---------------- *@
+<div class="section">
+    <div class="section-title"><h2>Use a real provider</h2><span class="muted small">Configuration only; restart the app after changing it</span></div>
+    <div class="grid grid-2">
+        <CodeBlock Language="shell" Title="OpenAI (key from user secrets or environment)" Code="@OpenAiConfig" />
+        <CodeBlock Language="shell" Title="Ollama / any OpenAI-compatible endpoint, or Azure OpenAI" Code="@CompatibleConfig" />
+    </div>
+    <Callout Kind="" Title="Keys">
+        <p>The key is read from <code>Ai:ApiKey</code> (user secrets or the <code>Ai__ApiKey</code> environment variable). It is never written to <code>appsettings.json</code>, logged, sent to the browser or shown: the page only knows whether one is configured. Error messages are rewritten before display and any occurrence of the key is masked.</p>
+    </Callout>
+</div>
+
+@* ---------------- MCP ---------------- *@
+<div class="section">
+    <div class="section-title"><h2>Model Context Protocol</h2><span class="muted small">ModelContextProtocol 2.4.0 · <code>dotnet new mcpserver</code> ships in SDK 11</span></div>
+    <div class="grid grid-2">
+        <div class="card card-pad">
+            <h3 class="ai-h3">How MCP fits</h3>
+            <p class="small">MCP standardises how an AI host discovers and calls tools that live in another process. <code>experimental/DotNet11Lab.Mcp</code> is a stdio MCP server built with the C# SDK: a host (VS Code, Claude Desktop, GitHub Copilot, or your own .NET app) launches it, sends JSON-RPC over stdin and reads replies on stdout.</p>
+            <p class="small">On the client side <code>McpClient.ListToolsAsync</code> returns <code>McpClientTool</code>, which <strong>derives from <code>AIFunction</code></strong>, so MCP tools go straight into <code>ChatOptions.Tools</code> and <code>FunctionInvokingChatClient</code> calls them over the protocol.</p>
+            <p class="small muted">The stable dashboard does not reference the MCP SDK. The probe below starts the separately built server process and speaks raw JSON-RPC to show the wire format.</p>
+        </div>
+        <CodeBlock Snippet="Ai.McpServerTools" />
+    </div>
+    <DemoPanel Title="Probe the MCP server over stdio" Cancellable="true"
+               Description="Starts experimental/DotNet11Lab.Mcp as a child process, then sends initialize, tools/list and tools/call (get_lab_features)."
+               OnRun="RunMcpProbeAsync" RunLabel="Start server and probe">
+        <ChildContent>
+            <div class="row">
+                <label class="small muted">Lab number
+                    <select @bind="_mcpLab">
+                        @for (var i = 1; i <= LabCatalog.Labs.Count; i++)
+                        {
+                            <option value="@i">@i</option>
+                        }
+                    </select>
+                </label>
+                <span class="small muted">Server: @(_mcpServerPath is null ? "not built yet — run 'dotnet build DotNet11Lab.slnx'" : System.IO.Path.GetFileName(_mcpServerPath))</span>
+            </div>
+        </ChildContent>
+        <Result>
+            @if (_mcp is not null)
+            {
+                <div class="grid grid-4">
+                    <MetricTile Label="Server" Value="@_mcp.ServerName" Sub="@("v" + _mcp.ServerVersion)" />
+                    <MetricTile Label="Protocol" Value="@_mcp.ProtocolVersion" Sub="negotiated" />
+                    <MetricTile Label="Tools listed" Value="@_mcp.ToolNames.Count.ToString()" Sub="@string.Join(", ", _mcp.ToolNames)" />
+                    <MetricTile Label="Round trip" Value="@Measure.FormatDuration(_mcp.Elapsed.TotalMicroseconds)" Sub="incl. process start" />
+                </div>
+                <div class="small muted" style="margin-top:.75rem">JSON-RPC messages (→ client to server, ← server to client)</div>
+                <div class="ai-wire">
+                    @foreach (var m in _mcp.Transcript)
+                    {
+                        <div class="ai-wire-line @(m.FromClient ? "out" : "in")"><span class="ai-wire-dir">@(m.FromClient ? "→" : "←")</span><code>@Abbreviate(m.Json)</code></div>
+                    }
+                </div>
+            }
+        </Result>
+    </DemoPanel>
+    <div class="grid grid-2">
+        <CodeBlock Snippet="Ai.McpServerHost" />
+        <CodeBlock Snippet="Ai.McpClientBridge" />
+    </div>
+    <CodeBlock Language="shell" Title="Try it" Code="@McpCommands" />
+</div>
+
+@* ---------------- Experimental ---------------- *@
+<div class="section">
+    <div class="section-title"><h2>Experimental: Blazor AI components</h2><StatusBadge Status="FeatureStatus.Experimental" /></div>
+    <Callout Kind="warn" Title="Prerelease only; not referenced by this app">
+        <p><code>Microsoft.AspNetCore.Components.AI</code> 11.0.0-preview.7.26425.128 was restored in a throwaway project to inspect its API. It is documented as experimental throughout .NET 11 and may never ship stable. Its dependencies are pinned to .NET 11 <em>RC1</em> packages (<code>Microsoft.AspNetCore.Components.Web 11.0.0-rc.1</code>, <code>Microsoft.Extensions.AI.Abstractions 10.6.0</code>), and restore reports <strong>NU1902</strong> (a known moderate vulnerability in <code>Microsoft.Extensions.Validation 11.0.0-rc.1</code>), which fails a build with warnings-as-errors. The chat on this page is therefore built with plain Razor.</p>
+    </Callout>
+    <div class="grid grid-2">
+        <div class="table-wrap">
+            <table class="data">
+                <thead><tr><th>Type (preview.7)</th><th>Role</th></tr></thead>
+                <tbody>
+                    <tr><td class="mono">UIAgent</td><td>Wraps any <code>IChatClient</code>; turns its stream into content blocks and keeps history. <code>SendMessageAsync(ChatMessage, ct)</code>.</td></tr>
+                    <tr><td class="mono">UIAgentOptions</td><td><code>ChatOptions</code> and <code>AddBlockHandler&lt;T&gt;</code> for custom content.</td></tr>
+                    <tr><td class="mono">ChatPage</td><td>Ready-made page: <code>Agent</code>, <code>Header</code>, <code>WelcomeContent</code>, <code>MessageListContent</code>, <code>Placeholder</code>, input actions.</td></tr>
+                    <tr><td class="mono">AgentBoundary · AgentContext</td><td>Cascades the conversation (<code>Turns</code>, <code>Status</code>: Idle / Streaming / AwaitingInput / Error).</td></tr>
+                    <tr><td class="mono">MessageList · MessageInput</td><td>Building blocks for custom layouts.</td></tr>
+                    <tr><td class="mono">BlockRenderer&lt;TBlock&gt;</td><td>Custom rendering per block type, filtered with <code>When</code>.</td></tr>
+                    <tr><td class="mono">RichContentBlock + RichText nodes</td><td>Parsed Markdown (headings, lists, tables, code) for streaming text.</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <div>
+            <CodeBlock Language="razor" Title="Usage (from the package's XML docs; not compiled here)" Code="@BlazorAiSample" />
+            <p class="small muted">The research notes listed further types (function-invocation and approval blocks, <code>UIAgent&lt;TState&gt;</code>, <code>[ToolBlock]</code> source generation). They are <strong>not</strong> in the preview.7 package, so treat the API as unsettled.</p>
+        </div>
+    </div>
+</div>
+
+@* ---------------- Guidance ---------------- *@
+<div class="section">
+    <div class="section-title"><h2>What changed and when to use it</h2></div>
+    <div class="grid grid-3">
+        <div class="card card-pad">
+            <h3 class="ai-h3">Microsoft.Extensions.AI 11.0.0</h3>
+            <p class="small">Released alongside .NET 11. <code>IChatClient</code>, <code>ChatClientBuilder</code>, <code>UseFunctionInvocation</code>, <code>UseLogging</code>, <code>UseOpenTelemetry</code>, <code>AddChatClient</code>/<code>AddKeyedChatClient</code> and <code>GetResponseAsync&lt;T&gt;</code> are stable. Newer pieces such as <code>FailoverChatClient</code>, <code>ReducingChatClient</code> and realtime clients carry the <code>MEAI001</code> experimental diagnostic and are not used here.</p>
+        </div>
+        <div class="card card-pad">
+            <h3 class="ai-h3">MCP C# SDK 2.4.0</h3>
+            <p class="small"><code>[McpServerToolType]</code>/<code>[McpServerTool]</code> turn methods into tools; <code>AddMcpServer().WithStdioServerTransport()</code> hosts them. SDK 11.0.100 bundles the <code>mcpserver</code> template (it references ModelContextProtocol 2.1.0 and sets <code>PackageType=McpServer</code> so the server can be published to NuGet).</p>
+        </div>
+        <div class="card card-pad">
+            <h3 class="ai-h3">Security</h3>
+            <p class="small">Tools run with the app's permissions and receive model-chosen arguments: treat them as untrusted input (this lab validates and caps sizes). Text returned by tools or MCP servers can carry prompt injection; keep tools read-only where possible, bound the loop (<code>MaximumIterationsPerRequest</code>), and require approval for anything destructive.</p>
+        </div>
+    </div>
+    <UsageGuidance>
+        <WhenToUse>
+            <ul>
+                <li>Any .NET app that calls an LLM: code against <code>IChatClient</code> and swap providers by configuration.</li>
+                <li>Cross-cutting concerns (tool loop, telemetry, logging, caching) that should not be rewritten per vendor.</li>
+                <li>Typed extraction with <code>GetResponseAsync&lt;T&gt;</code> instead of hand-parsing JSON.</li>
+                <li>MCP when tools must be shared across hosts (IDE agents, other apps) or run in a separate process.</li>
+                <li>A deterministic mock client for tests, demos and CI where no model is available.</li>
+            </ul>
+        </WhenToUse>
+        <WhenToAvoid>
+            <ul>
+                <li>You need a provider-only feature the abstraction does not model yet (use <code>GetService&lt;T&gt;()</code> or <code>RawRepresentation</code> for that call only).</li>
+                <li>Deterministic business rules: a model (and its tools) is the wrong place for logic that must always give the same answer.</li>
+                <li>Exposing destructive tools to a model without human approval, or MCP servers you do not trust.</li>
+                <li>Production UI built on the experimental Blazor AI components while they remain prerelease.</li>
+            </ul>
+        </WhenToAvoid>
+    </UsageGuidance>
+</div>
+</div>
