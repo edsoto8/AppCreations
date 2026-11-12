@@ -1,0 +1,146 @@
+@using DotNet11Lab.Api.Playground
+@using DotNet11Lab.Web.Labs.AspNetCore
+@inject ApiPlaygroundClient Client
+@inject NavigationManager Navigation
+
+<DemoPanel Title="API playground" Id="playground" RunLabel="Send request" Cancellable="true" OnRun="SendAsync"
+           Description="Pick a preset, edit it, and send a real HTTP request to this app's own /api endpoints. Nothing is mocked: the response comes from the Minimal API running in this process.">
+    <ChildContent>
+        <div class="playground">
+            <div class="presets" role="list" aria-label="Sample requests">
+                @foreach (var group in ApiPresets.All.GroupBy(p => p.Group))
+                {
+                    <div class="preset-group">@group.Key</div>
+                    @foreach (var preset in group)
+                    {
+                        <button type="button" role="listitem" class="preset @(preset.Id == _selected?.Id ? "active" : "")"
+                                data-preset="@preset.Id" @onclick="() => Select(preset)">
+                            <span class="method method-@preset.Method.ToLowerInvariant()">@preset.Method</span>
+                            <span class="preset-title">@preset.Title</span>
+                            <span class="preset-expect">@preset.ExpectedStatus</span>
+                        </button>
+                    }
+                }
+            </div>
+            <div class="editor">
+                @if (_selected is not null)
+                {
+                    <p class="small muted preset-explain">@_selected.Explanation</p>
+                }
+                <div class="row request-line">
+                    <div class="field" style="flex:0 0 110px">
+                        <label for="pg-method">Method</label>
+                        <select id="pg-method" @bind="_method">
+                            <option>GET</option>
+                            <option>POST</option>
+                            <option>PUT</option>
+                            <option>DELETE</option>
+                        </select>
+                    </div>
+                    <div class="field" style="flex:1 1 260px">
+                        <label for="pg-path">Path (relative to @Navigation.BaseUri)</label>
+                        <input id="pg-path" type="text" class="mono" @bind="_path" @bind:event="oninput" spellcheck="false" />
+                    </div>
+                </div>
+                <div class="field">
+                    <label for="pg-body">JSON body @(_method is "GET" or "DELETE" ? "(ignored for " + _method + ")" : "")</label>
+                    <textarea id="pg-body" rows="14" wrap="off" spellcheck="false" @bind="_body" @bind:event="oninput" maxlength="@ApiPlaygroundClient.MaxRequestBodyChars"></textarea>
+                </div>
+                @if (_inputError is not null)
+                {
+                    <div class="callout danger"><p>@_inputError</p></div>
+                }
+            </div>
+        </div>
+    </ChildContent>
+    <Result>
+        @if (_exchange is { } x)
+        {
+            <div class="exchange">
+                @if (x.Error is not null)
+                {
+                    <Callout Kind="danger" Title="Request failed"><p>@x.Error</p></Callout>
+                }
+                else
+                {
+                    <div class="status-line">
+                        <span class="status-code @StatusCss(x.StatusCode)" data-testid="status">@x.StatusCode @x.ReasonPhrase</span>
+                        <span class="mono small">@x.Method @x.Url.PathAndQuery</span>
+                        <span class="chip mono">@Measure.FormatDuration(x.Elapsed.TotalMicroseconds)</span>
+                        @if (_selected is not null && x.Url.AbsolutePath == _selected.Path && x.Method == _selected.Method)
+                        {
+                            @if (x.StatusCode == _selected.ExpectedStatus)
+                            {
+                                <span class="badge badge-stable">as expected</span>
+                            }
+                            else
+                            {
+                                <span class="badge badge-experimental">preset expects @_selected.ExpectedStatus</span>
+                            }
+                        }
+                    </div>
+                }
+                <div class="grid grid-2 exchange-grid">
+                    <div>
+                        <h3>Request</h3>
+                        <div class="result-box headers">@HeaderText($"{x.Method} {x.Url}", x.RequestHeaders)</div>
+                        @if (x.RequestBody is not null)
+                        {
+                            <CodeBlock Code="@x.RequestBody" Language="json" Title="request body" />
+                        }
+                    </div>
+                    <div>
+                        <h3>Response</h3>
+                        @if (x.Error is null)
+                        {
+                            <div class="result-box headers">@HeaderText($"HTTP {x.StatusCode} {x.ReasonPhrase}", x.ResponseHeaders)</div>
+                            <CodeBlock Code="@(x.ResponseBody.Length == 0 ? "(empty body)" : x.ResponseBody)" Language="json"
+                                       Title="@($"response body · {x.ContentType ?? "no content type"}{(x.ResponseTruncated ? " · truncated" : "")}")" />
+                        }
+                    </div>
+                </div>
+            </div>
+        }
+    </Result>
+</DemoPanel>
+
+@code {
+    private ApiPreset? _selected;
+    private string _method = "POST";
+    private string _path = "";
+    private string _body = "";
+    private string? _inputError;
+    private PlaygroundExchange? _exchange;
+
+    protected override void OnInitialized() => Select(ApiPresets.All[0]);
+
+    private void Select(ApiPreset preset)
+    {
+        _selected = preset;
+        _method = preset.Method;
+        _path = preset.Path;
+        _body = preset.Body ?? "";
+        _inputError = null;
+    }
+
+    private async Task SendAsync(CancellationToken cancellationToken)
+    {
+        _inputError = ApiPlaygroundClient.ValidateRequest(_method, _path.Trim(), _body);
+        if (_inputError is not null)
+        {
+            _exchange = null;
+            return;
+        }
+        _exchange = await Client.SendAsync(new Uri(Navigation.BaseUri), _method, _path.Trim(), _body, cancellationToken);
+    }
+
+    private static string HeaderText(string first, IEnumerable<KeyValuePair<string, string>> headers) =>
+        string.Join('\n', headers.Select(h => $"{h.Key}: {h.Value}").Prepend(first));
+
+    private static string StatusCss(int? status) => status switch
+    {
+        >= 200 and < 300 => "ok",
+        >= 400 and < 500 => "warn",
+        _ => "danger",
+    };
+}

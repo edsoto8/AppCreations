@@ -1,0 +1,70 @@
+@using DotNet11Lab.Api
+@using DotNet11Lab.Web.Labs.AspNetCore
+@inject ApiPlaygroundClient Client
+@inject NavigationManager Navigation
+
+<DemoPanel Title="Fetch the OpenAPI documents" Id="openapi-docs" RunLabel="Fetch both documents" OnRun="FetchAsync"
+           Description="GET /openapi/v1.json (default, 3.2) and /openapi/v1-3.1.json (same API, OpenApiVersion = OpenApi3_1). Highlighted lines: version, union anyOf, SSE itemSchema.">
+    <Result>
+        @if (_error is not null)
+        {
+            <Callout Kind="danger" Title="Could not fetch the documents"><p>@_error</p></Callout>
+        }
+        else if (_v32 is not null && _v31 is not null)
+        {
+            <div class="grid grid-4">
+                <MetricTile Label="Default document" Value="@_v32.Version" Sub="/openapi/v1.json" />
+                <MetricTile Label="Comparison document" Value="@_v31.Version" Sub="/openapi/v1-3.1.json" />
+                <MetricTile Label="Union schemas (anyOf)" Value="@_v32.UnionSchemas.Count.ToString()" Sub="@string.Join(", ", _v32.UnionSchemas)" />
+                <MetricTile Label="Paths / schemas" Value="@($"{_v32.Paths} / {_v32.Schemas}")" Sub="@($"{Measure.FormatBytes(_v32.SizeBytes)} vs {Measure.FormatBytes(_v31.SizeBytes)}")" />
+            </div>
+
+            <h3 style="margin-top:1rem">Every line that differs</h3>
+            <div class="table-wrap">
+                <table class="data">
+                    <thead><tr><th class="num">Line</th><th>OpenAPI 3.2 (default)</th><th>OpenAPI 3.1</th></tr></thead>
+                    <tbody>
+                        @foreach (var d in _diff)
+                        {
+                            <tr><td class="num">@d.Line</td><td class="mono small">@d.V32</td><td class="mono small">@d.V31</td></tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="grid grid-2 docs">
+                @foreach (var (title, lines) in new[] { ("/openapi/v1.json", _lines32), ("/openapi/v1-3.1.json", _lines31) })
+                {
+                    <div class="code scroll">
+                        <div class="code-head"><span class="code-title">@title</span></div>
+                        <pre class="doc">@foreach (var line in lines)
+{<span class="@(line.Highlight ? "hl" : null)"><span class="ln">@line.Number.ToString().PadLeft(4)</span> @line.Text</span>}</pre>
+                    </div>
+                }
+            </div>
+        }
+    </Result>
+</DemoPanel>
+
+@code {
+    private OpenApiFacts? _v32, _v31;
+    private IReadOnlyList<DocumentDifference> _diff = [];
+    private IReadOnlyList<DocumentLine> _lines32 = [], _lines31 = [];
+    private string? _error;
+
+    private async Task FetchAsync(CancellationToken cancellationToken)
+    {
+        var baseUri = new Uri(Navigation.BaseUri);
+        var a = Client.SendAsync(baseUri, "GET", $"/openapi/{LabApiExtensions.OpenApi32Document}.json", null, cancellationToken);
+        var b = Client.SendAsync(baseUri, "GET", $"/openapi/{LabApiExtensions.OpenApi31Document}.json", null, cancellationToken);
+        var (v32, v31) = (await a, await b);
+        _error = v32.Error ?? v31.Error ?? (v32.IsSuccess && v31.IsSuccess ? null : $"HTTP {v32.StatusCode} / {v31.StatusCode}");
+        if (_error is not null) return;
+
+        _v32 = OpenApiComparison.Facts(v32.ResponseBody);
+        _v31 = OpenApiComparison.Facts(v31.ResponseBody);
+        _diff = OpenApiComparison.Differences(v32.ResponseBody, v31.ResponseBody);
+        _lines32 = OpenApiComparison.Lines(v32.ResponseBody);
+        _lines31 = OpenApiComparison.Lines(v31.ResponseBody);
+    }
+}

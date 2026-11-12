@@ -1,7 +1,308 @@
 @page "/labs/aspnetcore"
+@rendermode InteractiveServer
+@using System.Text.Json
+@using DotNet11Lab.Api.Playground
+@using DotNet11Lab.Web.Components.Pages.Labs.AspNetCore
+@using DotNet11Lab.Web.Labs.AspNetCore
+@inject ApiPlaygroundClient Client
+@inject NavigationManager Navigation
 
-<LabHeader Slug="aspnetcore" />
+<LabHeader Slug="aspnetcore">
+    <p class="small muted">
+        Every request on this page is a real HTTP call from the server-side Blazor circuit to the Minimal API mapped in this same
+        process under <code>/api</code>. The endpoints are in <code>DotNet11Lab.Api</code>, the code blocks are read from that
+        compiled assembly, and the timings are measured on each click.
+    </p>
+</LabHeader>
 
-<Callout Kind="warn" Title="Under construction">
-    <p>This laboratory is being implemented.</p>
-</Callout>
+<nav class="tabs" aria-label="Sections">
+    <a class="tab" href="labs/aspnetcore#playground">Playground</a>
+    <a class="tab" href="labs/aspnetcore#async-validation">Async validation</a>
+    <a class="tab" href="labs/aspnetcore#unions">Unions in JSON</a>
+    <a class="tab" href="labs/aspnetcore#openapi">OpenAPI 3.2</a>
+    <a class="tab" href="labs/aspnetcore#problems">ProblemDetails</a>
+</nav>
+
+<ApiPlayground />
+
+@* ---------------------------------------------------------------- Async validation *@
+<div class="section" id="async-validation">
+    <div class="section-title"><h2>Async DataAnnotations validation</h2><StatusBadge Status="FeatureStatus.Stable" /><span class="badge badge-new">New in 11</span></div>
+    <p>
+        <code>AsyncValidationAttribute</code> (override <code>IsValidAsync</code>) and <code>IAsyncValidatableObject</code>
+        (<code>ValidateAsync</code> returns <code>IAsyncEnumerable&lt;ValidationResult&gt;</code>) are new in
+        <code>System.ComponentModel.Annotations</code>. With <code>builder.Services.AddValidation()</code>, Minimal APIs run them for
+        every bound body, including nested objects and collection items, and answer <code>400</code> with a
+        <code>ValidationProblem</code> before the handler is called. The request's <code>CancellationToken</code> flows into
+        each lookup.
+    </p>
+    <CodeCompare OldSnippet="AspNetCore.LegacyManualValidation" NewSnippet="AspNetCore.CheckoutRequest"
+                 OldTitle="POST /api/v10style/checkout: validation inside the handler" NewTitle="POST /api/checkout: validation declared on the model" />
+    <div class="grid grid-2" style="margin-top:1rem">
+        <CodeBlock Snippet="AspNetCore.AsyncAttribute" />
+        <div class="stack">
+            <CodeBlock Snippet="AspNetCore.MapCheckout" />
+            <CodeBlock Snippet="AspNetCore.AddLabApi" />
+        </div>
+    </div>
+
+    <Callout Kind="warn" Title="Found while building this lab">
+        <p>
+            When a model implements <code>IAsyncValidatableObject</code>, Minimal API validation calls <strong>only</strong>
+            <code>ValidateAsync</code>. The synchronous <code>Validate</code> member it inherits from <code>IValidatableObject</code>
+            is not invoked, so <code>CheckoutRequest.ValidateAsync</code> yields the sync rules itself (see the express-shipping rule;
+            covered by a test). Also, the synchronous <code>Validator</code> APIs cannot run an async-only attribute: use
+            <code>Validator.TryValidateObjectAsync</code>.
+        </p>
+    </Callout>
+
+    <DemoPanel Title="Same invalid request, two endpoints" Id="validation-race" RunLabel="Run 5 rounds" Cancellable="true" OnRun="RaceAsync"
+               Description="Sends the 'async attributes fail' body to /api/checkout (AddValidation) and to /api/v10style/checkout (manual), five times each, alternating. Each simulated lookup waits 35 ms.">
+        <Result>
+            @if (_race is { } race)
+            {
+                <BarChart Items="race.Bars" AriaLabel="Median latency per endpoint" />
+                <p class="small muted" style="margin-top:.6rem">
+                    Both endpoints returned <strong>@race.Statuses</strong> with @(race.SameErrors ? "identical" : "different") error dictionaries.
+                    The manual version awaits each lookup in turn; <code>AddValidation()</code> starts the async attributes of a member together
+                    and validates collection items in parallel. Medians of 5 runs, measured end to end from this circuit over loopback HTTP.
+                </p>
+            }
+        </Result>
+    </DemoPanel>
+
+    <UsageGuidance>
+        <WhenToUse>
+            <ul>
+                <li>Rules that need I/O: uniqueness, existence, entitlement, stock, coupon or fraud checks.</li>
+                <li>You want one declarative contract that Minimal APIs, Blazor forms and <code>Validator.*Async</code> all honour.</li>
+                <li>Validation must stop when the client disconnects (the token is the request's).</li>
+            </ul>
+        </WhenToUse>
+        <WhenToAvoid>
+            <ul>
+                <li>The check is the business operation itself (reserving stock): validate cheaply, then enforce atomically in the handler (see the 409).</li>
+                <li>High-throughput endpoints where each lookup is a remote call: cache, batch, or move the rule out of the per-request path.</li>
+                <li>Code paths that call the synchronous <code>Validator</code>: async-only attributes throw there.</li>
+            </ul>
+        </WhenToAvoid>
+    </UsageGuidance>
+</div>
+
+@* ---------------------------------------------------------------- Unions *@
+<div class="section" id="unions">
+    <div class="section-title"><h2>C# 15 unions in request and response bodies</h2><StatusBadge Status="FeatureStatus.Stable" /><span class="badge badge-new">New in 11</span></div>
+    <p>
+        System.Text.Json writes a union as the case it holds, with no wrapper and no <code>$type</code>. Minimal APIs use that for
+        return values and for bodies. Reading needs a way to pick the case: scalar cases are told apart by JSON token type; several
+        object cases need a classifier such as <code>JsonUnionTypeStructuralClassifier</code>, which matches property names.
+        Unions are <strong>not</strong> supported for route values, query strings, headers or form fields.
+    </p>
+    <div class="grid grid-2">
+        <CodeBlock Snippet="AspNetCore.PaymentOutcomeUnion" />
+        <CodeBlock Snippet="AspNetCore.PaymentMethodUnion" />
+    </div>
+    <div class="grid grid-2" style="margin-top:1rem">
+        <CodeBlock Snippet="AspNetCore.AuthorizeHandler" />
+        <CodeBlock Snippet="AspNetCore.AuthorizeSwitch" />
+    </div>
+
+    <DemoPanel Title="One endpoint, three response shapes" Id="union-cases" RunLabel="Authorize three payments" OnRun="UnionCasesAsync"
+               Description="POST /api/payments/authorize with a card, a declined card and a bank transfer. Same status code, same declared type, different JSON.">
+        <Result>
+            <div class="grid grid-3">
+                @foreach (var (preset, exchange) in _unionResults)
+                {
+                    <div>
+                        <div class="small" style="margin-bottom:.3rem"><strong>@preset.Title.Replace("Union case: ", "")</strong> · HTTP @exchange.StatusCode</div>
+                        <CodeBlock Code="@(exchange.Error ?? exchange.ResponseBody)" Language="json" Title="response body" />
+                    </div>
+                }
+            </div>
+        </Result>
+    </DemoPanel>
+
+    <UsageGuidance>
+        <WhenToUse>
+            <ul>
+                <li>An operation has a small, closed set of outcomes with different data (approved / declined / needs action).</li>
+                <li>You want the compiler to force every caller and handler to deal with every case.</li>
+                <li>Clients already branch on the shape of the payload (TypeScript discriminated by property, OpenAPI <code>anyOf</code>).</li>
+            </ul>
+        </WhenToUse>
+        <WhenToAvoid>
+            <ul>
+                <li>Cases with overlapping properties: the structural classifier throws when zero or several cases match. Add a field or a custom classifier.</li>
+                <li>Consumers that need an explicit discriminator (code generators that ignore <code>anyOf</code>): prefer <code>[JsonPolymorphic]</code> with <code>$type</code>.</li>
+                <li>Values bound from route, query, header or form: not supported.</li>
+            </ul>
+        </WhenToAvoid>
+    </UsageGuidance>
+</div>
+
+@* ---------------------------------------------------------------- OpenAPI *@
+<div class="section" id="openapi">
+    <div class="section-title"><h2>OpenAPI 3.2 by default</h2><StatusBadge Status="FeatureStatus.Stable" /><span class="badge badge-new">New in 11</span></div>
+    <p>
+        <code>Microsoft.AspNetCore.OpenApi</code> 11 emits OpenAPI <strong>3.2.0</strong> unless told otherwise; set
+        <code>OpenApiOptions.OpenApiVersion</code> to <code>OpenApiSpecVersion.OpenApi3_1</code> for tools that do not read 3.2 yet.
+        This app registers two documents for the same endpoints. Unions become <code>anyOf</code> of the case schemas (no
+        discriminator) in both. The visible difference here is Server-Sent Events: 3.2 has <code>itemSchema</code> for the type of each
+        event, which the 3.1 writer can only emit as the <code>x-oai-itemSchema</code> extension.
+    </p>
+    <div class="grid grid-2">
+        <CodeBlock Snippet="AspNetCore.AddLabApi" Title="Two documents, two versions" />
+        <CodeBlock Snippet="AspNetCore.MapOrderEvents" />
+    </div>
+    <OpenApiViewer />
+    <UsageGuidance>
+        <WhenToUse>
+            <ul>
+                <li>New APIs and tooling that reads 3.2 (streaming item schemas, the QUERY method, richer tags).</li>
+                <li>Publishing two versions side by side while consumers migrate, as here.</li>
+            </ul>
+        </WhenToUse>
+        <WhenToAvoid>
+            <ul>
+                <li>Client generators, gateways or linters that reject <code>"openapi": "3.2.0"</code>: pin <code>OpenApi3_1</code> until they catch up.</li>
+                <li>Contracts checked into source control and diffed in CI: upgrading the package changes the version line, so plan the switch.</li>
+            </ul>
+        </WhenToAvoid>
+    </UsageGuidance>
+</div>
+
+@* ---------------------------------------------------------------- ProblemDetails *@
+<div class="section" id="problems">
+    <div class="section-title"><h2>Structured errors with ProblemDetails</h2><StatusBadge Status="FeatureStatus.Baseline" /></div>
+    <p>
+        Not new in .NET 11: shown as the baseline the other features rely on. <code>AddProblemDetails</code> makes validation
+        failures, <code>TypedResults.Problem</code> and the exception filter all produce RFC 9457 <code>application/problem+json</code>.
+        <code>CustomizeProblemDetails</code> adds <code>instance</code> and <code>traceId</code> everywhere, and every error carries a
+        machine-readable <code>code</code>. Notice that all rows below share one trace id: the demo run starts an
+        <code>Activity</code> and <code>HttpClient</code> propagates <code>traceparent</code>, so the server joins the caller's trace.
+        Status codes are consistent: 400 malformed or invalid input, 404 unknown resource, 409 state
+        conflict, 422 well-formed but semantically wrong, 500 unexpected.
+    </p>
+    <div class="grid grid-2">
+        <CodeBlock Snippet="AspNetCore.ProblemFactory" />
+        <CodeBlock Snippet="AspNetCore.ExceptionFilter" />
+    </div>
+    <DemoPanel Title="Every error, one format" Id="problem-table" RunLabel="Trigger each error" OnRun="ProblemsAsync"
+               Description="Sends the 400, 404, 409, 422 and 500 presets and reads the problem documents back.">
+        <Result>
+            <div class="table-wrap">
+                <table class="data">
+                    <thead><tr><th>Request</th><th class="num">Status</th><th>Content type</th><th>code</th><th>title</th><th>traceId</th></tr></thead>
+                    <tbody>
+                        @foreach (var row in _problems)
+                        {
+                            <tr class="@(row.Status >= 500 ? "row-danger" : "row-warn")">
+                                <td class="mono small">@row.Request</td>
+                                <td class="num">@row.Status</td>
+                                <td class="mono small">@row.ContentType</td>
+                                <td class="mono small">@row.Code</td>
+                                <td class="small">@row.Title</td>
+                                <td class="mono small">@row.TraceId</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </Result>
+    </DemoPanel>
+    <UsageGuidance>
+        <WhenToUse>
+            <ul>
+                <li>Any HTTP API: clients get one parseable error format with a correlation id for support.</li>
+                <li>Add stable <code>code</code> extensions so clients do not parse human-readable titles.</li>
+            </ul>
+        </WhenToUse>
+        <WhenToAvoid>
+            <ul>
+                <li>Never put exception messages or stack traces in production problem documents (here the detail is generic and the exception is only logged).</li>
+                <li>Do not use 500 for client mistakes or 400 for business conflicts: callers retry or not based on the status.</li>
+            </ul>
+        </WhenToAvoid>
+    </UsageGuidance>
+</div>
+
+@code {
+    private sealed record RaceResult(IReadOnlyList<BarChart.Bar> Bars, string Statuses, bool SameErrors);
+    private sealed record ProblemRow(string Request, int? Status, string? ContentType, string? Code, string? Title, string? TraceId);
+
+    private RaceResult? _race;
+    private List<(ApiPreset Preset, PlaygroundExchange Exchange)> _unionResults = [];
+    private List<ProblemRow> _problems = [];
+
+    private Uri BaseUri => new(Navigation.BaseUri);
+
+    private Task<PlaygroundExchange> SendAsync(ApiPreset preset, CancellationToken cancellationToken) =>
+        Client.SendAsync(BaseUri, preset.Method, preset.Path, preset.Body, cancellationToken);
+
+    private async Task RaceAsync(CancellationToken cancellationToken)
+    {
+        var modern = ApiPresets.Get("checkout-async-invalid");
+        var legacy = ApiPresets.Get("checkout-v10style-invalid");
+        await SendAsync(modern, cancellationToken); // warm up both paths
+        await SendAsync(legacy, cancellationToken);
+
+        var modernRuns = new List<PlaygroundExchange>();
+        var legacyRuns = new List<PlaygroundExchange>();
+        for (var i = 0; i < 5; i++)
+        {
+            modernRuns.Add(await SendAsync(modern, cancellationToken));
+            legacyRuns.Add(await SendAsync(legacy, cancellationToken));
+        }
+        if (modernRuns.Concat(legacyRuns).FirstOrDefault(r => r.Error is not null) is { } failed) throw new HttpRequestException(failed.Error);
+
+        static double Median(List<PlaygroundExchange> runs) => runs.Select(r => r.Elapsed.TotalMicroseconds).Order().ElementAt(runs.Count / 2);
+        var m = Median(modernRuns);
+        var l = Median(legacyRuns);
+        _race = new RaceResult(
+            [
+                new("AddValidation() (.NET 11)", m, Measure.FormatDuration(m)),
+                new("Manual in handler (.NET 10 style)", l, Measure.FormatDuration(l), 1),
+            ],
+            string.Join(" / ", modernRuns.Concat(legacyRuns).Select(r => r.StatusCode).Distinct()),
+            ErrorsOf(modernRuns[0]) == ErrorsOf(legacyRuns[0]));
+    }
+
+    private static string ErrorsOf(PlaygroundExchange exchange)
+    {
+        using var doc = JsonDocument.Parse(exchange.ResponseBody);
+        return string.Join("|", doc.RootElement.GetProperty("errors").EnumerateObject()
+            .OrderBy(p => p.Name, StringComparer.Ordinal).Select(p => p.Name + "=" + p.Value.GetRawText()));
+    }
+
+    private async Task UnionCasesAsync(CancellationToken cancellationToken)
+    {
+        var results = new List<(ApiPreset, PlaygroundExchange)>();
+        foreach (var id in new[] { "payment-approved", "payment-declined", "payment-requires-action" })
+        {
+            var preset = ApiPresets.Get(id);
+            results.Add((preset, await SendAsync(preset, cancellationToken)));
+        }
+        _unionResults = results;
+    }
+
+    private async Task ProblemsAsync(CancellationToken cancellationToken)
+    {
+        var rows = new List<ProblemRow>();
+        foreach (var id in new[] { "checkout-sync-invalid", "order-not-found", "payment-already-paid", "payment-amount-mismatch", "unhandled-exception" })
+        {
+            var preset = ApiPresets.Get(id);
+            var x = await SendAsync(preset, cancellationToken);
+            string? code = null, title = null, traceId = null;
+            if (x.Error is null && x.ResponseBody.Length > 0)
+            {
+                using var doc = JsonDocument.Parse(x.ResponseBody);
+                var root = doc.RootElement;
+                code = root.TryGetProperty("code", out var c) ? c.GetString() : "(validation errors)";
+                title = root.TryGetProperty("title", out var t) ? t.GetString() : null;
+                traceId = root.TryGetProperty("traceId", out var tr) ? tr.GetString() : null;
+            }
+            rows.Add(new ProblemRow($"{preset.Method} {preset.Path}", x.StatusCode, x.ContentType, code, title, traceId ?? x.Error));
+        }
+        _problems = rows;
+    }
+}

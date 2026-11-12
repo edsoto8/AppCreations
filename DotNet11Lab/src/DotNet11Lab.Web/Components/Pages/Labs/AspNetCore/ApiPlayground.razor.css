@@ -1,0 +1,29 @@
+.playground { display: grid; grid-template-columns: minmax(220px, 300px) minmax(0, 1fr); gap: 1rem; }
+.presets { display: flex; flex-direction: column; gap: .2rem; max-height: 560px; overflow-y: auto; padding-right: .25rem; }
+.preset-group { font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; color: var(--text-muted); margin: .6rem 0 .2rem; font-weight: 600; }
+.preset-group:first-child { margin-top: 0; }
+.preset { display: grid; grid-template-columns: 44px 1fr auto; align-items: center; gap: .45rem; text-align: left; background: var(--bg-elev); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); padding: .35rem .5rem; font: inherit; font-size: .82rem; color: var(--text); cursor: pointer; }
+.preset:hover { border-color: var(--accent); }
+.preset.active { border-color: var(--accent); background: var(--accent-soft); }
+.preset-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.preset-expect { font-family: var(--font-mono); font-size: .72rem; color: var(--text-muted); }
+.method { font-family: var(--font-mono); font-size: .68rem; font-weight: 700; border-radius: 4px; padding: .05rem .25rem; text-align: center; }
+.method-get { background: var(--info-soft); color: var(--info); }
+.method-post { background: var(--ok-soft); color: var(--ok); }
+.method-put, .method-delete { background: var(--warn-soft); color: var(--warn); }
+.preset-explain { margin: 0 0 .6rem; }
+.editor textarea { min-height: 300px; }
+.editor input[type=text] { width: 100%; }
+.status-line { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem; margin-bottom: .75rem; }
+.status-code { font-family: var(--font-mono); font-weight: 700; padding: .2rem .6rem; border-radius: var(--radius-sm); }
+.status-code.ok { background: var(--ok-soft); color: var(--ok); }
+.status-code.warn { background: var(--warn-soft); color: var(--warn); }
+.status-code.danger { background: var(--danger-soft); color: var(--danger); }
+.exchange h3 { font-size: .9rem; margin: 0 0 .4rem; }
+.headers { margin-bottom: .6rem; font-size: .76rem; max-height: 220px; overflow: auto; }
+
+@media (max-width: 980px) {
+    .playground { grid-template-columns: 1fr; }
+    .presets { max-height: 260px; }
+}
