@@ -14,6 +14,7 @@ its commands from that app's folder, not from the repo root (there is no root so
 | `StepRecorder/` | Windows system-tray step recorder: .NET 10 WPF app, platform-neutral core, xUnit tests | `StepRecorder/CLAUDE.md`, `StepRecorder/README.md` |
 | `BoardFlow/` | Local-first Trello-style project board: .NET 10 Avalonia desktop app, SQLite + Dapper, Serilog, xUnit tests | `BoardFlow/CLAUDE.md`, `BoardFlow/README.md`, `BoardFlow/SPEC.md` |
 | `SkeletonWatch/` | 3D skeleton wristwatch with a working gear train: one static `index.html` using three.js from a CDN, no build step | `SkeletonWatch/README.md` |
+| `NoctCharacter/` | Cel-shaded 3D game character (hat, long coat, longsword) built in code: one static `index.html` using three.js from a CDN, no build step | `NoctCharacter/README.md` |
 
 `StepRecorder-MultiModel-Spec.md` (repo root) is the authoritative spec for `StepRecorder/`. That app is
 built one milestone at a time; its `CLAUDE.md` holds the rules the spec sets for each milestone.
@@ -22,6 +23,6 @@ built one milestone at a time; its `CLAUDE.md` holds the rules the spec sets for
 
 ## Shared Conventions
 
-- Most apps are C#/.NET (`SkeletonWatch/` is a single static HTML page). Each app's `Directory.Build.props` sets nullable, implicit usings and
+- Most apps are C#/.NET (`SkeletonWatch/` and `NoctCharacter/` are single static HTML pages). Each app's `Directory.Build.props` sets nullable, implicit usings and
   `TreatWarningsAsErrors`. Use the same settings for new .NET apps.
 - The root `.gitignore` is the standard Visual Studio one and covers every app.
