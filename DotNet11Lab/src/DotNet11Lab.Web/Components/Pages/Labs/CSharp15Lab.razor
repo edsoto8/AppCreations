@@ -1,7 +1,27 @@
 @page "/labs/csharp15"
+@rendermode InteractiveServer
+@using DotNet11Lab.Web.Components.Pages.Labs.CSharp15
 
-<LabHeader Slug="csharp15" />
+<LabHeader Slug="csharp15">
+    <nav class="row small" style="margin-top:.9rem;gap:.4rem" aria-label="On this page">
+        <a class="chip" href="labs/csharp15#unions">Unions</a>
+        <a class="chip" href="labs/csharp15#closed">Closed hierarchies</a>
+        <a class="chip" href="labs/csharp15#collection-args">Collection arguments</a>
+        <a class="chip" href="labs/csharp15#extension-indexers">Extension indexers</a>
+        <a class="chip" href="labs/csharp15#labeled-loops">Labeled break / continue</a>
+    </nav>
+</LabHeader>
 
-<Callout Kind="warn" Title="Under construction">
-    <p>This laboratory is being implemented.</p>
+<Callout Title="Every sample on this page is compiled C# 15">
+    <p>
+        The code panels are read from the running assembly (<code>DotNet11Lab.Core/Labs/CSharp15</code>), and the "Before" panels are
+        the same logic written the C# 14 way, compiled side by side. All five features are stable in C# 15, the default language
+        version for <code>net11.0</code>; none needs <code>LangVersion preview</code>.
+    </p>
 </Callout>
+
+<UnionsSection />
+<ClosedHierarchySection />
+<CollectionArgumentsSection />
+<ExtensionIndexersSection />
+<LabeledLoopsSection />

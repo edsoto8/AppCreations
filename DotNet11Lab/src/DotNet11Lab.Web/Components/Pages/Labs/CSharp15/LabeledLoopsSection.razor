@@ -1,0 +1,117 @@
+@using DotNet11Lab.Core.Labs.CSharp15
+
+<section class="section" id="labeled-loops">
+    <div class="section-title"><h2>5 · Labeled break and continue</h2><span class="badge badge-new">New in C# 15</span></div>
+    <p>
+        A label placed directly on a loop can now be the target of <code>break</code> and <code>continue</code>. Leaving two nested
+        loops no longer needs a flag checked in the outer condition, a <code>goto</code>, or extracting a local function just to
+        <code>return</code>. Unlabeled <code>break</code>/<code>continue</code> are unchanged. The IDE0410 analyzer suggests the rewrite.
+    </p>
+    <div style="margin-top:1.25rem"><CodeCompare OldSnippet="CSharp15.LegacyBreak" NewSnippet="CSharp15.LabeledBreak" /></div>
+
+    <DemoPanel Title="Find a bin in the warehouse" Id="labeled-break" OnRun="SearchAsync" RunLabel="Search"
+               Description="Scan aisles × shelves for the first bin holding enough units, then stop scanning entirely.">
+        <ChildContent>
+            <div class="row">
+                <div class="field"><label for="aisles">Aisles (max @Warehouse.MaxAisles)</label><input id="aisles" type="number" @bind="_aisles" style="width:6rem" /></div>
+                <div class="field"><label for="shelves">Shelves (max @Warehouse.MaxShelves)</label><input id="shelves" type="number" @bind="_shelves" style="width:6rem" /></div>
+                <div class="field"><label for="seed">Seed</label><input id="seed" type="number" @bind="_seed" style="width:6rem" /></div>
+                <div class="field">
+                    <label for="wsku">SKU</label>
+                    <select id="wsku" @bind="_sku">@foreach (var s in Warehouse.Skus) { <option>@s</option> }</select>
+                </div>
+                <div class="field"><label for="need">Units needed</label><input id="need" type="number" @bind="_needed" style="width:6rem" /></div>
+            </div>
+        </ChildContent>
+        <Result>
+            <div class="grid grid-4">
+                <MetricTile Label="Result" Value="@(_search!.Found ? $"Aisle {_search.Aisle + 1}, shelf {_search.Shelf + 1}" : "Not found")" />
+                <MetricTile Label="Bins inspected" Value="@_search.BinsInspected.ToString("N0")" Sub="labeled break" />
+                <MetricTile Label="Bins inspected" Value="@_legacySearch!.BinsInspected.ToString("N0")" Sub="flag variable (C# 14)" />
+                <MetricTile Label="Bins in warehouse" Value="@_totalBins.ToString("N0")" Sub="@($"{100.0 * _search.BinsInspected / Math.Max(1, _totalBins):0.#}% scanned")" />
+            </div>
+            <p class="small muted" style="margin-top:.5rem">
+                Both versions return @(_search == _legacySearch ? "identical results" : "DIFFERENT results"): the gain is readability, not speed.
+            </p>
+        </Result>
+    </DemoPanel>
+
+    <div style="margin-top:1.25rem"><CodeCompare OldSnippet="CSharp15.LegacyContinue" NewSnippet="CSharp15.LabeledContinue" /></div>
+
+    <DemoPanel Title="Post ledger batches all-or-nothing" Id="labeled-continue" OnRun="PostAsync" RunLabel="Post batches"
+               Description="A batch with any invalid transaction (zero amount or missing reference) is rejected as soon as it is found.">
+        <ChildContent>
+            <div class="row">
+                <div class="field"><label for="batches">Batches (max 500)</label><input id="batches" type="number" @bind="_batches" style="width:6rem" /></div>
+                <div class="field"><label for="bsize">Transactions per batch (max 500)</label><input id="bsize" type="number" @bind="_batchSize" style="width:6rem" /></div>
+                <div class="field"><label for="bad">Invalid %</label><input id="bad" type="number" @bind="_invalidPercent" style="width:5rem" /></div>
+            </div>
+        </ChildContent>
+        <Result>
+            <div class="grid grid-4">
+                <MetricTile Label="Batches posted" Value="@_post!.PostedBatches.Count.ToString("N0")" />
+                <MetricTile Label="Batches rejected" Value="@_post.RejectedBatches.Count.ToString("N0")" />
+                <MetricTile Label="Transactions inspected" Value="@_post.TransactionsInspected.ToString("N0")" Sub="@($"of {_batches * _batchSize:N0}; the rest were skipped")" />
+                <MetricTile Label="goto version agrees" Value="@(Agrees ? "Yes" : "No")" Sub="same posted / rejected / inspected" />
+            </div>
+            @if (_post.RejectedBatches.Count > 0)
+            {
+                <p class="small muted" style="margin-top:.5rem">Rejected batches: @string.Join(", ", _post.RejectedBatches.Take(40))@(_post.RejectedBatches.Count > 40 ? " …" : "")</p>
+            }
+        </Result>
+    </DemoPanel>
+
+    <UsageGuidance>
+        <WhenToUse>
+            <ul>
+                <li>Search loops over grids, matrices or nested collections that must stop at the first hit.</li>
+                <li>Batch processing where one failure skips the rest of the current outer item.</li>
+                <li>Replacing <code>goto</code> and boolean flags that exist only to steer loops.</li>
+            </ul>
+        </WhenToUse>
+        <WhenToAvoid>
+            <ul>
+                <li>Deeply nested loops with several labels: extracting a method with <code>return</code> is often clearer still.</li>
+                <li>Code that is naturally a LINQ query (<code>FirstOrDefault</code>, <code>Any</code>) without performance concerns.</li>
+            </ul>
+        </WhenToAvoid>
+    </UsageGuidance>
+</section>
+
+@code {
+    private int _aisles = 40, _shelves = 25, _seed = 7, _needed = 35;
+    private string _sku = Warehouse.Skus[4];
+    private BinSearchResult? _search, _legacySearch;
+    private int _totalBins;
+
+    private int _batches = 100, _batchSize = 25, _invalidPercent = 1;
+    private BatchRunResult? _post, _legacyPost;
+
+    private bool Agrees => _post is not null && _legacyPost is not null
+        && _post.PostedBatches.SequenceEqual(_legacyPost.PostedBatches)
+        && _post.RejectedBatches.SequenceEqual(_legacyPost.RejectedBatches)
+        && _post.TransactionsInspected == _legacyPost.TransactionsInspected;
+
+    private Task SearchAsync(CancellationToken cancellationToken)
+    {
+        _aisles = Math.Clamp(_aisles, 1, Warehouse.MaxAisles);
+        _shelves = Math.Clamp(_shelves, 1, Warehouse.MaxShelves);
+        _needed = Math.Clamp(_needed, 0, 1_000);
+        var warehouse = new Warehouse(_aisles, _shelves, _seed);
+        _totalBins = _aisles * _shelves;
+        _search = LabeledLoops.FindBin(warehouse.Bins, _sku, _needed);
+        _legacySearch = LabeledLoops.LegacyFindBin(warehouse.Bins, _sku, _needed);
+        return Task.CompletedTask;
+    }
+
+    private Task PostAsync(CancellationToken cancellationToken)
+    {
+        _batches = Math.Clamp(_batches, 1, 500);
+        _batchSize = Math.Clamp(_batchSize, 1, 500);
+        _invalidPercent = Math.Clamp(_invalidPercent, 0, 100);
+        var batches = LabeledLoops.GenerateBatches(_batches, _batchSize, _invalidPercent, _seed);
+        _post = LabeledLoops.PostBatches(batches);
+        _legacyPost = LabeledLoops.LegacyPostBatches(batches);
+        return Task.CompletedTask;
+    }
+}

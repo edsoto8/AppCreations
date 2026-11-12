@@ -1,0 +1,188 @@
+@using DotNet11Lab.Core.Labs.Libraries
+
+<section class="section" id="jsonl">
+    <div class="section-title"><h2>3 · JSON Lines output</h2><span class="badge badge-new">New in .NET 11</span></div>
+    <p>
+        JSON Lines (one compact JSON value per line, each ending in <code>\n</code>) is the usual format for log shipping, data exports,
+        bulk APIs and LLM datasets, because it can be produced and consumed one record at a time. .NET 9 could already
+        <em>read</em> it (<code>DeserializeAsyncEnumerable(..., topLevelValues: true)</code>). .NET 11 adds the writing side:
+        <code>SerializeAsyncEnumerable</code> with <code>topLevelValues: true</code> streams an <code>IAsyncEnumerable&lt;T&gt;</code>
+        without buffering, and ignores <code>WriteIndented</code> so the output is always valid JSONL.
+    </p>
+    <div style="margin-top:1.25rem"><CodeCompare OldSnippet="Libraries.LegacyJsonLinesWrite" NewSnippet="Libraries.JsonLinesWrite" /></div>
+
+    <DemoPanel Title="Stream transactions as JSON Lines" Id="jsonl-run" OnRun="JsonLinesAsync" Cancellable="true" RunLabel="Write and read back"
+               Description="Writes an async stream of transaction events with the source-generated LibrariesJsonContext, reads it back, and compares it with the hand-written loop.">
+        <ChildContent>
+            <div class="field"><label for="j-n">Events (1–@JsonLines.MaxItems.ToString("N0"))</label><input id="j-n" type="number" @bind="_items" style="width:8rem" /></div>
+        </ChildContent>
+        <Result>
+            @if (_jsonl is { } j)
+            {
+                <div class="grid grid-4">
+                    <MetricTile Label="Events written" Value="@j.Items.ToString("N0")" Sub="@Measure.FormatBytes(j.Bytes)" />
+                    <MetricTile Label="Events read back" Value="@j.ReadBack.ToString("N0")" Sub="@($"sum of amounts {j.ReadBackTotal:N2}")" />
+                    <MetricTile Label="Same bytes as the loop" Value="@(j.IdenticalToLegacy ? "Yes" : "No")" Sub="@($"legacy loop: {Measure.FormatBytes(j.LegacyBytes)}")" />
+                    <MetricTile Label="Lines" Value="@j.Items.ToString("N0")" Sub="one value + '\n' each, including the last" />
+                </div>
+                <div style="height:.75rem"></div>
+                <CodeBlock Language="json" Title="Raw output (first lines), topLevelValues: true" Code="@j.Preview" />
+                <div style="height:.6rem"></div>
+                <CodeBlock Language="json" Title="Same method, topLevelValues: false (3 items): a single JSON array" Code="@j.ArrayModePreview" />
+            }
+        </Result>
+    </DemoPanel>
+    <UsageGuidance>
+        <WhenToUse>
+            <ul>
+                <li>Exports and log streams that consumers process line by line (Spark, BigQuery, jq, OpenAI batch files).</li>
+                <li>Streaming database or API results to a file or HTTP response without holding them all in memory.</li>
+            </ul>
+        </WhenToUse>
+        <WhenToAvoid>
+            <ul>
+                <li>Clients that expect a JSON document (browsers calling <code>response.json()</code>): keep the default array mode.</li>
+                <li>Small, bounded collections where a plain array is simpler for everyone.</li>
+            </ul>
+        </WhenToAvoid>
+    </UsageGuidance>
+</section>
+
+<section class="section" id="stj">
+    <div class="section-title"><h2>4 · More System.Text.Json and BCL additions</h2><span class="badge badge-new">New in .NET 11</span></div>
+
+    <h3>Polymorphism inferred from a <code>closed</code> hierarchy</h3>
+    <p>
+        Serializing a <code>List&lt;PaymentEvent&gt;</code> writes only the declared base type's properties unless you list every derived type
+        with <code>[JsonDerivedType]</code>. Because a C# 15 <code>closed</code> type's subtypes are known to the compiler,
+        <code>InferClosedTypePolymorphism</code> builds that list for you, with <code>$type</code> discriminators.
+    </p>
+    <div class="grid grid-2" style="align-items:start">
+        <CodeBlock Snippet="Libraries.ClosedPaymentEvents" />
+        <CodeBlock Snippet="Libraries.InferClosedPolymorphism" />
+    </div>
+    <DemoPanel Title="Serialize payment events" Id="stj-closed" OnRun="PolymorphismAsync" RunLabel="Serialize">
+        <Result>
+            @if (_poly is { } p)
+            {
+                <CodeBlock Language="json" Title="Default options: derived data silently lost" Code="@p.WithoutInference" Scroll="false" />
+                <div style="height:.6rem"></div>
+                <CodeBlock Language="json" Title="InferClosedTypePolymorphism = true" Code="@p.WithInference" Scroll="false" />
+                <p class="small">Deserialized back as: <strong>@p.RoundTripped</strong></p>
+            }
+        </Result>
+    </DemoPanel>
+
+    <h3 style="margin-top:1.5rem">JsonNamingPolicy.PascalCase</h3>
+    <p>Joins CamelCase, SnakeCase and KebabCase as a built-in policy, for property names or dictionary keys (here: normalizing metadata keys from several upstream systems).</p>
+    <CodeBlock Snippet="Libraries.PascalCase" />
+    <DemoPanel Title="Convert names" Id="stj-pascal" OnRun="PascalAsync" RunLabel="Convert">
+        <ChildContent>
+            <label for="names">Names (one per line)</label>
+            <textarea id="names" @bind="_names" style="min-height:90px"></textarea>
+        </ChildContent>
+        <Result>
+            <div class="grid grid-2">
+                <div class="table-wrap">
+                    <table class="data">
+                        <thead><tr><th>Input</th><th>PascalCase.ConvertName</th></tr></thead>
+                        <tbody>@foreach (var (input, output) in _pascal) { <tr><td class="mono">@input</td><td class="mono">@output</td></tr> }</tbody>
+                    </table>
+                </div>
+                <CodeBlock Language="json" Title="DictionaryKeyPolicy = PascalCase" Code="@_metadataJson" Scroll="false" />
+            </div>
+        </Result>
+    </DemoPanel>
+
+    <h3 style="margin-top:1.5rem">Generic <code>GetTypeInfo&lt;T&gt;()</code></h3>
+    <div style="margin-top:1.25rem"><CodeCompare OldSnippet="Libraries.LegacyGetTypeInfo" NewSnippet="Libraries.GetTypeInfoGeneric" /></div>
+    <DemoPanel Title="Inspect the source-generated contract" Id="stj-typeinfo" OnRun="TypeInfoAsync" RunLabel="Inspect">
+        <Result>
+            @if (_typeInfo is { } t)
+            {
+                <p class="small">Kind: <strong>@t.Kind</strong> · @t.Properties.Count properties: <span class="mono">@string.Join(", ", t.Properties)</span></p>
+                <CodeBlock Language="json" Title="JsonSerializer.Serialize(sample, info)" Code="@t.Json" Scroll="false" />
+            }
+        </Result>
+    </DemoPanel>
+
+    <h3 style="margin-top:1.5rem"><code>EqualityComparer&lt;T&gt;.Create(keySelector)</code></h3>
+    <p>Builds a comparer from a key projection (with an optional key comparer), so equality and hashing can never disagree.</p>
+    <div style="margin-top:1.25rem"><CodeCompare OldSnippet="Libraries.LegacyEqualityComparer" NewSnippet="Libraries.EqualityComparerCreate" /></div>
+    <DemoPanel Title="Deduplicate retried webhook deliveries" Id="stj-comparer" OnRun="DedupeAsync" RunLabel="Deduplicate">
+        <ChildContent>
+            <div class="field"><label for="ev">Distinct events (1–10 000)</label><input id="ev" type="number" @bind="_events" style="width:7rem" /></div>
+        </ChildContent>
+        <Result>
+            @if (_dedupe is { } d)
+            {
+                <div class="grid grid-4">
+                    <MetricTile Label="Deliveries received" Value="@d.Deliveries.ToString("N0")" Sub="~30 % retried" />
+                    <MetricTile Label="Create(d => d?.EventId)" Value="@d.UniqueWithKeyComparer.ToString("N0")" Sub=".NET 11" />
+                    <MetricTile Label="Create(equals, hash)" Value="@d.UniqueWithLegacyComparer.ToString("N0")" Sub=".NET 8–10" />
+                    <MetricTile Label="Record equality" Value="@d.UniqueWithRecordEquality.ToString("N0")" Sub="Attempt differs: no dedupe" />
+                </div>
+            }
+        </Result>
+    </DemoPanel>
+    <UsageGuidance>
+        <WhenToUse>
+            <ul>
+                <li><code>InferClosedTypePolymorphism</code>: event and message hierarchies you already model as <code>closed</code>.</li>
+                <li><code>GetTypeInfo&lt;T&gt;</code>: library code that passes typed metadata to source-generated (AOT-safe) serializer overloads.</li>
+                <li><code>EqualityComparer.Create(key)</code>: Distinct/HashSet/Dictionary keyed by one property, in one line.</li>
+            </ul>
+        </WhenToUse>
+        <WhenToAvoid>
+            <ul>
+                <li>Polymorphic JSON read from untrusted sources without validating the <code>$type</code> you accept.</li>
+                <li>Discriminators that must stay stable across renames: prefer explicit <code>[JsonDerivedType(typeof(X), "x")]</code> names.</li>
+                <li>Key selectors that allocate (string concatenation) on hot paths: hashing calls them for every element.</li>
+            </ul>
+        </WhenToAvoid>
+    </UsageGuidance>
+</section>
+
+@code {
+    private int _items = 1_000, _events = 1_000;
+    private JsonLinesResult? _jsonl;
+    private PolymorphismDemo? _poly;
+    private string _names = "orderId\norder_id\nORDER\ntransaction-ref\neurBalance\niPhone";
+    private IReadOnlyList<(string Input, string Output)> _pascal = [];
+    private string _metadataJson = "";
+    private TypeInfoDemo? _typeInfo;
+    private DedupeDemo? _dedupe;
+
+    private async Task JsonLinesAsync(CancellationToken cancellationToken)
+    {
+        _items = Math.Clamp(_items, 1, JsonLines.MaxItems);
+        _jsonl = await JsonLines.RunAsync(_items, cancellationToken);
+    }
+
+    private Task PolymorphismAsync(CancellationToken cancellationToken)
+    {
+        _poly = JsonEnhancements.Polymorphism();
+        return Task.CompletedTask;
+    }
+
+    private Task PascalAsync(CancellationToken cancellationToken)
+    {
+        var names = _names.Split('\n', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries).Take(100).ToList();
+        _pascal = JsonEnhancements.PascalCaseNames(names);
+        _metadataJson = JsonEnhancements.NormalizeMetadata(names.Distinct().ToDictionary(n => n, n => $"value of {n}"));
+        return Task.CompletedTask;
+    }
+
+    private Task TypeInfoAsync(CancellationToken cancellationToken)
+    {
+        _typeInfo = JsonEnhancements.InspectContract();
+        return Task.CompletedTask;
+    }
+
+    private Task DedupeAsync(CancellationToken cancellationToken)
+    {
+        _events = Math.Clamp(_events, 1, 10_000);
+        _dedupe = JsonEnhancements.Dedupe(_events);
+        return Task.CompletedTask;
+    }
+}

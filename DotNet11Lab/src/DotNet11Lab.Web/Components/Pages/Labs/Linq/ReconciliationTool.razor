@@ -1,0 +1,248 @@
+@using DotNet11Lab.Core.Labs.Linq
+@using System.Globalization
+
+<DemoPanel Title="Financial reconciliation: bank statement vs general ledger" Id="reconcile" OnRun="RunAsync" RunLabel="Reconcile" Cancellable="true"
+           Description="Full-outer-joins both datasets on the transaction reference with Enumerable.FullJoin and classifies every row.">
+    <ChildContent>
+        <div class="tabs" role="tablist">
+            <button type="button" role="tab" class="tab @(_source == Source.Generated ? "active" : "")" @onclick="@(() => _source = Source.Generated)">Generated data</button>
+            <button type="button" role="tab" class="tab @(_source == Source.Csv ? "active" : "")" @onclick="@(() => _source = Source.Csv)">Paste / edit CSV</button>
+        </div>
+        @if (_source == Source.Generated)
+        {
+            <div class="row">
+                <div class="field"><label for="r-seed">Seed</label><input id="r-seed" type="number" @bind="_seed" style="width:6rem" /></div>
+                <div class="field"><label for="r-size">Transactions (max @ReconciliationScenario.MaxTransactions.ToString("N0"))</label><input id="r-size" type="number" @bind="_size" style="width:9rem" /></div>
+                <div class="field"><label for="r-mb">Missing in bank %</label><input id="r-mb" type="number" step="0.1" @bind="_missingInBank" style="width:6rem" /></div>
+                <div class="field"><label for="r-ml">Missing in ledger %</label><input id="r-ml" type="number" step="0.1" @bind="_missingInLedger" style="width:6rem" /></div>
+                <div class="field"><label for="r-mm">Amount mismatch %</label><input id="r-mm" type="number" step="0.1" @bind="_mismatch" style="width:6rem" /></div>
+                <div class="field"><label for="r-dup">Double-posted %</label><input id="r-dup" type="number" step="0.1" @bind="_duplicates" style="width:6rem" /></div>
+            </div>
+            <p class="small muted">
+                Generated deterministically from the seed: unique references, amounts and dates, then discrepancies injected at the given
+                rates (pending items missing from the bank, bank fees missing from the ledger, mistyped amounts, double postings).
+            </p>
+        }
+        else
+        {
+            <div class="grid grid-2">
+                <div>
+                    <label for="r-bank">Bank statement: reference,amount,date,description</label>
+                    <textarea id="r-bank" @bind="_bankCsv"></textarea>
+                </div>
+                <div>
+                    <label for="r-ledger">Ledger: reference,amount,date,account</label>
+                    <textarea id="r-ledger" @bind="_ledgerCsv"></textarea>
+                </div>
+            </div>
+            <div class="row" style="margin-top:.5rem">
+                <button type="button" class="btn btn-sm" @onclick="LoadSample">Load sample</button>
+                <button type="button" class="btn btn-sm" @onclick="LoadFromGenerator">Fill with 50 generated rows</button>
+                <span class="small muted">Up to @TransactionCsv.MaxRows.ToString("N0") rows per side; amounts use '.' as decimal separator; dates are yyyy-MM-dd.</span>
+            </div>
+        }
+        <label class="small" style="margin-top:.6rem;display:flex;gap:.4rem;align-items:center">
+            <input type="checkbox" @bind="_verify" /> Also run the GroupJoin emulation and the Dictionary version and check that all three agree
+        </label>
+    </ChildContent>
+    <Result>
+        @if (_parseErrors.Count > 0)
+        {
+            <Callout Kind="warn" Title="@($"{_parseErrors.Count} CSV row(s) skipped")">
+                <ul class="small">@foreach (var e in _parseErrors.Take(10)) { <li>@e</li> }</ul>
+            </Callout>
+        }
+        @if (_summary is { } s)
+        {
+            <div class="grid grid-4">
+                <MetricTile Label="Bank lines" Value="@s.BankEntries.ToString("N0")" Sub="@s.BankTotal.ToString("C", Usd)" />
+                <MetricTile Label="Ledger postings" Value="@s.LedgerEntries.ToString("N0")" Sub="@s.LedgerTotal.ToString("C", Usd)" />
+                <MetricTile Label="Match rate" Value="@s.MatchRate.ToString("P1")" Sub="@($"{s.Lines:N0} joined rows")" />
+                <MetricTile Label="Net difference" Value="@s.NetDifference.ToString("C", Usd)" Sub="@($"{s.DuplicateReferences:N0} duplicated reference(s)")" />
+            </div>
+            <div class="grid grid-2" style="margin-top:1rem;align-items:start">
+                <div class="card card-pad">
+                    <div class="small muted" style="margin-bottom:.5rem">Rows per category</div>
+                    <BarChart Items="@(Enum.GetValues<ReconciliationCategory>().Select(c => new BarChart.Bar(Label(c), s.Count(c), s.Count(c).ToString("N0"), c == ReconciliationCategory.Matched ? 2 : c == ReconciliationCategory.AmountMismatch ? 0 : 1)).ToList())"
+                              AriaLabel="Reconciliation rows per category" />
+                </div>
+                <div class="card card-pad">
+                    <div class="small muted" style="margin-bottom:.5rem">Timing (this run)</div>
+                    <div class="mono small">Data: @_dataTime</div>
+                    <div class="mono small">FullJoin + classify: @_joinTime</div>
+                    @if (_agreement is not null)
+                    {
+                        <div style="margin-top:.5rem">
+                            @if (_agreement == true) { <span class="badge badge-stable">✔ FullJoin, GroupJoin emulation and Dictionary agree row for row</span> }
+                            else { <span class="badge badge-danger">✘ Implementations disagree</span> }
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <div class="tabs" style="margin-top:1rem" role="tablist">
+                <button type="button" class="tab @(_filter is null ? "active" : "")" @onclick="@(() => SetFilter(null))">All (@s.Lines.ToString("N0"))</button>
+                @foreach (var c in Enum.GetValues<ReconciliationCategory>())
+                {
+                    <button type="button" class="tab @(_filter == c ? "active" : "")" @onclick="@(() => SetFilter(c))">@Label(c) (@s.Count(c).ToString("N0"))</button>
+                }
+            </div>
+            <div class="table-wrap">
+                <table class="data">
+                    <thead>
+                        <tr><th>Reference</th><th>Category</th><th class="num">Bank</th><th class="num">Ledger</th><th class="num">Difference</th><th>Bank text</th><th>Ledger account</th></tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var line in _filtered.Skip(_page * PageSize).Take(PageSize))
+                        {
+                            <tr class="@RowCss(line.Category)">
+                                <td class="mono">@line.Reference</td>
+                                <td><span class="badge @BadgeCss(line.Category)">@Label(line.Category)</span></td>
+                                <td class="num">@(line.Bank?.Amount.ToString("N2", CultureInfo.InvariantCulture) ?? "—")</td>
+                                <td class="num">@(line.Ledger?.Amount.ToString("N2", CultureInfo.InvariantCulture) ?? "—")</td>
+                                <td class="num">@(line.Difference == 0 ? "" : line.Difference.ToString("+0.00;-0.00", CultureInfo.InvariantCulture))</td>
+                                <td class="small">@line.Bank?.Description</td>
+                                <td class="small">@line.Ledger?.Account</td>
+                            </tr>
+                        }
+                        @if (_filtered.Count == 0)
+                        {
+                            <tr><td colspan="7" class="muted">No rows in this category.</td></tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            <div class="row" style="margin-top:.5rem;align-items:center">
+                <button type="button" class="btn btn-sm" disabled="@(_page == 0)" @onclick="@(() => _page = 0)">« First</button>
+                <button type="button" class="btn btn-sm" disabled="@(_page == 0)" @onclick="@(() => _page--)">‹ Prev</button>
+                <span class="small muted">Page @(_page + 1) of @PageCount.ToString("N0") · @_filtered.Count.ToString("N0") rows</span>
+                <button type="button" class="btn btn-sm" disabled="@(_page >= PageCount - 1)" @onclick="@(() => _page++)">Next ›</button>
+                <button type="button" class="btn btn-sm" disabled="@(_page >= PageCount - 1)" @onclick="@(() => _page = PageCount - 1)">Last »</button>
+            </div>
+        }
+    </Result>
+</DemoPanel>
+
+@code {
+    private enum Source { Generated, Csv }
+    private const int PageSize = 25;
+    private static readonly CultureInfo Usd = CultureInfo.GetCultureInfo("en-US");
+
+    private Source _source = Source.Generated;
+    private int _seed = 2026, _size = 25_000;
+    private double _missingInBank = 2, _missingInLedger = 1.5, _mismatch = 1, _duplicates = 0.2;
+    private string _bankCsv = TransactionCsv.SampleBank, _ledgerCsv = TransactionCsv.SampleLedger;
+    private bool _verify = true;
+
+    private List<ReconciliationLine> _lines = [];
+    private List<ReconciliationLine> _filtered = [];
+    private ReconciliationSummary? _summary;
+    private ReconciliationCategory? _filter;
+    private int _page;
+    private IReadOnlyList<string> _parseErrors = [];
+    private string _dataTime = "", _joinTime = "";
+    private bool? _agreement;
+
+    private int PageCount => Math.Max(1, (_filtered.Count + PageSize - 1) / PageSize);
+
+    private async Task RunAsync(CancellationToken cancellationToken)
+    {
+        var scenario = new ReconciliationScenario(_seed, _size, _missingInBank, _missingInLedger, _mismatch, _duplicates).Normalized();
+        (_seed, _size, _missingInBank, _missingInLedger, _mismatch, _duplicates) =
+            (scenario.Seed, scenario.Transactions, scenario.MissingInBankPercent, scenario.MissingInLedgerPercent, scenario.AmountMismatchPercent, scenario.DuplicatePercent);
+        var source = _source;
+        var (bankCsv, ledgerCsv, verify) = (_bankCsv, _ledgerCsv, _verify);
+
+        var result = await Task.Run(() =>
+        {
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            IReadOnlyList<BankEntry> bank;
+            IReadOnlyList<LedgerEntry> ledger;
+            List<string> errors = [];
+            if (source == Source.Generated)
+            {
+                var data = ReconciliationDataGenerator.Generate(scenario, cancellationToken);
+                (bank, ledger) = (data.Bank, data.Ledger);
+            }
+            else
+            {
+                var b = TransactionCsv.ParseBank(bankCsv);
+                var l = TransactionCsv.ParseLedger(ledgerCsv);
+                errors.AddRange(b.Errors.Select(e => "Bank " + e));
+                errors.AddRange(l.Errors.Select(e => "Ledger " + e));
+                (bank, ledger) = (b.Rows, l.Rows);
+            }
+            var dataTime = sw.Elapsed;
+            cancellationToken.ThrowIfCancellationRequested();
+
+            sw.Restart();
+            var lines = Reconciler.WithFullJoin(bank, ledger).ToList();
+            var joinTime = sw.Elapsed;
+
+            bool? agree = null;
+            if (verify)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var canonical = Reconciler.Canonical(lines);
+                agree = canonical.SequenceEqual(Reconciler.Canonical(Reconciler.WithGroupJoinEmulation(bank, ledger)))
+                        && canonical.SequenceEqual(Reconciler.Canonical(Reconciler.WithDictionary(bank, ledger)));
+            }
+            var summary = Reconciler.Summarize([.. bank], [.. ledger], lines);
+            // Show problems first: sort by category severity, then reference.
+            lines.Sort((x, y) => x.Category != y.Category ? Severity(x.Category).CompareTo(Severity(y.Category)) : string.CompareOrdinal(x.Reference, y.Reference));
+            return (lines, summary, errors, dataTime, joinTime, agree);
+        }, cancellationToken);
+
+        (_lines, _summary, _parseErrors, _agreement) = (result.lines, result.summary, result.errors, result.agree);
+        _dataTime = Measure.FormatDuration(result.dataTime.TotalMicroseconds);
+        _joinTime = Measure.FormatDuration(result.joinTime.TotalMicroseconds);
+        SetFilter(null);
+    }
+
+    private void SetFilter(ReconciliationCategory? category)
+    {
+        _filter = category;
+        _filtered = category is null ? _lines : _lines.Where(l => l.Category == category).ToList();
+        _page = 0;
+    }
+
+    private void LoadSample() => (_bankCsv, _ledgerCsv) = (TransactionCsv.SampleBank, TransactionCsv.SampleLedger);
+
+    private void LoadFromGenerator()
+    {
+        var data = ReconciliationDataGenerator.Generate(new ReconciliationScenario(_seed, 50, 6, 6, 6, 2));
+        _bankCsv = ReconciliationDataGenerator.ToBankCsv(data.Bank);
+        _ledgerCsv = ReconciliationDataGenerator.ToLedgerCsv(data.Ledger);
+    }
+
+    private static int Severity(ReconciliationCategory c) => c switch
+    {
+        ReconciliationCategory.AmountMismatch => 0,
+        ReconciliationCategory.MissingInLedger => 1,
+        ReconciliationCategory.MissingInBank => 2,
+        _ => 3,
+    };
+
+    private static string Label(ReconciliationCategory c) => c switch
+    {
+        ReconciliationCategory.Matched => "Matched",
+        ReconciliationCategory.AmountMismatch => "Amount mismatch",
+        ReconciliationCategory.MissingInBank => "Missing in bank",
+        ReconciliationCategory.MissingInLedger => "Missing in ledger",
+        _ => c.ToString(),
+    };
+
+    private static string BadgeCss(ReconciliationCategory c) => c switch
+    {
+        ReconciliationCategory.Matched => "badge-stable",
+        ReconciliationCategory.AmountMismatch => "badge-danger",
+        _ => "badge-experimental",
+    };
+
+    private static string RowCss(ReconciliationCategory c) => c switch
+    {
+        ReconciliationCategory.Matched => "row-ok",
+        ReconciliationCategory.AmountMismatch => "row-danger",
+        _ => "row-warn",
+    };
+}

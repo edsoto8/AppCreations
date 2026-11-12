@@ -1,7 +1,24 @@
 @page "/labs/libraries"
+@rendermode InteractiveServer
+@using DotNet11Lab.Web.Components.Pages.Labs.Libraries
 
-<LabHeader Slug="libraries" />
+<LabHeader Slug="libraries">
+    <nav class="row small" style="margin-top:.9rem;gap:.4rem" aria-label="On this page">
+        <a class="chip" href="labs/libraries#zstd">Zstandard</a>
+        <a class="chip" href="labs/libraries#streams">Memory stream adapters</a>
+        <a class="chip" href="labs/libraries#jsonl">JSON Lines</a>
+        <a class="chip" href="labs/libraries#stj">System.Text.Json and more</a>
+    </nav>
+</LabHeader>
 
-<Callout Kind="warn" Title="Under construction">
-    <p>This laboratory is being implemented.</p>
+<Callout Title="In-box, no packages">
+    <p>
+        Everything on this page ships in the .NET 11 shared framework. Data is generated deterministically (transaction logs,
+        application logs, webhook events), every round trip is verified byte for byte, and timings are quick in-process
+        measurements of this server, labelled as such.
+    </p>
 </Callout>
+
+<CompressionSection />
+<StreamAdaptersSection />
+<JsonSection />

@@ -1,7 +1,172 @@
 @page "/labs/linq"
+@rendermode InteractiveServer
+@using DotNet11Lab.Core.Labs.Linq
+@using DotNet11Lab.Web.Components.Pages.Labs.Linq
 
-<LabHeader Slug="linq" />
+<LabHeader Slug="linq">
+    <nav class="row small" style="margin-top:.9rem;gap:.4rem" aria-label="On this page">
+        <a class="chip" href="labs/linq#fulljoin">FullJoin</a>
+        <a class="chip" href="labs/linq#reconcile">Reconciliation tool</a>
+        <a class="chip" href="labs/linq#tuple-joins">Tuple Join / GroupJoin</a>
+        <a class="chip" href="labs/linq#join-perf">Performance</a>
+    </nav>
+</LabHeader>
 
-<Callout Kind="warn" Title="Under construction">
-    <p>This laboratory is being implemented.</p>
+<section class="section" id="fulljoin">
+    <div class="section-title"><h2>Enumerable.FullJoin</h2><span class="badge badge-new">New in .NET 11</span></div>
+    <p>
+        Reconciling two record sets is a full outer join: every bank line and every ledger posting must appear in the result,
+        paired when the reference matches and alone when it does not. .NET 10 added <code>LeftJoin</code> and <code>RightJoin</code>;
+        .NET 11 completes the set with <code>FullJoin</code>, which returns <code>(Outer, Inner)</code> tuples where either side is
+        <code>null</code> (or <code>default</code>) when it has no partner. It is also on <code>Queryable</code> (translated by providers
+        that support it) and <code>AsyncEnumerable</code>.
+    </p>
+    <div style="margin-top:1.25rem"><CodeCompare OldSnippet="Linq.LegacyFullJoin" NewSnippet="Linq.FullJoin" /></div>
+    <div class="grid grid-2" style="margin-top:1rem;align-items:start">
+        <CodeBlock Snippet="Linq.Classify" Title="Classification shared by all implementations" />
+        <CodeBlock Snippet="Linq.DictionaryJoin" Title="Hand-rolled alternative (for the benchmark)" />
+    </div>
+</section>
+
+<ReconciliationTool />
+
+<Callout Title="Practical use case">
+    <p>
+        Month-end close (bank vs ledger), payment-provider settlement files vs orders, inventory counts vs the stock system, or
+        syncing two systems of record: anything where "in A only", "in B only" and "in both but different" all matter.
+        Duplicate references pair as a cross product, exactly like SQL <code>FULL OUTER JOIN</code>, which is why the tool reports them.
+    </p>
 </Callout>
+
+<section class="section" id="tuple-joins">
+    <div class="section-title"><h2>Tuple-returning Join and GroupJoin</h2><span class="badge badge-new">New in .NET 11</span></div>
+    <p>
+        <code>Join</code> and <code>GroupJoin</code> gained overloads without a result selector (each with an optional
+        <code>IEqualityComparer&lt;TKey&gt;</code>). <code>Join</code> returns <code>(Outer, Inner)</code> tuples.
+        <code>GroupJoin</code> returns <code>IGrouping&lt;TOuter, TInner&gt;</code>: the group's <code>Key</code> is the outer element
+        itself, not a tuple (verified by reflection on the .NET 11 reference assemblies).
+    </p>
+    <div style="margin-top:1.25rem"><CodeCompare OldSnippet="Linq.LegacyTupleJoin" NewSnippet="Linq.TupleJoin" /></div>
+    <DemoPanel Title="Run the join shapes on the sample CSV" Id="tuple-run" OnRun="RunShapesAsync"
+               Description="Six statement lines and six ledger postings (one double-posted).">
+        <Result>
+            <div class="grid grid-2">
+                <div>
+                    <div class="small muted" style="margin-bottom:.35rem"><code>bank.Join(ledger, …)</code> → @_pairs.Count pairs (inner join)</div>
+                    <div class="table-wrap">
+                        <table class="data">
+                            <thead><tr><th>Bank.Reference</th><th class="num">Bank.Amount</th><th class="num">Ledger.Amount</th><th>Ledger.Account</th></tr></thead>
+                            <tbody>
+                                @foreach (var (bank, ledger) in _pairs)
+                                {
+                                    <tr><td class="mono">@bank.Reference</td><td class="num">@bank.Amount</td><td class="num">@ledger.Amount</td><td class="small">@ledger.Account</td></tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div>
+                    <div class="small muted" style="margin-bottom:.35rem"><code>bank.GroupJoin(ledger, …)</code> → @_groups.Count groups (one per bank line)</div>
+                    <div class="table-wrap">
+                        <table class="data">
+                            <thead><tr><th>group.Key.Reference</th><th class="num">group.Count()</th><th>Postings</th></tr></thead>
+                            <tbody>
+                                @foreach (var g in _groups)
+                                {
+                                    <tr class="@(g.Count() == 0 ? "row-warn" : "")"><td class="mono">@g.Key.Reference</td><td class="num">@g.Count()</td><td class="small">@string.Join(", ", g.Select(l => l.Amount))</td></tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </Result>
+    </DemoPanel>
+</section>
+
+<section class="section" id="join-perf">
+    <div class="section-title"><h2>Performance: FullJoin vs the alternatives</h2></div>
+    <p>
+        All three implementations below produce the same rows (the tests and the run below check it). The question is what the
+        built-in operator costs compared with the pre-.NET 10 emulation (GroupJoin + SelectMany + DefaultIfEmpty, then an anti-join
+        that enumerates the bank a second time) and a hand-written dictionary loop.
+    </p>
+    <DemoPanel Title="Measure the three implementations" Id="join-bench" OnRun="BenchmarkAsync" Cancellable="true" RunLabel="Measure"
+               Description="Quick in-process measurement (warm-up + timed iterations, allocations per thread). Use Lab 5 / BenchmarkDotNet for rigorous numbers.">
+        <ChildContent>
+            <div class="row">
+                <div class="field"><label for="b-size">Transactions (100 to @ReconciliationBenchmark.MaxTransactions.ToString("N0"))</label><input id="b-size" type="number" @bind="_benchSize" style="width:9rem" /></div>
+                <div class="field"><label for="b-iter">Iterations (1 to @ReconciliationBenchmark.MaxIterations)</label><input id="b-iter" type="number" @bind="_benchIterations" style="width:6rem" /></div>
+            </div>
+        </ChildContent>
+        <Result>
+            @if (_bench is { } b)
+            {
+                <p class="small muted">@b.BankEntries.ToString("N0") bank lines × @b.LedgerEntries.ToString("N0") ledger postings ·
+                    @if (b.AllAgree) { <span class="badge badge-stable">identical results</span> } else { <span class="badge badge-danger">results differ</span> }</p>
+                <div class="grid grid-2">
+                    <div class="card card-pad">
+                        <div class="small muted" style="margin-bottom:.5rem">Mean time per reconciliation</div>
+                        <BarChart Items="@(b.Measurements.Select((m, i) => new BarChart.Bar(m.Name, m.MeanMicroseconds, Measure.FormatDuration(m.MeanMicroseconds), i == 0 ? 0 : i == 1 ? 1 : 2)).ToList())" AriaLabel="Mean time" />
+                    </div>
+                    <div class="card card-pad">
+                        <div class="small muted" style="margin-bottom:.5rem">Allocated per reconciliation</div>
+                        <BarChart Items="@(b.Measurements.Select((m, i) => new BarChart.Bar(m.Name, m.AllocatedBytesPerOp, Measure.FormatBytes(m.AllocatedBytesPerOp), i == 0 ? 0 : i == 1 ? 1 : 2)).ToList())" AriaLabel="Allocations" />
+                    </div>
+                </div>
+                <div class="table-wrap" style="margin-top:1rem">
+                    <table class="data">
+                        <thead><tr><th>Implementation</th><th class="num">Iterations</th><th class="num">Mean</th><th class="num">Allocated / op</th><th class="num">Gen0 GCs</th></tr></thead>
+                        <tbody>
+                            @foreach (var m in b.Measurements)
+                            {
+                                <tr><td>@m.Name</td><td class="num">@m.Iterations</td><td class="num">@Measure.FormatDuration(m.MeanMicroseconds)</td><td class="num">@Measure.FormatBytes(m.AllocatedBytesPerOp)</td><td class="num">@m.Gen0Collections</td></tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </Result>
+    </DemoPanel>
+</section>
+
+<UsageGuidance>
+    <WhenToUse>
+        <ul>
+            <li>Reconciliation, diffing and synchronization where unmatched rows on <em>both</em> sides matter.</li>
+            <li>Replacing the GroupJoin/DefaultIfEmpty/Concat emulation: one call, one pass over each input, clearer intent.</li>
+            <li>Tuple <code>Join</code> when you only need the pair: no throwaway result selector.</li>
+        </ul>
+    </WhenToUse>
+    <WhenToAvoid>
+        <ul>
+            <li>You only need one side's unmatched rows: <code>LeftJoin</code>/<code>RightJoin</code> (.NET 10) say so more precisely.</li>
+            <li>Keys are not unique and you do not want a cross product: aggregate or deduplicate before joining.</li>
+            <li>Data lives in a database: let the query provider run the join (check that it translates <code>FullJoin</code>) instead of loading both tables.</li>
+        </ul>
+    </WhenToAvoid>
+</UsageGuidance>
+
+@code {
+    private IReadOnlyList<(BankEntry Bank, LedgerEntry Ledger)> _pairs = [];
+    private IReadOnlyList<IGrouping<BankEntry, LedgerEntry>> _groups = [];
+    private int _benchSize = 20_000, _benchIterations = 10;
+    private JoinBenchmarkResult? _bench;
+
+    private Task RunShapesAsync(CancellationToken cancellationToken)
+    {
+        var bank = TransactionCsv.ParseBank(TransactionCsv.SampleBank).Rows;
+        var ledger = TransactionCsv.ParseLedger(TransactionCsv.SampleLedger).Rows;
+        _pairs = JoinShapes.MatchedPairs(bank, ledger).ToList();
+        _groups = JoinShapes.PostingsPerStatementLine(bank, ledger).ToList();
+        return Task.CompletedTask;
+    }
+
+    private async Task BenchmarkAsync(CancellationToken cancellationToken)
+    {
+        _benchSize = Math.Clamp(_benchSize, 100, ReconciliationBenchmark.MaxTransactions);
+        _benchIterations = Math.Clamp(_benchIterations, 1, ReconciliationBenchmark.MaxIterations);
+        var (size, iterations) = (_benchSize, _benchIterations);
+        _bench = await Task.Run(() => ReconciliationBenchmark.Run(size, iterations, cancellationToken), cancellationToken);
+    }
+}
