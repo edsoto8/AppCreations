@@ -39,6 +39,27 @@ public sealed class LabAssistant(
 
     public static List<ChatMessage> NewConversation() => [new(ChatRole.System, SystemPrompt)];
 
+    /// <summary>Longest prompt accepted from the UI (enforced server-side; the textarea's maxlength is only a hint).</summary>
+    public const int MaxPromptChars = 4000;
+
+    /// <summary>History kept per conversation; every turn resends it to the provider, so it must not grow unbounded.</summary>
+    public const int MaxHistoryMessages = 40;
+
+    /// <summary>
+    /// Drops the oldest turns (never the system prompt) until the history fits, cutting only at user-message
+    /// boundaries so a tool call is never separated from its result.
+    /// </summary>
+    public static void TrimHistory(List<ChatMessage> history, int maxMessages = MaxHistoryMessages)
+    {
+        var first = history.Count > 0 && history[0].Role == ChatRole.System ? 1 : 0;
+        while (history.Count > maxMessages)
+        {
+            var nextUser = history.FindIndex(first + 1, m => m.Role == ChatRole.User);
+            if (nextUser < 0) break;
+            history.RemoveRange(first, nextUser - first);
+        }
+    }
+
     // <snippet:Ai.AbstractionAsk>
     /// <summary>Provider-neutral: the tool loop, tracing and logging all come from the middleware pipeline.</summary>
     public async Task<string> AskAsync(string question, bool forceMock, CancellationToken cancellationToken)
@@ -55,34 +76,48 @@ public sealed class LabAssistant(
     public async IAsyncEnumerable<AiTurnEvent> StreamTurnAsync(List<ChatMessage> history, string prompt, bool forceMock, bool useTools,
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
-        history.Add(new ChatMessage(ChatRole.User, prompt));
+        ArgumentException.ThrowIfNullOrWhiteSpace(prompt);
+        if (prompt.Length > MaxPromptChars) throw new ArgumentException($"Prompts are limited to {MaxPromptChars:N0} characters.", nameof(prompt));
+        var userMessage = new ChatMessage(ChatRole.User, prompt);
+        history.Add(userMessage);
         var chatOptions = new ChatOptions { Tools = useTools ? [.. Tools] : null };
         var updates = new List<ChatResponseUpdate>();
         var toolNames = new Dictionary<string, string>(StringComparer.Ordinal);
+        var completed = false;
 
-        await foreach (var update in GetClient(forceMock).GetStreamingResponseAsync(history, chatOptions, cancellationToken))
+        try
         {
-            updates.Add(update);
-            foreach (var content in update.Contents)
+            await foreach (var update in GetClient(forceMock).GetStreamingResponseAsync(history, chatOptions, cancellationToken))
             {
-                switch (content)
+                updates.Add(update);
+                foreach (var content in update.Contents)
                 {
-                    case FunctionCallContent call: // the model asked for a tool
-                        toolNames[call.CallId] = call.Name;
-                        yield return new(AiTurnEventKind.ToolCall, ToJson(call.Arguments), call.Name, call.CallId);
-                        break;
-                    case FunctionResultContent result: // FunctionInvokingChatClient ran it and streams the result back
-                        yield return new(AiTurnEventKind.ToolResult,
-                            result.Exception is { } ex ? $"error: {ex.Message}" : ToJson(result.Result),
-                            toolNames.GetValueOrDefault(result.CallId), result.CallId);
-                        break;
-                    case TextContent { Text.Length: > 0 } text:
-                        yield return new(AiTurnEventKind.Text, text.Text);
-                        break;
+                    switch (content)
+                    {
+                        case FunctionCallContent call: // the model asked for a tool
+                            toolNames[call.CallId] = call.Name;
+                            yield return new(AiTurnEventKind.ToolCall, ToJson(call.Arguments), call.Name, call.CallId);
+                            break;
+                        case FunctionResultContent result: // FunctionInvokingChatClient ran it and streams the result back
+                            yield return new(AiTurnEventKind.ToolResult,
+                                result.Exception is { } ex ? $"error: {ex.Message}" : ToJson(result.Result),
+                                toolNames.GetValueOrDefault(result.CallId), result.CallId);
+                            break;
+                        case TextContent { Text.Length: > 0 } text:
+                            yield return new(AiTurnEventKind.Text, text.Text);
+                            break;
+                    }
                 }
             }
+            history.AddMessages(updates); // keep calls, results and the answer for the next turn
+            TrimHistory(history);
+            completed = true;
         }
-        history.AddMessages(updates); // keep calls, results and the answer for the next turn
+        finally
+        {
+            // A failed or cancelled turn leaves no orphaned user message behind to be resent next time.
+            if (!completed) history.Remove(userMessage);
+        }
     }
     // </snippet:Ai.StreamTurn>
 

@@ -28,7 +28,8 @@ public sealed record LiveResult(
     int Gen0Collections,
     double SpeedupVsSlowest,
     long Checksum,
-    string ChecksumLabel);
+    string ChecksumLabel,
+    AllocationScope AllocationScope = AllocationScope.Thread);
 
 /// <summary>A live run. <see cref="Build"/> is "Release" or "Debug" (see <see cref="BuildInfo"/>).</summary>
 public sealed record LiveRun(string RunId, DateTimeOffset StartedUtc, string Runtime, string Build, string Machine, int Intensity, IReadOnlyList<LiveResult> Results);
@@ -85,7 +86,7 @@ public sealed class LivePerformanceRunner
         var slowest = measured.Max(x => x.Measurement.MeanMicroseconds);
         return measured.Select(x => new LiveResult(group.Id, x.Variant.Name, x.Measurement.Iterations, x.Measurement.MeanMicroseconds,
             x.Measurement.AllocatedBytesPerOp, x.Measurement.OpsPerSecond, x.Measurement.Gen0Collections,
-            x.Measurement.MeanMicroseconds > 0 ? slowest / x.Measurement.MeanMicroseconds : 1, x.Checksum, x.Variant.ChecksumLabel)).ToList();
+            x.Measurement.MeanMicroseconds > 0 ? slowest / x.Measurement.MeanMicroseconds : 1, x.Checksum, x.Variant.ChecksumLabel, x.Measurement.Scope)).ToList();
     }
 
     private static ValueTask<long> Sync(long value) => ValueTask.FromResult(value);

@@ -33,6 +33,7 @@ public partial class PerformanceLab
     [Inject] private BenchmarkResultsStore Results { get; set; } = default!;
     [Inject] private LivePerformanceRunner Runner { get; set; } = default!;
     [Inject] private PerformanceJournal Journal { get; set; } = default!;
+    [Inject] private IWebHostEnvironment HostEnvironment { get; set; } = default!;
 
     private ResultsLoad<BenchmarkResultsFile>? _published;
     private LiveRun? _live;
@@ -55,7 +56,8 @@ public partial class PerformanceLab
         var groups = Runner.Groups.Select(g => g.Id).Where(_selected.Contains).ToList();
         var run = await Runner.RunAsync(groups, _intensity, cancellationToken);
         _live = run;
-        await Journal.RecordAsync(run, cancellationToken);
+        // A journal failure (read-only folder, locked file) must not turn a successful measurement into an error.
+        await TryJournalAsync(() => Journal.RecordAsync(run, cancellationToken));
         _trendWorkload = (run.Results[0].GroupId, run.Results[0].Workload);
         await LoadHistoryAsync();
         // DemoPanel invokes OnRun as a plain delegate, so only the panel re-renders by itself; the journal section
@@ -65,21 +67,34 @@ public partial class PerformanceLab
 
     private async Task LoadHistoryAsync()
     {
-        try
-        {
-            _history = await Journal.GetRecentAsync(200);
-            _historyError = null;
-        }
-        catch (Exception ex) when (ex is Microsoft.Data.Sqlite.SqliteException or IOException or UnauthorizedAccessException)
-        {
-            _historyError = ex.Message;
-        }
+        if (await TryJournalAsync(async () => _history = await Journal.GetRecentAsync(200))) _historyError = null;
     }
+
+    /// <summary>
+    /// The journal is shared by everyone using this server, so clearing it is limited to Development
+    /// (a local single-user run). Elsewhere the button is hidden.
+    /// </summary>
+    private bool CanClearHistory => HostEnvironment.IsDevelopment();
 
     private async Task ClearHistoryAsync()
     {
-        await Journal.ClearAsync();
+        if (!CanClearHistory) return;
+        await TryJournalAsync(() => Journal.ClearAsync());
         await LoadHistoryAsync();
+    }
+
+    private async Task<bool> TryJournalAsync(Func<Task> action)
+    {
+        try
+        {
+            await action();
+            return true;
+        }
+        catch (Exception ex) when (ex is Microsoft.Data.Sqlite.SqliteException or IOException or UnauthorizedAccessException)
+        {
+            _historyError = $"Run journal unavailable: {ex.Message}";
+            return false;
+        }
     }
 
     private void Toggle(string id, bool on)

@@ -145,17 +145,43 @@ public partial class AiLab
     {
         _summary = null;
         _summaryJson = null;
-        var response = await FeatureSummaryExtractor.ExtractAsync(Assistant.GetClient(UsingMock), _featureQuery, cancellationToken);
-        _summaryJson = Pretty(response.Text);
-        _summary = response.TryGetResult(out var result) ? result : null;
+        // Server-side cap: the input's maxlength attribute is only a browser hint.
+        var query = _featureQuery.Trim();
+        if (query.Length is 0 or > MaxFeatureQueryChars)
+            throw new ArgumentException($"Enter a feature name of 1 to {MaxFeatureQueryChars} characters.");
+        try
+        {
+            var response = await FeatureSummaryExtractor.ExtractAsync(Assistant.GetClient(UsingMock), query, cancellationToken);
+            _summaryJson = Pretty(response.Text);
+            _summary = response.TryGetResult(out var result) ? result : null;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            throw Redacted(ex);
+        }
     }
+
+    private const int MaxFeatureQueryChars = 200;
+
+    /// <summary>
+    /// DemoPanel displays exception messages verbatim, so provider failures are re-thrown with the same key-redacted
+    /// description the chat transcript uses.
+    /// </summary>
+    private InvalidOperationException Redacted(Exception ex) => new(Assistant.DescribeFailure(ex));
 
     private async Task RunMcpProbeAsync(CancellationToken cancellationToken)
     {
         _mcp = null;
         _mcpServerPath = McpServerLocator.Find(AiOptionsAccessor.Value.McpServerPath, Environment.ContentRootPath)
             ?? throw new InvalidOperationException("The MCP server is not built. Run 'dotnet build DotNet11Lab.slnx' (or set Ai:McpServerPath) and try again.");
-        _mcp = await McpStdioProbe.RunAsync(_mcpServerPath, _mcpLab, cancellationToken);
+        try
+        {
+            _mcp = await McpStdioProbe.RunAsync(_mcpServerPath, _mcpLab, cancellationToken);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            throw Redacted(ex);
+        }
     }
 
     private static IEnumerable<string> Parameters(AIFunction tool) =>

@@ -77,7 +77,7 @@
                                         <tr class="@(r.SpeedupVsSlowest > 1.05 ? "row-ok" : "")">
                                             <td>@r.Workload<div class="small muted">@r.ChecksumLabel @r.Checksum.ToString("N0", CultureInfo.InvariantCulture)</div></td>
                                             <td class="num">@Measure.FormatDuration(r.MeanMicroseconds)</td>
-                                            <td class="num">@Measure.FormatBytes(r.AllocatedBytesPerOp)</td>
+                                            <td class="num" title="@(r.AllocationScope == AllocationScope.Process ? "Process-wide counter (async continuations hop threads): includes concurrent work such as other users' requests" : "Counted on the measuring thread only")">@Measure.FormatBytes(r.AllocatedBytesPerOp)@(r.AllocationScope == AllocationScope.Process ? " †" : "")</td>
                                             <td class="num">@r.OpsPerSecond.ToString("N0", CultureInfo.InvariantCulture)</td>
                                             <td class="num">@(r.SpeedupVsSlowest < 1.005 ? "slowest" : $"{r.SpeedupVsSlowest:0.00}× faster")</td>
                                         </tr>
@@ -85,6 +85,10 @@
                                 </tbody>
                             </table>
                         </div>
+                        @if (group.Any(r => r.AllocationScope == AllocationScope.Process))
+                        {
+                            <div class="small muted" style="margin-top:.4rem">† allocations counted process-wide (async continuations hop threads), so concurrent work in this process is included; compare † rows with each other, not with per-thread rows.</div>
+                        }
                         @if (group.Select(r => r.Checksum).Distinct().Count() == 1 && group.Key != "compression")
                         {
                             <div class="small" style="margin-top:.4rem;color:var(--ok)">✔ all variants returned the same result</div>
@@ -130,7 +134,10 @@
         </div>
         <div class="demo-actions">
             <button type="button" class="btn btn-sm" @onclick="LoadHistoryAsync">Refresh</button>
-            <button type="button" class="btn btn-sm" @onclick="ClearHistoryAsync" disabled="@(_history.Count == 0)">Clear</button>
+            @if (CanClearHistory)
+            {
+                <button type="button" class="btn btn-sm" @onclick="ClearHistoryAsync" disabled="@(_history.Count == 0)">Clear</button>
+            }
         </div>
     </div>
     <div class="demo-body">

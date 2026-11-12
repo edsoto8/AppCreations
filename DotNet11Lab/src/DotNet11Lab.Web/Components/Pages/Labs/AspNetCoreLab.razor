@@ -5,7 +5,6 @@
 @using DotNet11Lab.Web.Components.Pages.Labs.AspNetCore
 @using DotNet11Lab.Web.Labs.AspNetCore
 @inject ApiPlaygroundClient Client
-@inject NavigationManager Navigation
 
 <LabHeader Slug="aspnetcore">
     <p class="small muted">
@@ -234,10 +233,8 @@
     private List<(ApiPreset Preset, PlaygroundExchange Exchange)> _unionResults = [];
     private List<ProblemRow> _problems = [];
 
-    private Uri BaseUri => new(Navigation.BaseUri);
-
     private Task<PlaygroundExchange> SendAsync(ApiPreset preset, CancellationToken cancellationToken) =>
-        Client.SendAsync(BaseUri, preset.Method, preset.Path, preset.Body, cancellationToken);
+        Client.SendAsync(preset.Method, preset.Path, preset.Body, cancellationToken);
 
     private async Task RaceAsync(CancellationToken cancellationToken)
     {

@@ -91,7 +91,7 @@
     protected override void OnInitialized()
     {
         _transactions = Data.Items.AsQueryable();
-        _merchants = TransactionSearch.SummarizeByMerchant(Data).AsQueryable();
+        _merchants = Data.MerchantSummary.AsQueryable();
         _query = new Uri(Navigation.Uri).Query;
         Navigation.LocationChanged += OnLocationChanged;
     }

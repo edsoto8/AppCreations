@@ -2,8 +2,18 @@ using System.Diagnostics;
 
 namespace DotNet11Lab.Core.Diagnostics;
 
+/// <summary>What <see cref="Measurement.AllocatedBytes"/> counts.</summary>
+public enum AllocationScope
+{
+    /// <summary>Only the measuring thread: precise for synchronous code.</summary>
+    Thread,
+    /// <summary>The whole process: async continuations hop threads, so concurrent work (other users, Kestrel) is included.</summary>
+    Process,
+}
+
 /// <summary>Result of one in-process quick measurement. Not a substitute for BenchmarkDotNet (see Lab 5).</summary>
-public sealed record Measurement(string Name, TimeSpan Elapsed, long AllocatedBytes, int Iterations, int Gen0Collections)
+public sealed record Measurement(string Name, TimeSpan Elapsed, long AllocatedBytes, int Iterations, int Gen0Collections,
+    AllocationScope Scope = AllocationScope.Thread)
 {
     public double MeanMicroseconds => Elapsed.TotalMicroseconds / Iterations;
     public double AllocatedBytesPerOp => (double)AllocatedBytes / Iterations;
@@ -50,7 +60,7 @@ public static class Measure
             await action().ConfigureAwait(false);
         }
         sw.Stop();
-        return new Measurement(name, sw.Elapsed, GC.GetTotalAllocatedBytes(precise: true) - allocated, iterations, GC.CollectionCount(0) - gen0);
+        return new Measurement(name, sw.Elapsed, GC.GetTotalAllocatedBytes(precise: true) - allocated, iterations, GC.CollectionCount(0) - gen0, AllocationScope.Process);
     }
 
     public static string FormatBytes(double bytes) => bytes switch

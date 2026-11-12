@@ -88,25 +88,32 @@ public abstract class TransactionExplorerBase : ComponentBase, IDisposable
     /// <summary>Each keystroke cancels the previous pending search; only the last one (after a pause) scans.</summary>
     protected async Task FilterChangedAsync()
     {
+        // Each call owns (and disposes) its own source; a newer keystroke only cancels it. The token is captured once,
+        // because reading .Token from a source another call already disposed would throw ObjectDisposedException.
+        using var cts = new CancellationTokenSource();
         _debounce?.Cancel();
-        _debounce?.Dispose();
-        var cts = _debounce = new CancellationTokenSource();
+        _debounce = cts;
+        var token = cts.Token;
         try
         {
-            await Task.Delay(DebounceMilliseconds, cts.Token);
+            await Task.Delay(DebounceMilliseconds, token);
             var query = new TransactionQuery(SearchText, Category, Status, MinAmount);
-            Current = await Task.Run(() => TransactionSearch.Filter(Data, query, cts.Token), cts.Token);
+            Current = await Task.Run(() => TransactionSearch.Filter(Data, query, token), token);
             Stats.Filtered(Current.Elapsed);
             if (List is not null)
             {
                 await List.RefreshDataAsync();   // tell Virtualize the item source changed
-                if (Current.Matches.Count > 0) await List.ScrollToItemAsync(0, cts.Token);   // new results start at the top
+                if (Current.Matches.Count > 0) await List.ScrollToItemAsync(0, token);   // new results start at the top
             }
             StateHasChanged();
         }
-        catch (OperationCanceledException) when (cts.IsCancellationRequested)
+        catch (OperationCanceledException) when (token.IsCancellationRequested)
         {
             Stats.Superseded();
+        }
+        finally
+        {
+            if (ReferenceEquals(_debounce, cts)) _debounce = null;
         }
     }
     // </snippet:Blazor.DebouncedSearch>
@@ -132,8 +139,8 @@ public abstract class TransactionExplorerBase : ComponentBase, IDisposable
 
     public void Dispose()
     {
+        // Only cancel: the in-flight FilterChangedAsync call disposes its own source when it unwinds.
         _debounce?.Cancel();
-        _debounce?.Dispose();
         GC.SuppressFinalize(this);
     }
 }

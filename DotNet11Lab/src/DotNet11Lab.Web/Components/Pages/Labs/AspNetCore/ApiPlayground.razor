@@ -1,7 +1,6 @@
 @using DotNet11Lab.Api.Playground
 @using DotNet11Lab.Web.Labs.AspNetCore
 @inject ApiPlaygroundClient Client
-@inject NavigationManager Navigation
 
 <DemoPanel Title="API playground" Id="playground" RunLabel="Send request" Cancellable="true" OnRun="SendAsync"
            Description="Pick a preset, edit it, and send a real HTTP request to this app's own /api endpoints. Nothing is mocked: the response comes from the Minimal API running in this process.">
@@ -38,7 +37,7 @@
                         </select>
                     </div>
                     <div class="field" style="flex:1 1 260px">
-                        <label for="pg-path">Path (relative to @Navigation.BaseUri)</label>
+                        <label for="pg-path">Path (relative to this server, @(Client.BaseAddress?.ToString() ?? "address unknown"))</label>
                         <input id="pg-path" type="text" class="mono" @bind="_path" @bind:event="oninput" spellcheck="false" />
                     </div>
                 </div>
@@ -131,7 +130,7 @@
             _exchange = null;
             return;
         }
-        _exchange = await Client.SendAsync(new Uri(Navigation.BaseUri), _method, _path.Trim(), _body, cancellationToken);
+        _exchange = await Client.SendAsync(_method, _path.Trim(), _body, cancellationToken);
     }
 
     private static string HeaderText(string first, IEnumerable<KeyValuePair<string, string>> headers) =>

@@ -1,7 +1,6 @@
 @using DotNet11Lab.Api
 @using DotNet11Lab.Web.Labs.AspNetCore
 @inject ApiPlaygroundClient Client
-@inject NavigationManager Navigation
 
 <DemoPanel Title="Fetch the OpenAPI documents" Id="openapi-docs" RunLabel="Fetch both documents" OnRun="FetchAsync"
            Description="GET /openapi/v1.json (default, 3.2) and /openapi/v1-3.1.json (same API, OpenApiVersion = OpenApi3_1). Highlighted lines: version, union anyOf, SSE itemSchema.">
@@ -54,9 +53,8 @@
 
     private async Task FetchAsync(CancellationToken cancellationToken)
     {
-        var baseUri = new Uri(Navigation.BaseUri);
-        var a = Client.SendAsync(baseUri, "GET", $"/openapi/{LabApiExtensions.OpenApi32Document}.json", null, cancellationToken);
-        var b = Client.SendAsync(baseUri, "GET", $"/openapi/{LabApiExtensions.OpenApi31Document}.json", null, cancellationToken);
+        var a = Client.SendAsync("GET", $"/openapi/{LabApiExtensions.OpenApi32Document}.json", null, cancellationToken);
+        var b = Client.SendAsync("GET", $"/openapi/{LabApiExtensions.OpenApi31Document}.json", null, cancellationToken);
         var (v32, v31) = (await a, await b);
         _error = v32.Error ?? v31.Error ?? (v32.IsSuccess && v31.IsSuccess ? null : $"HTTP {v32.StatusCode} / {v31.StatusCode}");
         if (_error is not null) return;

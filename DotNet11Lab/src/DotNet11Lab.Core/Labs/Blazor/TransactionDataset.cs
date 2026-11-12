@@ -60,6 +60,15 @@ public sealed class TransactionDataset
 
     public int Count => Items.Count;
 
+    private IReadOnlyList<MerchantSummary>? _merchantSummary;
+
+    /// <summary>
+    /// Per-merchant totals, computed once: the dataset is immutable and shared (singleton), so regrouping
+    /// 100k rows on every component initialisation (twice per visit with prerendering) would be wasted work.
+    /// </summary>
+    public IReadOnlyList<MerchantSummary> MerchantSummary =>
+        LazyInitializer.EnsureInitialized(ref _merchantSummary, () => TransactionSearch.SummarizeByMerchant(this));
+
     public static IReadOnlyList<string> AllCategories => Categories;
 
     private static Transaction[] Generate(int count)

@@ -1,5 +1,8 @@
+using System.Buffers;
 using System.Diagnostics;
 using System.Net.Http.Headers;
+using Microsoft.AspNetCore.Hosting.Server;
+using Microsoft.AspNetCore.Hosting.Server.Features;
 using System.Text;
 using System.Text.Json;
 
@@ -25,9 +28,14 @@ public sealed record PlaygroundExchange(
 
 /// <summary>
 /// Sends real HTTP requests from the Blazor circuit to this application's own /api endpoints.
-/// Only relative paths under /api/ and /openapi/ are accepted, so the playground cannot be used to reach other hosts.
+/// <para>
+/// SSRF guard: the target host is never taken from the client. <c>NavigationManager.BaseUri</c> is supplied by
+/// the browser when a circuit starts, so trusting it would let a crafted client make the server call arbitrary
+/// hosts. The base address is instead the configured <c>ApiPlayground:BaseAddress</c> or the address Kestrel is
+/// actually bound to; only relative paths under /api/ and /openapi/ are accepted, and redirects are not followed.
+/// </para>
 /// </summary>
-public sealed class ApiPlaygroundClient(IHttpClientFactory httpClientFactory)
+public sealed class ApiPlaygroundClient(IHttpClientFactory httpClientFactory, IServer server, IConfiguration configuration)
 {
     public const string HttpClientName = "lab3-playground";
     public const int MaxRequestBodyChars = 32 * 1024;
@@ -44,8 +52,35 @@ public sealed class ApiPlaygroundClient(IHttpClientFactory httpClientFactory)
         return null;
     }
 
-    public async Task<PlaygroundExchange> SendAsync(Uri baseUri, string method, string path, string? body, CancellationToken cancellationToken)
+    /// <summary>The server's own address that playground requests are sent to, or null if it cannot be determined.</summary>
+    public Uri? BaseAddress => ResolveBaseAddress(configuration["ApiPlayground:BaseAddress"], server.Features.Get<IServerAddressesFeature>()?.Addresses);
+
+    /// <summary>Picks the configured address, else the first bound http(s) address with wildcard hosts mapped to localhost.</summary>
+    public static Uri? ResolveBaseAddress(string? configured, IEnumerable<string>? boundAddresses)
     {
+        if (!string.IsNullOrWhiteSpace(configured))
+        {
+            return Uri.TryCreate(configured, UriKind.Absolute, out var c) && c.Scheme is "http" or "https" ? WithTrailingSlash(c) : null;
+        }
+        var bound = (boundAddresses ?? []).ToList();
+        var chosen = bound.FirstOrDefault(a => a.StartsWith("http://", StringComparison.OrdinalIgnoreCase)) ?? bound.FirstOrDefault();
+        if (chosen is null) return null;
+        // Kestrel reports wildcard bindings verbatim (http://+:80, http://*:80, http://0.0.0.0:80, http://[::]:80).
+        chosen = chosen.Replace("://+", "://localhost").Replace("://*", "://localhost")
+                       .Replace("://0.0.0.0", "://localhost").Replace("://[::]", "://localhost");
+        return Uri.TryCreate(chosen, UriKind.Absolute, out var u) && u.Scheme is "http" or "https" ? WithTrailingSlash(u) : null;
+    }
+
+    private static Uri WithTrailingSlash(Uri u) => u.AbsoluteUri.EndsWith('/') ? u : new Uri(u.AbsoluteUri + "/");
+
+    public async Task<PlaygroundExchange> SendAsync(string method, string path, string? body, CancellationToken cancellationToken)
+    {
+        var baseUri = BaseAddress;
+        if (baseUri is null)
+        {
+            return Failed(method, new Uri("http://localhost/"), [], null, TimeSpan.Zero,
+                "Could not determine this server's own address. Set ApiPlayground:BaseAddress (e.g. http://localhost:5180/).");
+        }
         var url = new Uri(baseUri, path.TrimStart('/'));
         var sendBody = method is "GET" or "DELETE" || string.IsNullOrWhiteSpace(body) ? null : body;
         var problem = ValidateRequest(method, path, body);
@@ -71,7 +106,7 @@ public sealed class ApiPlaygroundClient(IHttpClientFactory httpClientFactory)
         catch (HttpRequestException ex)
         {
             return Failed(method, url, requestHeaders, sendBody, stopwatch.Elapsed,
-                $"Could not reach {url.GetLeftPart(UriPartial.Authority)}: {ex.Message}. The playground calls the address this page was served from; behind a proxy that address may not be reachable from the server.");
+                $"Could not reach {url.GetLeftPart(UriPartial.Authority)}: {ex.Message}. The playground calls the address this server is bound to; set ApiPlayground:BaseAddress if that is not reachable from the server itself.");
         }
         catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
@@ -98,11 +133,19 @@ public sealed class ApiPlaygroundClient(IHttpClientFactory httpClientFactory)
     {
         await using var stream = await content.ReadAsStreamAsync(cancellationToken);
         using var reader = new StreamReader(stream, Encoding.UTF8);
-        var buffer = new char[MaxResponseChars + 1];
-        var read = 0;
-        int n;
-        while (read < buffer.Length && (n = await reader.ReadAsync(buffer.AsMemory(read), cancellationToken)) > 0) read += n;
-        return read > MaxResponseChars ? (new string(buffer, 0, MaxResponseChars), true) : (new string(buffer, 0, read), false);
+        // Pooled buffer: a fresh 512 KB char[] per request would land on the large object heap every time.
+        var buffer = ArrayPool<char>.Shared.Rent(MaxResponseChars + 1);
+        try
+        {
+            var read = 0;
+            int n;
+            while (read <= MaxResponseChars && (n = await reader.ReadAsync(buffer.AsMemory(read, MaxResponseChars + 1 - read), cancellationToken)) > 0) read += n;
+            return read > MaxResponseChars ? (new string(buffer, 0, MaxResponseChars), true) : (new string(buffer, 0, read), false);
+        }
+        finally
+        {
+            ArrayPool<char>.Shared.Return(buffer);
+        }
     }
 
     private static List<KeyValuePair<string, string>> Flatten(HttpHeaders headers, HttpHeaders? contentHeaders) =>

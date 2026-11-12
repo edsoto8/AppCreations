@@ -40,7 +40,10 @@ All inputs are generated from fixed seeds (`WorkloadData`), so every run sees id
 - Exporters: BenchmarkDotNet full JSON and GitHub markdown in `artifacts/benchmarks/results/`, plus the compact
   `results/benchmarks/latest.json` written by `SummaryConverter` (BenchmarkDotNet's full JSON has no field for the
   job's runtime or the benchmark categories, so the compact file is built from the in-memory summaries).
-- Default job (`Job.Default`) for full runs: BenchmarkDotNet chooses launch, warm-up and iteration counts.
+- `Job.MediumRun` for full runs: 2 launches × (10 warm-up + 15 measured iterations). BenchmarkDotNet's adaptive
+  `Job.Default` was tried first. On the shared 4-vCPU VM, timing noise drove almost every benchmark to the
+  100-iteration cap, so the suite would have run past two hours without a better estimate. A fixed, standard
+  budget is more honest than a run that never converges. Error and standard deviation are still reported.
 - `--quick`: `Job.ShortRun` with 1 warm-up and 3 iterations. For checking the pipeline only; such files are
   marked `"preliminary": true` and the dashboard says so.
 - **Ratio** = mean time on .NET 11 / mean time on .NET 10 for the same benchmark (below 1.00 is faster), the same

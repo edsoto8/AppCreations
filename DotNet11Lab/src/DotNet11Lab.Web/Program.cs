@@ -38,7 +38,11 @@ try
     }
 
     builder.Services.AddRazorComponents()
-        .AddInteractiveServerComponents();
+        .AddInteractiveServerComponents()
+        // Labs accept pasted input larger than SignalR's 32 KB default (Lab 2 CSV: 200,000 chars; Lab 3 bodies: 32 KB
+        // plus framing). Without this, oversized input silently drops the circuit instead of reaching the labs'
+        // own validation messages.
+        .AddHubOptions(o => o.MaximumReceiveMessageSize = 1024 * 1024);
 
     builder.Services.AddLabCore(builder.Configuration,
         typeof(LabApiExtensions).Assembly,

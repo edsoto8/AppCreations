@@ -28,7 +28,11 @@ public static class LabBenchmarkConfig
         var job = quick
             // Smoke-test job: enough to prove the pipeline works end to end. Its numbers are not meaningful.
             ? Job.ShortRun.WithWarmupCount(1).WithIterationCount(3)
-            : Job.Default;
+            // MediumRun (2 launches x 15 iterations after 10 warm-ups) rather than Job.Default: on noisy, shared VMs the
+            // default job's adaptive iteration count hits its 100-iteration cap on almost every benchmark, stretching
+            // the suite past two hours without improving the estimate. MediumRun is a fixed, documented budget and
+            // BenchmarkDotNet still reports error and standard deviation for every result.
+            : Job.MediumRun;
 
         var config = ManualConfig.CreateMinimumViable()
             .AddDiagnoser(MemoryDiagnoser.Default)
