@@ -33,6 +33,16 @@ public abstract class AsyncSignupFormBase : ComponentBase, IDisposable
         return EditContext.IsValid(id) ? FieldState.Valid : FieldState.Invalid;
     }
 
+    /// <summary>
+    /// True while any async check runs. The parameterless IsValidationPending() was observed to stay false while only a
+    /// field-level check is pending, so the fields are asked individually as well.
+    /// </summary>
+    protected bool AnyValidationPending =>
+        EditContext.IsValidationPending()
+        || EditContext.IsValidationPending(() => Model.Username)
+        || EditContext.IsValidationPending(() => Model.Email)
+        || EditContext.IsValidationPending(() => Model.InviteCode);
+
     /// <summary>EditForm awaits every async validator before calling OnValidSubmit, in any render mode.</summary>
     protected Task OnValidSubmitAsync(EditContext context)
     {

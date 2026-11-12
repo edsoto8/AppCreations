@@ -53,12 +53,21 @@
             <code>ValidationRequestedEventArgs.AddAsyncValidator(Func&lt;CancellationToken, Task&gt;)</code> for custom validator components.
         </p>
     </Callout>
+    <Callout Kind="warn" Title="Found while building this lab">
+        <p>
+            The parameterless <code>EditContext.IsValidationPending()</code> stays <code>false</code> while only a field-level async check
+            is running (verified by a test); the per-field overloads report it. The submit button therefore asks each async field
+            (<code>AnyValidationPending</code>). Also: with an <code>ItemsProvider</code>, the Razor analyzer reports <code>BL0011</code>
+            unless <code>Virtualize</code> gets an <code>ItemComparer</code>, which is <em>not</em> flagged experimental on
+            <code>Virtualize</code> itself (only on QuickGrid, <code>ASP0030</code>).
+        </p>
+    </Callout>
     <UsageGuidance>
         <WhenToUse>
             <ul>
                 <li>Availability, uniqueness or entitlement checks the user should see before submitting.</li>
                 <li>Sharing one validated model between a Blazor form and an API endpoint.</li>
-                <li>Disabling submit while checks run: <code>IsValidationPending()</code> replaces hand-kept "checking" flags.</li>
+                <li>Disabling submit while checks run: the <code>IsValidationPending</code> overloads replace hand-kept "checking" flags.</li>
             </ul>
         </WhenToUse>
         <WhenToAvoid>

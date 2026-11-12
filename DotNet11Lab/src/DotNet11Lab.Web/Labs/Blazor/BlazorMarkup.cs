@@ -20,7 +20,7 @@ public static class BlazorMarkup
         """);
 
     public static readonly Excerpt SubmitButton = new("Components/Pages/Labs/Blazor/AsyncSignupForm.razor", """
-        <button type="submit" class="btn btn-primary btn-sm" disabled="@EditContext.IsValidationPending()">
+        <button type="submit" class="btn btn-primary btn-sm" disabled="@AnyValidationPending">
         """);
 
     public static readonly Excerpt QuickGrids = new("Components/Pages/Labs/Blazor/QuickGridLab.razor", """
