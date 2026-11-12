@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import type { Ctx } from '../context';
 import type { FaultDefinition, FaultId, Transaction } from '../../core/types';
 import { FAULTS } from '../../faults/catalog';
-import { runScenario } from '../../faults/autopilot';
+import { runScenario, recoverFault } from '../../faults/autopilot';
 import { componentInfo } from '../../knowledge/components';
 import { formatCents } from '../../core/money';
 import { h, mount } from '../dom';
@@ -111,60 +111,28 @@ export class TroubleshootController {
     }
   }
 
-  /** Performs the operator recovery action(s) for a fault. */
+  /** Performs the technician's recovery workflow for a fault (domain `recoverFault`), logging each step. */
   async recover(id: FaultId): Promise<void> {
     const c = this.ctx;
-    const op = c.sys.operator;
+    if (this.running) return;
     if (c.sys.app.sessionActive && id !== 'power-loss') {
       c.ui.toast('Wait for the customer session to end before servicing the ATM.', 'warn');
       return;
     }
-    const wasActive = op.active;
+    this.running = true;
+    this.say('Recovery: technician opens the ATM…');
+    const doorsWere = c.views.doorsHeldOpen;
+    c.views.holdDoorsOpen(true);
     try {
-      if (!wasActive && id !== 'power-loss') op.enter();
-      switch (id) {
-        case 'cash-jam':
-        case 'pick-failure':
-          await op.clearJam();
-          op.resetDevice('dispenser');
-          break;
-        case 'note-rejected':
-          op.emptyBin('reject');
-          break;
-        case 'cash-not-collected':
-          op.emptyBin('retract');
-          break;
-        case 'printer-out-of-paper':
-          op.loadPaper();
-          break;
-        case 'card-reader-unavailable':
-          op.resetDevice('cardReader');
-          break;
-        case 'host-unavailable':
-          c.sys.faults.disarm('host-unavailable');
-          op.resetDevice('host');
-          break;
-        case 'network-timeout':
-          c.sys.faults.disarm('network-timeout');
-          op.resetDevice('network');
-          break;
-        case 'power-loss':
-          await op.restorePower();
-          op.returnRetainedCards();
-          break;
-        case 'insufficient-atm-cash':
-        case 'low-cash-warning':
-          for (const cs of Object.values(c.sys.inventory.cassettes)) op.replenish(cs.id, cs.capacity - cs.counter);
-          break;
-        default:
-          c.sys.faults.disarm(id);
-      }
-      c.sys.faults.disarm(id);
-      c.ui.toast('Recovery performed — see the journal for each operator step', 'ok');
+      const lines = await recoverFault(c.sys, id);
+      for (const l of lines) this.say('🔧 ' + l);
+      c.ui.toast('Recovery complete — ATM back in service', 'ok');
     } catch (err) {
       c.ui.toast('Recovery failed: ' + (err instanceof Error ? err.message : String(err)), 'err');
     } finally {
-      if (!wasActive && op.active) op.exit();
+      this.running = false;
+      await c.clock.wait(1200);
+      c.views.holdDoorsOpen(doorsWere);
       c.ui.refresh();
     }
   }

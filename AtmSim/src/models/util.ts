@@ -49,6 +49,21 @@ export function extrudeProfileX(pts: Array<[number, number]>, width: number, bev
   return g;
 }
 
+/** Extrude a side shape given in (z, y) coordinates (holes allowed) along X with thickness `width`, centred on x = 0. */
+export function extrudeShapeX(shape: THREE.Shape, width: number): THREE.BufferGeometry {
+  const g = new THREE.ExtrudeGeometry(shape, { depth: width, bevelEnabled: false, curveSegments: 12 });
+  g.rotateY(-Math.PI / 2);
+  g.translate(width / 2, 0, 0);
+  return g;
+}
+
+/** Extrude a plan shape given in (x, z) coordinates (holes allowed) downwards from y = 0 to y = -thickness. */
+export function extrudeShapeY(shape: THREE.Shape, thickness: number): THREE.BufferGeometry {
+  const g = new THREE.ExtrudeGeometry(shape, { depth: thickness, bevelEnabled: false, curveSegments: 12 });
+  g.rotateX(Math.PI / 2);
+  return g;
+}
+
 /** Extrude a front shape given in the XY plane (holes allowed) along +Z by depth, front face at z = depth. */
 export function extrudeXY(shape: THREE.Shape, depth: number, bevel = 0): THREE.BufferGeometry {
   const g = new THREE.ExtrudeGeometry(shape, {
@@ -264,7 +279,7 @@ export function mergeStatic(root: THREE.Object3D, shell: Set<THREE.Mesh>): void 
       const geos: THREE.BufferGeometry[] = [];
       for (const m of list) {
         m.updateMatrix();
-        let g = m.geometry.index ? m.geometry.toNonIndexed() : m.geometry.clone();
+        const g = m.geometry.index ? m.geometry.toNonIndexed() : m.geometry.clone();
         g.clearGroups();
         g.applyMatrix4(m.matrix);
         for (const name of Object.keys(g.attributes)) {
@@ -275,7 +290,6 @@ export function mergeStatic(root: THREE.Object3D, shell: Set<THREE.Mesh>): void 
         }
         if (!g.attributes.normal) g.computeVertexNormals();
         geos.push(g);
-        g = g as THREE.BufferGeometry;
       }
       const merged = mergeGeometries(geos, false);
       for (const g of geos) g.dispose();

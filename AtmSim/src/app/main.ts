@@ -18,6 +18,7 @@ import { NetworkViz } from '../ui/NetworkViz';
 import { Ui } from '../ui/Ui';
 import { TroubleshootController } from '../ui/panels/troubleshootPanel';
 import { componentInfo } from '../knowledge/components';
+import { installTestHooks } from './testHooks';
 import type { Ctx, NotePath } from '../ui/context';
 import type { KeypadKey, CassetteId } from '../core/types';
 import { CASSETTE_IDS } from '../core/types';
@@ -198,6 +199,7 @@ function boot(): void {
 
   // Expose for debugging and browser tests.
   (window as unknown as { atm: Ctx }).atm = ctx;
+  installTestHooks(ctx);
 }
 
 boot();

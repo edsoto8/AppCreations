@@ -287,6 +287,16 @@ export class CashInventory {
     return out;
   }
 
+  /** Consistency check of the location index (every note listed exactly once, under its own `loc`). */
+  indexProblems(): string | undefined {
+    let listed = 0;
+    for (const [loc, list] of this.byLoc) {
+      listed += list.length;
+      for (const n of list) if (n.loc !== loc) return `Note ${n.serial} listed at ${loc} but located at ${n.loc}`;
+    }
+    return listed === this.notes.length ? undefined : `Location index lists ${listed} notes, ${this.notes.length} exist`;
+  }
+
   get totals(): InventorySnapshot['totals'] {
     const a = this.activity;
     return {

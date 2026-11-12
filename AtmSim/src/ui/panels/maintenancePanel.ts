@@ -9,8 +9,9 @@ const TESTABLE: DeviceId[] = ['dispenser', 'printer', 'cardReader', 'contactless
 
 async function act(ctx: Ctx, label: string, fn: () => unknown): Promise<void> {
   try {
-    await fn();
-    ctx.ui.toast(label, 'ok');
+    const r = (await fn()) as { ok?: boolean; message?: string } | undefined;
+    if (r && r.ok === false) ctx.ui.toast(r.message ?? `${label}: refused`, 'warn');
+    else ctx.ui.toast(r?.message ?? label, 'ok');
   } catch (err) {
     ctx.ui.toast(`${label} failed: ${err instanceof Error ? err.message : String(err)}`, 'err');
   }
