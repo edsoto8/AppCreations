@@ -40,8 +40,8 @@ export function installTestHooks(ctx: Ctx): void {
       if (!uv) return null;
       const mesh = ctx.model.screenMesh;
       const g = mesh.geometry;
-      const pos = g.getAttribute('position');
-      const uvs = g.getAttribute('uv');
+      const pos = g.getAttribute('position') as THREE.BufferAttribute;
+      const uvs = g.getAttribute('uv') as THREE.BufferAttribute;
       // Bilinear search over the mesh's vertices: find local point whose UV matches (works for planes).
       let best: THREE.Vector3 | null = null;
       const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3();

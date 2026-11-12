@@ -83,7 +83,7 @@ export class ViewModes {
       const f = this.model.anchors.focus;
       if (mode === 'internal') this.stage.focus(f.dispenser.position, f.dispenser.target);
       else if (mode === 'cutaway') this.stage.focus(f.side.position, f.side.target);
-      else if (mode === 'exploded') this.stage.focus(new THREE.Vector3(2.0, 1.7, 2.6), new THREE.Vector3(0, 0.95, 0));
+      else if (mode === 'exploded') this.stage.focus(new THREE.Vector3(2.5, 1.9, 3.3), new THREE.Vector3(0, 0.95, 0));
       else if (mode === 'xray') this.stage.focus(new THREE.Vector3(1.3, 1.45, 1.9), new THREE.Vector3(0, 0.9, 0));
       else this.stage.focus(f.front.position, f.front.target);
     }

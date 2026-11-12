@@ -66,7 +66,10 @@ export class TroubleshootController {
       if (waiting) {
         await c.clock.wait(1400);
         if (kind === 'cash') c.port.collectCash();
-        else c.port.takeCard();
+        else {
+          c.port.takeCard();
+          c.mech.takeCard();
+        }
         return;
       }
       await c.clock.wait(100);

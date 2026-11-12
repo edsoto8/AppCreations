@@ -31,7 +31,12 @@ async function ready(page: Page, errors: string[]) {
   await page.waitForFunction(() => !!(window as any).atmTest, null, { timeout: 60_000 });
   // Fast sim + jump camera to the front so 3D targets are reachable.
   await page.evaluate(() => {
-    (window as any).atm.clock.setSpeed(2);
+    const a = (window as any).atm;
+    a.stage.setQuality('low'); // software WebGL in CI is slow: no shadows/outlines
+    a.clock.maxFrameMs = 1000;
+    a.clock.setSpeed(4);
+    a.sys.config.cashTakeTimeoutMs = 600_000; // the slow headless renderer needs time to click
+    a.sys.config.cardTakeTimeoutMs = 600_000;
   });
   await page.waitForTimeout(2200); // intro camera move
 }
@@ -112,15 +117,15 @@ test('E3 view modes and component inspection', async ({ page }) => {
   for (const v of ['xray', 'cutaway', 'exploded', 'internal', 'exterior']) {
     await page.locator(`[data-view="${v}"]`).click();
     await page.waitForTimeout(1600);
-    await page.screenshot({ path: `test-results/e3-${v}.png` });
+    if (v === 'exploded') await page.screenshot({ path: `test-results/e3-${v}.png` });
   }
   await page.locator('[data-select="stacker"]').first().click();
   await expect(page.locator('[data-component="stacker"]')).toBeVisible();
   // Click a part in 3D: keypad body
   await page.evaluate(() => (window as any).atmTest.camera('front'));
   await page.waitForTimeout(300);
-  await clickAt(page, await page.evaluate(() => (window as any).atmTest.partPoint('topper-sign')), 'topper sign');
-  await expect(page.locator('[data-component="topper-sign"]')).toBeVisible();
+  await clickAt(page, await page.evaluate(() => (window as any).atmTest.partPoint('vault-door')), 'vault door');
+  await expect(page.locator('[data-component="vault-door"]')).toBeVisible();
   expect(errors).toEqual([]);
 });
 

@@ -52,10 +52,10 @@ button { font: inherit; color: inherit; }
 .logo::after { content: ''; position: absolute; left: 5px; right: 5px; top: 5px; height: 10px; background: #0b1220; border-radius: 2px; }
 .brand-title { font-weight: 650; letter-spacing: 0.2px; }
 .brand-sub { color: var(--muted); font-size: 11px; }
-#mode-tabs { display: flex; gap: 4px; flex: 1; justify-content: center; flex-wrap: wrap; }
+#mode-tabs { display: flex; gap: 2px; flex: 1; justify-content: center; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; min-width: 0; }
 .mode-tab {
   border: 1px solid transparent; background: transparent; color: var(--muted);
-  padding: 6px 12px; border-radius: 999px; cursor: pointer; transition: all .15s;
+  padding: 6px 11px; border-radius: 999px; cursor: pointer; transition: all .15s; white-space: nowrap; flex: none;
 }
 .mode-tab:hover { color: var(--text); background: var(--panel-2); }
 .mode-tab.active { color: #04130f; background: var(--accent); font-weight: 600; }
@@ -142,25 +142,25 @@ tr.diff td { background: #3a182044; }
 #viewport-overlays > * { pointer-events: auto; }
 .ov { position: absolute; background: #0e1522e6; border: 1px solid var(--line-2); border-radius: 10px; backdrop-filter: blur(6px); box-shadow: 0 8px 30px #0008; }
 
-.view-switch { top: 10px; left: 10px; padding: 4px; display: flex; gap: 4px; align-items: center; }
+.view-switch { top: 10px; left: 10px; right: 10px; width: fit-content; max-width: calc(100% - 20px); padding: 4px; display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
 .view-switch .seg button { font-size: 12px; }
-.wallet { right: 10px; bottom: 10px; width: 250px; padding: 10px; }
+.wallet { right: 10px; bottom: 10px; width: 236px; padding: 8px 10px; }
 .wallet h4 { margin: 0 0 6px; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--dim); display: flex; justify-content: space-between; }
 .wallet .cards { display: flex; flex-direction: column; gap: 4px; }
-.wallet .wcard { display: grid; grid-template-columns: 30px 1fr auto; gap: 8px; align-items: center; padding: 5px 7px; border-radius: 7px; border: 1px solid var(--line); cursor: pointer; background: transparent; text-align: left; }
+.wallet .wcard { display: grid; grid-template-columns: 26px 1fr auto; gap: 8px; align-items: center; padding: 3px 6px; border-radius: 7px; border: 1px solid var(--line); cursor: pointer; background: transparent; text-align: left; }
 .wallet .wcard.active { border-color: var(--accent); background: #12302f; }
-.wallet .wcard .chipico { width: 30px; height: 20px; border-radius: 3px; }
+.wallet .wcard .chipico { width: 26px; height: 17px; border-radius: 3px; }
 .wallet .wcard .pin { font-family: var(--mono); font-size: 11px; color: var(--warn); }
 .wallet .actions { display: flex; gap: 6px; margin-top: 8px; }
 .wallet .actions .btn { flex: 1; }
 .wallet .cash { margin-top: 6px; color: var(--muted); font-size: 11px; }
 
-.net-strip { top: 54px; left: 50%; transform: translateX(-50%); width: min(760px, calc(100% - 20px)); padding: 8px 10px 6px; }
-.net-strip svg { width: 100%; height: 86px; display: block; }
+.net-strip { top: 52px; left: 10px; width: min(520px, calc(100% - 330px)); padding: 6px 8px 4px; }
+.net-strip svg { width: 100%; height: 62px; display: block; }
 .net-strip .last { font-family: var(--mono); font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.hint { left: 50%; bottom: 14px; transform: translateX(-50%); padding: 8px 14px; font-size: 13px; color: #e8fffb; border-color: #2a6f69; max-width: 70%; text-align: center; }
+.hint { left: 10px; bottom: 10px; padding: 8px 14px; font-size: 13px; color: #e8fffb; border-color: #2a6f69; max-width: calc(100% - 270px); }
 .hint.hidden { display: none; }
-.stage-banner { top: 10px; right: 10px; padding: 6px 12px; font-size: 12px; max-width: 360px; }
+.stage-banner { top: 52px; right: 10px; padding: 6px 12px; font-size: 12px; max-width: 300px; }
 .stage-banner b { color: var(--accent); }
 
 .tour-card { left: 10px; bottom: 10px; width: 380px; padding: 12px 14px; border-color: #2a6f69; }
@@ -217,9 +217,9 @@ tr.diff td { background: #3a182044; }
 .sm { display: flex; flex-wrap: wrap; gap: 4px; }
 
 /* tablet */
+@media (max-width: 1500px) { .brand-sub { display: none; } .brand { min-width: 0; } .mode-tab { padding: 6px 8px; } }
 @media (max-width: 1200px) {
   #app { grid-template-columns: 220px minmax(0, 1fr) 300px; }
-  .brand-sub { display: none; }
 }
 @media (max-width: 960px) {
   #app { grid-template-columns: minmax(0, 1fr) 300px; grid-template-areas: 'top top' 'view right' 'time time'; }

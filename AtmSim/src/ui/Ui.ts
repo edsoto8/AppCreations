@@ -41,7 +41,8 @@ export class Ui implements UiApi {
   private viewSwitch = h('div', { class: 'ov view-switch' });
   private tourEl = h('div', { class: 'ov tour-card', style: 'display:none', id: 'tour-card' });
   tours!: TourRunner;
-  private showNet = true;
+  private showNet = false;
+  private netActiveUntil = 0;
   private refreshThrottled = rafThrottle(() => this.renderAll());
 
   init(ctx: Ctx): void {
@@ -81,13 +82,19 @@ export class Ui implements UiApi {
     for (const ev of ['txn.state', 'txn.created', 'inventory.changed', 'ledger.changed', 'device.changed', 'fault.armed', 'fault.cleared', 'audit'] as const) {
       bus.on(ev, () => this.refreshThrottled());
     }
-    bus.on('screen.changed', () => this.renderHint());
+    bus.on('screen.changed', ({ screen }) => {
+      this.renderHint();
+      if (screen.id === 'WELCOME' || screen.id === 'SERVICE_MODE') this.stageEl.style.display = 'none';
+    });
     ctx.port.onChange(() => this.renderHint());
     bus.on('mech.stage', ({ label }) => {
       this.stageEl.style.display = '';
       mount(this.stageEl, h('span', { class: 'muted' }, 'Stage: '), h('b', null, label));
     });
     bus.on('net.message', (m) => {
+      this.netActiveUntil = performance.now() + 7000;
+      this.updateNetStrip();
+      setTimeout(() => this.updateNetStrip(), 7100);
       const last = document.getElementById('net-last');
       if (last) last.textContent = `${m.from} → ${m.to}: ${m.direction === 'request' ? m.request.type + ' request' : (m.response?.code ?? '') + ' ' + (m.response?.text ?? '')}${m.dropped ? ' — LOST' : ''}`;
     });
@@ -237,7 +244,13 @@ export class Ui implements UiApi {
     this.renderViewSwitch();
     this.renderWallet();
     this.renderHint();
-    this.netStrip.style.display = this.showNet && this.mode !== 'network' ? '' : 'none';
+    this.updateNetStrip();
+  }
+
+  /** The network strip shows when pinned, or automatically while messages are travelling. */
+  private updateNetStrip(): void {
+    const auto = performance.now() < this.netActiveUntil && this.mode !== 'maintenance' && this.mode !== 'reconciliation';
+    this.netStrip.style.display = (this.showNet || auto) && this.mode !== 'network' ? '' : 'none';
   }
 
   private renderViewSwitch(): void {
@@ -256,11 +269,20 @@ export class Ui implements UiApi {
     );
   }
 
+  private leftKey = '';
+
   private renderLeft(): void {
     const c = this.ctx;
     const faults = c.sys.faults;
+    // Only rebuild when something the panel shows has changed, and keep the scroll position.
+    const key = [this.mode, this.selected, this.tours?.active?.id, faults.armed.join(',')].join('|');
+    if (key === this.leftKey) return;
+    this.leftKey = key;
+    const left = document.getElementById('left-panel')!;
+    const scroll = left.scrollTop;
+    const open = new Set([...left.querySelectorAll('details[open] > summary')].map((x) => x.textContent));
     mount(
-      document.getElementById('left-panel')!,
+      left,
       h(
         'div',
         { class: 'section' },
@@ -297,6 +319,8 @@ export class Ui implements UiApi {
         ),
       ),
     );
+    if (open.size) left.querySelectorAll('details').forEach((d) => (d.open = open.has(d.querySelector('summary')?.textContent ?? '')));
+    left.scrollTop = scroll;
   }
 
   private renderWallet(): void {
@@ -318,7 +342,7 @@ export class Ui implements UiApi {
             'button',
             { class: 'wcard' + (card.id === this.activeCardId ? ' active' : ''), 'data-card': card.id, title: card.persona, onclick: () => this.setActiveCard(card.id) },
             h('span', { class: 'chipico', style: `background:linear-gradient(135deg, ${col}, #0b1220)` }),
-            h('span', null, h('div', null, card.holderName), h('div', { class: 'muted', style: 'font-size:11px' }, card.persona + (card.status !== 'ACTIVE' ? ` · ${card.status}` : ''))),
+            h('span', null, card.holderName, card.status !== 'ACTIVE' ? h('span', { class: 'muted', style: 'font-size:11px' }, ` · ${card.status.toLowerCase()}`) : null),
             h('span', { class: 'pin', title: 'Demo PIN (fictional)' }, `PIN ${card.demoPin}`),
           );
         }),

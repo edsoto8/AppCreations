@@ -102,7 +102,7 @@ export function buildAtm(opts: BuildAtmOptions = {}): AtmModel {
     focus: {
       front: { position: v(0.3, 1.45, 2.75), target: v(0, 0.98, 0.05) },
       screen: { position: v(0.0, 1.36, 0.95), target: v(0, 1.31, 0.32) },
-      keypad: { position: v(0.06, 1.42, 0.9), target: v(0.03, 1.08, 0.4) },
+      keypad: { position: v(0.08, 1.52, 1.25), target: v(0.03, 1.08, 0.4) },
       upper: { position: v(0.38, 1.45, 1.3), target: v(-0.02, 1.2, -0.1) },
       dispenser: { position: v(0.75, 0.95, 1.1), target: v(0.1, 0.5, -0.05) },
       safe: { position: v(0.25, 0.85, 1.55), target: v(0.0, 0.45, 0.0) },

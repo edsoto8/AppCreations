@@ -46,6 +46,8 @@ export class AnimClock implements SimClock {
   private stepping = false;
   speed = 1;
   paused = false;
+  /** Largest real frame gap honoured per update (avoids jumps after a tab switch). Tests raise it. */
+  maxFrameMs = 100;
   /** Label of the most recent stage. */
   currentStage = '';
   private listeners = new Set<() => void>();
@@ -121,7 +123,7 @@ export class AnimClock implements SimClock {
   update(realDtMs: number): void {
     if (this.paused) return;
     // Clamp huge frame gaps (tab switch) so animations don't jump.
-    const dt = Math.min(realDtMs, 100) * this.speed;
+    const dt = Math.min(realDtMs, this.maxFrameMs) * this.speed;
     this.advance(dt);
   }
 

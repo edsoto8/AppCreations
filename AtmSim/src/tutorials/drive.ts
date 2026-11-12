@@ -71,5 +71,8 @@ export async function takeWhenPresented(ctx: Ctx, kind: 'cash' | 'card', run?: T
   await ctx.clock.wait(delay);
   if (run?.cancelled) return;
   if (kind === 'cash') ctx.port.collectCash();
-  else ctx.port.takeCard();
+  else {
+    ctx.port.takeCard();
+    ctx.mech.takeCard();
+  }
 }

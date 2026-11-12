@@ -137,7 +137,10 @@ function boot(): void {
     onProp: (prop) => {
       sfx.unlock();
       if (prop === 'cash' && port.collectCash()) ui.toast('Cash collected', 'ok');
-      else if (prop === 'card-ejected' && port.takeCard()) ui.toast('Card taken');
+      else if (prop === 'card-ejected') {
+        if (port.takeCard()) ui.toast('Card taken');
+        mech.takeCard();
+      }
       else if (prop === 'receipt') mech.takeReceipt();
     },
     describe: (id) => {

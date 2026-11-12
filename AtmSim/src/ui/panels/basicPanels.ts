@@ -121,6 +121,11 @@ const STATE_HELP: Partial<Record<TxnState, string>> = {
   ESCROWED: 'Deposited notes are held in escrow until the customer confirms.',
 };
 
+/** Two-column key/value grid (each cell is an element so CSS grid lays it out). */
+export function kv(rows: Array<[string, string]>): HTMLElement {
+  return h('div', { class: 'kv mono', style: 'margin-top:6px' }, rows.map(([k, v]) => [h('span', null, k), h('span', null, v)]));
+}
+
 export function currentTxn(ctx: Ctx): Transaction | undefined {
   const list = ctx.sys.journal.transactions;
   return list[list.length - 1];
@@ -151,19 +156,17 @@ export function renderTransaction(ctx: Ctx, el: HTMLElement): void {
         'div',
         { class: 'card', 'data-txn': t.id, 'data-state': t.state },
         h('div', { style: 'display:flex;justify-content:space-between;align-items:center' }, h('h3', null, `${t.type.replace('_', ' ')} · ${txnAmount(t)}`), h('span', { class: `pill-state ${t.state === 'COMPLETED' ? 'final-ok' : FINAL_TXN_STATES.includes(t.state) ? 'final-bad' : 'current'}`, id: 'txn-state' }, t.state)),
-        h(
-          'div',
-          { class: 'kv mono', style: 'margin-top:6px' },
-          'Txn', t.id,
-          'STAN', t.stan,
-          'Account', t.accountId ?? '—',
-          t.toAccountId ? 'To' : null, t.toAccountId ?? null,
-          'Response', t.responseCode ? `${t.responseCode}` : '—',
-          'Auth code', t.authCode ?? '—',
-          'Presented', formatCents(t.presentedCents),
-          'Collected', formatCents(t.collectedCents),
-          'Posted', formatCents(t.postedCents),
-        ),
+        kv([
+          ['Txn', t.id],
+          ['STAN', t.stan],
+          ['Account', t.accountId ?? '—'],
+          ...(t.toAccountId ? [['To', t.toAccountId] as [string, string]] : []),
+          ['Response', t.responseCode ?? '—'],
+          ['Auth code', t.authCode ?? '—'],
+          ['Presented', formatCents(t.presentedCents)],
+          ['Collected', formatCents(t.collectedCents)],
+          ['Posted', formatCents(t.postedCents)],
+        ]),
         t.plan ? h('p', { class: 'muted', style: 'margin-top:6px' }, 'Dispense plan: ' + t.plan.picks.filter((p) => p.count).map((p) => `${p.count} × $${p.denom} (cassette ${p.cassette})`).join(' + ')) : null,
         t.outcome ? h('p', { style: 'margin-top:6px' }, h('b', null, 'Outcome: '), t.outcome) : null,
         STATE_HELP[t.state] ? h('p', { class: 'muted' }, STATE_HELP[t.state]!) : null,
