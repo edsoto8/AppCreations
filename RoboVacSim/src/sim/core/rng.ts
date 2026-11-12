@@ -31,9 +31,8 @@ export class Rng {
       return v;
     }
     let u = 0;
-    let v = 0;
     while (u <= Number.EPSILON) u = this.next();
-    v = this.next();
+    const v = this.next();
     const mag = Math.sqrt(-2 * Math.log(u));
     this.spare = mag * Math.sin(2 * Math.PI * v);
     return mag * Math.cos(2 * Math.PI * v);

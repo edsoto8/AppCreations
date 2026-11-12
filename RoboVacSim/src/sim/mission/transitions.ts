@@ -8,13 +8,13 @@ import type { Command, RobotMode } from './types';
 const ACTIVE: RobotMode[] = ['undocking', 'mapping', 'cleaning', 'returning', 'docking', 'recovering', 'diagnostic', 'maintenance', 'charging', 'manual'];
 
 export const COMMAND_RULES: Record<Command['type'], { allowed: RobotMode[]; reason: string }> = {
-  start: { allowed: ['idle', 'charging', 'error'], reason: 'Stop the current activity before starting a new mission' },
+  start: { allowed: ['idle', 'charging', 'maintenance', 'error'], reason: 'Stop the current activity before starting a new mission' },
   pause: { allowed: ACTIVE, reason: 'Nothing to pause' },
   resume: { allowed: ['paused'], reason: 'Only a paused robot can resume' },
   stop: { allowed: [...ACTIVE, 'paused', 'error'], reason: 'Robot is already idle' },
   dock: { allowed: ['idle', 'mapping', 'cleaning', 'manual', 'recovering', 'error', 'diagnostic'], reason: 'Robot is already docked or heading home' },
   manual: { allowed: ['idle', 'charging', 'manual', 'error'], reason: 'Stop the mission before taking manual control' },
-  diagnostic: { allowed: ['idle', 'charging'], reason: 'Diagnostics require an idle robot' },
+  diagnostic: { allowed: ['idle', 'charging', 'maintenance'], reason: 'Diagnostics require an idle robot' },
   clearError: { allowed: ['error'], reason: 'No error to clear' },
 };
 

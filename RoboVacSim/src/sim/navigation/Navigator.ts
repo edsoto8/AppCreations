@@ -20,6 +20,8 @@ export interface NavRequest {
   allowUnknown?: boolean;
   /** Label shown in telemetry, e.g. "Lane 12/40". */
   label: string;
+  /** Edge cleaning: hug the wall on the right using the side ToF sensor. */
+  wallFollow?: boolean;
 }
 
 export interface NavInputs {
@@ -32,6 +34,9 @@ export interface NavInputs {
   cliff: boolean;
   /** Nearest front-sensor return (m), Infinity if clear. */
   frontNearest: number;
+  /** Right-side wall gap (m) and 45° forward-right gap from the wall sensor (Infinity = none). */
+  wallSide: number;
+  wallDiagonal: number;
   /** Longest-range LiDAR direction (robot frame, rad) for recovery rotation. */
   openDirection: number;
   dt: number;
@@ -73,6 +78,8 @@ export class Navigator {
   private recoveryTimer = 0;
   private readonly out = { v: 0, w: 0 };
   private lastSeg = 0;
+  /** Lateral virtual-pose offset used for wall hugging (m, + = robot is further left than reported). */
+  wallOffset = 0;
 
   constructor(
     private readonly map: RobotMap,
@@ -148,6 +155,7 @@ export class Navigator {
     this.path = dedupe(p);
     this.follower.setPath(this.path);
     this.lastSeg = 0;
+    this.wallOffset = 0;
     this.lastCostmapVersion = this.map.costmapVersion;
     this.validateTimer = 0;
   }
@@ -165,7 +173,6 @@ export class Navigator {
    * or -1 if the remaining path is clear (checked up to `horizon` meters ahead).
    */
   private firstBlocked(x: number, y: number, seg: number, horizon: number): number {
-    const cm = this.map.costmap;
     const allowUnknown = this.request?.allowUnknown ?? false;
     let prev: Vec2 = { x, y };
     let travelled = 0;
@@ -189,7 +196,9 @@ export class Navigator {
   private cellSafe(idx: number, allowUnknown: boolean): boolean {
     const cm = this.map.costmap;
     if (!allowUnknown && cm.cost[idx] === COST_UNKNOWN) return false;
-    return cm.obstacleDistance[idx] >= ROBOT.radius + 0.004;
+    // Mapped obstacles are conservative (hits quantise outward by up to one cell), so contact with a
+    // mapped obstacle minus 1.5 cm is the execution-time collision threshold.
+    return cm.obstacleDistance[idx] >= ROBOT.radius - 0.015;
   }
 
   private segmentSafe(a: Vec2, b: Vec2, allowUnknown: boolean): boolean {
@@ -213,9 +222,9 @@ export class Navigator {
       return ok;
     }
     const cm = this.map.costmap;
-    const rest = densify(this.path.slice(blockedIdx - 1), 0.1);
-    // Candidate rejoin points after the blocked section.
-    for (let k = 1; k < rest.length; k++) {
+    const rest = densify(this.path.slice(blockedIdx), 0.1);
+    // Candidate rejoin points strictly after the blocked segment.
+    for (let k = 0; k < rest.length; k++) {
       const p = rest[k];
       const idx = cm.geom.indexAt(p.x, p.y);
       if (idx < 0 || !this.cellSafe(idx, req.allowUnknown ?? false)) continue;
@@ -223,7 +232,7 @@ export class Navigator {
       if (res.ok && pathLength(res.path) < 3 * Math.hypot(p.x - x, p.y - y) + 2.5) {
         this.setPath([...res.path, ...rest.slice(k + 1)]);
         this.emit('detour', `Obstacle detected — detouring (${req.label})`);
-        if (k > 2) this.partial = true;
+        if (k > 3) this.partial = true;
         return true;
       }
     }
@@ -315,7 +324,18 @@ export class Navigator {
       }
     }
 
-    const f = this.follower.update(inp.x, inp.y, inp.theta);
+    // Reactive wall hugging for edge cleaning: the side ToF sensor measures the real gap to the wall;
+    // the follower is fed a virtual pose shifted away from the wall by the excess gap, so it steers
+    // the real robot to within ~1.2 cm of the wall while still tracking the planned loop.
+    let target = 0;
+    if (req.wallFollow) {
+      const gap = Math.min(inp.wallSide, inp.wallDiagonal * 0.7071 + 0.01);
+      // gap is measured from the real robot, which already sits `wallOffset` closer than the path.
+      if (gap < 0.14) target = Math.max(-0.03, Math.min(0.12, gap + this.wallOffset - 0.012));
+    }
+    this.wallOffset += (target - this.wallOffset) * Math.min(1, inp.dt * 3);
+    const off = this.wallOffset;
+    const f = this.follower.update(inp.x - Math.sin(inp.theta) * off, inp.y + Math.cos(inp.theta) * off, inp.theta);
     this.lastSeg = Math.max(0, f.segmentIndex);
     if (f.done) {
       this.state = 'arrived';

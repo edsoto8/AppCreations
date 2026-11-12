@@ -49,6 +49,7 @@ export interface ControllerHooks {
   /** Most open LiDAR direction (robot frame). */
   openDirection: () => number;
   frontNearest: () => number;
+  wallGap: () => { side: number; diagonal: number };
   onMissionEnd: (m: MissionState) => void;
 }
 
@@ -474,6 +475,8 @@ export class RobotController {
       bumpAngle: b.bumpAngle,
       cliff: b.cliffTriggered,
       frontNearest: this.hooks.frontNearest(),
+      wallSide: this.hooks.wallGap().side,
+      wallDiagonal: this.hooks.wallGap().diagonal,
       openDirection: this.hooks.openDirection(),
       dt,
     });
@@ -622,7 +625,7 @@ export class RobotController {
       const label = next.kind === 'edge' ? 'edge loop' : `${next.kind} ${m.tasksDone + m.tasksSkipped + 1}/${m.tasksPlanned}`;
       this.targetLabel = label;
       this.targetPoint = next.points[next.points.length - 1];
-      this.nav.start({ points: next.points, mode: 'track', speed, tolerance: 0.05, label }, this.body.x, this.body.y);
+      this.nav.start({ points: next.points, mode: 'track', speed, tolerance: 0.05, label, wallFollow: next.kind === 'edge' }, this.body.x, this.body.y);
       if (this.nav.state !== 'active') return; // failed immediately; handled next step
     }
     this.driveNav(dt);

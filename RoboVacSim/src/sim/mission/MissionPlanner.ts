@@ -2,7 +2,6 @@ import type { SimConfig } from '../config';
 import type { RobotMap } from '../mapping/RobotMap';
 import { planCoverage, planEdgePaths } from '../navigation/CoveragePlanner';
 import { densify, pathLength } from '../navigation/Navigator';
-import { ROBOT } from '../robot/robotSpec';
 import type { Vec2 } from '../world/types';
 import type { WorldModel } from '../world/WorldModel';
 import type { CleanTask, MissionSettings } from './types';
@@ -56,34 +55,8 @@ export function effectiveRegion(map: RobotMap, region: Uint8Array, settings: Mis
 export function planEdgeTasks(map: RobotMap, region: Uint8Array, pass: number): CleanTask[] {
   const loops = planEdgePaths(map.costmap, region, { minLoopLength: 0.8, simplifyTolerance: 0.03 });
   return loops.map((raw) => {
-    const pts = hugWalls(map, densify(raw, 0.1));
+    const pts = densify(raw, 0.1);
     return { id: taskIds++, kind: 'edge' as const, pass, points: pts, length: pathLength(pts) };
-  });
-}
-
-/**
- * Edge paths come out on the first fully traversable cells (planning band + up to one cell of
- * quantisation). For wall following we pull each point toward the nearest obstacle along the
- * distance-field gradient so the shell runs ~1.5 cm from the wall, as real edge-cleaning does.
- */
-export function hugWalls(map: RobotMap, pts: Vec2[], target = ROBOT.radius + 0.015): Vec2[] {
-  const cm = map.costmap;
-  const g = map.geom;
-  const od = (x: number, y: number) => {
-    const idx = g.indexAt(x, y);
-    return idx < 0 ? 0 : cm.obstacleDistance[idx];
-  };
-  const h = g.cellSize;
-  return pts.map((p) => {
-    const d = od(p.x, p.y);
-    if (d > target + 0.12 || d <= target) return p;
-    const gx = od(p.x + h, p.y) - od(p.x - h, p.y);
-    const gy = od(p.x, p.y + h) - od(p.x, p.y - h);
-    const gl = Math.hypot(gx, gy);
-    if (gl < 1e-6) return p;
-    const step = d - target;
-    const q = { x: p.x - (gx / gl) * step, y: p.y - (gy / gl) * step };
-    return od(q.x, q.y) >= ROBOT.radius + 0.006 ? q : p;
   });
 }
 

@@ -14,6 +14,7 @@ import { RobotBody } from './robot/RobotBody';
 import { ROBOT } from './robot/robotSpec';
 import { FrontSensor } from './sensors/FrontSensor';
 import { Lidar } from './sensors/Lidar';
+import { WallSensor } from './sensors/WallSensor';
 import type { DirtKind, HouseLayout, Vec2 } from './world/types';
 import { WorldModel } from './world/WorldModel';
 
@@ -62,6 +63,7 @@ export class Simulation {
   readonly body: RobotBody;
   readonly lidar: Lidar;
   readonly front: FrontSensor;
+  readonly wall = new WallSensor();
   readonly map: RobotMap;
   readonly nav: Navigator;
   readonly dirt: DirtField;
@@ -112,6 +114,7 @@ export class Simulation {
       frontSamples: () => this.frontSamples,
       openDirection: () => this.openDirection(),
       frontNearest: () => this.front.nearest,
+      wallGap: () => this.wall,
       onMissionEnd: (m) => this.events.emit('missionEnd', m),
     });
     const d = this.layout.dock;
@@ -191,6 +194,7 @@ export class Simulation {
     this.lidar.step(dt, b.x, b.y, b.theta, this.world);
     this.map.integrateLidar(this.lidar.stepRays, this.lidar.rayCount);
     this.map.markRobotFootprint(b.x, b.y);
+    this.wall.step(b.x, b.y, b.theta, this.world);
     if (this.front.step(dt, b.x, b.y, b.theta, this.world)) {
       this.frontSamples++;
       this.integrateFrontSensor();
