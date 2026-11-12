@@ -65,7 +65,10 @@ dotnet run --project src/DotNet11Lab.Cli -- --help
 - C# 15 unions lower to a struct implementing `IUnion` (`object? Value`). Patterns apply to the contained value.
   `default(Union).Value` is null.
 - `closed` implies abstract (`closed abstract` is error CS9384).
-- An extension indexer is not considered when the receiver already has an applicable instance indexer.
+- Extension indexers: `List<int>["x"]` binds to an extension indexer (no instance indexer takes a string), but
+  `"abc"[2L]` does not compile, so don't rely on extensions for indexers on types that already have one.
+- `Dictionary<,> d = [with(comparer), ...]` does not compile (CS9215). `HashSet`, `SortedSet` and `ImmutableHashSet` do.
+- `WritableMemoryStream.Length` starts at the full capacity. A write that doesn't fit throws `NotSupportedException`.
 - `LeftJoin`/`RightJoin` are .NET 10. `FullJoin` and tuple-returning `Join`/`GroupJoin` are .NET 11.
 - Runtime async: off by default for user code. `<Features>runtime-async=on</Features>` produces
   `MethodImplAttributes.Async` methods with no state machine type.

@@ -6,7 +6,7 @@
         <span class="code-title">@(Title ?? _snippet?.Id ?? Language)</span>
         @if (_snippet is not null)
         {
-            <span title="Embedded from the compiled assembly">@_snippet.File</span>
+            <span class="code-file" title="Embedded from the compiled assembly: @_snippet.File">@_snippet.File</span>
         }
         <button type="button" class="icon-btn btn-sm copy" onclick="dotnet11lab.copyCode(this)">Copy</button>
     </div>
