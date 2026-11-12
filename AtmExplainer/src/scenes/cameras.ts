@@ -7,7 +7,7 @@ export const CAM_SAFE: Cam = { fx: 370, fy: 865, sx: 1200, sy: 500, z: 2.05, yaw
 /** Stacker + presenter + cash slot. */
 export const CAM_PRESENT: Cam = { fx: 360, fy: 735, sx: 1200, sy: 470, z: 1.75, yaw: 0 };
 /** Front of the machine around the cash slot. */
-export const CAM_SLOT: Cam = { fx: 360, fy: 690, sx: 1180, sy: 500, z: 1.95, yaw: -3 };
+export const CAM_SLOT: Cam = { fx: 360, fy: 690, sx: 1270, sy: 500, z: 1.95, yaw: -3 };
 /** Upper safe incl. sensor, diverter and reject area. */
 export const CAM_REJECT: Cam = { fx: 460, fy: 840, sx: 1430, sy: 520, z: 1.9, yaw: 0 };
 /** Closing hero shot. */
