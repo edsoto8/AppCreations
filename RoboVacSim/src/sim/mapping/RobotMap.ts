@@ -22,6 +22,9 @@ export class RobotMap {
   readonly geom: GridGeometry;
   readonly occ: OccupancyGrid;
   readonly costmap: Costmap;
+  /** Reduced-margin costmap for squeezing through tight passages when the strict one finds no route. */
+  readonly relaxed: Costmap;
+  private relaxedVersion = -1;
   readonly lowObstacles: Uint8Array;
   readonly cliffs: Uint8Array;
   readonly extraLethal: Uint8Array;
@@ -41,6 +44,7 @@ export class RobotMap {
     this.geom = geom;
     this.occ = new OccupancyGrid(geom);
     this.costmap = new Costmap(geom, { robotRadius: ROBOT.radius, inflationRadius: cfg.inflationRadius, safetyMargin: cfg.safetyMargin });
+    this.relaxed = new Costmap(geom, { robotRadius: ROBOT.radius - 0.035, inflationRadius: 0.3, safetyMargin: 0 });
     this.lowObstacles = new Uint8Array(geom.size);
     this.cliffs = new Uint8Array(geom.size);
     this.extraLethal = new Uint8Array(geom.size);
@@ -97,8 +101,19 @@ export class RobotMap {
     }
   }
 
-  markCliff(x: number, y: number): void {
-    this.fillDisc(this.cliffs, x, y, 0.06, 1);
+  /**
+   * Record a drop-off detected by a cliff sensor at (x, y). `dirX/dirY` points from the robot centre
+   * toward the sensor: the drop extends beyond the sensor, so a strip ahead is marked as well (the
+   * LiDAR cannot see cliffs, so this layer is the only knowledge the planner has of them).
+   */
+  markCliff(x: number, y: number, dirX = 0, dirY = 0): void {
+    this.fillDisc(this.cliffs, x, y, 0.08, 1);
+    const len = Math.hypot(dirX, dirY);
+    if (len > 1e-6) {
+      const ux = dirX / len;
+      const uy = dirY / len;
+      for (let d = 0.08; d <= 0.3; d += 0.06) this.fillDisc(this.cliffs, x + ux * d, y + uy * d, 0.1, 1);
+    }
     this.masksDirty = true;
     this.layersVersion++;
   }
@@ -166,6 +181,15 @@ export class RobotMap {
     this.masksDirty = false;
     this.costmapVersion++;
     return true;
+  }
+
+  /** Bring the relaxed costmap up to date with the strict one (on demand — it is only a fallback). */
+  updateRelaxed(): Costmap {
+    if (this.relaxedVersion !== this.costmapVersion) {
+      this.relaxed.update(this.occ, { noGo: this.noGo, extraLethal: this.extraLethal });
+      this.relaxedVersion = this.costmapVersion;
+    }
+    return this.relaxed;
   }
 
   /** Fraction of the masked cells that are known (free or occupied). */

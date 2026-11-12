@@ -9,7 +9,7 @@ import { PathFollower } from './PathFollower';
 
 export type NavState = 'idle' | 'active' | 'arrived' | 'failed';
 export type NavFailure = 'noPath' | 'stuck' | 'blocked' | null;
-export type RecoveryKind = 'backup' | 'rotate' | 'escape' | null;
+export type RecoveryKind = 'backup' | 'forward' | 'rotate' | 'escape' | null;
 
 export interface NavRequest {
   /** Either a single goal point (A* planned), or a polyline to track exactly (approached via A*). */
@@ -32,6 +32,8 @@ export interface NavInputs {
   bumped: boolean;
   bumpAngle: number;
   cliff: boolean;
+  /** The triggered cliff sensor is behind the wheel axle (drop is behind/beside-rear). */
+  cliffRear?: boolean;
   /** Nearest front-sensor return (m), Infinity if clear. */
   frontNearest: number;
   /** Right-side wall gap (m) and 45° forward-right gap from the wall sensor (Infinity = none). */
@@ -80,6 +82,9 @@ export class Navigator {
   private lastSeg = 0;
   /** Lateral virtual-pose offset used for wall hugging (m, + = robot is further left than reported). */
   wallOffset = 0;
+  private hugCooldown = 0;
+  /** Current path was planned on the reduced-margin costmap: drive slowly. */
+  squeeze = false;
 
   constructor(
     private readonly map: RobotMap,
@@ -124,8 +129,17 @@ export class Navigator {
     this.map.update(0, true);
     const cm = this.map.costmap;
     const start = { x, y };
+    this.squeeze = false;
     if (req.mode === 'goto') {
-      const res = this.planner.plan(cm, start, req.points[0], { allowUnknown: req.allowUnknown, goalTolerance: req.tolerance ?? 0.2 });
+      let res = this.planner.plan(cm, start, req.points[0], { allowUnknown: req.allowUnknown, goalTolerance: req.tolerance ?? 0.2 });
+      if (!res.ok) {
+        // Fallback: tight passage — plan with the reduced-margin costmap and creep through slowly.
+        res = this.planner.plan(this.map.updateRelaxed(), start, req.points[0], { allowUnknown: req.allowUnknown, goalTolerance: req.tolerance ?? 0.2 });
+        if (res.ok) {
+          this.squeeze = true;
+          this.emit('replan', `Tight passage — squeezing through with reduced margin (${req.label})`);
+        }
+      }
       if (!res.ok) return this.fail('noPath', `No path to ${req.label} (${res.reason ?? 'unknown'})`);
       this.setPath(res.path);
       return true;
@@ -138,7 +152,11 @@ export class Navigator {
       let approach: Vec2[];
       if (d < 0.12) approach = [start];
       else {
-        const res = this.planner.plan(cm, start, p, { allowUnknown: req.allowUnknown, goalTolerance: 0.08 });
+        let res = this.planner.plan(cm, start, p, { allowUnknown: req.allowUnknown, goalTolerance: 0.08 });
+        if (!res.ok && k === 0) {
+          res = this.planner.plan(this.map.updateRelaxed(), start, p, { allowUnknown: req.allowUnknown, goalTolerance: 0.08 });
+          if (res.ok) this.squeeze = true;
+        }
         if (!res.ok) {
           this.partial = true;
           continue;
@@ -198,7 +216,7 @@ export class Navigator {
     if (!allowUnknown && cm.cost[idx] === COST_UNKNOWN) return false;
     // Mapped obstacles are conservative (hits quantise outward by up to one cell), so contact with a
     // mapped obstacle minus 1.5 cm is the execution-time collision threshold.
-    return cm.obstacleDistance[idx] >= ROBOT.radius - 0.015;
+    return cm.obstacleDistance[idx] >= ROBOT.radius - (this.squeeze ? 0.03 : 0.015);
   }
 
   private segmentSafe(a: Vec2, b: Vec2, allowUnknown: boolean): boolean {
@@ -272,6 +290,13 @@ export class Navigator {
       }
       return true;
     }
+    if (this.recovery === 'forward') {
+      out.v = 0.1;
+      out.w = 0;
+      this.recoveryProgress += Math.abs(inp.v) * inp.dt;
+      if (this.recoveryProgress >= 0.08 || this.recoveryTimer > 2) this.recovery = null;
+      return true;
+    }
     if (this.recovery === 'rotate') {
       out.v = 0;
       const remaining = this.recoveryTarget - this.recoveryProgress;
@@ -293,11 +318,15 @@ export class Navigator {
     // Reflexes: bumper / cliff -> mark & back off.
     if (inp.bumped || inp.cliff) {
       this.bumpsOnGoal++;
+      // Stop hugging for a moment: the wall/furniture is closer than the side sensor suggested.
+      this.wallOffset = 0;
+      this.hugCooldown = 2;
       if (this.bumpsOnGoal > 8) {
         this.fail('blocked', `${req.label}: repeated collisions`);
         return out;
       }
-      this.startRecovery('backup', inp, inp.cliff ? 'Cliff detected — backing off' : 'Bumper hit — backing off');
+      if (inp.cliff && inp.cliffRear) this.startRecovery('forward', inp, 'Rear cliff sensor — moving away from the edge');
+      else this.startRecovery('backup', inp, inp.cliff ? 'Cliff detected — backing off' : 'Bumper hit — backing off');
     }
 
     if (this.recovery) {
@@ -328,7 +357,8 @@ export class Navigator {
     // the follower is fed a virtual pose shifted away from the wall by the excess gap, so it steers
     // the real robot to within ~1.2 cm of the wall while still tracking the planned loop.
     let target = 0;
-    if (req.wallFollow) {
+    this.hugCooldown = Math.max(0, this.hugCooldown - inp.dt);
+    if (req.wallFollow && this.hugCooldown === 0) {
       const gap = Math.min(inp.wallSide, inp.wallDiagonal * 0.7071 + 0.01);
       // gap is measured from the real robot, which already sits `wallOffset` closer than the path.
       if (gap < 0.14) target = Math.max(-0.03, Math.min(0.12, gap + this.wallOffset - 0.012));
@@ -344,7 +374,7 @@ export class Navigator {
     }
     out.v = f.v;
     out.w = f.w;
-    if (inp.frontNearest < 0.3 && out.v > 0.12) out.v = 0.12;
+    if ((inp.frontNearest < 0.3 || this.squeeze) && out.v > 0.12) out.v = 0.12;
 
     // Stuck detection: commanded motion without progress.
     if (Math.abs(out.v) > 0.05 && Math.abs(inp.v) < 0.015) this.stallTime += inp.dt;

@@ -5,11 +5,11 @@ import type { RobotMap } from '../mapping/RobotMap';
 import { findFrontiers, type Frontier } from '../navigation/Frontier';
 import type { Navigator } from '../navigation/Navigator';
 import type { Resources } from '../resources/Resources';
-import { DOCK } from '../robot/robotSpec';
+import { DOCK, ROBOT } from '../robot/robotSpec';
 import type { RobotBody } from '../robot/RobotBody';
 import type { Vec2 } from '../world/types';
 import type { WorldModel } from '../world/WorldModel';
-import { buildRegion, effectiveRegion, erodeSpecks, planEdgeTasks, planLaneTasks, uncoveredMask } from './MissionPlanner';
+import { buildRegion, effectiveRegion, erodeSpecks, planEdgeTasks, planLaneTasks, reachableRegion, uncoveredMask } from './MissionPlanner';
 import { canCommand, canTransition } from './transitions';
 import {
   MISSION_LABEL,
@@ -286,8 +286,8 @@ export class RobotController {
     m.phase = phase;
     this.setMode('cleaning');
     this.map.update(0, true);
-    const region = effectiveRegion(this.map, m.region, m.settings);
     const here = { x: this.body.x, y: this.body.y };
+    const region = reachableRegion(this.map, this.nav.planner, effectiveRegion(this.map, m.region, m.settings), here);
     let tasks: CleanTask[] = [];
     if (phase === 'edges') {
       tasks = planEdgeTasks(this.map, region, m.pass);
@@ -317,7 +317,7 @@ export class RobotController {
     }
     if (m.phase === 'coverage' || m.phase === 'touchup') {
       if (s.kind !== 'spot' && m.touchups < 2 * m.pass) {
-        const region = effectiveRegion(this.map, m.region, s);
+        const region = reachableRegion(this.map, this.nav.planner, effectiveRegion(this.map, m.region, s), { x: this.body.x, y: this.body.y });
         const un = uncoveredMask(this.map, region, this.hooks.dirtPasses(), m.pass);
         const n = erodeSpecks(un.mask, this.map.geom.width);
         const area = n * this.map.geom.cellSize ** 2;
@@ -474,6 +474,7 @@ export class RobotController {
       bumped: b.bumped,
       bumpAngle: b.bumpAngle,
       cliff: b.cliffTriggered,
+      cliffRear: b.cliffTriggered && b.cliffSensor >= 0 && ROBOT.cliffSensors[b.cliffSensor].x < 0,
       frontNearest: this.hooks.frontNearest(),
       wallSide: this.hooks.wallGap().side,
       wallDiagonal: this.hooks.wallGap().diagonal,
@@ -539,7 +540,10 @@ export class RobotController {
   private pickFrontier(): Frontier | null {
     const fs = this.relevantFrontiers();
     if (fs.length === 0) return null;
-    const field = this.nav.planner.distanceField(this.map.costmap, { x: this.body.x, y: this.body.y });
+    let field = this.nav.planner.distanceField(this.map.costmap, { x: this.body.x, y: this.body.y });
+    if (!fs.some((f) => Number.isFinite(field[this.map.geom.indexAt(f.target.x, f.target.y)]))) {
+      field = this.nav.planner.distanceField(this.map.updateRelaxed(), { x: this.body.x, y: this.body.y });
+    }
     let best: Frontier | null = null;
     let bestScore = Infinity;
     for (const f of fs) {

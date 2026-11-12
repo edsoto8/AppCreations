@@ -84,7 +84,7 @@ export class RobotBody {
     const thMid = this.theta + (w * dt) / 2;
     let nx = this.x + Math.cos(thMid) * v * dt;
     let ny = this.y + Math.sin(thMid) * v * dt;
-    const nth = wrapAngle(this.theta + w * dt);
+    let nth = wrapAngle(this.theta + w * dt);
 
     // Cliff reflex: refuse motion that would put any relevant cliff sensor over a drop.
     this.cliffTriggered = false;
@@ -103,9 +103,13 @@ export class RobotBody {
       }
     }
     if (this.cliffTriggered) {
+      // Refuse the whole motion (translation AND rotation): turning in place can also swing a
+      // sensor over the edge.
       nx = this.x;
       ny = this.y;
+      nth = this.theta;
       this.v = 0;
+      this.w = 0;
     }
 
     // Collision resolution (iterative push-out).

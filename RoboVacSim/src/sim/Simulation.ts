@@ -185,7 +185,7 @@ export class Simulation {
     }
     if (b.cliffTriggered) {
       this.stats.cliffEvents++;
-      this.map.markCliff(b.cliffX, b.cliffY);
+      this.map.markCliff(b.cliffX, b.cliffY, b.cliffX - b.x, b.cliffY - b.y);
       if (this.stats.cliffEvents % 20 === 1) this.log('warn', 'Cliff sensor triggered — drop-off marked on map');
     }
 

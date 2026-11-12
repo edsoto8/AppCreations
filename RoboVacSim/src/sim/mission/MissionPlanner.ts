@@ -1,5 +1,6 @@
 import type { SimConfig } from '../config';
 import type { RobotMap } from '../mapping/RobotMap';
+import type { AStarPlanner } from '../navigation/AStar';
 import { planCoverage, planEdgePaths } from '../navigation/CoveragePlanner';
 import { densify, pathLength } from '../navigation/Navigator';
 import type { Vec2 } from '../world/types';
@@ -100,4 +101,27 @@ export function erodeSpecks(mask: Uint8Array, width: number): number {
     else n++;
   }
   return n;
+}
+
+/**
+ * Restrict a region to cells reachable from `from` through the current costmap. Cells the robot can
+ * see but cannot reach (behind a too-narrow gap, enclosed by furniture) would otherwise produce
+ * lanes that are skipped one by one.
+ */
+export function reachableRegion(map: RobotMap, planner: AStarPlanner, region: Uint8Array, from: Vec2): Uint8Array {
+  let field = planner.distanceField(map.costmap, from);
+  const here = map.geom.indexAt(from.x, from.y);
+  let reach = 0;
+  for (let i = 0; i < field.length && reach < 400; i++) if (Number.isFinite(field[i])) reach++;
+  // Trapped by map noise in a tight spot: measure reachability with the reduced-margin costmap.
+  if (reach < 400 || here < 0) field = planner.distanceField(map.updateRelaxed(), from);
+  const out = new Uint8Array(region.length);
+  let n = 0;
+  for (let i = 0; i < region.length; i++) {
+    if (region[i] && Number.isFinite(field[i])) {
+      out[i] = 1;
+      n++;
+    }
+  }
+  return n > 0 ? out : region;
 }
