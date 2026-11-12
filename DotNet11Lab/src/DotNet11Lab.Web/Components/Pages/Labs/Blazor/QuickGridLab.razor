@@ -1,0 +1,115 @@
+@page "/labs/blazor/quickgrid"
+@rendermode InteractiveServer
+@implements IDisposable
+@inject TransactionDataset Data
+@inject BlazorLabState LabState
+@inject NavigationManager Navigation
+
+<PageTitle>QuickGrid · Blazor 11 · DotNet 11 Lab</PageTitle>
+
+<header class="lab-header">
+    <div class="lab-kicker"><a href="labs/blazor">Lab 04 · Blazor 11</a> · QuickGrid (interactive)</div>
+    <h1>QuickGrid with URL state</h1>
+    <p class="tagline">
+        Sorting and paging live in the query string, so every view has a shareable URL and the back button works. Two grids on one
+        page keep separate state through <code>QueryParameterNameOptions</code>; <code>OnRowClick</code> opens a detail panel.
+    </p>
+    <RenderModeBadge Label="This page" Assigned="AssignedRenderMode" />
+    <p class="small" style="margin-top:.6rem">Same grid without any interactivity: <a href="labs/blazor/quickgrid-static">static SSR version</a>.</p>
+</header>
+
+<div class="card card-pad url-box">
+    <div class="metric-label">Current URL query (updated on every sort or page click)</div>
+    <code class="mono" data-testid="query">@(string.IsNullOrEmpty(_query) ? "(empty: defaults)" : _query)</code>
+</div>
+
+<div class="qg-layout">
+    <section class="card card-pad">
+        <h2>@Data.Count.ToString("N0") transactions</h2>
+        <div class="grid-wrap" data-testid="tx-grid">
+            <QuickGrid TGridItem="Transaction" Items="_transactions" Pagination="_txPages" OnRowClick="SelectAsync" RowClass="RowClass" Class="lab-grid">
+                <PropertyColumn Property="t => t.Id" Title="Id" IsDefaultSortColumn="true" Sortable="true" />
+                <PropertyColumn Property="t => t.Date" Title="Date" Format="yyyy-MM-dd" Sortable="true" />
+                <PropertyColumn Property="t => t.Merchant" Title="Merchant" Sortable="true" />
+                <PropertyColumn Property="t => t.Category" Title="Category" Sortable="true" />
+                <PropertyColumn Property="t => t.Status" Title="Status" Sortable="true" />
+                <PropertyColumn Property="t => t.Amount" Title="Amount" Format="N2" Align="Align.End" Sortable="true" />
+            </QuickGrid>
+        </div>
+        <Paginator State="_txPages" />
+    </section>
+
+    <aside class="card card-pad detail" data-testid="detail">
+        <h2>Row detail</h2>
+        @if (_selected is null)
+        {
+            <p class="muted small">Click any row. <code>OnRowClick</code> passes the row's item to this handler; the row gets the <code>row-clickable</code> class.</p>
+        }
+        else
+        {
+            <dl>
+                <dt>Id</dt><dd class="mono">#@_selected.Id</dd>
+                <dt>Reference</dt><dd class="mono">@_selected.Reference</dd>
+                <dt>Date</dt><dd>@_selected.Date.ToString("D")</dd>
+                <dt>Merchant</dt><dd>@_selected.Merchant (@_selected.Category, @_selected.Country)</dd>
+                <dt>Amount</dt><dd class="mono">@_selected.Amount.ToString("N2")</dd>
+                <dt>Status</dt><dd>@_selected.Status</dd>
+                @if (_selected.Note is not null)
+                {
+                    <dt>Note</dt><dd>@_selected.Note</dd>
+                }
+            </dl>
+            <button type="button" class="btn btn-sm" @onclick="() => LabState.Pin(_selected, QuickGridSource)">Pin to state container</button>
+        }
+    </aside>
+</div>
+
+<section class="card card-pad" style="margin-top:1rem">
+    <h2>Second grid: per-merchant totals</h2>
+    <p class="small muted">Its sort and page parameters are prefixed with <code>m_</code>, so paging here leaves the transactions grid where it was.</p>
+    <div class="grid-wrap" data-testid="merchant-grid">
+        <QuickGrid Items="_merchants" Pagination="_merchantPages" QueryParameterNameOptions="_merchantQueryNames" Class="lab-grid">
+            <PropertyColumn Property="m => m.Merchant" Title="Merchant" IsDefaultSortColumn="true" Sortable="true" />
+            <PropertyColumn Property="m => m.Category" Title="Category" Sortable="true" />
+            <PropertyColumn Property="m => m.Transactions" Title="Count" Format="N0" Align="Align.End" Sortable="true" />
+            <PropertyColumn Property="m => m.Total" Title="Total" Format="N2" Align="Align.End" Sortable="true" />
+        </QuickGrid>
+    </div>
+    <Paginator State="_merchantPages" />
+</section>
+
+@code {
+    private const string QuickGridSource = "QuickGrid";
+    private readonly PaginationState _txPages = new() { ItemsPerPage = 15 };
+    private readonly PaginationState _merchantPages = new() { ItemsPerPage = 8 };
+    private readonly QueryParameterNameOptions _merchantQueryNames = new("m_");
+    private IQueryable<Transaction> _transactions = default!;
+    private IQueryable<MerchantSummary> _merchants = default!;
+    private Transaction? _selected;
+    private string _query = "";
+
+    protected override void OnInitialized()
+    {
+        _transactions = Data.Items.AsQueryable();
+        _merchants = TransactionSearch.SummarizeByMerchant(Data).AsQueryable();
+        _query = new Uri(Navigation.Uri).Query;
+        Navigation.LocationChanged += OnLocationChanged;
+    }
+
+    private Task SelectAsync(Transaction transaction)
+    {
+        _selected = transaction;
+        LabState.Record(QuickGridSource, $"Opened #{transaction.Id} via OnRowClick");
+        return Task.CompletedTask;
+    }
+
+    private string? RowClass(Transaction t) => t.Id == _selected?.Id ? "selected" : null;
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
+    {
+        _query = new Uri(e.Location).Query;
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose() => Navigation.LocationChanged -= OnLocationChanged;
+}

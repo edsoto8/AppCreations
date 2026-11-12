@@ -1,0 +1,7 @@
+/* InputText renders <input> without a type attribute, which app.css's input[type=...] rules do not match. */
+.island ::deep .signup input {
+    font: inherit; font-size: .9rem; color: var(--text); background: var(--bg-elev); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); padding: .42rem .6rem; width: 100%; box-sizing: border-box;
+}
+.island ::deep .signup input:focus { outline: 2px solid color-mix(in srgb, var(--accent) 45%, transparent); border-color: var(--accent); }
+.island ::deep .signup label { display: flex; align-items: center; gap: .4rem; }

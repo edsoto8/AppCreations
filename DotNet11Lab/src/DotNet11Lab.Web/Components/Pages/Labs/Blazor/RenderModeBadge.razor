@@ -1,0 +1,17 @@
+@* Shows where this component instance is running right now. Rendered once while prerendering (Static) and again once
+   the circuit is up (Server). AssignedRenderMode is only set on the component that carries @rendermode. *@
+<span class="render-mode @(RendererInfo.IsInteractive ? "live" : "static")" data-testid="render-mode" title="@Tooltip">
+    <span class="dot"></span>
+    @Label · RendererInfo.Name = <b>@RendererInfo.Name</b> · IsInteractive = <b>@RendererInfo.IsInteractive.ToString().ToLowerInvariant()</b>
+    · AssignedRenderMode = <b>@(Assigned?.GetType().Name ?? "null")</b>
+</span>
+
+@code {
+    [Parameter] public string Label { get; set; } = "This island";
+    /// <summary>Pass the island root's AssignedRenderMode (a child component's own is null).</summary>
+    [Parameter] public IComponentRenderMode? Assigned { get; set; }
+
+    private string Tooltip => RendererInfo.IsInteractive
+        ? "Interactive: events run on the server over the SignalR circuit."
+        : "Static or prerendering: HTML produced once, no event handlers attached.";
+}

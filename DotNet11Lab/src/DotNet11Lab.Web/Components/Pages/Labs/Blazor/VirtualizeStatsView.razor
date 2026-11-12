@@ -1,0 +1,34 @@
+@implements IDisposable
+
+<div class="grid grid-4 vstats" data-testid="vstats">
+    <MetricTile Label="Rows in dataset" Value="@Total.ToString("N0")" Sub="@($"opened at row {InitialIndex + 1:N0} (InitialItemIndex)")" />
+    <MetricTile Label="Matching filter" Value="@Matches.ToString("N0")"
+                Sub="@($"last scan {Measure.FormatDuration(Stats.LastFilterTime.TotalMicroseconds)} · {Stats.FilterRuns} scans · {Stats.SupersededSearches} debounced away")" />
+    <MetricTile Label="ItemsProvider calls" Value="@Stats.ProviderCalls.ToString("N0")" Sub="@($"last asked for {Stats.LastCount} rows from index {Stats.LastStart:N0}")" />
+    <MetricTile Label="Rows materialized" Value="@Stats.RowsMaterialized.ToString("N0")"
+                Sub="@($"{(Total == 0 ? 0 : Stats.RowsMaterialized * 100.0 / Total):0.0}% of the dataset, cumulative")" />
+</div>
+
+@code {
+    [Parameter, EditorRequired] public VirtualizeStats Stats { get; set; } = default!;
+    [Parameter] public int Total { get; set; }
+    [Parameter] public int Matches { get; set; }
+    [Parameter] public int InitialIndex { get; set; }
+
+    private VirtualizeStats? _subscribed;
+
+    protected override void OnParametersSet()
+    {
+        if (ReferenceEquals(_subscribed, Stats)) return;
+        if (_subscribed is not null) _subscribed.Changed -= OnChanged;
+        _subscribed = Stats;
+        Stats.Changed += OnChanged;
+    }
+
+    private void OnChanged() => _ = InvokeAsync(StateHasChanged);
+
+    public void Dispose()
+    {
+        if (_subscribed is not null) _subscribed.Changed -= OnChanged;
+    }
+}

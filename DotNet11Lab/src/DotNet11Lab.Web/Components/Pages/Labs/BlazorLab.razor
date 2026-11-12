@@ -1,7 +1,206 @@
 @page "/labs/blazor"
+@using DotNet11Lab.Web.Components.Pages.Labs.Blazor
+@using DotNet11Lab.Web.Labs.Blazor
+@using DotNet11Lab.Core.Labs.Blazor
+@inject TransactionDataset Data
 
-<LabHeader Slug="blazor" />
+@* This page has NO render mode: it is static SSR. Only the three "island" components below are interactive. *@
 
-<Callout Kind="warn" Title="Under construction">
-    <p>This laboratory is being implemented.</p>
-</Callout>
+<LabHeader Slug="blazor">
+    <p class="small muted">
+        This page is rendered on the server as plain HTML. The three demos marked "island" are separate components rendered with
+        <code>@@rendermode="InteractiveServer"</code>: they are prerendered into the HTML, then attach to one SignalR circuit. The
+        badge below is this static page's own view of itself.
+    </p>
+    <RenderModeBadge Label="Page" Assigned="AssignedRenderMode" />
+</LabHeader>
+
+<nav class="tabs" aria-label="Sections">
+    <a class="tab" href="labs/blazor#forms">Async form validation</a>
+    <a class="tab" href="labs/blazor#quickgrid">QuickGrid</a>
+    <a class="tab" href="labs/blazor#virtualize">Virtualize</a>
+    <a class="tab" href="labs/blazor#state">Render modes &amp; state</a>
+</nav>
+
+@* ---------------------------------------------------------------- Forms *@
+<section class="section" id="forms">
+    <div class="section-title"><h2>Async form validation</h2><StatusBadge Status="FeatureStatus.Stable" /><span class="badge badge-new">New in 11</span></div>
+    <p>
+        <code>&lt;DataAnnotationsValidator /&gt;</code> now runs <code>AsyncValidationAttribute</code> and
+        <code>IAsyncValidatableObject</code>. When a field changes, its async check starts and
+        <code>EditContext.IsValidationPending(field)</code> is true until it finishes; a newer edit cancels the older check (the framework
+        owns the <code>CancellationToken</code>). On submit, <code>EditForm</code> awaits every pending validator before deciding between
+        <code>OnValidSubmit</code> and <code>OnInvalidSubmit</code>. The same <code>[UsernameAvailable]</code> attribute would work
+        unchanged on a Minimal API body.
+    </p>
+    <FormsIsland @rendermode="InteractiveServer" />
+    <div style="margin-top:1rem">
+        <CodeCompare OldSnippet="Blazor.LegacyManualAsync" NewSnippet="Blazor.PendingState"
+                     OldTitle="LegacySignupFormBase: checks by hand on submit" NewTitle="AsyncSignupFormBase: the framework runs them" />
+    </div>
+    <div class="grid grid-2" style="margin-top:1rem">
+        <CodeBlock Snippet="Blazor.SignupModel" />
+        <div class="stack">
+            <CodeBlock Snippet="Blazor.UsernameAvailable" />
+            <CodeBlock Code="@BlazorMarkup.Join(BlazorMarkup.AsyncForm, BlazorMarkup.SubmitButton)" Language="razor" Title="AsyncSignupForm.razor (markup excerpt)" />
+        </div>
+    </div>
+    <Callout Title="API names, as compiled against Microsoft.AspNetCore.Components.Forms 11.0">
+        <p>
+            <code>EditContext.IsValidationPending()</code> / <code>(FieldIdentifier)</code> / <code>(Expression&lt;Func&lt;T&gt;&gt;)</code>,
+            the same three overloads of <code>IsValidationFaulted</code>, <code>EditContext.ValidateAsync(CancellationToken)</code>,
+            <code>EditContext.RegisterAsyncFieldValidator(FieldIdentifier, Func&lt;CancellationToken, Task&gt;)</code> and
+            <code>ValidationRequestedEventArgs.AddAsyncValidator(Func&lt;CancellationToken, Task&gt;)</code> for custom validator components.
+        </p>
+    </Callout>
+    <UsageGuidance>
+        <WhenToUse>
+            <ul>
+                <li>Availability, uniqueness or entitlement checks the user should see before submitting.</li>
+                <li>Sharing one validated model between a Blazor form and an API endpoint.</li>
+                <li>Disabling submit while checks run: <code>IsValidationPending()</code> replaces hand-kept "checking" flags.</li>
+            </ul>
+        </WhenToUse>
+        <WhenToAvoid>
+            <ul>
+                <li>Treating validation as a guarantee: two users can pass the same check; enforce uniqueness at write time (the demo does).</li>
+                <li>Expensive checks on every keystroke: Blazor validates on change (blur for inputs), keep it that way or debounce your own.</li>
+                <li>Static SSR forms that must work without a circuit: the server-side async check runs on post, not live.</li>
+            </ul>
+        </WhenToAvoid>
+    </UsageGuidance>
+</section>
+
+@* ---------------------------------------------------------------- QuickGrid *@
+<section class="section" id="quickgrid">
+    <div class="section-title"><h2>QuickGrid: URL-based sorting and paging, OnRowClick</h2><StatusBadge Status="FeatureStatus.Stable" /><span class="badge badge-new">New in 11</span></div>
+    <p>
+        In .NET 11, QuickGrid keeps its sort column, direction and page in the query string by default and renders headers and pager
+        buttons as links. Consequences: a grid view is a bookmarkable URL, back/forward work, and paging works on a static SSR page with no
+        circuit at all. <code>QueryParameterNameOptions</code> gives each grid on a page its own parameter names, and the new
+        <code>OnRowClick</code> callback makes rows clickable without a template column.
+    </p>
+    <div class="grid grid-2">
+        <a class="card card-pad lab-link" href="labs/blazor/quickgrid">
+            <strong>QuickGrid, interactive →</strong>
+            <span class="small muted">@Data.Count.ToString("N0") rows, sorting and paging in the URL, OnRowClick detail panel, a second grid with <code>m_</code>-prefixed parameters.</span>
+        </a>
+        <a class="card card-pad lab-link" href="labs/blazor/quickgrid-static?page=3&amp;sort=Amount&amp;direction=desc">
+            <strong>QuickGrid, static SSR →</strong>
+            <span class="small muted">No render mode, no WebSocket. This link opens page 3 sorted by amount, descending, straight from the URL.</span>
+        </a>
+    </div>
+    <div class="grid grid-2" style="margin-top:1rem">
+        <CodeBlock Code="@BlazorMarkup.QuickGrids.Code" Language="razor" Title="QuickGridLab.razor (markup excerpt)" />
+        <CodeBlock Code="@BlazorMarkup.Join(BlazorMarkup.SecondGrid, BlazorMarkup.SecondGridState)" Language="razor" Title="Second grid on the same page" />
+    </div>
+    <Callout Kind="warn" Title="Breaking changes to plan for">
+        <ul>
+            <li>Two grids on one page now <strong>must</strong> use distinct <code>QueryParameterNameOptions</code> and separate <code>PaginationState</code> objects, or they fight over <code>?page=</code>.</li>
+            <li>The sort parameter holds the column <code>Title</code>: renaming a column breaks bookmarked URLs.</li>
+            <li>Header and pager markup changed from buttons to links (<code>a.col-title</code>, <code>nav a[aria-disabled]</code>): custom CSS may need updating.</li>
+            <li>To keep the old behaviour, turn off the <code>Microsoft.AspNetCore.Components.QuickGrid.EnableUrlBasedQuickGridNavigationAndSorting</code> AppContext switch.</li>
+        </ul>
+    </Callout>
+    <Callout Title="Not used here: experimental members">
+        <p><code>AnchorMode</code> and <code>ItemComparer</code> on QuickGrid are marked experimental (diagnostic <code>ASP0030</code>) and are left out of this stable app.</p>
+    </Callout>
+    <UsageGuidance>
+        <WhenToUse>
+            <ul>
+                <li>Admin and back-office lists where people share links to "page 4, sorted by amount".</li>
+                <li>Read-mostly pages that should stay static SSR (cheaper: no circuit per user) but still need paging.</li>
+            </ul>
+        </WhenToUse>
+        <WhenToAvoid>
+            <ul>
+                <li>Grids whose state must stay private or out of history (sensitive filters in URLs end up in logs and referrers).</li>
+                <li>Server-side <code>IQueryable</code> over a database without an index on the sort columns: every page click re-sorts.</li>
+            </ul>
+        </WhenToAvoid>
+    </UsageGuidance>
+</section>
+
+@* ---------------------------------------------------------------- Virtualize *@
+<section class="section" id="virtualize">
+    <div class="section-title"><h2>Virtualize: jump to any row, variable heights</h2><StatusBadge Status="FeatureStatus.Stable" /><span class="badge badge-new">New in 11</span></div>
+    <p>
+        <code>Virtualize</code> renders only the rows near the viewport. New in .NET 11: <code>ScrollToItemAsync(index)</code> brings any row
+        into view, <code>InitialItemIndex</code> opens the list at a row (try <a href="labs/blazor?item=75000#virtualize">?item=75000</a>), item
+        heights are measured at runtime so rows with notes can be taller, and the default <code>OverscanCount</code> went from 3 to 15.
+        The filter below scans all rows on a background thread after a 250 ms pause; each keystroke cancels the previous scan.
+    </p>
+    <TransactionExplorer @rendermode="InteractiveServer" />
+    <div class="grid grid-2" style="margin-top:1rem">
+        <CodeBlock Snippet="Blazor.ScrollToItem" />
+        <CodeBlock Snippet="Blazor.ItemsProvider" />
+    </div>
+    <div class="grid grid-2" style="margin-top:1rem">
+        <CodeBlock Snippet="Blazor.DebouncedSearch" />
+        <div class="stack">
+            <CodeBlock Code="@BlazorMarkup.Virtualize.Code" Language="razor" Title="TransactionExplorer.razor (markup excerpt)" />
+            <CodeBlock Snippet="Blazor.FilterScan" />
+        </div>
+    </div>
+    <UsageGuidance>
+        <WhenToUse>
+            <ul>
+                <li>Long lists or logs (thousands to millions of rows) where paging would break the reading flow.</li>
+                <li>"Go to row N", search-result jumps, or restoring a reader's position (<code>InitialItemIndex</code> from the URL).</li>
+            </ul>
+        </WhenToUse>
+        <WhenToAvoid>
+            <ul>
+                <li>Short lists (a few hundred rows): plain rendering is simpler and Ctrl+F finds everything.</li>
+                <li>Content that must be fully in the DOM for printing, SEO or in-page find.</li>
+                <li>Rows whose height depends on images that load late, unless you reserve their size.</li>
+            </ul>
+        </WhenToAvoid>
+    </UsageGuidance>
+</section>
+
+@* ---------------------------------------------------------------- Render modes & state *@
+<section class="section" id="state">
+    <div class="section-title"><h2>Render modes, persistent state and a circuit-scoped container</h2><StatusBadge Status="FeatureStatus.Baseline" /></div>
+    <p>
+        Not new in .NET 11 (it is the platform these features run on), but it decides what you pay for. Interactive components are
+        <em>prerendered</em>: their <code>OnInitializedAsync</code> runs once to produce HTML, and again when the circuit starts. Without
+        care, data is loaded twice and the screen flickers. <code>[PersistentState]</code> (introduced in .NET 10) serializes the first
+        result into the page and hands it to the interactive instance.
+    </p>
+    <div class="table-wrap" style="margin-bottom:1rem">
+        <table class="data">
+            <thead><tr><th>Part of this page</th><th>Render mode</th><th>Why</th></tr></thead>
+            <tbody>
+                <tr><td>Page shell, explanations, code blocks</td><td><span class="badge badge-baseline">Static SSR</span></td><td>Nothing to click; no circuit needed. Cheapest for the server.</td></tr>
+                <tr><td>Forms, explorer and state islands</td><td><span class="badge badge-optin">InteractiveServer</span></td><td>Live validation, scrolling and filtering need events. Data stays on the server.</td></tr>
+                <tr><td><a href="labs/blazor/quickgrid">QuickGrid page</a></td><td><span class="badge badge-optin">InteractiveServer</span></td><td>Row clicks open a detail panel.</td></tr>
+                <tr><td><a href="labs/blazor/quickgrid-static">QuickGrid static page</a></td><td><span class="badge badge-baseline">Static SSR</span></td><td>URL-based paging needs no interactivity in .NET 11.</td></tr>
+            </tbody>
+        </table>
+    </div>
+    <StateIsland @rendermode="InteractiveServer" />
+    <div class="grid grid-2" style="margin-top:1rem">
+        <CodeBlock Snippet="Blazor.PersistentState" />
+        <div class="stack">
+            <CodeBlock Snippet="Blazor.StateContainer" />
+            <CodeBlock Code="@BlazorMarkup.Islands.Code" Language="razor" Title="BlazorLab.razor: a static page with interactive islands" />
+        </div>
+    </div>
+    <UsageGuidance>
+        <WhenToUse>
+            <ul>
+                <li><code>[PersistentState]</code> for any prerendered component that loads data in <code>OnInitializedAsync</code>.</li>
+                <li>Islands: keep pages static and make only the interactive parts <code>InteractiveServer</code> (fewer circuits, less memory).</li>
+                <li>A scoped state container to share state between components of one user's circuit without cascading parameters.</li>
+            </ul>
+        </WhenToUse>
+        <WhenToAvoid>
+            <ul>
+                <li>Persisting large or sensitive data: it is serialized into the HTML (protected for server components, but it still adds bytes).</li>
+                <li>Scoped services as cross-user caches: one instance per circuit; use a singleton (with care) or a real cache.</li>
+                <li>Holding scoped state you cannot lose: circuits end when the tab closes or the server restarts.</li>
+            </ul>
+        </WhenToAvoid>
+    </UsageGuidance>
+</section>
