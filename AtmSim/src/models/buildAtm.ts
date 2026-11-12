@@ -52,6 +52,7 @@ export function buildAtm(opts: BuildAtmOptions = {}): AtmModel {
   card.root.position.copy(ext.cardRest.position);
   card.root.quaternion.copy(ext.cardRest.quaternion);
   restParent.add(card.root);
+  card.root.userData.setAppearance = card.setAppearance;
 
   // component ids: every mesh inherits the id of its nearest part group
   const assign = (o: THREE.Object3D, id: ComponentId | undefined): void => {
@@ -99,10 +100,10 @@ export function buildAtm(opts: BuildAtmOptions = {}): AtmModel {
     shutterOutside: a('shutterOutside'),
     retractEntry: a('retractEntry'),
     focus: {
-      front: { position: v(0.35, 1.5, 2.35), target: v(0, 1.02, 0.1) },
-      screen: { position: v(0.0, 1.42, 0.98), target: v(0, 1.3, 0.3) },
+      front: { position: v(0.3, 1.45, 2.75), target: v(0, 0.98, 0.05) },
+      screen: { position: v(0.0, 1.36, 0.95), target: v(0, 1.31, 0.32) },
       keypad: { position: v(0.06, 1.42, 0.9), target: v(0.03, 1.08, 0.4) },
-      upper: { position: v(0.75, 1.55, 1.25), target: v(0.0, 1.2, -0.05) },
+      upper: { position: v(0.38, 1.45, 1.3), target: v(-0.02, 1.2, -0.1) },
       dispenser: { position: v(0.75, 0.95, 1.1), target: v(0.1, 0.5, -0.05) },
       safe: { position: v(0.25, 0.85, 1.55), target: v(0.0, 0.45, 0.0) },
       side: { position: v(2.1, 1.25, 0.55), target: v(0, 0.9, 0) },
@@ -111,43 +112,43 @@ export function buildAtm(opts: BuildAtmOptions = {}): AtmModel {
 
   const parts = ctx.parts;
   const E: Partial<Record<ComponentId, THREE.Vector3>> = {
-    // exterior
-    'topper-sign': v(0, 0.35, 0),
-    cabinet: v(0, 0, -0.75),
-    safe: v(0, 0, -0.75),
-    'service-door': v(-0.05, 0.12, 0.75),
-    display: v(0, 0.1, 0.45),
-    keypad: v(0, -0.06, 0.55),
-    'card-reader': v(0.2, 0.02, 0.45),
-    'contactless-reader': v(0.2, 0.08, 0.4),
-    'receipt-slot': v(0.2, -0.05, 0.45),
-    speakers: v(0, 0.02, 0.32),
-    camera: v(0, 0.14, 0.4),
-    'status-leds': v(0.12, 0.14, 0.4),
-    accessibility: v(-0.18, 0, 0.4),
-    'cash-slot': v(0.05, -0.04, 0.42),
-    'deposit-slot': v(-0.08, -0.04, 0.42),
-    'vault-door': v(-0.15, 0, 0.85),
-    'locks-hinges': v(-0.3, 0, 0.35),
+    // exterior skin moves back / aside so every module stands free in front of it
+    cabinet: v(0, 0, -1.05),
+    safe: v(0, 0, -1.05),
+    'topper-sign': v(0, 0.32, -1.05),
+    'locks-hinges': v(0, 0, -1.05),
+    'service-door': v(-0.95, 0.05, 0.1),
+    'vault-door': v(-0.95, 0, 0.1),
+    display: v(0, 0.16, 0.5),
+    keypad: v(0, 0.02, 0.62),
+    'card-reader': v(0.22, 0.04, 0.5),
+    'contactless-reader': v(0.22, 0.1, 0.45),
+    'receipt-slot': v(0.22, -0.02, 0.5),
+    speakers: v(0, 0.08, 0.38),
+    camera: v(0, 0.2, 0.42),
+    'status-leds': v(0.12, 0.2, 0.42),
+    accessibility: v(-0.2, 0.04, 0.42),
+    'cash-slot': v(0.08, -0.02, 0.5),
+    'deposit-slot': v(-0.1, -0.02, 0.5),
     // internal: cash
-    'cassette-A': v(0.0, 0.12, 0.62),
-    'cassette-B': v(0.0, 0.06, 0.5),
-    'cassette-C': v(0.0, 0.0, 0.38),
-    'reject-cassette': v(0.0, -0.04, 0.26),
-    'retract-bin': v(0.0, 0.18, 0.72),
-    dispenser: v(0.32, 0, -0.1),
-    'picker-rollers': v(0.18, 0.0, -0.18),
-    transport: v(0.18, 0.0, -0.32),
-    'validation-sensors': v(0.18, 0.06, -0.46),
-    stacker: v(0.18, 0.2, -0.22),
-    'presenter-shutter': v(0.18, 0.26, 0.1),
-    'deposit-module': v(-0.38, 0.0, 0.2),
+    'cassette-A': v(0.0, 0.1, 0.52),
+    'cassette-B': v(0.0, 0.05, 0.4),
+    'cassette-C': v(0.0, 0.0, 0.28),
+    'reject-cassette': v(0.0, -0.04, 0.16),
+    'retract-bin': v(0.0, 0.16, 0.62),
+    dispenser: v(0.42, 0, -0.1),
+    'picker-rollers': v(0.22, 0.0, -0.2),
+    transport: v(0.22, 0.0, -0.36),
+    'validation-sensors': v(0.22, 0.08, -0.5),
+    stacker: v(0.22, 0.22, -0.26),
+    'presenter-shutter': v(0.22, 0.3, 0.1),
+    'deposit-module': v(-0.4, 0.0, 0.18),
     // internal: upper module
-    'card-reader-module': v(0.4, 0.12, 0.15),
-    'receipt-printer': v(0.4, -0.06, 0.25),
-    'controller-pc': v(-0.1, 0.3, -0.35),
-    'power-supply': v(-0.45, 0.15, -0.2),
-    comms: v(0.25, 0.48, -0.3),
+    'card-reader-module': v(0.42, 0.14, 0.2),
+    'receipt-printer': v(0.42, -0.04, 0.3),
+    'controller-pc': v(-0.12, 0.32, -0.2),
+    'power-supply': v(-0.48, 0.18, -0.12),
+    comms: v(0.28, 0.5, -0.2),
   };
   const explodeOffsets = new Map<ComponentId, THREE.Vector3>();
   for (const id of parts.keys()) explodeOffsets.set(id, E[id] ?? v(0, 0, 0));

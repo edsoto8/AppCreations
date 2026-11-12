@@ -118,8 +118,8 @@ export function buildInternals(ctx: BuildCtx, denoms: Record<CassetteId, Denomin
   plateShape.lineTo(pz1, py1);
   plateShape.lineTo(pz0, py1);
   plateShape.lineTo(pz0, py0);
-  for (const y of [0.2, 0.33, 0.46, 0.59]) plateShape.holes.push(holeCircle(-0.2, y, 0.035));
-  for (const y of [0.265, 0.395, 0.525]) plateShape.holes.push(holeRect(-0.03, y, 0.12, 0.06, 0.015));
+  // big service window over the transport/picker area so the note path is visible from the side
+  plateShape.holes.push(holeRect(-0.245, 0.445, 0.2, 0.6, 0.03));
   const plateGeo = extrudeShapeX(plateShape, 0.005);
   for (const x of [0.016, 0.254]) mesh(plateGeo, m.frameGrey, dispShake, [x, 0, 0]);
   // cross members + cassette rails
@@ -316,8 +316,10 @@ export function buildInternals(ctx: BuildCtx, denoms: Record<CassetteId, Denomin
   // side guide plates of the vertical transport
   for (const x of [D.dispX - 0.1, D.dispX + 0.1]) mesh(box(0.003, 0.55, 0.05), m.zinc, trShake, [x, 0.42, D.transportZ - 0.012]);
   // reject channel (behind the transport, running down to the reject cassette)
-  mesh(box(0.2, 0.47, 0.002), zincDS, trShake, [D.dispX, 0.43, D.rejectChannelZ - 0.012]);
-  mesh(box(0.2, 0.47, 0.002), zincDS, trShake, [D.dispX, 0.43, D.rejectChannelZ + 0.012]);
+  for (const x of [D.dispX - 0.085, D.dispX + 0.085]) {
+    for (const dz of [-0.012, 0.012]) mesh(box(0.012, 0.47, 0.002), zincDS, trShake, [x, 0.43, D.rejectChannelZ + dz]);
+    mesh(box(0.003, 0.47, 0.024), m.zinc, trShake, [x + Math.sign(x - D.dispX) * 0.006, 0.43, D.rejectChannelZ]);
+  }
   label(ctx, trShake, { w: 256, h: 48, bg: '#c0392b', lines: [{ text: 'REJECT PATH', size: 28, weight: '800', color: '#fff', y: 0.55 }] }, [0.06, 0.011], [D.dispX, 0.5, D.rejectChannelZ + 0.0135]);
   // diverter gate (rotates to send a note to the reject path)
   const div = group(trShake, [D.dispX, D.diverterY, D.transportZ - 0.008], 'diverter');
@@ -420,7 +422,7 @@ export function buildInternals(ctx: BuildCtx, denoms: Record<CassetteId, Denomin
   for (const x of [D.dispX - 0.111, D.dispX + 0.111]) mesh(box(0.006, 0.12, 0.012), m.frameGrey, pr, [x, D.cash.y - 0.03, 0.405]);
   mesh(cylX(0.012, 0.03, 16), m.darkMetal, pr, [D.dispX + 0.13, D.cash.y - 0.06, 0.39]);
   PRESENTER_POINTS.forEach((p, i) => anchor(ctx, `presenter-${i}`, pr, p));
-  anchor(ctx, 'shutterOutside', pr, [D.dispX, D.cash.y, D.front + 0.028]);
+  anchor(ctx, 'shutterOutside', pr, [D.dispX, D.cash.y, D.front + 0.036]);
 
   // ───────────────────────────── deposit module ─────────────────────────────
   const dm = part(ctx, 'deposit-module', root);
@@ -586,6 +588,13 @@ export function buildInternals(ctx: BuildCtx, denoms: Record<CassetteId, Denomin
   ledMesh(ctx, cylZ(0.003, 0.002, 10), pc, [pcX + 0.095, pcY - 0.12, pcZ + 0.134], 0x22dd66, null, 1.5);
   label(ctx, pc, { w: 512, h: 160, bg: '#d9dcdf', border: { color: '#333', width: 6 }, lines: [{ text: 'ATM CONTROLLER PC', size: 40, weight: '800', color: '#1a1a1a', y: 0.33 }, { text: 'generic · runs the ATM application', size: 26, weight: '500', color: '#333', y: 0.7 }] }, [0.12, 0.0375], [pcX - 0.06, pcY - 0.1, pcZ + 0.1325]);
   fasteners(pc, [[pcX - 0.14, pcY + 0.155, pcZ + 0.1325], [pcX + 0.14, pcY + 0.155, pcZ + 0.1325], [pcX - 0.14, pcY - 0.155, pcZ + 0.1325], [pcX + 0.14, pcY - 0.155, pcZ + 0.1325]], [0, 0, 1], m.zinc, 0.004, 'controller-pc');
+
+  // I/O distribution board + cable duct on the upper module floor (part of the controller system)
+  mesh(rbox(0.14, 0.03, 0.1, 0.004), m.greyPlastic, pc, [-0.2, D.band.y1 + 0.015, 0.02]);
+  mesh(box(0.13, 0.002, 0.09), m.pcb, pc, [-0.2, D.band.y1 + 0.031, 0.02]);
+  instancedBoxes(pc, [0.014, 0.008, 0.01], [[-0.24, D.band.y1 + 0.036, 0.0], [-0.22, D.band.y1 + 0.036, 0.0], [-0.2, D.band.y1 + 0.036, 0.0], [-0.18, D.band.y1 + 0.036, 0.0], [-0.16, D.band.y1 + 0.036, 0.04]], m.lightPlastic).userData.componentId = 'controller-pc';
+  label(ctx, pc, { w: 256, h: 48, bg: '#e7e7e2', lines: [{ text: 'I/O BOARD', size: 30, weight: '800', color: '#222', y: 0.55 }] }, [0.05, 0.0095], [-0.2, D.band.y1 + 0.015, 0.0705]);
+  mesh(box(0.5, 0.025, 0.03), m.greyPlastic, pc, [0.0, D.band.y1 + 0.0125, -0.1]);
 
   // ───────────────────────────── power supply ─────────────────────────────
   const ps = part(ctx, 'power-supply', root);

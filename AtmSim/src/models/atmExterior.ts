@@ -154,11 +154,14 @@ export function buildExterior(ctx: BuildCtx): ExteriorBuild {
   mesh(box(0.6, 0.003, 0.012), m.warmGlow, cab, [0, D.topY - 0.004, D.front - 0.02]);
   // rear panel
   shellMesh(ctx, mesh(rbox(0.672, sideH - 0.005, 0.012, 0.004), s.rearPaint, cab, [0, D.plinthH + sideH / 2, D.back + 0.006]), true);
-  // rear louvres (upper module ventilation)
-  for (const y of [1.42, 1.22]) {
-    const v = shellMesh(ctx, mesh(new THREE.PlaneGeometry(0.34, 0.16), s.vent, cab, [0, y, D.back - 0.0008], [0, Math.PI, 0]));
-    v.renderOrder = 1;
+  // rear louvres (upper module ventilation): brushed plates with dark slots
+  for (const y of [1.44, 1.2]) {
+    mesh(rbox(0.36, 0.17, 0.004, 0.002), m.brushedAlu, cab, [0, y, D.back - 0.002]);
+    const slots: V3[] = [];
+    for (let r = 0; r < 7; r++) for (const x of [-0.085, 0.085]) slots.push([x, y - 0.06 + r * 0.02, D.back - 0.0042]);
+    instancedBoxes(cab, [0.14, 0.008, 0.001], slots, m.throatDark).userData.componentId = 'cabinet';
   }
+  fasteners(cab, [-0.17, 0.17].flatMap((x) => [1.36, 1.52, 1.12, 1.28].map((y) => [x, y, D.back - 0.004] as V3)), [0, 0, -1], m.zinc, 0.004, 'cabinet');
   // rear access panel seam (upper) + lock
   for (const [w, h, x, y] of [
     [0.56, 0.004, 0, 1.585],
@@ -193,13 +196,6 @@ export function buildExterior(ctx: BuildCtx): ExteriorBuild {
   mesh(box(D.skinIn * 2, 0.004, 0.004), m.brushedAlu, cab, [0, D.band.y1 - 0.002, D.front + 0.001]);
   // upper module floor plate (internal)
   mesh(box(0.66, 0.006, 0.71), m.zinc, cab, [0, D.band.y1 - 0.003, -0.06]);
-  label(
-    ctx,
-    cab,
-    { w: 512, h: 64, bg: null, lines: [{ text: 'TRAINING UNIT — FICTIONAL BANK & CURRENCY', size: 30, weight: '700', color: '#9aa7b3', y: 0.5 }] },
-    [0.26, 0.032],
-    [-0.0, 0.862, D.front + 0.0006],
-  );
 
   // ───────────────────────────── topper sign ─────────────────────────────
   const topper = part(ctx, 'topper-sign', root);
@@ -272,7 +268,7 @@ export function buildExterior(ctx: BuildCtx): ExteriorBuild {
   );
   // brushed lip along the deck front + rubber mat on the shelf
   mesh(box(dW - 0.004, dk.yFrontTop - dk.yBottom - 0.004, 0.002), m.brushedAlu, sd, [0, (dk.yBottom + dk.yFrontTop) / 2, dk.zFront + 0.001]);
-  mesh(rbox(shelfW - 0.03, 0.002, 0.17, 0.001), m.rubber, sd, [dk.shelfX + shelfW / 2, dk.shelfTop + 0.001, 0.41]);
+  mesh(rbox(shelfW - 0.024, 0.002, 0.19, 0.001), m.brushedAlu, sd, [dk.shelfX + shelfW / 2, dk.shelfTop + 0.0042, 0.41]);
   // door back: stiffening frame (visible when open)
   for (const [w, h, x, y] of [
     [dW - 0.04, 0.02, 0, 1.6],
@@ -280,7 +276,7 @@ export function buildExterior(ctx: BuildCtx): ExteriorBuild {
     [0.02, 0.49, -0.3, 1.355],
     [0.02, 0.49, 0.3, 1.355],
   ] as Array<[number, number, number, number]>) {
-    mesh(box(w, h, 0.012), s.doorInner, sd, [x, y, D.door.face - D.door.faceT - 0.006]);
+    shellMesh(ctx, mesh(box(w, h, 0.012), s.doorInner, sd, [x, y, D.door.face - D.door.faceT - 0.006]));
   }
   label(
     ctx,
@@ -327,7 +323,8 @@ export function buildExterior(ctx: BuildCtx): ExteriorBuild {
 
   // ───────────────────────────── display ─────────────────────────────
   const sc = D.screen;
-  const disp = part(ctx, 'display', svc.inner, [sc.cx, sc.cy, D.door.face]);
+  // pushed forward so the top of the tilted screen stays in front of the fascia face
+  const disp = part(ctx, 'display', svc.inner, [sc.cx, sc.cy, D.door.face + 0.022]);
   disp.rotation.x = sc.tilt;
   const bezelShape = rectShape(0, 0, 0.372, 0.296, 0.012);
   bezelShape.holes.push(holeRect(0, 0.004, sc.w + 0.004, sc.h + 0.004, 0.002));
@@ -489,8 +486,8 @@ export function buildExterior(ctx: BuildCtx): ExteriorBuild {
 
   // card rest: on the wallet shelf, right of the keypad
   const cardRest = {
-    position: new THREE.Vector3(0.245, dk.shelfTop + 0.0025, 0.415),
-    quaternion: new THREE.Quaternion().setFromEuler(new THREE.Euler(-Math.PI / 2, 0, 0.18)),
+    position: new THREE.Vector3(0.258, dk.shelfTop + 0.0058, 0.474),
+    quaternion: new THREE.Quaternion().setFromEuler(new THREE.Euler(-Math.PI / 2, 0, 0.1)),
   };
 
   // ───────────────────────────── cash slot (fixed fascia band) ─────────────────────────────
@@ -568,7 +565,7 @@ export function buildExterior(ctx: BuildCtx): ExteriorBuild {
   );
   label(ctx, vp, { w: 512, h: 64, bg: null, lines: [{ text: 'MERIDIAN · SECURE CASH MODULE', size: 28, weight: '800', color: '#3e444b', y: 0.55, letterSpacing: 3 }] }, [0.24, 0.03], [-0.07, 0.15, vd.z1 + 0.0042]);
   // inner side: bolt-work cover + bolts into the right wall
-  mesh(box(vW - 0.06, vH - 0.06, 0.008), s.vaultInner, vp, [0, vCy, vd.z0 - 0.004]);
+  shellMesh(ctx, mesh(box(vW - 0.06, vH - 0.06, 0.008), s.vaultInner, vp, [0, vCy, vd.z0 - 0.004]));
   for (const y of [0.22, 0.454, 0.69]) mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.05, 16).rotateZ(Math.PI / 2), m.chrome, vp, [vd.x1 - 0.02, y, vd.z0 + 0.012]);
   fasteners(vp, [0.24, -0.24].flatMap((x) => [0.2, 0.454, 0.7].map((y) => [x, y, vd.z0 - 0.008] as V3)), [0, 0, -1], m.zinc, 0.006, 'vault-door');
 

@@ -364,10 +364,10 @@ export function buildLobby(): Lobby {
   // ───────────── small props: waste bin + plant ─────────────
   const binMat = new THREE.MeshStandardMaterial({ color: 0x9aa1a8, metalness: 0.9, roughness: 0.35 });
   const bin = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.13, 0.55, 32, 1, true), binMat);
-  bin.position.set(0.72, 0.275, 0.1);
+  bin.position.set(0.98, 0.275, -0.25);
   group.add(bin);
   const binTop = new THREE.Mesh(new THREE.CylinderGeometry(0.155, 0.155, 0.03, 32), new THREE.MeshStandardMaterial({ color: 0x23262a, roughness: 0.6 }));
-  binTop.position.set(0.72, 0.565, 0.1);
+  binTop.position.set(0.98, 0.565, -0.25);
   group.add(binTop);
   const potMat = new THREE.MeshStandardMaterial({ color: 0x3b3f45, roughness: 0.5, metalness: 0.2 });
   const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.17, 0.5, 32), potMat);
