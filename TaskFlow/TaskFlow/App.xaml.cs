@@ -17,8 +17,14 @@ public partial class App : Application
 
     protected Window? MainWindow { get; private set; }
 
-    protected override void OnLaunched(LaunchActivatedEventArgs args)
+    /// <summary>The app's services and view models. Pages read their view model from here.</summary>
+    public static AppServices Services { get; private set; } = null!;
+
+    protected override async void OnLaunched(LaunchActivatedEventArgs args)
     {
+        Services = new AppServices();
+        await Services.AddSampleTasksAsync();
+
         MainWindow = new Window();
 #if DEBUG
         MainWindow.UseStudio();

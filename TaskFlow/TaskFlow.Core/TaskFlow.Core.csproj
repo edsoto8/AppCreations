@@ -10,4 +10,13 @@
     <RootNamespace>TaskFlow.Core</RootNamespace>
   </PropertyGroup>
 
+  <ItemGroup>
+    <!-- Versions live in ../Directory.Packages.props (central package management). -->
+    <PackageReference Include="CommunityToolkit.Mvvm" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="TaskFlow.Tests" />
+  </ItemGroup>
+
 </Project>

@@ -4,7 +4,7 @@
 |---|---|---|
 | 1 | Environment and first application | Done |
 | 2 | First user interface | Done |
-| 3 | MVVM and data binding | Not started |
+| 3 | MVVM and data binding | Done |
 | 4 | Task editing and navigation | Not started |
 | 5 | Local data storage | Not started |
 | 6 | UI improvements | Not started |
@@ -25,3 +25,12 @@
   `Click` event handler in code-behind (replaced by MVVM in Milestone 3).
 - Verified: built with 0 warnings; launched under Xvfb + openbox, clicked Add Task twice with `xdotool`, and the list
   grew to 5 tasks with the counter showing "1 of 5 completed".
+
+## Milestone 3 — MVVM and data binding
+
+- `TaskFlow.Core`: `TaskService` (single source of truth, raises `Changed`), `TaskQuery` (pure filter/sort),
+  `CollectionSync` (in-place `ObservableCollection` updates), `TaskDraft`, `Choice<T>`.
+- View models (CommunityToolkit.Mvvm partial properties + `[RelayCommand]`): `MainViewModel`, `TaskItemViewModel`.
+- App: `AppServices` composition root; `MainPage` binds with `x:Bind` (filter/sort ComboBoxes, list, commands).
+- `TaskFlow.Tests` (xUnit v3 on Microsoft.Testing.Platform): 12 tests passing.
+- Verified in the running app: complete (checkbox), delete, add, counter update, filter ComboBox opens.

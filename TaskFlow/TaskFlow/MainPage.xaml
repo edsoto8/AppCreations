@@ -1,10 +1,9 @@
 <Page x:Class="TaskFlow.MainPage"
       xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-      xmlns:models="using:TaskFlow.Core.Models"
+      xmlns:vm="using:TaskFlow.Core.ViewModels"
       Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
 
-  <!-- Three rows: header, counter, list. "Auto" = size to content, "*" = take the remaining space. -->
   <Grid Padding="24" RowSpacing="16">
     <Grid.RowDefinitions>
       <RowDefinition Height="Auto" />
@@ -12,31 +11,54 @@
       <RowDefinition Height="*" />
     </Grid.RowDefinitions>
 
-    <!-- Row 0: title on the left, button on the right -->
-    <Grid Grid.Row="0" ColumnSpacing="12">
+    <!-- Header: title + counter on the left, Add Task on the right -->
+    <Grid ColumnSpacing="12">
       <Grid.ColumnDefinitions>
         <ColumnDefinition Width="*" />
         <ColumnDefinition Width="Auto" />
       </Grid.ColumnDefinitions>
-      <TextBlock Text="TaskFlow" FontSize="32" FontWeight="SemiBold" VerticalAlignment="Center" />
-      <Button Grid.Column="1" x:Name="AddTaskButton" Content="Add Task" Click="AddTaskButton_Click" />
+      <StackPanel>
+        <TextBlock Text="TaskFlow" FontSize="32" FontWeight="SemiBold" />
+        <!-- OneWay: update the text whenever the view model raises PropertyChanged for SummaryText -->
+        <TextBlock Text="{x:Bind ViewModel.SummaryText, Mode=OneWay}" Opacity="0.7" />
+      </StackPanel>
+      <!-- Command instead of Click: the button calls MainViewModel.AddTaskCommand -->
+      <Button Grid.Column="1" Content="Add Task" Command="{x:Bind ViewModel.AddTaskCommand}" VerticalAlignment="Center" />
     </Grid>
 
-    <!-- Row 1: the counter. The code-behind sets its Text. -->
-    <TextBlock Grid.Row="1" x:Name="CounterText" Opacity="0.7" />
+    <!-- Filter and sort. TwoWay: when the user picks an item, the view model property is updated. -->
+    <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="12">
+      <ComboBox Header="Show" MinWidth="140"
+                ItemsSource="{x:Bind ViewModel.FilterChoices}"
+                SelectedItem="{x:Bind ViewModel.SelectedFilter, Mode=TwoWay}" />
+      <ComboBox Header="Sort by" MinWidth="140"
+                ItemsSource="{x:Bind ViewModel.SortChoices}"
+                SelectedItem="{x:Bind ViewModel.SelectedSort, Mode=TwoWay}" />
+    </StackPanel>
 
-    <!-- Row 2: the list. ItemTemplate describes how ONE task looks; ListView repeats it per item. -->
-    <ListView Grid.Row="2" x:Name="TaskList" SelectionMode="None">
+    <ListView Grid.Row="2" ItemsSource="{x:Bind ViewModel.Tasks}" SelectionMode="None">
       <ListView.ItemTemplate>
-        <DataTemplate x:DataType="models:TaskItem">
-          <StackPanel Padding="0,8" Spacing="2">
-            <TextBlock Text="{x:Bind Title}" FontWeight="SemiBold" />
-            <TextBlock Text="{x:Bind Description}" Opacity="0.7" TextWrapping="Wrap" />
-            <TextBlock Opacity="0.7" FontSize="12">
-              <Run Text="Priority:" />
-              <Run Text="{x:Bind Priority}" />
-            </TextBlock>
-          </StackPanel>
+        <DataTemplate x:DataType="vm:TaskItemViewModel">
+          <Grid Padding="0,8" ColumnSpacing="12">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="Auto" />
+              <ColumnDefinition Width="*" />
+              <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <CheckBox IsChecked="{x:Bind IsCompleted, Mode=OneWay}"
+                      Command="{x:Bind ToggleCompletedCommand}"
+                      MinWidth="0" VerticalAlignment="Top" />
+            <StackPanel Grid.Column="1" Spacing="2">
+              <TextBlock Text="{x:Bind Title, Mode=OneWay}" FontWeight="SemiBold" />
+              <TextBlock Text="{x:Bind Description, Mode=OneWay}" Opacity="0.7" TextWrapping="Wrap" />
+              <TextBlock Opacity="0.7" FontSize="12">
+                <Run Text="{x:Bind PriorityLabel, Mode=OneWay}" />
+                <Run Text="  " />
+                <Run Text="{x:Bind DueDateText, Mode=OneWay}" />
+              </TextBlock>
+            </StackPanel>
+            <Button Grid.Column="2" Content="Delete" Command="{x:Bind DeleteCommand}" VerticalAlignment="Top" />
+          </Grid>
         </DataTemplate>
       </ListView.ItemTemplate>
     </ListView>

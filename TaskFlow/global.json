@@ -5,5 +5,9 @@
   },
   "sdk": {
     "allowPrerelease": false
+  },
+  // Use the new Microsoft.Testing.Platform runner for `dotnet test` (required by xUnit v3 4.x on the .NET 10 SDK).
+  "test": {
+    "runner": "Microsoft.Testing.Platform"
   }
 }

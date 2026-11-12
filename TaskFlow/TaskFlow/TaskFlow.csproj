@@ -24,8 +24,10 @@
       UnoFeatures are used to quickly add and manage features enabled for your app.
       https://aka.platform.uno/singleproject-features
     -->
+    <!--
+      Mvvm is not listed: CommunityToolkit.Mvvm comes in through TaskFlow.Core, where the view models live.
+    -->
     <UnoFeatures>
-      Mvvm;
       Skia;
     </UnoFeatures>
   </PropertyGroup>
