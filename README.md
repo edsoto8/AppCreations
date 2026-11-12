@@ -7,3 +7,4 @@ Different App Creations for all types of Technology
 | [StepRecorder](StepRecorder/) | Windows system-tray step recorder (WPF) |
 | [BoardFlow](BoardFlow/) | Local-first Trello-style project board (Avalonia, SQLite) |
 | [AtmSim](AtmSim/) | Interactive 3D ATM training simulator (Three.js, TypeScript, Vite) |
+| [AtmExplainer](AtmExplainer/) | 60-second animated explainer: how cash works inside an ATM (Remotion, React, SVG) |

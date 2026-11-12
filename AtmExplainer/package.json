@@ -1,0 +1,43 @@
+{
+  "name": "atm-cash-explainer",
+  "version": "1.0.0",
+  "description": "How Cash Works Inside an ATM \u2014 60-second Remotion explainer",
+  "repository": {},
+  "license": "UNLICENSED",
+  "engines": {
+    "node": "^20.19.0 || ^22.13.0 || >=24"
+  },
+  "private": true,
+  "dependencies": {
+    "@remotion/cli": "4.0.543",
+    "@remotion/fonts": "^4.0.543",
+    "@remotion/media": "^4.0.543",
+    "@remotion/transitions": "^4.0.543",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "remotion": "4.0.543"
+  },
+  "devDependencies": {
+    "@remotion/bundler": "^4.0.543",
+    "@remotion/eslint-config-flat": "4.0.543",
+    "@remotion/renderer": "^4.0.543",
+    "@types/react": "19.3.0",
+    "@types/web": "0.0.166",
+    "eslint": "10.12.0",
+    "prettier": "3.8.1",
+    "typescript": "5.9.3"
+  },
+  "scripts": {
+    "dev": "remotion studio",
+    "build": "remotion bundle",
+    "upgrade": "remotion upgrade",
+    "lint": "eslint src && tsc",
+    "audio": "node scripts/generate-audio.mjs",
+    "render": "remotion render ATMExplainer output/atm-cash-explainer.mp4 --codec=h264 --crf=18",
+    "stills": "node scripts/stills.mjs output/stills 90 400 700 1000 1300 1600 1760",
+    "typecheck": "tsc --noEmit"
+  },
+  "allowScripts": {
+    "esbuild": false
+  }
+}

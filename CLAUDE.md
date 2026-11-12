@@ -13,6 +13,7 @@ its commands from that app's folder, not from the repo root (there is no root so
 | `SkyHop/` | Endless tap-to-flap arcade game: .NET 10 Blazor WebAssembly, pure C# game core, xUnit tests | `SkyHop/CLAUDE.md`, `SkyHop/README.md` |
 | `StepRecorder/` | Windows system-tray step recorder: .NET 10 WPF app, platform-neutral core, xUnit tests | `StepRecorder/CLAUDE.md`, `StepRecorder/README.md` |
 | `AtmSim/` | Interactive 3D ATM training simulator: Three.js + TypeScript + Vite, pure-TS banking/cash domain, Vitest + Playwright | `AtmSim/CLAUDE.md`, `AtmSim/README.md`, `AtmSim/docs/` |
+| `AtmExplainer/` | 60 s Remotion explainer video "How Cash Works Inside an ATM": React + TypeScript + SVG, original synthesized audio | `AtmExplainer/README.md`, `AtmExplainer/ARCHITECTURE.md` |
 | `BoardFlow/` | Local-first Trello-style project board: .NET 10 Avalonia desktop app, SQLite + Dapper, Serilog, xUnit tests | `BoardFlow/CLAUDE.md`, `BoardFlow/README.md`, `BoardFlow/SPEC.md` |
 
 `StepRecorder-MultiModel-Spec.md` (repo root) is the authoritative spec for `StepRecorder/`. That app is
@@ -22,6 +23,6 @@ built one milestone at a time; its `CLAUDE.md` holds the rules the spec sets for
 
 ## Shared Conventions
 
-- Most apps are C#/.NET (AtmSim is TypeScript; its own `CLAUDE.md` has its conventions). Each app's `Directory.Build.props` sets nullable, implicit usings and
+- Most apps are C#/.NET (AtmSim and AtmExplainer are TypeScript; see their own docs). Each app's `Directory.Build.props` sets nullable, implicit usings and
   `TreatWarningsAsErrors`. Use the same settings for new .NET apps.
 - The root `.gitignore` is the standard Visual Studio one and covers every app.
