@@ -1,0 +1,79 @@
+.ai-provider { margin-bottom: 1rem; }
+.ai-provider-row { display: flex; gap: 1rem; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; }
+.ai-provider-main { min-width: 0; }
+.ai-provider-name { font-size: 1.15rem; font-weight: 700; display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; margin: .15rem 0 .5rem; }
+.ai-chips { gap: .4rem; align-items: center; }
+
+.ai-layout { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 1rem; align-items: start; }
+.ai-chat { display: flex; flex-direction: column; min-width: 0; }
+.ai-chat .demo-head { padding: 1rem 1.25rem .5rem; display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+.ai-chat .demo-head h2 { margin: 0; font-size: 1.1rem; }
+.ai-chat .desc { color: var(--text-muted); font-size: .85rem; }
+.ai-toggle { display: inline-flex; gap: .3rem; align-items: center; }
+
+/* column-reverse keeps the scroll position pinned to the newest message without JavaScript */
+.ai-transcript {
+    display: flex; flex-direction: column-reverse; height: 460px; overflow-y: auto;
+    margin: 0 1.25rem; padding: .75rem; background: var(--bg-sunken); border: 1px solid var(--border); border-radius: var(--radius-sm);
+}
+.ai-transcript-inner { display: flex; flex-direction: column; gap: .6rem; }
+.ai-empty { padding: 1rem; text-align: center; }
+
+.ai-msg { max-width: 88%; padding: .55rem .8rem; border-radius: var(--radius); overflow-wrap: anywhere; line-height: 1.45; font-size: .9rem; }
+.ai-user { align-self: flex-end; background: var(--accent); color: var(--accent-text); }
+.ai-assistant { align-self: flex-start; background: var(--bg-elev); border: 1px solid var(--border); }
+.ai-text { white-space: pre-wrap; }
+.ai-role { font-size: .68rem; text-transform: uppercase; letter-spacing: .05em; opacity: .75; margin-bottom: .15rem; font-family: var(--font-mono); }
+.ai-caret { animation: ai-blink 1s steps(2) infinite; color: var(--accent); }
+@keyframes ai-blink { 50% { opacity: 0; } }
+
+.ai-tool { align-self: flex-start; max-width: 92%; border: 1px dashed var(--accent); background: var(--accent-soft); border-radius: var(--radius-sm); padding: .4rem .65rem; font-size: .82rem; }
+.ai-tool-call { display: flex; flex-wrap: wrap; gap: .45rem; align-items: baseline; }
+.ai-tool-tag { font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--accent); }
+.ai-args { font-family: var(--font-mono); font-size: .75rem; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--text); }
+.ai-tool-result summary { cursor: pointer; }
+.ai-tool-result pre { margin: .4rem 0 0; max-height: 220px; overflow: auto; }
+.ai-error { margin: 0; align-self: stretch; }
+.ai-note { align-self: center; font-style: italic; }
+
+.ai-suggestions { display: flex; flex-wrap: wrap; gap: .4rem; padding: .75rem 1.25rem 0; }
+.ai-suggestion { cursor: pointer; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ai-suggestion:hover:not(:disabled) { border-color: var(--accent); color: var(--text); }
+.ai-suggestion:disabled { opacity: .5; cursor: not-allowed; }
+
+.ai-input { display: flex; gap: .5rem; padding: .75rem 1.25rem 1.1rem; }
+.ai-input input { flex: 1; }
+
+.ai-side { min-width: 0; }
+.ai-h3 { margin: 0 0 .35rem; font-size: 1rem; }
+.ai-pipeline { list-style: none; padding: 0; margin: .5rem 0 0; display: flex; flex-direction: column; gap: 0; }
+.ai-stage { position: relative; display: flex; flex-direction: column; padding: .45rem .65rem; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg-elev); margin-bottom: 1.1rem; }
+.ai-stage:not(:last-child)::after { content: "↓"; position: absolute; left: 50%; bottom: -1.15rem; transform: translateX(-50%); color: var(--text-muted); font-size: .85rem; }
+.ai-stage strong { font-size: .82rem; overflow-wrap: anywhere; }
+.ai-stage-app { border-style: dashed; }
+.ai-stage-provider { border-color: var(--accent); background: var(--accent-soft); margin-bottom: 0; }
+.ai-tools { list-style: none; padding: 0; margin: .5rem 0 0; display: flex; flex-direction: column; gap: .55rem; font-size: .85rem; overflow-wrap: anywhere; }
+
+.ai-wire { margin-top: .35rem; background: var(--bg-sunken); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: .5rem .7rem; max-height: 320px; overflow: auto; }
+.ai-wire-line { display: flex; gap: .5rem; font-size: .75rem; padding: .15rem 0; }
+.ai-wire-line code { font-family: var(--font-mono); white-space: pre-wrap; overflow-wrap: anywhere; }
+.ai-wire-dir { font-weight: 700; flex: none; }
+.ai-wire-line.out .ai-wire-dir { color: var(--accent); }
+.ai-wire-line.in .ai-wire-dir { color: var(--ok); }
+
+@media (max-width: 1100px) {
+    .ai-layout { grid-template-columns: 1fr; }
+}
+@media (max-width: 760px) {
+    .ai-transcript { height: 380px; margin: 0 .75rem; }
+    .ai-msg { max-width: 100%; }
+    .ai-input, .ai-suggestions { padding-left: .75rem; padding-right: .75rem; }
+}
+
+/* Child components (CodeBlock, DemoPanel) are styled through ::deep so long code lines scroll inside their block
+   instead of widening single-column grids on narrow screens. */
+.ai-page ::deep .grid > * { min-width: 0; }
+.ai-page ::deep .demo-head { flex-wrap: wrap; }
+.ai-page ::deep .code { max-width: 100%; }
+.ai-page ::deep .code-head { flex-wrap: wrap; }
+.ai-page ::deep .code-head > span { overflow-wrap: anywhere; min-width: 0; }

@@ -8,6 +8,7 @@
   </Folder>
   <Folder Name="/experimental/">
     <Project Path="experimental/DotNet11Lab.RuntimeAsync/DotNet11Lab.RuntimeAsync.csproj" />
+    <Project Path="experimental/DotNet11Lab.Mcp/DotNet11Lab.Mcp.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/DotNet11Lab.Tests/DotNet11Lab.Tests.csproj" />

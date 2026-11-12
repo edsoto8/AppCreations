@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    ISOLATED MCP SERVER SAMPLE (Lab 9). A stdio Model Context Protocol server built with the ModelContextProtocol
+    C# SDK, exposing the lab's tools. Same shape as `dotnet new mcpserver` (bundled with SDK 11), minus the packaging
+    properties. The stable dashboard does NOT reference this project or the MCP SDK.
+
+    The tool type and the client bridge are compiled from src/DotNet11Lab.Core/Labs/Ai/Mcp/*.cs (guarded by
+    DOTNET11LAB_MCP) so that the dashboard can show their source; Core itself compiles those files as empty.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <DefineConstants>$(DefineConstants);DOTNET11LAB_MCP</DefineConstants>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- Microsoft.Extensions.Hosting comes from the shared framework (as in Core), so no extra package version is needed. -->
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <PackageReference Include="ModelContextProtocol" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\DotNet11Lab.Core\DotNet11Lab.Core.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="..\..\src\DotNet11Lab.Core\Labs\Ai\Mcp\LabMcpTools.cs" Link="Shared\LabMcpTools.cs" />
+    <Compile Include="..\..\src\DotNet11Lab.Core\Labs\Ai\Mcp\McpToolBridge.cs" Link="Shared\McpToolBridge.cs" />
+  </ItemGroup>
+</Project>
