@@ -1,7 +1,244 @@
 @page "/labs/runtime-async"
+@rendermode InteractiveServer
+@using System.Globalization
+@using DotNet11Lab.Core.Labs.Performance
+@using DotNet11Lab.Core.Labs.RuntimeAsync
+@using LabService = DotNet11Lab.Core.Labs.RuntimeAsync.RuntimeAsyncLab
+@using DotNet11Lab.Web.Components.Pages.Labs.Performance
 
 <LabHeader Slug="runtime-async" />
 
-<Callout Kind="warn" Title="Under construction">
-    <p>This laboratory is being implemented.</p>
+<Callout Kind="warn" Title="Opt-in and isolated">
+    <p>
+        Runtime async is enabled in exactly one assembly, <code>experimental/DotNet11Lab.RuntimeAsync</code>, with
+        <code>&lt;Features&gt;runtime-async=on&lt;/Features&gt;</code>. Every other project in this solution, including the
+        one serving this page, is compiled the classic way. The same source file is compiled into both, so everything
+        below compares the compiler output and runtime behaviour of identical code.
+    </p>
 </Callout>
+
+<section class="section">
+    <div class="section-title"><h2>How to enable it</h2></div>
+    <div class="grid grid-2">
+        <div>
+            <CodeBlock Language="xml" Title="experimental/DotNet11Lab.RuntimeAsync/DotNet11Lab.RuntimeAsync.csproj" Scroll="false" Code="@CsprojExcerpt" />
+        </div>
+        <div class="card card-pad">
+            <h3>Status in .NET 11 (what we verified)</h3>
+            <ul class="small" style="padding-left:1.1rem;margin:0">
+                <li><strong>Your code: off by default.</strong> Built with SDK 11.0.100 for <code>net11.0</code>, a project without the feature flag gets classic state machines; the reflection table below shows it live. Setting <code>UseRuntimeAsync</code> to true or false alone changed nothing in our build.</li>
+                <li><strong>Framework libraries: already on.</strong> Microsoft's docs state the .NET runtime libraries and shared-framework-only ASP.NET Core libraries are compiled with runtime async, so apps benefit when calling them. (Cited, not measured here.)</li>
+                <li>No <code>EnablePreviewFeatures</code> is needed for <code>net11.0</code>.</li>
+                <li>The docs page is ambiguous about the default (it shows both an "enable" flag and an "opt out" property); our compiler output is the evidence used in this lab.</li>
+            </ul>
+        </div>
+    </div>
+</section>
+
+<section class="card demo">
+    <div class="demo-head">
+        <div>
+            <h2>What the compiler emitted (live reflection)</h2>
+            <div class="desc">Method implementation flags, <code>[AsyncStateMachine]</code> attributes and compiler-generated <code>IAsyncStateMachine</code> types, read from the loaded assemblies.</div>
+        </div>
+    </div>
+    <div class="demo-body">
+        @if (_runtimeAsyncFacts is null)
+        {
+            <Callout Kind="danger" Title="Experimental assembly not available"><p>@LabService.ExperimentalAssemblyName could not be loaded by this host.</p></Callout>
+        }
+        else
+        {
+            <div class="grid grid-4">
+                <MetricTile Label="Classic · state machine types" Value="@_classicFacts.StateMachineTypes.Count.ToString(CultureInfo.InvariantCulture)" Sub="@($"nested in {_classicFacts.TypeName.Split('.')[^1]}")" />
+                <MetricTile Label="Runtime async · state machine types" Value="@_runtimeAsyncFacts.StateMachineTypes.Count.ToString(CultureInfo.InvariantCulture)" Sub="@($"whole assembly: {_runtimeAsyncFacts.AssemblyStateMachineTypeCount}")" />
+                <MetricTile Label="Classic · IL bytes (async methods)" Value="@_classicFacts.Methods.Sum(m => m.IlBytes).ToString("N0", CultureInfo.InvariantCulture)" Sub="stubs that start the state machine" />
+                <MetricTile Label="Runtime async · IL bytes" Value="@_runtimeAsyncFacts.Methods.Sum(m => m.IlBytes).ToString("N0", CultureInfo.InvariantCulture)" Sub="the method bodies themselves" />
+            </div>
+            <div class="table-wrap" style="margin-top:1rem">
+                <table class="data">
+                    <thead>
+                        <tr><th>Method</th><th>Returns</th><th>Classic: impl flags</th><th>Classic: state machine</th><th class="num">IL</th><th>Runtime async: impl flags</th><th>Runtime async: state machine</th><th class="num">IL</th></tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var m in _classicFacts.Methods)
+                        {
+                            var ra = _runtimeAsyncFacts.Methods.FirstOrDefault(x => x.Name == m.Name);
+                            <tr>
+                                <td class="mono small">@m.Name</td>
+                                <td class="mono small">@m.ReturnType</td>
+                                <td class="mono small">@m.ImplFlags</td>
+                                <td class="mono small">@(m.StateMachineType ?? "none")</td>
+                                <td class="num">@m.IlBytes</td>
+                                <td class="mono small">@(ra?.ImplFlags.ToString() ?? "?") @if (ra?.HasAsyncImplFlag == true) { <span class="badge badge-optin">Async</span> }</td>
+                                <td class="mono small">@(ra is null ? "?" : ra.StateMachineType ?? "none")</td>
+                                <td class="num">@(ra?.IlBytes.ToString(CultureInfo.InvariantCulture) ?? "?")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            <p class="small muted" style="margin-top:.5rem">
+                Classic state machine types: @string.Join(", ", _classicFacts.StateMachineTypes). In the runtime-async copy the
+                method bodies keep their logic and the runtime provides suspension and resumption, so no type is generated.
+            </p>
+            <CodeBlock Snippet="RuntimeAsync.Inspect" Title="How these facts are read" />
+        }
+    </div>
+</section>
+
+<section class="card demo">
+    <div class="demo-head">
+        <div>
+            <h2>The shared source</h2>
+            <div class="desc">Both assemblies embed their copy; the dashboard compares them line by line, ignoring only the namespace line.</div>
+        </div>
+    </div>
+    <div class="demo-body">
+        @if (_sourceDifference is null)
+        {
+            <Callout Kind="ok" Title="Identical source"><p><code>@LabService.ClassicSourceFile</code> and <code>@LabService.RuntimeAsyncSourceFile</code> match apart from the namespace.</p></Callout>
+        }
+        else
+        {
+            <Callout Kind="danger" Title="The copies differ"><p>@_sourceDifference</p></Callout>
+        }
+        <CodeBlock Code="@_runtimeAsyncSource" Title="@LabService.RuntimeAsyncSourceFile" />
+    </div>
+</section>
+
+<DemoPanel Title="Run both copies" Description="Executes every workload through each compiled copy and compares the results." OnRun="CompareAsync">
+    <Result>
+        <div class="table-wrap">
+            <table class="data">
+                <thead><tr><th>Workload</th><th class="num">Classic</th><th class="num">Runtime async</th><th>Same?</th></tr></thead>
+                <tbody>
+                    @foreach (var c in _comparisons)
+                    {
+                        <tr class="@(c.Equal ? "row-ok" : "row-danger")">
+                            <td>@c.Workload</td>
+                            <td class="num">@c.Classic.ToString("N0", CultureInfo.InvariantCulture)</td>
+                            <td class="num">@c.RuntimeAsync.ToString("N0", CultureInfo.InvariantCulture)</td>
+                            <td>@(c.Equal ? "✔ identical" : "✘ different")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </Result>
+</DemoPanel>
+
+<DemoPanel Title="Stack traces from a four-level async chain"
+           Description="PlaceOrderAsync → ValidateOrderAsync → LoadCustomerAsync → QueryDatabaseAsync captures new StackTrace() while the chain runs synchronously, or after Task.Yield resumed it on the thread pool, or throws after resuming."
+           OnRun="CaptureStacksAsync">
+    <ChildContent>
+        <div class="tabs" role="tablist">
+            <button type="button" class="tab @(_stackTab == StackKind.LiveBeforeSuspension ? "active" : "")" @onclick="() => _stackTab = StackKind.LiveBeforeSuspension">Live stack, before any suspension</button>
+            <button type="button" class="tab @(_stackTab == StackKind.LiveAfterResume ? "active" : "")" @onclick="() => _stackTab = StackKind.LiveAfterResume">Live stack, after resuming</button>
+            <button type="button" class="tab @(_stackTab == StackKind.Exception ? "active" : "")" @onclick="() => _stackTab = StackKind.Exception">Exception (ex.ToString())</button>
+        </div>
+    </ChildContent>
+    <Result>
+        @{
+            var (classic, ra) = SelectedStacks;
+        }
+        @if (classic is not null && ra is not null)
+        {
+            <div class="grid grid-2">
+                <div>
+                    <div class="compare-label old">◌ Classic state machine · @classic.FrameCount frames</div>
+                    <div class="result-box" style="max-height:380px;overflow:auto">@classic.Text</div>
+                </div>
+                <div>
+                    <div class="compare-label new">● Runtime async · @ra.FrameCount frames</div>
+                    <div class="result-box" style="max-height:380px;overflow:auto">@ra.Text</div>
+                </div>
+            </div>
+            <Callout Title="What differs here (derived from the captured text)">
+                <ul style="margin:0;padding-left:1.1rem">
+                    @foreach (var fact in LabService.DescribeStacks(classic, ra, _stackTab))
+                    {
+                        <li>@fact</li>
+                    }
+                </ul>
+            </Callout>
+        }
+    </Result>
+</DemoPanel>
+
+<DemoPanel Title="Quick measurement: deep await chain" Cancellable="true"
+           Description="Measure.RunAsync over ChainAsync(depth) for both copies, once completing synchronously and once yielding at the leaf (a real suspension that resumes on the thread pool)."
+           OnRun="MeasureAsync">
+    <ChildContent>
+        <div class="row">
+            <div class="field" style="margin:0">
+                <label for="depth">Depth (1-@LabService.MaxDepth)</label>
+                <input id="depth" type="number" min="1" max="@LabService.MaxDepth" @bind="_depth" />
+            </div>
+            <div class="field" style="margin:0">
+                <label for="iters">Iterations (1-@LabService.MaxIterations.ToString("N0", CultureInfo.InvariantCulture))</label>
+                <input id="iters" type="number" min="1" max="@LabService.MaxIterations" @bind="_iterations" />
+            </div>
+            <span class="small muted">The yielding variant uses a tenth of the iterations. Allocation is process-wide (other requests count too).</span>
+        </div>
+    </ChildContent>
+    <Result>
+        <Callout Kind="warn" Title="Quick measurement, not a benchmark">
+            <p>One process, one runtime, shared CPU and process-wide allocation counters. The BenchmarkDotNet suite below is the reference.</p>
+            @if (!BuildInfo.IsOptimized(typeof(BuildInfo).Assembly))
+            {
+                <p><strong>Debug build:</strong> the classic copy's state machines are classes in Debug (one heap object per call), which inflates its allocations, and the experimental assembly is unoptimized too. Run <code>@BuildInfo.RunReleaseCommand</code> for representative numbers.</p>
+            }
+        </Callout>
+        <div class="grid grid-2">
+            <div>
+                <h3>Mean time per call</h3>
+                <BarChart Items="@_measurements.Select(m => new BarChart.Bar(m.Name, m.MeanMicroseconds, Measure.FormatDuration(m.MeanMicroseconds), m.Name.StartsWith("Classic", StringComparison.Ordinal) ? 1 : 0)).ToList()" Legend="@([("classic", 1), ("runtime async", 0)])" AriaLabel="Mean time" />
+            </div>
+            <div>
+                <h3>Allocated per call</h3>
+                <BarChart Items="@_measurements.Select(m => new BarChart.Bar(m.Name, m.AllocatedBytesPerOp, Measure.FormatBytes(m.AllocatedBytesPerOp), m.Name.StartsWith("Classic", StringComparison.Ordinal) ? 1 : 0)).ToList()" AriaLabel="Allocated bytes" />
+            </div>
+        </div>
+    </Result>
+</DemoPanel>
+
+<section class="section">
+    <div class="section-title"><h2>BenchmarkDotNet: classic vs runtime async</h2><span class="muted small">RuntimeAsyncBenchmarks · .NET 11 job only</span></div>
+    <BenchmarkResultsView Load="_published" Categories="@(["RuntimeAsync"])" FilterHint="'*RuntimeAsync*'"
+                          ProduceCommand="dotnet run -c Release -f net11.0 --project src/DotNet11Lab.Benchmarks -- --filter '*RuntimeAsyncBenchmarks*'" />
+</section>
+
+<section class="section">
+    <div class="section-title"><h2>Compatibility considerations</h2></div>
+    <div class="table-wrap">
+        <table class="data">
+            <thead><tr><th>Area</th><th>What we know</th><th>Evidence</th></tr></thead>
+            <tbody>
+                <tr><td>Reflection over state machines</td><td>Code or tools that look for <code>[AsyncStateMachine]</code> or <code>&lt;M&gt;d__N</code> types find nothing in runtime-async assemblies (methods carry <code>MethodImplAttributes.Async</code> instead).</td><td><span class="badge badge-stable">Verified here</span></td></tr>
+                <tr><td>Results</td><td>Identical for every workload in this lab.</td><td><span class="badge badge-stable">Verified here</span></td></tr>
+                <tr><td>Live stacks / debugger</td><td>Docs: breakpoints bind and stepping over <code>await</code> works; live stack traces show the real call chain.</td><td><span class="badge badge-optin">Docs + live demo above</span></td></tr>
+                <tr><td>Profilers</td><td>Docs: the async profiler instruments both runtime-async and state-machine methods. Third-party profilers and APM agents that rewrite IL or read state machines: not verified.</td><td><span class="badge badge-experimental">Unverified</span></td></tr>
+                <tr><td>Native AOT / ReadyToRun</td><td>Docs: supported. Not exercised by this lab (the AOT CLI in Lab 8 does not enable runtime async).</td><td><span class="badge badge-experimental">Cited, unverified here</span></td></tr>
+                <tr><td>WebAssembly</td><td>Docs: runtime async is incompatible with WebAssembly, which is why NuGet-shipped ASP.NET Core packages are not compiled with it.</td><td><span class="badge badge-optin">Docs</span></td></tr>
+                <tr><td>Older runtimes</td><td>The flag targets <code>net11.0</code>; a library multi-targeting older frameworks must enable it only for <code>net11.0</code>.</td><td><span class="badge badge-optin">Docs</span></td></tr>
+            </tbody>
+        </table>
+    </div>
+    <UsageGuidance>
+        <WhenToUse>
+            <ul>
+                <li>Apps and services targeting only <code>net11.0</code> with deep async call chains, after measuring.</li>
+                <li>When better live stacks in debuggers and profilers matter for diagnosing production issues.</li>
+                <li>Try it per project first; it is a compile-time switch you can turn off again.</li>
+            </ul>
+        </WhenToUse>
+        <WhenToAvoid>
+            <ul>
+                <li>Libraries that also target older frameworks or WebAssembly (enable it for <code>net11.0</code> only, if at all).</li>
+                <li>Code, tests or tooling that inspect compiler-generated async state machines.</li>
+                <li>When your APM/profiler vendor has not confirmed support.</li>
+            </ul>
+        </WhenToAvoid>
+    </UsageGuidance>
+</section>

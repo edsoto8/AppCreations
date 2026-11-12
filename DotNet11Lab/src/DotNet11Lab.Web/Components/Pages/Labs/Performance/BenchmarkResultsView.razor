@@ -1,0 +1,175 @@
+@using DotNet11Lab.Core.Labs.Performance
+@using System.Globalization
+
+@* Renders results/benchmarks/latest.json. Every number comes from the file; nothing is computed except ratios
+   that the file already defines (mean / baseline mean). *@
+
+@if (Load is null)
+{
+    <p class="muted small">Loading…</p>
+}
+else if (Load.Status == ResultsFileStatus.Missing)
+{
+    <Callout Kind="warn" Title="No published benchmark results yet">
+        <p>There is no file at <code>@Load.Path</code>. Nothing is shown rather than made-up numbers. Produce it from the <code>DotNet11Lab/</code> folder (takes a while: each benchmark runs on .NET 10 and .NET 11):</p>
+    </Callout>
+    <CodeBlock Language="shell" Title="Run the full suite" Code="@ProduceCommand" Scroll="false" />
+}
+else if (Load.Status == ResultsFileStatus.Invalid)
+{
+    <Callout Kind="danger" Title="The results file could not be read">
+        <p class="mono small">@Load.Path</p>
+        <p>@Load.Error</p>
+    </Callout>
+}
+else if (Load.File is { } file)
+{
+    var rows = Filtered(file);
+    <div class="row" style="margin-bottom:.75rem">
+        @if (file.Preliminary)
+        {
+            <span class="badge badge-experimental" title="Smoke-test run (short job and/or busy machine)">Preliminary</span>
+        }
+        else
+        {
+            <span class="badge badge-stable">Full run</span>
+        }
+        <span class="small muted">mode <code>@file.Mode</code> · generated @file.GeneratedUtc.ToString("yyyy-MM-dd HH:mm 'UTC'", CultureInfo.InvariantCulture) · BenchmarkDotNet @file.Machine.BenchmarkDotNetVersion</span>
+    </div>
+    @if (file.Preliminary)
+    {
+        <Callout Kind="warn" Title="Preliminary numbers - do not quote">
+            <p>This file comes from a validation run (short job and/or a machine shared with other work). It proves the pipeline works; re-run the full suite on a quiet machine for numbers worth comparing.</p>
+            @if (!string.IsNullOrWhiteSpace(file.Note))
+            {
+                <p class="small">Note: @file.Note</p>
+            }
+        </Callout>
+    }
+    else if (!string.IsNullOrWhiteSpace(file.Note))
+    {
+        <p class="small muted">Note: @file.Note</p>
+    }
+
+    <div class="grid grid-4">
+        <MetricTile Label="Benchmarks" Value="@rows.Select(r => r.Key).Distinct().Count().ToString(CultureInfo.InvariantCulture)" Sub="@($"{rows.Count} measurements")" />
+        <MetricTile Label="Runtimes" Value="@string.Join(" vs ", rows.Select(r => r.Runtime).Distinct().Order())" Sub="@(IsPairCategory(rows) ? "baseline: the *_Classic twin" : "baseline: .NET 10")" />
+        <MetricTile Label="Processor" Value="@($"{file.Machine.LogicalCores?.ToString(CultureInfo.InvariantCulture) ?? "?"} cores")" Sub="@file.Machine.Processor" />
+        <MetricTile Label="OS / SDK" Value="@file.Machine.Architecture" Sub="@($"{file.Machine.Os} · SDK {file.Machine.DotNetSdk}")" />
+    </div>
+
+    @if (rows.Count == 0)
+    {
+        <p class="muted" style="margin-top:1rem">This results file has no entries for this lab. Run the suite without a filter (or with <code>--filter @FilterHint</code>).</p>
+    }
+    else
+    {
+        var categories = rows.Select(r => r.Category).Distinct().Order(StringComparer.Ordinal).ToList();
+        var active = categories.Contains(_category ?? "") ? _category! : categories[0];
+        @if (categories.Count > 1)
+        {
+            <div class="tabs" style="margin-top:1rem" role="tablist">
+                @foreach (var c in categories)
+                {
+                    <button type="button" class="tab @(c == active ? "active" : "")" role="tab" @onclick="() => _category = c">@c</button>
+                }
+            </div>
+        }
+        var inCategory = rows.Where(r => r.Category == active).ToList();
+        var ratios = inCategory.Where(r => r.Ratio is not null && !r.IsBaseline && !r.Method.EndsWith(BenchmarkResultsJson.ClassicSuffix, StringComparison.Ordinal)).ToList();
+
+        @if (ratios.Count > 0)
+        {
+            <h3 style="margin-top:1rem">@RatioTitle(inCategory)</h3>
+            <p class="small muted">Mean time divided by the baseline's mean time: below 1.00× is faster. @RatioExplanation(inCategory)</p>
+            <BarChart Items="@ratios.Select(r => new BarChart.Bar(r.Method + (r.Parameters.Length > 0 ? $" ({Params(r)})" : ""), r.Ratio!.Value, $"{r.Ratio:0.00}×", r.Ratio <= 1 ? 2 : 0)).ToList()"
+                      Max="@Math.Max(1.25, ratios.Max(r => r.Ratio!.Value))"
+                      Legend="@([("faster than baseline", 2), ("slower than baseline", 0)])"
+                      AriaLabel="Ratio to baseline" />
+        }
+
+        <div class="grid grid-3" style="margin-top:1rem">
+            @foreach (var group in inCategory.GroupBy(r => PairKey(r)))
+            {
+                var items = group.OrderBy(r => r.IsBaseline || r.Method.EndsWith(BenchmarkResultsJson.ClassicSuffix, StringComparison.Ordinal) ? 0 : 1).ToList();
+                <div class="card card-pad narrow-bars">
+                    <div class="small" style="font-weight:600;margin-bottom:.4rem" title="@group.Key">@group.Key</div>
+                    <BarChart Items="@items.Select(r => new BarChart.Bar(SeriesLabel(r), r.MeanNs, BenchmarkResultsJson.FormatNs(r.MeanNs), IsBaselineLike(r) ? 1 : 0)).ToList()" AriaLabel="Mean time" />
+                    <div class="small muted" style="margin-top:.4rem">
+                        Allocated: @string.Join(" → ", items.Select(r => r.AllocatedBytes is { } a ? BenchmarkResultsJson.FormatBytes(a) : "n/a"))
+                    </div>
+                </div>
+            }
+        </div>
+
+        <details style="margin-top:1rem">
+            <summary class="small">Full table (@inCategory.Count rows)</summary>
+            <div class="table-wrap" style="margin-top:.5rem">
+                <table class="data">
+                    <thead>
+                        <tr><th>Benchmark</th><th>Runtime</th><th class="num">Mean</th><th class="num">Median</th><th class="num">StdDev</th><th class="num">Allocated</th><th class="num">Gen0 / 1k ops</th><th class="num">Ratio</th><th class="num">Alloc ratio</th></tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var r in inCategory.OrderBy(r => r.Key, StringComparer.Ordinal).ThenBy(r => r.Runtime, StringComparer.Ordinal))
+                        {
+                            <tr class="@(r.Ratio is < 0.95 ? "row-ok" : r.Ratio is > 1.05 ? "row-warn" : "")">
+                                <td class="mono small">@r.Key</td>
+                                <td>@r.Runtime</td>
+                                <td class="num">@BenchmarkResultsJson.FormatNs(r.MeanNs)</td>
+                                <td class="num">@(r.MedianNs is { } md ? BenchmarkResultsJson.FormatNs(md) : "-")</td>
+                                <td class="num">@(r.StdDevNs is { } sd ? BenchmarkResultsJson.FormatNs(sd) : "-")</td>
+                                <td class="num">@(r.AllocatedBytes is { } a ? BenchmarkResultsJson.FormatBytes(a) : "-")</td>
+                                <td class="num">@(r.Gen0Per1000Ops is { } g ? g.ToString("0.###", CultureInfo.InvariantCulture) : "-")</td>
+                                <td class="num">@(r.Ratio is { } x ? x.ToString("0.00", CultureInfo.InvariantCulture) : "-")</td>
+                                <td class="num">@(r.AllocatedRatio is { } y ? y.ToString("0.00", CultureInfo.InvariantCulture) : "-")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            <p class="small muted" style="margin-top:.4rem">Read from <code>@Load.Path</code>. Runtime versions: @string.Join("; ", rows.Select(r => r.RuntimeVersion).Where(v => v is not null).Distinct())</p>
+        </details>
+    }
+}
+
+@code {
+    [Parameter, EditorRequired] public ResultsLoad<BenchmarkResultsFile>? Load { get; set; }
+    /// <summary>Only show these categories (null = all).</summary>
+    [Parameter] public IReadOnlyCollection<string>? Categories { get; set; }
+    [Parameter] public string FilterHint { get; set; } = "*";
+    [Parameter] public string ProduceCommand { get; set; } = BenchmarkResultsStore.ProduceCommand;
+
+    private string? _category;
+
+    /// <summary>BenchmarkDotNet prints parameters as "[Depth=10]"; show them without the brackets.</summary>
+    private static string Params(BenchmarkResultEntry r) => r.Parameters.Trim('[', ']');
+
+    private List<BenchmarkResultEntry> Filtered(BenchmarkResultsFile file) =>
+        file.Results.Where(r => Categories is null || Categories.Contains(r.Category)).ToList();
+
+    private static bool IsPairCategory(IEnumerable<BenchmarkResultEntry> rows) =>
+        rows.Any(r => r.Method.EndsWith(BenchmarkResultsJson.RuntimeAsyncSuffix, StringComparison.Ordinal));
+
+    private static string RatioTitle(List<BenchmarkResultEntry> rows) =>
+        IsPairCategory(rows) ? "Runtime async vs classic state machine (same runtime)" : ".NET 11 vs .NET 10 (ratio)";
+
+    private static string RatioExplanation(List<BenchmarkResultEntry> rows) =>
+        IsPairCategory(rows) ? "Baseline: the *_Classic twin of each method, compiled from the same source." : "Baseline: the same benchmark on .NET 10.";
+
+    private static bool IsBaselineLike(BenchmarkResultEntry r) => r.IsBaseline || r.Method.EndsWith(BenchmarkResultsJson.ClassicSuffix, StringComparison.Ordinal);
+
+    private static string PairKey(BenchmarkResultEntry r)
+    {
+        var method = r.Method;
+        foreach (var suffix in new[] { BenchmarkResultsJson.ClassicSuffix, BenchmarkResultsJson.RuntimeAsyncSuffix })
+        {
+            if (method.EndsWith(suffix, StringComparison.Ordinal)) method = method[..^suffix.Length];
+        }
+        return r.Parameters.Length == 0 ? method : $"{method} ({Params(r)})";
+    }
+
+    private static string SeriesLabel(BenchmarkResultEntry r) =>
+        r.Method.EndsWith(BenchmarkResultsJson.ClassicSuffix, StringComparison.Ordinal) ? "classic"
+        : r.Method.EndsWith(BenchmarkResultsJson.RuntimeAsyncSuffix, StringComparison.Ordinal) ? "runtime async"
+        : r.Runtime;
+}

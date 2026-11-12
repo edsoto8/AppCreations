@@ -1,7 +1,213 @@
 @page "/labs/performance"
+@rendermode InteractiveServer
+@using System.Globalization
+@using DotNet11Lab.Core.Labs.Performance
+@using DotNet11Lab.Web.Components.Pages.Labs.Performance
 
 <LabHeader Slug="performance" />
 
-<Callout Kind="warn" Title="Under construction">
-    <p>This laboratory is being implemented.</p>
+<Callout Title="Two kinds of numbers on this page">
+    <p>
+        <strong>Published results</strong> come from BenchmarkDotNet: every benchmark runs in separate processes on
+        the .NET 10 and .NET 11 runtimes, with warm-up, many iterations and statistics. <strong>Live quick
+        measurements</strong> run the same workload code inside this web server on .NET 11 only, in a few
+        milliseconds, while other requests share the CPU. Use the first to compare runtimes; use the second to see
+        the shape of a difference (for example allocations) right now.
+    </p>
 </Callout>
+
+<section class="section">
+    <div class="section-title"><h2>Published BenchmarkDotNet results</h2><span class="muted small">results/benchmarks/latest.json</span></div>
+    <BenchmarkResultsView Load="_published" Categories="CrossRuntimeCategories" />
+</section>
+
+<DemoPanel Title="Live quick measurements (.NET 11, in-process)"
+           Description="Runs the shared workloads on the runtime serving this page with Measure.Run: warm-up, then timed iterations; allocations counted by the GC. Each run is saved to the run journal below."
+           RunLabel="Run selected" Cancellable="true" OnRun="RunLiveAsync" Disabled="@(_selected.Count == 0)">
+    <ChildContent>
+        @if (!BuildInfo.IsOptimized(typeof(BuildInfo).Assembly))
+        {
+            <Callout Kind="warn" Title="This server runs a Debug build">
+                <p>JIT optimizations are disabled and async methods compile to heap-allocated state machines, so live numbers (especially async allocations) differ from BenchmarkDotNet's Release builds. For representative live numbers run <code>@BuildInfo.RunReleaseCommand</code>.</p>
+            </Callout>
+        }
+        <div class="grid grid-3" style="gap:.35rem .75rem">
+            @foreach (var g in Runner.Groups)
+            {
+                <label style="display:flex;gap:.45rem;align-items:center;color:var(--text);margin:0">
+                    <input type="checkbox" checked="@_selected.Contains(g.Id)" @onchange="e => Toggle(g.Id, e.Value is true)" />
+                    <span>@g.Title</span>
+                </label>
+            }
+        </div>
+        <div class="row" style="margin-top:.75rem">
+            <div class="field" style="margin:0">
+                <label for="intensity">Iterations multiplier</label>
+                <select id="intensity" @bind="_intensity">
+                    @for (var i = LivePerformanceRunner.MinIntensity; i <= LivePerformanceRunner.MaxIntensity; i++)
+                    {
+                        <option value="@i">×@i</option>
+                    }
+                </select>
+            </div>
+            <button type="button" class="btn btn-sm" @onclick="SelectAll">All</button>
+            <button type="button" class="btn btn-sm" @onclick="() => _selected.Clear()">None</button>
+            <span class="small muted">Quick, single-runtime measurements: expect run-to-run noise of 10% or more.</span>
+        </div>
+    </ChildContent>
+    <Result>
+        @if (_live is { } run)
+        {
+            <div class="small muted" style="margin-bottom:.5rem">@run.Runtime · @run.Build build · ×@run.Intensity · run <code>@run.RunId</code> saved to the journal</div>
+            <div class="grid grid-2">
+                @foreach (var group in run.Results.GroupBy(r => r.GroupId))
+                {
+                    var info = Runner.GetGroup(group.Key);
+                    var slowest = group.Max(r => r.MeanMicroseconds);
+                    <div class="card card-pad narrow-bars">
+                        <h3>@info.Title</h3>
+                        <p class="small muted">@info.Description</p>
+                        <BarChart Items="@group.Select(r => new BarChart.Bar(r.Workload, r.MeanMicroseconds, Measure.FormatDuration(r.MeanMicroseconds), r.MeanMicroseconds >= slowest ? 1 : 0)).ToList()" AriaLabel="Mean time per operation" />
+                        <div class="table-wrap" style="margin-top:.6rem">
+                            <table class="data">
+                                <thead><tr><th>Variant</th><th class="num">Mean</th><th class="num">Alloc/op</th><th class="num">Ops/s</th><th class="num">vs slowest</th></tr></thead>
+                                <tbody>
+                                    @foreach (var r in group)
+                                    {
+                                        <tr class="@(r.SpeedupVsSlowest > 1.05 ? "row-ok" : "")">
+                                            <td>@r.Workload<div class="small muted">@r.ChecksumLabel @r.Checksum.ToString("N0", CultureInfo.InvariantCulture)</div></td>
+                                            <td class="num">@Measure.FormatDuration(r.MeanMicroseconds)</td>
+                                            <td class="num">@Measure.FormatBytes(r.AllocatedBytesPerOp)</td>
+                                            <td class="num">@r.OpsPerSecond.ToString("N0", CultureInfo.InvariantCulture)</td>
+                                            <td class="num">@(r.SpeedupVsSlowest < 1.005 ? "slowest" : $"{r.SpeedupVsSlowest:0.00}× faster")</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                        @if (group.Select(r => r.Checksum).Distinct().Count() == 1 && group.Key != "compression")
+                        {
+                            <div class="small" style="margin-top:.4rem;color:var(--ok)">✔ all variants returned the same result</div>
+                        }
+                    </div>
+                }
+            </div>
+        }
+    </Result>
+</DemoPanel>
+
+<section class="card demo">
+    <div class="demo-head">
+        <div>
+            <h2>The code being measured</h2>
+            <div class="desc">One source file per area, compiled into DotNet11Lab.Core (live) and linked into DotNet11Lab.Benchmarks (net10.0 and net11.0).</div>
+        </div>
+    </div>
+    <div class="demo-body">
+        <div class="tabs" role="tablist">
+            @foreach (var (id, title, _, _) in CodeTabs)
+            {
+                <button type="button" class="tab @(id == _codeTab ? "active" : "")" role="tab" @onclick="() => _codeTab = id">@title</button>
+            }
+        </div>
+        @{ var tab = CodeTabs.First(t => t.Id == _codeTab); }
+        @if (tab.New is null)
+        {
+            <CodeBlock Snippet="@tab.Old" />
+        }
+        else
+        {
+            <CodeCompare OldSnippet="@tab.Old" NewSnippet="@tab.New" OldLabel="Allocation-heavy / previous approach" NewLabel="Allocation-efficient alternative" />
+        }
+    </div>
+</section>
+
+<section class="card demo">
+    <div class="demo-head">
+        <div>
+            <h2>Run journal (SQLite)</h2>
+            <div class="desc">Live runs are stored with Dapper + Microsoft.Data.Sqlite so you can compare across sessions and restarts. The table keeps the latest @PerformanceJournal.MaxRows.ToString("N0", CultureInfo.InvariantCulture) rows.</div>
+        </div>
+        <div class="demo-actions">
+            <button type="button" class="btn btn-sm" @onclick="LoadHistoryAsync">Refresh</button>
+            <button type="button" class="btn btn-sm" @onclick="ClearHistoryAsync" disabled="@(_history.Count == 0)">Clear</button>
+        </div>
+    </div>
+    <div class="demo-body">
+        <p class="small muted">Database: <code>@Journal.DatabasePath</code> (set <code>@PerformanceJournal.ConfigurationKey</code> to move it)</p>
+        @if (_historyError is not null)
+        {
+            <Callout Kind="danger" Title="Journal unavailable"><p>@_historyError</p></Callout>
+        }
+        else if (_history.Count == 0)
+        {
+            <p class="muted">No runs recorded yet. Run a live measurement above.</p>
+        }
+        else
+        {
+            var workloads = _history.Select(h => (h.GroupId, h.Workload)).Distinct().ToList();
+            var current = workloads.Contains(_trendWorkload) ? _trendWorkload : workloads[0];
+            <div class="row">
+                <div class="field" style="margin:0">
+                    <label for="trend">Trend for workload</label>
+                    <select id="trend" value="@($"{current.GroupId}|{current.Workload}")" @onchange="e => _trendWorkload = ParseTrendKey(e.Value as string)">
+                        @foreach (var w in workloads)
+                        {
+                            <option value="@($"{w.GroupId}|{w.Workload}")">@Runner.GetGroup(w.GroupId).Title · @w.Workload</option>
+                        }
+                    </select>
+                </div>
+            </div>
+            var trend = _history.Where(h => h.GroupId == current.GroupId && h.Workload == current.Workload).Take(12).Reverse().ToList();
+            <div style="margin-top:.75rem">
+                <BarChart Items="@trend.Select(h => new BarChart.Bar($"{h.RecordedUtc.ToLocalTime():MM-dd HH:mm:ss} · {h.RunId[..6]}", h.MeanMicroseconds, $"{Measure.FormatDuration(h.MeanMicroseconds)} · {Measure.FormatBytes(h.AllocatedBytesPerOp)}/op · {h.Build}")).ToList()" AriaLabel="Mean time across runs" />
+            </div>
+            <details style="margin-top:1rem">
+                <summary class="small">Recent entries (@_history.Count)</summary>
+                <div class="table-wrap" style="margin-top:.5rem">
+                    <table class="data">
+                        <thead><tr><th>Recorded</th><th>Run</th><th>Runtime</th><th>Build</th><th>Workload</th><th class="num">Iterations</th><th class="num">Mean</th><th class="num">Alloc/op</th><th class="num">Ops/s</th></tr></thead>
+                        <tbody>
+                            @foreach (var h in _history)
+                            {
+                                <tr>
+                                    <td class="small">@h.RecordedUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture)</td>
+                                    <td class="mono small">@h.RunId</td>
+                                    <td class="small">@h.Runtime</td>
+                                    <td class="small">@h.Build</td>
+                                    <td>@h.Workload <span class="small muted">(@h.GroupId)</span></td>
+                                    <td class="num">@h.Iterations.ToString("N0", CultureInfo.InvariantCulture)</td>
+                                    <td class="num">@Measure.FormatDuration(h.MeanMicroseconds)</td>
+                                    <td class="num">@Measure.FormatBytes(h.AllocatedBytesPerOp)</td>
+                                    <td class="num">@h.OpsPerSecond.ToString("N0", CultureInfo.InvariantCulture)</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </details>
+        }
+        <CodeCompare OldSnippet="Perf.JournalSchema" NewSnippet="Perf.JournalRecord" OldLabel="Schema" NewLabel="Recording a run (Dapper)" />
+    </div>
+</section>
+
+<section class="section">
+    <div class="section-title"><h2>Reproduce the published numbers</h2></div>
+    <CodeBlock Language="shell" Title="From DotNet11Lab/ (see BENCHMARKS.md)" Scroll="false" Code="@ReproduceCommands" />
+    <UsageGuidance>
+        <WhenToUse>
+            <ul>
+                <li>Compare runtimes or algorithms with BenchmarkDotNet before changing production code.</li>
+                <li>Use the live panel to see allocation differences (they are deterministic) and rough speed ratios.</li>
+                <li>Prefer spans, <code>PipeReader</code>, source-generated JSON and frozen collections on hot paths you have measured.</li>
+            </ul>
+        </WhenToUse>
+        <WhenToAvoid>
+            <ul>
+                <li>Do not quote live numbers as benchmark results: one process, one runtime, shared CPU, no statistics.</li>
+                <li>Do not rewrite readable LINQ into loops, or <code>Dictionary</code> into <code>FrozenDictionary</code>, without a profile showing that code matters. Frozen collections are slower to build.</li>
+                <li>Do not compare numbers from different machines or from a run marked preliminary.</li>
+            </ul>
+        </WhenToAvoid>
+    </UsageGuidance>
+</section>

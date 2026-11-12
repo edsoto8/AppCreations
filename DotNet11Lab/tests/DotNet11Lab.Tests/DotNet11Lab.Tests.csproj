@@ -17,6 +17,7 @@
     <ProjectReference Include="..\..\src\DotNet11Lab.Api\DotNet11Lab.Api.csproj" />
     <ProjectReference Include="..\..\src\DotNet11Lab.Web\DotNet11Lab.Web.csproj" />
     <ProjectReference Include="..\..\experimental\DotNet11Lab.RuntimeAsync\DotNet11Lab.RuntimeAsync.csproj" />
+    <ProjectReference Include="..\..\src\DotNet11Lab.Cli\DotNet11Lab.Cli.csproj" />
   </ItemGroup>
   <ItemGroup>
     <Using Include="Xunit" />

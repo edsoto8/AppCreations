@@ -1,0 +1,4 @@
+/* In half-width cards the shared .bar-row grid (label max 220px + value) squeezes the 1fr track. */
+.narrow-bars ::deep .bar-row {
+    grid-template-columns: minmax(70px, 38%) minmax(60px, 1fr) auto;
+}
