@@ -21,6 +21,8 @@ public sealed partial class MainViewModel : ObservableObject
     // One item view model per task, reused across refreshes so the ListView keeps its rows.
     private readonly Dictionary<Guid, TaskItemViewModel> _itemCache = [];
 
+    private DateOnly _lastRefreshDay;
+
     public MainViewModel(TaskService tasks, INavigationService navigation, IDialogService dialogs, TimeProvider time)
     {
         _tasks = tasks;
@@ -80,9 +82,10 @@ public sealed partial class MainViewModel : ObservableObject
 
     public bool HasWarning => WarningMessage is not null;
 
-    /// <summary>True while tasks are being loaded at startup.</summary>
+    /// <summary>True while tasks are being loaded at startup. Adding is disabled until loading finishes.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ShowEmptyState))]
+    [NotifyCanExecuteChangedFor(nameof(AddTaskCommand))]
     public partial bool IsLoading { get; private set; }
 
     /// <summary>Show the empty-state message only when loading is done and nothing is visible.</summary>
@@ -121,8 +124,22 @@ public sealed partial class MainViewModel : ObservableObject
     [RelayCommand]
     private void DismissWarning() => WarningMessage = null;
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanAddTask))]
     private void AddTask() => _navigation.OpenTaskEditor(null);
+
+    private bool CanAddTask() => !IsLoading;
+
+    /// <summary>
+    /// Re-evaluates "Due today" and overdue flags if the date has changed since the last refresh
+    /// (the app was left open past midnight). The page calls this from a timer.
+    /// </summary>
+    public void RefreshIfDayChanged()
+    {
+        if (Today != _lastRefreshDay)
+        {
+            Refresh();
+        }
+    }
 
     [RelayCommand]
     private void DismissError() => ErrorMessage = null;
@@ -154,6 +171,7 @@ public sealed partial class MainViewModel : ObservableObject
             return;
         }
 
+        _lastRefreshDay = Today;
         var all = _tasks.Tasks;
         TotalCount = all.Count;
         CompletedCount = all.Count(t => t.IsCompleted);

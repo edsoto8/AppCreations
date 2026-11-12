@@ -21,6 +21,8 @@ public partial class App : Application
     /// <summary>The app's services and view models. Pages read their view model from here.</summary>
     public static AppServices Services { get; private set; } = null!;
 
+    // OnLaunched is "async void" because the framework calls it as an event-style method.
+    // Exceptions in async void methods crash the app, so everything inside is wrapped in try/catch.
     protected override async void OnLaunched(LaunchActivatedEventArgs args)
     {
         MainWindow = new Window();
@@ -28,37 +30,44 @@ public partial class App : Application
         MainWindow.UseStudio();
 #endif
 
-
-        // Do not repeat app initialization when the Window already has content,
-        // just ensure that the window is active
-        if (MainWindow.Content is not Frame rootFrame)
+        try
         {
-            // Create a Frame to act as the navigation context and navigate to the first page
-            rootFrame = new Frame();
-
-            // Place the frame in the current Window
-            MainWindow.Content = rootFrame;
-
+            // Create a Frame to act as the navigation context and place it in the window
+            var rootFrame = new Frame();
             rootFrame.NavigationFailed += OnNavigationFailed;
+            MainWindow.Content = rootFrame;
 
             // Services need the Frame (for navigation and dialogs), so they are created right after it.
             Services = await AppServices.CreateAsync(rootFrame);
-        }
-
-        if (rootFrame.Content == null)
-        {
-            // When the navigation stack isn't restored navigate to the first page,
-            // configuring the new page by passing required information as a navigation
-            // parameter
             rootFrame.Navigate(typeof(MainPage), args.Arguments);
+
+            MainWindow.SetWindowIcon();
+            MainWindow.Activate();
+
+            // Show the window first, then load: the page shows a progress ring until the tasks arrive.
+            await Services.MainViewModel.LoadCommand.ExecuteAsync(null);
         }
+        catch (Exception ex)
+        {
+            ShowStartupError(ex);
+        }
+    }
 
-        MainWindow.SetWindowIcon();
-        // Ensure the current window is active
+    /// <summary>Last-resort error screen, so a startup failure is explained instead of showing a blank window.</summary>
+    private void ShowStartupError(Exception ex)
+    {
+        LoggerFactory?.CreateLogger<App>().LogCritical(ex, "TaskFlow failed to start");
+        MainWindow!.Content = new StackPanel
+        {
+            Padding = new Thickness(32),
+            Spacing = 12,
+            Children =
+            {
+                new TextBlock { Text = "TaskFlow couldn't start", FontSize = 24 },
+                new TextBlock { Text = ex.Message, TextWrapping = TextWrapping.Wrap },
+            },
+        };
         MainWindow.Activate();
-
-        // Show the window first, then load: the page shows a progress ring until the tasks arrive.
-        await Services.MainViewModel.LoadCommand.ExecuteAsync(null);
     }
 
     /// <summary>

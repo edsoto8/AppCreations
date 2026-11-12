@@ -8,7 +8,7 @@
 | 4 | Task editing and navigation | Done |
 | 5 | Local data storage | Done |
 | 6 | UI improvements | Done |
-| 7 | Testing and code quality | Not started |
+| 7 | Testing and code quality | Done |
 | 8 | Final review | Not started |
 
 ## Milestone 1 — Environment and first application
@@ -74,3 +74,26 @@
 - Verified in the running app: light and dark main page, dark dialog and editor, 420px narrow layout, empty
   state, Ctrl+N, theme choice remembered across launches.
 - Known limitation: the dimming layer behind a dialog keeps the system theme's tint when the app theme is forced.
+
+## Milestone 7 — Testing and code quality
+
+- 96 xUnit tests covering creation, completion, editing, deletion, filtering, sorting, serialization, invalid
+  input, corrupt files, save failures, loading, dates and formatting. `dotnet format --verify-no-changes` clean.
+- An independent code review found real issues; all were fixed with a regression test each:
+
+| Finding | Fix |
+|---|---|
+| A failed save left the change in memory, so retrying "Add" created a duplicate | `TaskService` undoes the change when saving fails, so memory always matches the file |
+| Adding a task while loading was still running lost the task | Add is disabled while loading; `TaskService` rejects changes before a successful load, without touching memory |
+| A file from a newer TaskFlow version lost unknown data on the next save | Newer versions open read-only, with a warning |
+| One bad task in the file hid all tasks | Tasks are read one by one; bad ones are skipped, the original file is backed up, and the user is told how many |
+| Save snapshots shared live `TaskItem` objects | Snapshots are deep copies (`TaskItem.Clone`) |
+| "Due today" and overdue labels went stale after midnight | `MainPage` timer calls `RefreshIfDayChanged` every minute |
+| A startup failure gave a blank window | `OnLaunched` catches it and shows an error screen |
+| Possible off-by-one due date in other time zones | Picker values are converted to local time before taking the date. Verified in the app at UTC+13 and UTC−8 |
+| Save stayed clickable for a deleted task | `SaveCommand.CanExecute` is false |
+
+- Found while testing: tasks written without an `id` all loaded as `Guid.Empty`, because the source-generated
+  serializer skips property initializers, and then collapsed into one task. They now get fresh ids.
+- Verified in the running app: forced save failure → error shown in the editor, text kept, list unchanged after
+  Cancel. WebAssembly: ran in headless Chromium; add + page reload kept the task (IndexedDB).

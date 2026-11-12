@@ -162,10 +162,12 @@ public class MainViewModelTests
         await _service.AddAsync(Draft("A"));
         _store.FailSaves = true;
 
-        await _vm.Tasks.Single().ToggleCompletedCommand.ExecuteAsync(null);
+        var item = _vm.Tasks.Single();
+        await item.ToggleCompletedCommand.ExecuteAsync(null);
 
         Assert.True(_vm.HasError);
         Assert.Contains("disk full", _vm.ErrorMessage);
+        Assert.False(item.IsCompleted); // the change was undone, matching the file
 
         _vm.DismissErrorCommand.Execute(null);
         Assert.False(_vm.HasError);
@@ -192,5 +194,44 @@ public class MainViewModelTests
 
         Assert.True(vm.HasError);
         Assert.False(vm.IsLoading);
+    }
+
+    [Fact]
+    public async Task AddTask_IsDisabledWhileLoading()
+    {
+        var store = new SlowStore();
+        var vm = new MainViewModel(new TaskService(store, _time), _navigation, _dialogs, _time);
+
+        var loading = vm.LoadCommand.ExecuteAsync(null);
+        Assert.True(vm.IsLoading);
+        Assert.False(vm.AddTaskCommand.CanExecute(null));
+
+        store.Finish();
+        await loading;
+        Assert.True(vm.AddTaskCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public async Task RefreshIfDayChanged_UpdatesDueTextAfterMidnight()
+    {
+        await _service.AddAsync(Draft("t", due: Today.AddDays(1)));
+        var item = _vm.Tasks.Single();
+        Assert.Equal("Due tomorrow", item.DueDateText);
+
+        _time.Now = _time.Now.AddDays(1);
+        _vm.RefreshIfDayChanged();
+
+        Assert.Equal("Due today", item.DueDateText);
+    }
+
+    private sealed class SlowStore : ITaskStore
+    {
+        private readonly TaskCompletionSource<TaskLoadResult> _load = new();
+
+        public void Finish() => _load.SetResult(new TaskLoadResult([]));
+
+        public Task<TaskLoadResult> LoadAsync(CancellationToken cancellationToken = default) => _load.Task;
+
+        public Task SaveAsync(IReadOnlyList<TaskFlow.Core.Models.TaskItem> tasks, CancellationToken cancellationToken = default) => Task.CompletedTask;
     }
 }

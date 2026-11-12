@@ -23,7 +23,7 @@ public class TaskServiceTests
         Assert.Equal("details", task.Description);
         Assert.Equal(FixedTimeProvider.DefaultNow, task.CreatedAt);
         Assert.False(task.IsCompleted);
-        Assert.Same(task, Assert.Single(_store.Saved));
+        Assert.Equal(task.Id, Assert.Single(_store.Saved).Id);
     }
 
     [Fact]
@@ -73,7 +73,7 @@ public class TaskServiceTests
         await _service.DeleteAsync(drop.Id);
 
         Assert.Equal([keep], _service.Tasks);
-        Assert.Equal([keep], _store.Saved);
+        Assert.Equal([keep.Id], _store.Saved.Select(t => t.Id));
     }
 
     [Fact]
@@ -103,11 +103,85 @@ public class TaskServiceTests
     }
 
     [Fact]
-    public async Task SaveFailure_SurfacesAsTaskStoreException_ButKeepsChangeInMemory()
+    public async Task SaveFailure_OnAdd_RollsBack()
     {
         _store.FailSaves = true;
         await Assert.ThrowsAsync<TaskStoreException>(() => _service.AddAsync(Draft("unsaved")));
-        Assert.Single(_service.Tasks);
+        Assert.Empty(_service.Tasks);
+    }
+
+    [Fact]
+    public async Task SaveFailure_OnUpdate_RestoresOldValues()
+    {
+        var task = await _service.AddAsync(Draft("Before", Priority.Low, Today, "old"));
+        _store.FailSaves = true;
+
+        await Assert.ThrowsAsync<TaskStoreException>(() => _service.UpdateAsync(task.Id, Draft("After", Priority.High, null, "new")));
+
+        Assert.Equal("Before", task.Title);
+        Assert.Equal(Priority.Low, task.Priority);
+        Assert.Equal(Today, task.DueDate);
+        Assert.Equal("old", task.Description);
+    }
+
+    [Fact]
+    public async Task SaveFailure_OnDelete_PutsTaskBackInItsPlace()
+    {
+        var a = await _service.AddAsync(Draft("a"));
+        var b = await _service.AddAsync(Draft("b"));
+        var c = await _service.AddAsync(Draft("c"));
+        _store.FailSaves = true;
+
+        await Assert.ThrowsAsync<TaskStoreException>(() => _service.DeleteAsync(b.Id));
+
+        Assert.Equal([a, b, c], _service.Tasks);
+    }
+
+    [Fact]
+    public async Task SaveFailure_OnComplete_Reverts_AndRaisesChangedAgain()
+    {
+        var task = await _service.AddAsync(Draft("a"));
+        _store.FailSaves = true;
+        var changes = 0;
+        _service.Changed += (_, _) => changes++;
+
+        await Assert.ThrowsAsync<TaskStoreException>(() => _service.SetCompletedAsync(task.Id, true));
+
+        Assert.False(task.IsCompleted);
+        Assert.Equal(2, changes); // once for the change, once for the undo
+    }
+
+    [Fact]
+    public async Task ChangesBeforeLoad_AreRejected_WithoutTouchingMemory()
+    {
+        var service = new TaskService(new FakeTaskStore(), new FixedTimeProvider());
+        await Assert.ThrowsAsync<TaskStoreException>(() => service.AddAsync(Draft("too early")));
+        Assert.Empty(service.Tasks);
+    }
+
+    [Fact]
+    public async Task SavedSnapshot_IsACopy_NotTheLiveObjects()
+    {
+        var task = await _service.AddAsync(Draft("a"));
+        Assert.NotSame(task, Assert.Single(_store.Saved));
+        Assert.Equal(task.Id, _store.Saved[0].Id);
+    }
+
+    [Fact]
+    public async Task NewerFileVersion_LoadsReadOnly()
+    {
+        using var folder = new TempFolder();
+        var path = folder.File("tasks.json");
+        await File.WriteAllTextAsync(path, """{ "version": 99, "tasks": [ { "title": "from the future" } ] }""",
+            TestContext.Current.CancellationToken);
+        var service = new TaskService(new JsonTaskStore(path), new FixedTimeProvider());
+
+        var warning = await service.LoadAsync(TestContext.Current.CancellationToken);
+
+        Assert.NotNull(warning);
+        Assert.Single(service.Tasks);
+        await Assert.ThrowsAsync<TaskStoreException>(() => service.AddAsync(Draft("x")));
+        Assert.Contains("\"version\": 99", await File.ReadAllTextAsync(path, TestContext.Current.CancellationToken));
     }
 
     [Fact]

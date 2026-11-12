@@ -34,11 +34,11 @@ public sealed class JsonTaskStore : ITaskStore
             return new TaskLoadResult([]);
         }
 
-        TaskFile? file;
+        RawTaskFile? file;
         try
         {
             await using var stream = File.OpenRead(FilePath);
-            file = await JsonSerializer.DeserializeAsync(stream, TaskJsonContext.Default.TaskFile, cancellationToken);
+            file = await JsonSerializer.DeserializeAsync(stream, TaskJsonContext.Default.RawTaskFile, cancellationToken);
         }
         catch (JsonException ex)
         {
@@ -55,15 +55,53 @@ public sealed class JsonTaskStore : ITaskStore
             return RecoverFromCorruptFile(null);
         }
 
-        if (file.Version > CurrentVersion)
+        // Read each task on its own, so one damaged entry doesn't hide all the others.
+        var tasks = new List<TaskItem?>();
+        var skipped = 0;
+        foreach (var element in file.Tasks)
         {
-            // Written by a newer TaskFlow. Reading it is fine, but saving could drop fields we don't know about.
-            _logger.LogWarning("Task file version {Version} is newer than {Current}", file.Version, CurrentVersion);
+            try
+            {
+                tasks.Add(element.Deserialize(TaskJsonContext.Default.TaskItem));
+            }
+            catch (JsonException ex)
+            {
+                skipped++;
+                _logger.LogWarning(ex, "Skipping an unreadable task in {Path}", FilePath);
+            }
         }
 
-        var tasks = Sanitize(file.Tasks);
-        _logger.LogInformation("Loaded {Count} tasks from {Path}", tasks.Count, FilePath);
-        return new TaskLoadResult(tasks);
+        var result = Sanitize(tasks);
+        _logger.LogInformation("Loaded {Count} tasks from {Path}", result.Count, FilePath);
+
+        if (file.Version > CurrentVersion)
+        {
+            // Written by a newer TaskFlow. Show the tasks, but saving could drop data this version doesn't know.
+            _logger.LogWarning("Task file version {Version} is newer than {Current}; opening read-only", file.Version, CurrentVersion);
+            return new TaskLoadResult(
+                result,
+                "These tasks were saved by a newer version of TaskFlow. You can view them, but changes can't be saved.",
+                IsReadOnly: true);
+        }
+
+        if (skipped > 0)
+        {
+            // The next save would drop the skipped entries, so keep a copy of the original file first.
+            var backupPath = BackupPath();
+            try
+            {
+                File.Copy(FilePath, backupPath, overwrite: true);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                throw new TaskStoreException($"Some saved tasks are unreadable and the file couldn't be backed up ({ex.Message}).", ex);
+            }
+
+            var what = skipped == 1 ? "1 saved task couldn't be read and was" : $"{skipped} saved tasks couldn't be read and were";
+            return new TaskLoadResult(result, $"{what} skipped. The original file was kept as {Path.GetFileName(backupPath)}.");
+        }
+
+        return new TaskLoadResult(result);
     }
 
     public async Task SaveAsync(IReadOnlyList<TaskItem> tasks, CancellationToken cancellationToken = default)
@@ -77,7 +115,7 @@ public sealed class JsonTaskStore : ITaskStore
             // the previous tasks.json is still intact.
             await using (var stream = File.Create(tempPath))
             {
-                var file = new TaskFile { Version = CurrentVersion, Tasks = [.. tasks] };
+                var file = new TaskFile { Version = CurrentVersion, Tasks = tasks.ToList() };
                 await JsonSerializer.SerializeAsync(stream, file, TaskJsonContext.Default.TaskFile, cancellationToken);
             }
 
@@ -94,8 +132,7 @@ public sealed class JsonTaskStore : ITaskStore
     /// <summary>Keeps the unreadable file (renamed) so nothing is lost, and starts with an empty list.</summary>
     private TaskLoadResult RecoverFromCorruptFile(Exception? error)
     {
-        var stamp = _time.GetUtcNow().ToString("yyyyMMdd-HHmmss");
-        var backupPath = Path.ChangeExtension(FilePath, $".corrupt-{stamp}.json");
+        var backupPath = BackupPath();
         _logger.LogWarning(error, "Task file {Path} is unreadable; moving it to {Backup}", FilePath, backupPath);
 
         try
@@ -113,13 +150,30 @@ public sealed class JsonTaskStore : ITaskStore
             $"Your saved tasks couldn't be read, so TaskFlow started with an empty list. The old file was kept as {Path.GetFileName(backupPath)}.");
     }
 
+    private string BackupPath() =>
+        Path.ChangeExtension(FilePath, $".corrupt-{_time.GetUtcNow():yyyyMMdd-HHmmss}.json");
+
     /// <summary>Repairs small problems in otherwise valid JSON instead of rejecting the whole file.</summary>
     private static List<TaskItem> Sanitize(IEnumerable<TaskItem?> tasks)
     {
         var seen = new HashSet<Guid>();
         var result = new List<TaskItem>();
-        foreach (var task in tasks)
+        foreach (var entry in tasks)
         {
+            // A task written without an "id" deserializes with Guid.Empty: give it a real one.
+            var task = entry is { Id: var id } && id == Guid.Empty
+                ? new TaskItem
+                {
+                    Id = Guid.NewGuid(),
+                    Title = entry.Title,
+                    Description = entry.Description,
+                    DueDate = entry.DueDate,
+                    Priority = entry.Priority,
+                    IsCompleted = entry.IsCompleted,
+                    CreatedAt = entry.CreatedAt,
+                }
+                : entry;
+
             if (task is null || !seen.Add(task.Id))
             {
                 continue; // skip null entries and duplicate ids
@@ -143,7 +197,15 @@ public sealed class JsonTaskStore : ITaskStore
     {
         public int Version { get; set; }
 
-        public List<TaskItem?>? Tasks { get; set; }
+        public List<TaskItem>? Tasks { get; set; }
+    }
+
+    /// <summary>The same file, read with each task left as raw JSON so tasks can be checked one at a time.</summary>
+    internal sealed class RawTaskFile
+    {
+        public int Version { get; set; }
+
+        public List<JsonElement>? Tasks { get; set; }
     }
 }
 
@@ -156,4 +218,5 @@ public sealed class JsonTaskStore : ITaskStore
     PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
     UseStringEnumConverter = true)]
 [JsonSerializable(typeof(JsonTaskStore.TaskFile))]
+[JsonSerializable(typeof(JsonTaskStore.RawTaskFile))]
 internal sealed partial class TaskJsonContext : JsonSerializerContext;

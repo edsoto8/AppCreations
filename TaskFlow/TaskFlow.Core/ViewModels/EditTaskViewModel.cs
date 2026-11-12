@@ -101,17 +101,11 @@ public sealed partial class EditTaskViewModel : ObservableObject
 
     public bool HasError => ErrorMessage is not null;
 
-    public TaskDraft ToDraft() =>
-        new(Title, Description, DueDate is { } d ? DateOnly.FromDateTime(d.Date) : null, SelectedPriority.Value);
+    public TaskDraft ToDraft() => new(Title, Description, ToDateOnly(DueDate), SelectedPriority.Value);
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanSave))]
     private async Task SaveAsync()
     {
-        if (IsMissing)
-        {
-            return;
-        }
-
         _showErrors = true;
         if (!Validate())
         {
@@ -139,6 +133,8 @@ public sealed partial class EditTaskViewModel : ObservableObject
         }
     }
 
+    private bool CanSave() => !IsMissing;
+
     [RelayCommand]
     private void Cancel() => _navigation.GoBack();
 
@@ -165,6 +161,14 @@ public sealed partial class EditTaskViewModel : ObservableObject
         return result.IsValid;
     }
 
-    private static DateTimeOffset? ToDateTimeOffset(DateOnly? date) =>
+    /// <summary>A date becomes local midnight of that day, which is what CalendarDatePicker shows.</summary>
+    internal static DateTimeOffset? ToDateTimeOffset(DateOnly? date) =>
         date is { } d ? new DateTimeOffset(d.ToDateTime(TimeOnly.MinValue)) : null;
+
+    /// <summary>
+    /// Converts back to a calendar date in the user's time zone. Converting to local time first means we get the
+    /// right day whether the picker hands us local midnight or the same moment expressed in UTC.
+    /// </summary>
+    internal static DateOnly? ToDateOnly(DateTimeOffset? value) =>
+        value is { } v ? DateOnly.FromDateTime(v.ToLocalTime().DateTime) : null;
 }

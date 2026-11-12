@@ -75,8 +75,6 @@ public sealed class JsonTaskStoreTests : IDisposable
     [Theory]
     [InlineData("this is not json")]
     [InlineData("{ \"version\": 1, \"tasks\": [ { \"title\": ")]
-    [InlineData("{ \"version\": 1, \"tasks\": [ { \"id\": \"00000000-0000-0000-0000-000000000001\" } ] }")] // title is required
-    [InlineData("{ \"version\": 1, \"tasks\": [ { \"title\": \"x\", \"priority\": \"Urgent\" } ] }")]   // unknown enum name
     [InlineData("{ \"version\": 1 }")]
     [InlineData("null")]
     [InlineData("")]
@@ -91,6 +89,39 @@ public sealed class JsonTaskStoreTests : IDisposable
         Assert.False(File.Exists(_store.FilePath));
         var backup = Assert.Single(Directory.GetFiles(_folder.Path, "tasks.corrupt-*.json"));
         Assert.Equal(contents, await File.ReadAllTextAsync(backup, Ct));
+    }
+
+    [Fact]
+    public async Task OneBadTask_IsSkipped_OthersLoad_AndOriginalIsBackedUp()
+    {
+        const string json = """
+            { "version": 1, "tasks": [
+              { "title": "good one" },
+              { "id": "00000000-0000-0000-0000-000000000001" },
+              { "title": "unknown priority name", "priority": "Urgent" },
+              { "title": "good two" }
+            ] }
+            """;
+        await File.WriteAllTextAsync(_store.FilePath, json, Ct);
+
+        var result = await _store.LoadAsync(Ct);
+
+        Assert.Equal(["good one", "good two"], result.Tasks.Select(t => t.Title));
+        Assert.Contains("2 saved tasks", result.Warning);
+        Assert.False(result.IsReadOnly);
+        Assert.True(File.Exists(_store.FilePath)); // original stays in place
+        var backup = Assert.Single(Directory.GetFiles(_folder.Path, "tasks.corrupt-*.json"));
+        Assert.Equal(json, await File.ReadAllTextAsync(backup, Ct));
+    }
+
+    [Fact]
+    public async Task NewerVersion_IsReadOnly_WithWarning()
+    {
+        await File.WriteAllTextAsync(_store.FilePath, """{ "version": 2, "tasks": [ { "title": "x" } ] }""", Ct);
+        var result = await _store.LoadAsync(Ct);
+        Assert.True(result.IsReadOnly);
+        Assert.NotNull(result.Warning);
+        Assert.Single(result.Tasks);
     }
 
     [Fact]
@@ -114,6 +145,16 @@ public sealed class JsonTaskStoreTests : IDisposable
         Assert.Equal(Priority.Medium, result.Tasks[0].Priority);
         Assert.Equal("(untitled)", result.Tasks[1].Title);
         Assert.Equal(string.Empty, result.Tasks[1].Description);
+    }
+
+    [Fact]
+    public async Task TasksWithoutIds_EachGetAUniqueId()
+    {
+        await File.WriteAllTextAsync(_store.FilePath, """{ "version": 1, "tasks": [ { "title": "a" }, { "title": "b" } ] }""", Ct);
+        var tasks = (await _store.LoadAsync(Ct)).Tasks;
+        Assert.Equal(2, tasks.Count);
+        Assert.All(tasks, t => Assert.NotEqual(Guid.Empty, t.Id));
+        Assert.NotEqual(tasks[0].Id, tasks[1].Id);
     }
 
     [Fact]

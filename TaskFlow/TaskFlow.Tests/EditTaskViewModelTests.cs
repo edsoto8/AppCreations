@@ -29,7 +29,7 @@ public class EditTaskViewModelTests
         var vm = Editor();
         vm.Title = "  Write tests  ";
         vm.Description = "xUnit";
-        vm.DueDate = new DateTimeOffset(2026, 4, 1, 0, 0, 0, TimeSpan.Zero);
+        vm.DueDate = EditTaskViewModel.ToDateTimeOffset(new DateOnly(2026, 4, 1));
         vm.SelectedPriority = vm.PriorityChoices.Single(c => c.Value == Priority.High);
 
         await vm.SaveCommand.ExecuteAsync(null);
@@ -118,8 +118,42 @@ public class EditTaskViewModelTests
         Assert.True(vm.IsMissing);
         Assert.True(vm.HasError);
 
-        vm.Title = "Anything";
+        Assert.False(vm.SaveCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public async Task RetryAfterFailedSave_AddsTheTaskOnlyOnce()
+    {
+        var store = new FakeTaskStore { FailSaves = true };
+        var service = Services.LoadedTaskService(store);
+        var vm = new EditTaskViewModel(service, _navigation, null) { Title = "Buy milk" };
+
         await vm.SaveCommand.ExecuteAsync(null);
-        Assert.Empty(_service.Tasks);
+        Assert.True(vm.HasError);
+        Assert.Empty(service.Tasks);           // rolled back
+        Assert.Equal(0, _navigation.BackCount); // stays on the page, nothing typed is lost
+
+        store.FailSaves = false;
+        await vm.SaveCommand.ExecuteAsync(null);
+
+        Assert.Single(service.Tasks);
+        Assert.Single(store.Saved);
+        Assert.Equal(1, _navigation.BackCount);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(2)]
+    [InlineData(-7)]
+    [InlineData(14)]
+    public void DueDate_SameMomentInAnyOffset_GivesTheSameLocalDay(int offsetHours)
+    {
+        var day = new DateOnly(2026, 6, 15);
+        var localMidnight = EditTaskViewModel.ToDateTimeOffset(day)!.Value;
+        var sameMomentElsewhere = localMidnight.ToOffset(TimeSpan.FromHours(offsetHours));
+
+        Assert.Equal(day, EditTaskViewModel.ToDateOnly(localMidnight));
+        Assert.Equal(day, EditTaskViewModel.ToDateOnly(sameMomentElsewhere));
+        Assert.Null(EditTaskViewModel.ToDateOnly(null));
     }
 }

@@ -17,7 +17,15 @@ public sealed partial class MainPage : Page
         // Keep this page alive while the editor is open, so going back is instant and keeps the scroll position.
         NavigationCacheMode = NavigationCacheMode.Required;
         UpdateThemeButton();
+
+        // If the app stays open past midnight, "Due today" and overdue flags must move on by themselves.
+        _dayTimer.Interval = TimeSpan.FromMinutes(1);
+        _dayTimer.Tick += (_, _) => ViewModel.RefreshIfDayChanged();
+        _dayTimer.Start();
     }
+
+    // A DispatcherTimer ticks on the UI thread, so it may touch view models and controls directly.
+    private readonly DispatcherTimer _dayTimer = new();
 
     public MainViewModel ViewModel { get; }
 

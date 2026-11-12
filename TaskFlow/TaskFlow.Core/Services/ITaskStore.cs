@@ -16,8 +16,12 @@ public interface ITaskStore
     Task SaveAsync(IReadOnlyList<TaskItem> tasks, CancellationToken cancellationToken = default);
 }
 
-/// <summary>What <see cref="ITaskStore.LoadAsync"/> found, and an optional message to show the user.</summary>
-public sealed record TaskLoadResult(IReadOnlyList<TaskItem> Tasks, string? Warning = null);
+/// <summary>
+/// What <see cref="ITaskStore.LoadAsync"/> found, and an optional message to show the user.
+/// <paramref name="IsReadOnly"/> means the tasks may be shown but must not be saved back
+/// (for example, the file was written by a newer version of TaskFlow).
+/// </summary>
+public sealed record TaskLoadResult(IReadOnlyList<TaskItem> Tasks, string? Warning = null, bool IsReadOnly = false);
 
 /// <summary>A storage problem, with a message that is safe to show to the user.</summary>
 public sealed class TaskStoreException(string message, Exception? innerException = null)

@@ -20,4 +20,7 @@ public sealed class TaskItem
     public bool IsCompleted { get; set; }
 
     public DateTimeOffset CreatedAt { get; init; } = DateTimeOffset.UtcNow;
+
+    /// <summary>A separate copy with the same values (used for save snapshots and undo).</summary>
+    public TaskItem Clone() => (TaskItem)MemberwiseClone();
 }
