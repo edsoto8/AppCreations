@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    TaskFlow.Core holds everything that is NOT user interface: models, view models, rules and services.
+    It targets plain net10.0 and knows nothing about Uno, so it can be unit-tested anywhere and reused
+    by any future head (Android, iOS, ...).
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>TaskFlow.Core</RootNamespace>
+  </PropertyGroup>
+
+</Project>
