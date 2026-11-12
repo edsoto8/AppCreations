@@ -73,6 +73,21 @@ public sealed partial class MainViewModel : ObservableObject
 
     public bool HasError => ErrorMessage is not null;
 
+    /// <summary>A non-fatal notice, such as "your file was unreadable and was backed up".</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasWarning))]
+    public partial string? WarningMessage { get; set; }
+
+    public bool HasWarning => WarningMessage is not null;
+
+    /// <summary>True while tasks are being loaded at startup.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowEmptyState))]
+    public partial bool IsLoading { get; private set; }
+
+    /// <summary>Show the empty-state message only when loading is done and nothing is visible.</summary>
+    public bool ShowEmptyState => IsEmpty && !IsLoading;
+
     public string SummaryText => TotalCount == 0
         ? "No tasks yet"
         : $"{CompletedCount} of {TotalCount} completed";
@@ -87,6 +102,24 @@ public sealed partial class MainViewModel : ObservableObject
 
     /// <summary>Today's date in the user's time zone. Used for "Due today" and overdue checks.</summary>
     public DateOnly Today => DateOnly.FromDateTime(_time.GetLocalNow().DateTime);
+
+    /// <summary>Loads saved tasks. Called once when the app starts.</summary>
+    [RelayCommand]
+    private async Task LoadAsync()
+    {
+        IsLoading = true;
+        try
+        {
+            await RunAsync(async () => WarningMessage = await _tasks.LoadAsync());
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    [RelayCommand]
+    private void DismissWarning() => WarningMessage = null;
 
     [RelayCommand]
     private void AddTask() => _navigation.OpenTaskEditor(null);
@@ -143,6 +176,7 @@ public sealed partial class MainViewModel : ObservableObject
 
         OnPropertyChanged(nameof(SummaryText));
         OnPropertyChanged(nameof(IsEmpty));
+        OnPropertyChanged(nameof(ShowEmptyState));
         OnPropertyChanged(nameof(EmptyTitle));
         OnPropertyChanged(nameof(EmptyMessage));
     }

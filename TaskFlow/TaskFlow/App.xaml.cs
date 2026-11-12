@@ -42,8 +42,7 @@ public partial class App : Application
             rootFrame.NavigationFailed += OnNavigationFailed;
 
             // Services need the Frame (for navigation and dialogs), so they are created right after it.
-            Services = new AppServices(rootFrame);
-            await Services.AddSampleTasksAsync();
+            Services = await AppServices.CreateAsync(rootFrame);
         }
 
         if (rootFrame.Content == null)
@@ -57,6 +56,9 @@ public partial class App : Application
         MainWindow.SetWindowIcon();
         // Ensure the current window is active
         MainWindow.Activate();
+
+        // Show the window first, then load: the page shows a progress ring until the tasks arrive.
+        await Services.MainViewModel.LoadCommand.ExecuteAsync(null);
     }
 
     /// <summary>
@@ -68,6 +70,9 @@ public partial class App : Application
     {
         throw new InvalidOperationException($"Failed to load {e.SourcePageType.FullName}: {e.Exception}");
     }
+
+    /// <summary>The app's logger factory (Debug builds only; null in Release, where logging is off for speed).</summary>
+    public static ILoggerFactory? LoggerFactory { get; private set; }
 
     /// <summary>
     /// Configures global Uno Platform logging
@@ -82,7 +87,7 @@ public partial class App : Application
         //
         // For more performance documentation: https://platform.uno/docs/articles/Uno-UI-Performance.html
 
-        var factory = LoggerFactory.Create(builder =>
+        var factory = Microsoft.Extensions.Logging.LoggerFactory.Create(builder =>
         {
 #if __WASM__
             builder.AddProvider(new global::Uno.Extensions.Logging.WebAssembly.WebAssemblyConsoleLoggerProvider());
@@ -102,6 +107,10 @@ public partial class App : Application
             builder.AddFilter("Uno", LogLevel.Warning);
             builder.AddFilter("Windows", LogLevel.Warning);
             builder.AddFilter("Microsoft", LogLevel.Warning);
+
+            // Hot Design / DevServer messages are noise when no IDE is attached
+            builder.AddFilter("Uno.UI.HotDesign", LogLevel.None);
+            builder.AddFilter("Uno.UI.RemoteControl", LogLevel.None);
 
             // Generic Xaml events
             // builder.AddFilter("Microsoft.UI.Xaml", LogLevel.Debug );
@@ -132,6 +141,7 @@ public partial class App : Application
         });
 
         global::Uno.Extensions.LogExtensionPoint.AmbientLoggerFactory = factory;
+        LoggerFactory = factory;
 
 #if HAS_UNO
         global::Uno.UI.Adapter.Microsoft.Extensions.Logging.LoggingAdapter.Initialize();

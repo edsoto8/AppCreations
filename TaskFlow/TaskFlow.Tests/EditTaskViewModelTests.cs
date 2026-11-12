@@ -8,7 +8,7 @@ namespace TaskFlow.Tests;
 public class EditTaskViewModelTests
 {
     private readonly FakeNavigation _navigation = new();
-    private readonly TaskService _service = new(new FixedTimeProvider());
+    private readonly TaskService _service = Services.LoadedTaskService();
 
     private EditTaskViewModel Editor(Guid? id = null) => new(_service, _navigation, id);
 

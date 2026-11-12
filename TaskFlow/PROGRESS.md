@@ -6,7 +6,7 @@
 | 2 | First user interface | Done |
 | 3 | MVVM and data binding | Done |
 | 4 | Task editing and navigation | Done |
-| 5 | Local data storage | Not started |
+| 5 | Local data storage | Done |
 | 6 | UI improvements | Not started |
 | 7 | Testing and code quality | Not started |
 | 8 | Final review | Not started |
@@ -45,3 +45,17 @@
 - Views moved to `Views/`. Tests: 34 passing (editor, validator, navigation and dialog fakes).
 - Verified in the running app: empty-title error appears and clears while typing, priority via keyboard, date via
   calendar, Ctrl+S saves and returns, delete dialog (Enter cancels, Delete confirms), Edit pre-fills, Escape cancels.
+
+## Milestone 5 — Local data storage
+
+- `ITaskStore` / `JsonTaskStore`: versioned JSON (`{ "version": 1, "tasks": [...] }`), System.Text.Json source
+  generation, enum names as strings, atomic save (temp file + `File.Move`), corrupt files moved to
+  `tasks.corrupt-<timestamp>.json` with a user-facing warning, small problems repaired on load.
+- `TaskService` loads at startup and saves after every change (one save at a time). If loading fails, saving is
+  blocked so the unreadable file is never overwritten.
+- App: data in `ApplicationData.Current.LocalFolder` (override with `TASKFLOW_DATA_DIR`), `ILogger` from the
+  template's logger factory (Debug builds), progress-free load after the window appears, warning `InfoBar`.
+- Tests: 64 passing (round trip, corrupt files, repair, IO failures, restart survival).
+- Verified in the running app: added a task and completed it → `tasks.json` written; relaunched → task reloaded;
+  corrupted the file → app started with the warning and the backup file. Default Linux path:
+  `~/.local/share/TaskFlow/com.taskflow.app/LocalState/TaskFlow/tasks.json`.

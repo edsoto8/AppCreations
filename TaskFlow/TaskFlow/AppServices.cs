@@ -1,4 +1,6 @@
+using Microsoft.Extensions.Logging.Abstractions;
 using TaskFlow.Services;
+using Windows.Storage;
 
 namespace TaskFlow;
 
@@ -8,14 +10,23 @@ namespace TaskFlow;
 /// </summary>
 public sealed class AppServices
 {
-    public AppServices(Frame rootFrame)
+    public const string DataFileName = "tasks.json";
+
+    /// <summary>Set this environment variable to keep tasks somewhere else (handy for trying things out).</summary>
+    public const string DataFolderVariable = "TASKFLOW_DATA_DIR";
+
+    private AppServices(Frame rootFrame, string dataFilePath, ILoggerFactory loggerFactory)
     {
+        DataFilePath = dataFilePath;
         Time = TimeProvider.System;
-        Tasks = new TaskService(Time);
+        var store = new JsonTaskStore(dataFilePath, loggerFactory.CreateLogger<JsonTaskStore>(), Time);
+        Tasks = new TaskService(store, Time, loggerFactory.CreateLogger<TaskService>());
         Navigation = new FrameNavigationService(rootFrame);
         Dialogs = new ContentDialogService(() => rootFrame.XamlRoot);
         MainViewModel = new MainViewModel(Tasks, Navigation, Dialogs, Time);
     }
+
+    public string DataFilePath { get; }
 
     public TimeProvider Time { get; }
 
@@ -28,15 +39,34 @@ public sealed class AppServices
     /// <summary>One instance for the app's lifetime, so the main list keeps its filter and sort.</summary>
     public MainViewModel MainViewModel { get; }
 
+    public static async Task<AppServices> CreateAsync(Frame rootFrame)
+    {
+        var loggerFactory = App.LoggerFactory ?? NullLoggerFactory.Instance;
+        var folder = await GetDataFolderAsync();
+        var path = Path.Combine(folder, DataFileName);
+        loggerFactory.CreateLogger<AppServices>().LogInformation("Tasks are stored in {Path}", path);
+        return new AppServices(rootFrame, path, loggerFactory);
+    }
+
     /// <summary>A fresh editor view model each time the editor opens.</summary>
     public EditTaskViewModel CreateEditTaskViewModel(Guid? taskId) => new(Tasks, Navigation, taskId);
 
-    /// <summary>Milestone 3/4: start with a few in-memory sample tasks. Milestone 5 loads them from disk instead.</summary>
-    public async Task AddSampleTasksAsync()
+    /// <summary>
+    /// The app's private data folder. ApplicationData.LocalFolder works on every Uno target:
+    /// on desktop it is a normal folder (see README), on WebAssembly it is backed by the browser's IndexedDB.
+    /// </summary>
+    private static async Task<string> GetDataFolderAsync()
     {
-        var today = DateOnly.FromDateTime(DateTime.Today);
-        await Tasks.AddAsync(new TaskDraft("Read the Uno Platform docs", "Start with 'How Uno works'.", today, Priority.High));
-        await Tasks.AddAsync(new TaskDraft("Build the TaskFlow main page", "Grid, StackPanel and ListView.", today.AddDays(2), Priority.Medium));
-        await Tasks.AddAsync(new TaskDraft("Buy groceries", "", null, Priority.Low));
+        var overrideFolder = Environment.GetEnvironmentVariable(DataFolderVariable);
+        if (!string.IsNullOrWhiteSpace(overrideFolder))
+        {
+            return overrideFolder;
+        }
+
+        // Awaiting a StorageFolder call first also makes sure the WebAssembly file system is ready
+        // before we use System.IO on it.
+        var folder = await ApplicationData.Current.LocalFolder
+            .CreateFolderAsync("TaskFlow", CreationCollisionOption.OpenIfExists);
+        return folder.Path;
     }
 }

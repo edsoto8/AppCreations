@@ -13,6 +13,7 @@
   <ItemGroup>
     <!-- Versions live in ../Directory.Packages.props (central package management). -->
     <PackageReference Include="CommunityToolkit.Mvvm" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
   </ItemGroup>
 
   <ItemGroup>

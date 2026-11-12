@@ -60,3 +60,64 @@ public sealed class FakeDialogs : IDialogService
         return Task.FromResult(Answer);
     }
 }
+
+/// <summary>An in-memory <see cref="ITaskStore"/>. Set <see cref="FailSaves"/> or <see cref="FailLoad"/> to simulate disk errors.</summary>
+public sealed class FakeTaskStore : ITaskStore
+{
+    public List<TaskItem> Saved { get; set; } = [];
+
+    public int SaveCount { get; private set; }
+
+    public bool FailSaves { get; set; }
+
+    public bool FailLoad { get; set; }
+
+    public string? LoadWarning { get; set; }
+
+    public Task<TaskLoadResult> LoadAsync(CancellationToken cancellationToken = default) =>
+        FailLoad
+            ? throw new TaskStoreException("disk unreadable")
+            : Task.FromResult(new TaskLoadResult(Saved.ToList(), LoadWarning));
+
+    public Task SaveAsync(IReadOnlyList<TaskItem> tasks, CancellationToken cancellationToken = default)
+    {
+        if (FailSaves)
+        {
+            throw new TaskStoreException("disk full");
+        }
+
+        SaveCount++;
+        Saved = tasks.ToList();
+        return Task.CompletedTask;
+    }
+}
+
+public static class Services
+{
+    /// <summary>A TaskService over a fake store that has already "loaded" (so saving is allowed).</summary>
+    public static TaskService LoadedTaskService(FakeTaskStore? store = null, TimeProvider? time = null)
+    {
+        var service = new TaskService(store ?? new FakeTaskStore(), time ?? new FixedTimeProvider());
+        service.LoadAsync().GetAwaiter().GetResult();
+        return service;
+    }
+}
+
+/// <summary>A unique temporary folder per test, deleted afterwards.</summary>
+public sealed class TempFolder : IDisposable
+{
+    public TempFolder()
+    {
+        Path = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "taskflow-tests-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(Path);
+    }
+
+    public string Path { get; }
+
+    public string File(string name) => System.IO.Path.Combine(Path, name);
+
+    public void Dispose()
+    {
+        try { Directory.Delete(Path, recursive: true); } catch (IOException) { }
+    }
+}

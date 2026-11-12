@@ -9,6 +9,7 @@ namespace TaskFlow.Tests;
 public class MainViewModelTests
 {
     private readonly FixedTimeProvider _time = new();
+    private readonly FakeTaskStore _store = new();
     private readonly FakeNavigation _navigation = new();
     private readonly FakeDialogs _dialogs = new();
     private readonly TaskService _service;
@@ -16,7 +17,7 @@ public class MainViewModelTests
 
     public MainViewModelTests()
     {
-        _service = new TaskService(_time);
+        _service = Services.LoadedTaskService(_store, _time);
         _vm = new MainViewModel(_service, _navigation, _dialogs, _time);
     }
 
@@ -149,5 +150,43 @@ public class MainViewModelTests
         var task = await _service.AddAsync(Draft("late", due: Today.AddDays(-3)));
         await _service.SetCompletedAsync(task.Id, true);
         Assert.False(_vm.Tasks.Single().IsOverdue);
+    }
+
+    [Fact]
+    public async Task SaveFailure_ShowsErrorMessage_InsteadOfThrowing()
+    {
+        await _service.AddAsync(Draft("A"));
+        _store.FailSaves = true;
+
+        await _vm.Tasks.Single().ToggleCompletedCommand.ExecuteAsync(null);
+
+        Assert.True(_vm.HasError);
+        Assert.Contains("disk full", _vm.ErrorMessage);
+
+        _vm.DismissErrorCommand.Execute(null);
+        Assert.False(_vm.HasError);
+    }
+
+    [Fact]
+    public async Task LoadCommand_ShowsWarningFromStore()
+    {
+        _store.LoadWarning = "file was corrupt";
+        await _vm.LoadCommand.ExecuteAsync(null);
+
+        Assert.True(_vm.HasWarning);
+        Assert.False(_vm.IsLoading);
+        Assert.True(_vm.ShowEmptyState);
+    }
+
+    [Fact]
+    public async Task LoadCommand_Failure_ShowsError()
+    {
+        var store = new FakeTaskStore { FailLoad = true };
+        var vm = new MainViewModel(new TaskService(store, _time), _navigation, _dialogs, _time);
+
+        await vm.LoadCommand.ExecuteAsync(null);
+
+        Assert.True(vm.HasError);
+        Assert.False(vm.IsLoading);
     }
 }

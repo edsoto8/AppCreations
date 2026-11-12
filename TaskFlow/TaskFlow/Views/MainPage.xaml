@@ -37,8 +37,12 @@
                 SelectedItem="{x:Bind ViewModel.SelectedSort, Mode=TwoWay}" />
     </StackPanel>
 
-    <InfoBar Grid.Row="1" Severity="Error" IsOpen="{x:Bind ViewModel.HasError, Mode=OneWay}"
-             Message="{x:Bind ViewModel.ErrorMessage, Mode=OneWay}" IsClosable="False" />
+    <StackPanel Grid.Row="1">
+      <InfoBar Severity="Error" IsOpen="{x:Bind ViewModel.HasError, Mode=OneWay}"
+               Message="{x:Bind ViewModel.ErrorMessage, Mode=OneWay}" IsClosable="False" />
+      <InfoBar Severity="Warning" IsOpen="{x:Bind ViewModel.HasWarning, Mode=OneWay}"
+               Message="{x:Bind ViewModel.WarningMessage, Mode=OneWay}" IsClosable="False" />
+    </StackPanel>
 
     <ListView Grid.Row="3" ItemsSource="{x:Bind ViewModel.Tasks}" SelectionMode="None">
       <ListView.ItemTemplate>
