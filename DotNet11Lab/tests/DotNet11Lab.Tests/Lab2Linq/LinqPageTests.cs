@@ -17,7 +17,7 @@ public class LinqPageTests : BunitContext
         var cut = Render<ReconciliationTool>();
 
         cut.FindAll(".tab").First(t => t.TextContent.Contains("CSV", StringComparison.Ordinal)).Click();
-        cut.Find("#reconcile .demo-actions .btn-primary").Click();
+        cut.Act(c => c.Find("#reconcile .demo-actions .btn-primary").Click());
 
         cut.WaitForAssertion(() => Assert.Contains("agree row for row", cut.Markup, StringComparison.Ordinal), TimeSpan.FromSeconds(10));
         Assert.Equal(8, cut.FindAll("#reconcile tbody tr").Count);   // 4 matched + 1 mismatch + 1 missing in bank + 2 missing in ledger

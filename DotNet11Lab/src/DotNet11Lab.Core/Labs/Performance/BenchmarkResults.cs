@@ -34,8 +34,20 @@ public sealed record BenchmarkResultEntry(
     long? AllocatedBytes,
     double? Gen0Per1000Ops,
     double? Ratio = null,
-    double? AllocatedRatio = null)
+    double? AllocatedRatio = null,
+    double? NoiseScore = null)
 {
+    /// <summary>
+    /// A ratio counts as a real difference only when |mean - baseline mean| is at least this many combined standard
+    /// deviations. On noisy (shared, virtualised) hardware most small ratios fail this test and are shown as
+    /// "within noise" rather than as wins or regressions.
+    /// </summary>
+    public const double SignificanceThreshold = 2.0;
+
+    /// <summary>True when the difference from the baseline clearly exceeds measurement noise.</summary>
+    [JsonIgnore]
+    public bool IsSignificant => NoiseScore is >= SignificanceThreshold;
+
     /// <summary>Identifies the same benchmark across runtimes.</summary>
     [JsonIgnore]
     public string Key => Parameters.Length == 0 ? $"{Type}.{Method}" : $"{Type}.{Method}({Parameters})";
@@ -80,7 +92,8 @@ public static class BenchmarkResultsJson
             throw new InvalidDataException($"Unsupported schemaVersion {file.SchemaVersion} (expected {BenchmarkResultsFile.CurrentSchemaVersion}).");
         if (file.Results is null || file.Machine is null)
             throw new InvalidDataException("The benchmark results file is missing 'results' or 'machine'.");
-        return file;
+        // Recompute derived columns, so files written before NoiseScore existed get it too.
+        return file with { Results = WithRatios(file.Results) };
     }
 
     /// <summary>Suffix pair used by same-runtime comparisons (Lab 7): <c>X_RuntimeAsync</c> is compared with <c>X_Classic</c>.</summary>
@@ -111,13 +124,27 @@ public static class BenchmarkResultsJson
             {
                 baselines.TryGetValue(e.Key, out b);
             }
-            if (b is null || b.MeanNs <= 0) return e with { Ratio = null, AllocatedRatio = null };
+            if (b is null || b.MeanNs <= 0) return e with { Ratio = null, AllocatedRatio = null, NoiseScore = null };
             double? allocRatio = b.AllocatedBytes is > 0 && e.AllocatedBytes is not null
                 ? (double)e.AllocatedBytes.Value / b.AllocatedBytes.Value
                 : null;
-            return e with { Ratio = e.MeanNs / b.MeanNs, AllocatedRatio = allocRatio };
+            // Difference in units of combined standard deviation (null for the baseline itself or without std devs).
+            double? noise = ReferenceEquals(e, b) || e.StdDevNs is not { } sd || b.StdDevNs is not { } bsd
+                ? null
+                : Math.Abs(e.MeanNs - b.MeanNs) / Math.Max(Math.Sqrt(sd * sd + bsd * bsd), double.Epsilon);
+            return e with { Ratio = e.MeanNs / b.MeanNs, AllocatedRatio = allocRatio, NoiseScore = noise };
         }).ToList();
     }
+
+    /// <summary>"faster", "slower", "within noise", "baseline" or "-" (no comparison available).</summary>
+    public static string Verdict(BenchmarkResultEntry r) => r switch
+    {
+        { Ratio: null } => "-",
+        { NoiseScore: null } => "baseline",
+        { IsSignificant: false } => "within noise",
+        { Ratio: < 1 } => "faster",
+        _ => "slower",
+    };
 
     private static string TwinMethod(string method) => method.EndsWith(RuntimeAsyncSuffix, StringComparison.Ordinal)
         ? method[..^RuntimeAsyncSuffix.Length] + ClassicSuffix
@@ -141,11 +168,13 @@ public static class BenchmarkResultsJson
         sb.AppendLine(inv, $"- Host runtime: {m.HostRuntime} · SDK {m.DotNetSdk ?? "?"} · BenchmarkDotNet {m.BenchmarkDotNetVersion}");
         if (!string.IsNullOrWhiteSpace(file.Note)) sb.AppendLine(inv, $"- Note: {file.Note}");
         sb.AppendLine();
-        sb.AppendLine("| Category | Benchmark | Runtime | Mean | Ratio | Allocated | Alloc ratio |");
-        sb.AppendLine("|---|---|---|---:|---:|---:|---:|");
+        sb.AppendLine(inv, $"Verdict: a ratio is reported as faster/slower only when the difference is at least {BenchmarkResultEntry.SignificanceThreshold:0.#} combined standard deviations; otherwise \"within noise\".");
+        sb.AppendLine();
+        sb.AppendLine("| Category | Benchmark | Runtime | Mean | StdDev | Ratio | Verdict | Allocated | Alloc ratio |");
+        sb.AppendLine("|---|---|---|---:|---:|---:|---|---:|---:|");
         foreach (var r in file.Results.OrderBy(r => r.Category, StringComparer.Ordinal).ThenBy(r => r.Key, StringComparer.Ordinal).ThenBy(r => r.Runtime, StringComparer.Ordinal))
         {
-            sb.AppendLine(inv, $"| {r.Category} | {r.Key} | {r.Runtime} | {FormatNs(r.MeanNs)} | {(r.Ratio is { } ratio ? ratio.ToString("0.00", inv) : "-")} | {(r.AllocatedBytes is { } a ? FormatBytes(a) : "-")} | {(r.AllocatedRatio is { } ar ? ar.ToString("0.00", inv) : "-")} |");
+            sb.AppendLine(inv, $"| {r.Category} | {r.Key} | {r.Runtime} | {FormatNs(r.MeanNs)} | {(r.StdDevNs is { } sd ? FormatNs(sd) : "-")} | {(r.Ratio is { } ratio ? ratio.ToString("0.00", inv) : "-")} | {Verdict(r)} | {(r.AllocatedBytes is { } a ? FormatBytes(a) : "-")} | {(r.AllocatedRatio is { } ar ? ar.ToString("0.00", inv) : "-")} |");
         }
         return sb.ToString();
     }

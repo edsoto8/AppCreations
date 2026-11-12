@@ -135,7 +135,8 @@ foreach ($m in $Modes) {
 }
 
 $generated = [DateTime]::UtcNow.ToString('yyyy-MM-ddTHH:mm:ssZ')
-$fullNote = (($Note, 'Timer: .NET Stopwatch in PowerShell (includes PowerShell process-launch overhead). Wall-clock includes process creation and teardown.') | Where-Object { $_ }) -join ' '
+$noteText = if ($Note -and $Note -notmatch '[.!?]$') { "$Note." } else { $Note }
+$fullNote = (($noteText, 'Timer: .NET Stopwatch in PowerShell (includes PowerShell process-launch overhead). Wall-clock includes process creation and teardown.') | Where-Object { $_ }) -join ' '
 $result = [ordered]@{
     schemaVersion = 1
     generatedUtc = $generated

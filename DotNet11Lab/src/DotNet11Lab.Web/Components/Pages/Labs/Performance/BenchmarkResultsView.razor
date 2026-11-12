@@ -81,10 +81,11 @@ else if (Load.File is { } file)
         @if (ratios.Count > 0)
         {
             <h3 style="margin-top:1rem">@RatioTitle(inCategory)</h3>
-            <p class="small muted">Mean time divided by the baseline's mean time: below 1.00× is faster. @RatioExplanation(inCategory)</p>
-            <BarChart Items="@ratios.Select(r => new BarChart.Bar(r.Method + (r.Parameters.Length > 0 ? $" ({Params(r)})" : ""), r.Ratio!.Value, $"{r.Ratio:0.00}×", r.Ratio <= 1 ? 2 : 0)).ToList()"
+            <p class="small muted">Mean time divided by the baseline's mean time: below 1.00× is faster. @RatioExplanation(inCategory)
+                Grey bars are <strong>within noise</strong>: the difference is under @BenchmarkResultEntry.SignificanceThreshold.ToString("0.#", CultureInfo.InvariantCulture) combined standard deviations, so no change was detected on this hardware.</p>
+            <BarChart Items="@ratios.Select(r => new BarChart.Bar(r.Method + (r.Parameters.Length > 0 ? $" ({Params(r)})" : ""), r.Ratio!.Value, $"{r.Ratio:0.00}× · {BenchmarkResultsJson.Verdict(r)}", !r.IsSignificant ? 1 : r.Ratio <= 1 ? 2 : 0)).ToList()"
                       Max="@Math.Max(1.25, ratios.Max(r => r.Ratio!.Value))"
-                      Legend="@([("faster than baseline", 2), ("slower than baseline", 0)])"
+                      Legend="@([("faster than baseline", 2), ("slower than baseline", 0), ("within noise", 1)])"
                       AriaLabel="Ratio to baseline" />
         }
 
@@ -107,12 +108,12 @@ else if (Load.File is { } file)
             <div class="table-wrap" style="margin-top:.5rem">
                 <table class="data">
                     <thead>
-                        <tr><th>Benchmark</th><th>Runtime</th><th class="num">Mean</th><th class="num">Median</th><th class="num">StdDev</th><th class="num">Allocated</th><th class="num">Gen0 / 1k ops</th><th class="num">Ratio</th><th class="num">Alloc ratio</th></tr>
+                        <tr><th>Benchmark</th><th>Runtime</th><th class="num">Mean</th><th class="num">Median</th><th class="num">StdDev</th><th class="num">Allocated</th><th class="num">Gen0 / 1k ops</th><th class="num">Ratio</th><th>Verdict</th><th class="num">Alloc ratio</th></tr>
                     </thead>
                     <tbody>
                         @foreach (var r in inCategory.OrderBy(r => r.Key, StringComparer.Ordinal).ThenBy(r => r.Runtime, StringComparer.Ordinal))
                         {
-                            <tr class="@(r.Ratio is < 0.95 ? "row-ok" : r.Ratio is > 1.05 ? "row-warn" : "")">
+                            <tr class="@(!r.IsSignificant ? "" : r.Ratio is < 1 ? "row-ok" : "row-warn")">
                                 <td class="mono small">@r.Key</td>
                                 <td>@r.Runtime</td>
                                 <td class="num">@BenchmarkResultsJson.FormatNs(r.MeanNs)</td>
@@ -121,6 +122,7 @@ else if (Load.File is { } file)
                                 <td class="num">@(r.AllocatedBytes is { } a ? BenchmarkResultsJson.FormatBytes(a) : "-")</td>
                                 <td class="num">@(r.Gen0Per1000Ops is { } g ? g.ToString("0.###", CultureInfo.InvariantCulture) : "-")</td>
                                 <td class="num">@(r.Ratio is { } x ? x.ToString("0.00", CultureInfo.InvariantCulture) : "-")</td>
+                                <td><span class="badge @VerdictCss(r)" title="@(r.NoiseScore is { } z ? $"difference = {z:0.0} combined standard deviations" : "")">@BenchmarkResultsJson.Verdict(r)</span></td>
                                 <td class="num">@(r.AllocatedRatio is { } y ? y.ToString("0.00", CultureInfo.InvariantCulture) : "-")</td>
                             </tr>
                         }
@@ -149,6 +151,13 @@ else if (Load.File is { } file)
 
     private static bool IsPairCategory(IEnumerable<BenchmarkResultEntry> rows) =>
         rows.Any(r => r.Method.EndsWith(BenchmarkResultsJson.RuntimeAsyncSuffix, StringComparison.Ordinal));
+
+    private static string VerdictCss(BenchmarkResultEntry r) => BenchmarkResultsJson.Verdict(r) switch
+    {
+        "faster" => "badge-stable",
+        "slower" => "badge-danger",
+        _ => "badge-baseline",
+    };
 
     private static string RatioTitle(List<BenchmarkResultEntry> rows) =>
         IsPairCategory(rows) ? "Runtime async vs classic state machine (same runtime)" : ".NET 11 vs .NET 10 (ratio)";

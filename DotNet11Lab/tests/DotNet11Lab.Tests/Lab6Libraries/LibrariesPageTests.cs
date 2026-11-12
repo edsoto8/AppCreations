@@ -16,7 +16,7 @@ public class LibrariesPageTests : BunitContext
     {
         var cut = Render<StreamAdaptersSection>();
 
-        cut.Find("#streams-writable .demo-actions .btn-primary").Click();
+        cut.Act(c => c.Find("#streams-writable .demo-actions .btn-primary").Click());
 
         cut.WaitForAssertion(() => Assert.Equal(2, cut.FindAll("#streams-writable tr.row-danger").Count));
     }
@@ -26,7 +26,7 @@ public class LibrariesPageTests : BunitContext
     {
         var cut = Render<JsonSection>();
 
-        cut.Find("#jsonl-run .demo-actions .btn-primary").Click();
+        cut.Act(c => c.Find("#jsonl-run .demo-actions .btn-primary").Click());
 
         cut.WaitForAssertion(() =>
         {
@@ -40,10 +40,10 @@ public class LibrariesPageTests : BunitContext
     public void Compression_demo_verifies_every_round_trip()
     {
         var cut = Render<CompressionSection>();
-        cut.Find("#z-size").Change("64");
-        cut.Find("#z-it").Change("1");
+        cut.Act(c => c.Find("#z-size").Change("64"));
+        cut.Act(c => c.Find("#z-it").Change("1"));
 
-        cut.Find("#zstd-compare .demo-actions .btn-primary").Click();
+        cut.Act(c => c.Find("#zstd-compare .demo-actions .btn-primary").Click());
 
         cut.WaitForAssertion(() => Assert.Equal(3, cut.FindAll("#zstd-compare .badge-stable").Count), TimeSpan.FromSeconds(20));
     }

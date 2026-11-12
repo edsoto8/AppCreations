@@ -183,6 +183,8 @@ done
 
 GENERATED="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 FULL_NOTE="$NOTE"
+# Separate the user's note from the timer sentence with a full stop unless it already ends with one.
+[[ -n "$FULL_NOTE" && ! "$FULL_NOTE" =~ [.!?]$ ]] && FULL_NOTE+="."
 [[ -n "$FULL_NOTE" ]] && FULL_NOTE+=" "
 FULL_NOTE+="Timer: $TIMER. Wall-clock includes process creation and teardown."
 {

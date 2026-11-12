@@ -135,20 +135,71 @@ Native AOT compilation.
 
 ## 3. Results
 
-> **Pending final run.** The files committed under `results/` come from validation runs in a shared, contended
-> 4-core container (other agents were building at the same time) and are marked `"preliminary": true`; the
-> benchmark file used the `--quick` job and a subset of benchmarks. They prove the pipelines work end to end and
-> must not be quoted. The final numbers will be produced on a quiet machine with the commands above and
-> summarised here.
+Recorded on **2026-11-12** on an otherwise idle 4-vCPU cloud VM: Intel Xeon @ 2.10 GHz, Ubuntu 24.04.5,
+SDK 11.0.100, runtimes .NET 10.0.15 and .NET 11.0.0, BenchmarkDotNet 0.15.8, `Job.MediumRun`. The complete tables are
+[`results/benchmarks/latest.md`](results/benchmarks/latest.md) and [`results/publish/latest.md`](results/publish/latest.md),
+and the dashboard (Labs 5 and 8) reads the matching `.json` files. Both are marked `"preliminary": false`.
 
-### Runtime comparison (.NET 10 vs .NET 11)
+### How to read the ratios
 
-_Pending final run - see `results/benchmarks/latest.md` once produced._
+This VM is noisy: run-to-run standard deviation was **5–18% of the mean** for most benchmarks. A ratio is therefore
+reported as *faster* or *slower* only when the difference is at least **2 combined standard deviations**
+(`|mean − baseline mean| / √(sd² + sd_baseline²) ≥ 2`). Anything else is **within noise**, meaning no change was
+detectable on this hardware. It does not mean "no change". Allocation figures are deterministic, so allocation
+ratios do not carry this caveat.
 
-### Runtime async vs classic state machines (.NET 11)
+### Runtime comparison (.NET 10 → .NET 11, same workload, same machine)
 
-_Pending final run._
+| Benchmark | .NET 10 | .NET 11 | Ratio | Verdict |
+|---|---:|---:|---:|---|
+| `ValueTask<int>` that completes asynchronously | 108.82 µs | 61.54 µs | **0.57** | **faster** (z ≈ 5.4) |
+| JSON serialize, source-generated | 165.50 µs | 101.94 µs | **0.62** | **faster** (z ≈ 2.0) |
+| JSON serialize, reflection | 235.57 µs | 168.11 µs | 0.71 | within noise (z ≈ 1.5), consistent with the above |
+| JSON deserialize, source-generated | 414.61 µs | 370.76 µs | 0.89 | within noise |
+| GZip optimal | 5.28 ms | 4.98 ms | 0.94 | within noise |
+| All other cross-runtime benchmarks (16) | | | 0.95–1.07 | within noise |
 
-### Publish modes
+No benchmark was detectably **slower** on .NET 11. Allocations were identical across runtimes for every benchmark
+(allocation ratio 1.00), so the gains above come from faster code paths, not fewer allocations.
 
-_Pending final run - see `results/publish/latest.md` once produced._
+**What this does and doesn't show.** On this hardware, .NET 11 improves async `ValueTask` paths and JSON
+serialization. Text parsing, streams, LINQ, dictionary lookups and Brotli/GZip did not change measurably. A quieter
+or bare-metal machine may detect smaller differences. Re-run the suite on your own hardware before drawing
+conclusions for your workload.
+
+### Zstandard (.NET 11 only, same 115 KB payload as the Brotli/GZip benchmarks)
+
+| Benchmark | Mean | Allocated |
+|---|---:|---:|
+| Zstandard fastest | 913.08 µs | 115.6 KB |
+| Zstandard optimal | 1.55 ms | 115.6 KB |
+| Brotli fastest / optimal (.NET 11) | 1.37 ms / 4.34 ms | 115.5 KB |
+| GZip fastest / optimal (.NET 11) | 1.57 ms / 4.98 ms | 346.2 KB / 115.6 KB |
+
+On this payload Zstandard compressed faster than both Brotli and GZip at the matching level. Compression *ratios*
+are measured live in Lab 6, because they depend on the data.
+
+### Runtime async vs classic state machines (.NET 11, depth-10 await chains)
+
+| Workload | Classic | Runtime async | Time ratio | Verdict | Alloc (classic → runtime async) |
+|---|---:|---:|---:|---|---|
+| Chain completing synchronously | 146.4 ns | 71.9 ns | **0.49** | **faster** | 216 B → 72 B (0.33) |
+| Chain with `Task.Yield` at the leaf | 2.75 µs | 2.33 µs | **0.85** | **faster** | 1.3 KB → 744 B (0.56) |
+| Order pricing (mixed) | 44.10 µs | 36.10 µs | 0.82 | within noise | 2.2 KB → 1.4 KB (0.65) |
+
+The two copies are compiled from identical source (a test enforces it); only the compilation mode differs.
+Runtime async allocated less in every case. It remains **opt-in** for your code
+(`<Features>runtime-async=on</Features>`). See Lab 7 for the compatibility considerations before enabling it.
+
+### Publish modes (Lab 8: `dotnet11lab` CLI, linux-x64, 20 startup runs each)
+
+| Mode | Deployed size | Startup (median wall-clock) | Peak working set | Dynamic code |
+|---|---:|---:|---:|---|
+| Framework-dependent | 0.1 MB (4 files) + shared .NET 11 runtime | 68.7 ms | 27.3 MB | yes |
+| Self-contained single file | 73.9 MB | 65.4 ms | 26.1 MB | yes |
+| **Native AOT** | **4.0 MB** | **4.4 ms** | **5.8 MB** | no |
+
+For this CLI, Native AOT started about **15× faster**, used about **4.5× less memory** and was **18× smaller** than
+the self-contained build. Framework-dependent is the smallest download but needs the runtime installed, and its
+size excludes that runtime. `/usr/bin/time` was not available, so max RSS is not recorded; peak working set
+comes from the CLI's own `--startup-probe`.

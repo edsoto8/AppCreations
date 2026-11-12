@@ -1,13 +1,13 @@
 {
   "schemaVersion": 1,
-  "generatedUtc": "2026-11-12T18:27:16Z",
-  "preliminary": true,
-  "note": "Validation run on a contended shared 4-core container (other builds running). Timer: bash EPOCHREALTIME. Wall-clock includes process creation and teardown.",
+  "generatedUtc": "2026-11-12T19:34:15Z",
+  "preliminary": false,
+  "note": "Integrator final run on an otherwise idle 4-vCPU cloud VM. Timer: bash EPOCHREALTIME. Wall-clock includes process creation and teardown.",
   "machine": {"os": "Ubuntu 24.04.5 LTS (kernel 6.18.44-fc-v378)", "processor": "Intel(R) Xeon(R) Processor @ 2.10GHz", "logicalCores": 4, "rid": "linux-x64", "sdk": "11.0.100"},
-  "settings": {"configuration": "Release", "startupRuns": 10, "selfContainedVariant": "single-file, untrimmed"},
+  "settings": {"configuration": "Release", "startupRuns": 20, "selfContainedVariant": "single-file, untrimmed"},
   "modes": [
-    {"mode":"framework-dependent","publishCommand":"dotnet publish src/DotNet11Lab.Cli/DotNet11Lab.Cli.csproj -c Release -r linux-x64 --self-contained false -p:PublishSingleFile=false -o artifacts/publish/framework-dependent","succeeded":true,"totalSizeBytes":147217,"fileCount":4,"executable":"dotnet11lab","executableSizeBytes":32144,"startupWallMs":{"median":78.771,"min":64.060,"max":97.602},"startupProbeMs":{"median":34.129,"min":23.999,"max":51.754},"peakWorkingSetBytes":28594176,"maxRssBytes":null,"isDynamicCodeSupported":true,"runtime":".NET 11.0.0"},
-    {"mode":"self-contained","publishCommand":"dotnet publish src/DotNet11Lab.Cli/DotNet11Lab.Cli.csproj -c Release -r linux-x64 --self-contained true -p:PublishSingleFile=true -o artifacts/publish/self-contained","succeeded":true,"totalSizeBytes":77529114,"fileCount":1,"executable":"dotnet11lab","executableSizeBytes":77529114,"startupWallMs":{"median":76.683,"min":58.511,"max":85.676},"startupProbeMs":{"median":30.468,"min":21.673,"max":33.912},"peakWorkingSetBytes":27328512,"maxRssBytes":null,"isDynamicCodeSupported":true,"runtime":".NET 11.0.0"},
-    {"mode":"native-aot","publishCommand":"dotnet publish src/DotNet11Lab.Cli/DotNet11Lab.Cli.csproj -c Release -r linux-x64 -p:PublishAot=true -o artifacts/publish/native-aot","succeeded":true,"totalSizeBytes":4246080,"fileCount":1,"executable":"dotnet11lab","executableSizeBytes":4246080,"startupWallMs":{"median":5.230,"min":4.173,"max":5.697},"startupProbeMs":{"median":9.094,"min":4.566,"max":14.020},"peakWorkingSetBytes":6019072,"maxRssBytes":null,"isDynamicCodeSupported":false,"runtime":".NET 11.0.0"}
+    {"mode":"framework-dependent","publishCommand":"dotnet publish src/DotNet11Lab.Cli/DotNet11Lab.Cli.csproj -c Release -r linux-x64 --self-contained false -p:PublishSingleFile=false -o artifacts/publish/framework-dependent","succeeded":true,"totalSizeBytes":147217,"fileCount":4,"executable":"dotnet11lab","executableSizeBytes":32144,"startupWallMs":{"median":68.728,"min":58.563,"max":90.695},"startupProbeMs":{"median":30.495,"min":21.593,"max":37.867},"peakWorkingSetBytes":28608512,"maxRssBytes":null,"isDynamicCodeSupported":true,"runtime":".NET 11.0.0"},
+    {"mode":"self-contained","publishCommand":"dotnet publish src/DotNet11Lab.Cli/DotNet11Lab.Cli.csproj -c Release -r linux-x64 --self-contained true -p:PublishSingleFile=true -o artifacts/publish/self-contained","succeeded":true,"totalSizeBytes":77529114,"fileCount":1,"executable":"dotnet11lab","executableSizeBytes":77529114,"startupWallMs":{"median":65.371,"min":57.258,"max":102.065},"startupProbeMs":{"median":27.389,"min":18.988,"max":41.014},"peakWorkingSetBytes":27330560,"maxRssBytes":null,"isDynamicCodeSupported":true,"runtime":".NET 11.0.0"},
+    {"mode":"native-aot","publishCommand":"dotnet publish src/DotNet11Lab.Cli/DotNet11Lab.Cli.csproj -c Release -r linux-x64 -p:PublishAot=true -o artifacts/publish/native-aot","succeeded":true,"totalSizeBytes":4246080,"fileCount":1,"executable":"dotnet11lab","executableSizeBytes":4246080,"startupWallMs":{"median":4.447,"min":4.034,"max":12.561},"startupProbeMs":{"median":9.494,"min":4.210,"max":16.416},"peakWorkingSetBytes":6060032,"maxRssBytes":null,"isDynamicCodeSupported":false,"runtime":".NET 11.0.0"}
   ]
 }

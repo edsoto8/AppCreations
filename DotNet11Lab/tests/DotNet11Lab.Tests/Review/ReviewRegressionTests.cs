@@ -121,3 +121,22 @@ public class ReviewRegressionTests
         Assert.Equal(AllocationScope.Process, async.Scope);
     }
 }
+
+public class BenchmarkVerdictTests
+{
+    private static DotNet11Lab.Core.Labs.Performance.BenchmarkResultEntry Entry(string runtime, bool baseline, double mean, double sd) =>
+        new("Json", "JsonBenchmarks", "Serialize", "", runtime, null, baseline, mean, sd, mean, 100, 0);
+
+    [Theory]
+    [InlineData(100, 10, 89, 10, "within noise")]   // 0.89x but only 0.78 combined std devs apart
+    [InlineData(100, 2, 60, 2, "faster")]
+    [InlineData(100, 2, 140, 2, "slower")]
+    public void Ratios_are_judged_against_measurement_noise(double baseMean, double baseSd, double mean, double sd, string expected)
+    {
+        var results = DotNet11Lab.Core.Labs.Performance.BenchmarkResultsJson.WithRatios(
+            [Entry(".NET 10.0", true, baseMean, baseSd), Entry(".NET 11.0", false, mean, sd)]);
+
+        Assert.Equal("baseline", DotNet11Lab.Core.Labs.Performance.BenchmarkResultsJson.Verdict(results[0]));
+        Assert.Equal(expected, DotNet11Lab.Core.Labs.Performance.BenchmarkResultsJson.Verdict(results[1]));
+    }
+}

@@ -1,3 +1,4 @@
+using DotNet11Lab.Tests.Infrastructure;
 using Bunit;
 using DotNet11Lab.Core.Labs.Blazor;
 using DotNet11Lab.Core.Labs.Blazor.Components;
@@ -29,7 +30,7 @@ public sealed class BlazorComponentTests : IDisposable
     {
         var cut = _ctx.Render<AsyncSignupForm>();
 
-        cut.Find("#as-username").Change("ada");
+        cut.Act(c => c.Find("#as-username").Change("ada"));
 
         // Pending immediately after the change event (IsValidationPending)...
         cut.WaitForAssertion(() => Assert.NotNull(cut.Find("label[for=as-username] [data-state=pending]")), TimeSpan.FromSeconds(2));
@@ -64,7 +65,7 @@ public sealed class BlazorComponentTests : IDisposable
     {
         _accountOptions.Latency = TimeSpan.FromMilliseconds(20);
         var cut = _ctx.Render<AsyncSignupForm>();
-        cut.Find("#as-username").Change("brand_new_user");
+        cut.Act(c => c.Find("#as-username").Change("brand_new_user"));
         cut.WaitForAssertion(() => Assert.NotNull(cut.Find("label[for=as-username] [data-state=valid]")), TimeSpan.FromSeconds(5));
     }
 
@@ -73,18 +74,18 @@ public sealed class BlazorComponentTests : IDisposable
     {
         _accountOptions.Latency = TimeSpan.FromMilliseconds(20);
         var cut = _ctx.Render<AsyncSignupForm>();
-        cut.Find("#as-username").Change("newcomer_1");
-        cut.Find("#as-email").Change("newcomer@fabrikam.com");
-        cut.Find("#as-password").Change("long enough pw");
-        cut.Find("#as-invite").Change("CONTOSO-2026");
+        cut.Act(c => c.Find("#as-username").Change("newcomer_1"));
+        cut.Act(c => c.Find("#as-email").Change("newcomer@fabrikam.com"));
+        cut.Act(c => c.Find("#as-password").Change("long enough pw"));
+        cut.Act(c => c.Find("#as-invite").Change("CONTOSO-2026"));
 
-        cut.Find("form").Submit();
+        cut.Act(c => c.Find("form").Submit());
 
         cut.WaitForAssertion(() => Assert.Contains("is for @contoso.com addresses", cut.Markup, StringComparison.Ordinal), TimeSpan.FromSeconds(5));
         Assert.DoesNotContain("created", cut.Markup, StringComparison.Ordinal);
 
-        cut.Find("#as-invite").Change("");
-        cut.Find("form").Submit();
+        cut.Act(c => c.Find("#as-invite").Change(""));
+        cut.Act(c => c.Find("form").Submit());
         cut.WaitForAssertion(() => Assert.Contains("Account 'newcomer_1' created", cut.Markup, StringComparison.Ordinal), TimeSpan.FromSeconds(5));
         Assert.Contains(_ctx.Services.GetRequiredService<BlazorLabState>().Activity, a => a.Source == "Async form");
     }
@@ -94,12 +95,12 @@ public sealed class BlazorComponentTests : IDisposable
     {
         _accountOptions.Latency = TimeSpan.FromMilliseconds(20);
         var cut = _ctx.Render<LegacySignupForm>();
-        cut.Find("#ls-username").Change("grace");
+        cut.Act(c => c.Find("#ls-username").Change("grace"));
         Assert.DoesNotContain("already taken", cut.Markup, StringComparison.Ordinal);
 
-        cut.Find("#ls-email").Change("grace@example.com");
-        cut.Find("#ls-password").Change("password123");
-        cut.Find("form").Submit();
+        cut.Act(c => c.Find("#ls-email").Change("grace@example.com"));
+        cut.Act(c => c.Find("#ls-password").Change("password123"));
+        cut.Act(c => c.Find("form").Submit());
 
         cut.WaitForAssertion(() =>
         {
@@ -108,7 +109,7 @@ public sealed class BlazorComponentTests : IDisposable
         }, TimeSpan.FromSeconds(5));
 
         // Hand-written errors are cleared when the field is edited.
-        cut.Find("#ls-username").Change("grace2");
+        cut.Act(c => c.Find("#ls-username").Change("grace2"));
         cut.WaitForAssertion(() => Assert.DoesNotContain("already taken", cut.Markup, StringComparison.Ordinal), TimeSpan.FromSeconds(2));
     }
 

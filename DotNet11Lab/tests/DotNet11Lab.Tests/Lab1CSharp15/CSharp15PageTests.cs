@@ -21,8 +21,8 @@ public class CSharp15PageTests : BunitContext
     {
         var cut = Render<UnionsSection>();
 
-        cut.Find("#scenario").Change("1");   // Insufficient funds
-        cut.Find("#union-run .demo-actions .btn-primary").Click();
+        cut.Act(c => c.Find("#scenario").Change("1"));   // Insufficient funds
+        cut.Act(c => c.Find("#union-run .demo-actions .btn-primary").Click());
 
         cut.WaitForAssertion(() =>
         {
@@ -36,7 +36,7 @@ public class CSharp15PageTests : BunitContext
     {
         var cut = Render<UnionsSection>();
 
-        cut.Find("#union-json .demo-actions .btn-primary").Click();
+        cut.Act(c => c.Find("#union-json .demo-actions .btn-primary").Click());
 
         cut.WaitForAssertion(() =>
         {
@@ -64,7 +64,7 @@ public class CSharp15PageTests : BunitContext
     {
         var cut = Render<LabeledLoopsSection>();
 
-        cut.Find("#labeled-break .demo-actions .btn-primary").Click();
+        cut.Act(c => c.Find("#labeled-break .demo-actions .btn-primary").Click());
 
         cut.WaitForAssertion(() => Assert.Contains("identical results", cut.Find("#labeled-break").TextContent, StringComparison.Ordinal));
     }
