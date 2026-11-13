@@ -30,6 +30,8 @@ export interface EduStep {
 export interface EduTopicDef {
   id: EduTopic;
   title: string;
+  /** Short name for the topic picker. */
+  short: string;
   icon: IconName;
   summary: string;
   steps: EduStep[];
@@ -46,6 +48,7 @@ export const EDU_TOPICS: Record<EduTopic, EduTopicDef> = {
   differentialDrive: {
     id: 'differentialDrive',
     title: 'Differential drive',
+    short: 'Diff drive',
     icon: 'robot',
     summary: 'How two independently driven wheels move and steer the robot.',
     steps: [
@@ -106,6 +109,7 @@ export const EDU_TOPICS: Record<EduTopic, EduTopicDef> = {
   lidar: {
     id: 'lidar',
     title: 'LiDAR sensing',
+    short: 'LiDAR',
     icon: 'scan',
     summary: 'A spinning laser rangefinder measures distances all around the robot.',
     steps: [
@@ -162,6 +166,7 @@ export const EDU_TOPICS: Record<EduTopic, EduTopicDef> = {
   occupancy: {
     id: 'occupancy',
     title: 'Occupancy mapping',
+    short: 'Mapping',
     icon: 'map',
     summary: 'Turning noisy range readings into a probabilistic grid map.',
     steps: [
@@ -218,6 +223,7 @@ export const EDU_TOPICS: Record<EduTopic, EduTopicDef> = {
   astar: {
     id: 'astar',
     title: 'A* path planning',
+    short: 'A* planning',
     icon: 'target',
     summary: 'Finding a short, safe path across the costmap.',
     steps: [
@@ -273,6 +279,7 @@ export const EDU_TOPICS: Record<EduTopic, EduTopicDef> = {
   coverage: {
     id: 'coverage',
     title: 'Coverage path choice',
+    short: 'Coverage',
     icon: 'layers',
     summary: 'Why the robot cleans in neat lanes instead of bouncing randomly.',
     steps: [
@@ -328,6 +335,7 @@ export const EDU_TOPICS: Record<EduTopic, EduTopicDef> = {
   cliff: {
     id: 'cliff',
     title: 'Cliff sensors',
+    short: 'Cliff sensors',
     icon: 'alert',
     summary: 'Not falling down the stairs.',
     steps: [
@@ -373,6 +381,7 @@ export const EDU_TOPICS: Record<EduTopic, EduTopicDef> = {
   docking: {
     id: 'docking',
     title: 'Automatic docking',
+    short: 'Docking',
     icon: 'dock',
     summary: 'Finding the way home and landing on the charging contacts.',
     steps: [
@@ -419,6 +428,7 @@ export const EDU_TOPICS: Record<EduTopic, EduTopicDef> = {
   suction: {
     id: 'suction',
     title: 'Suction & brushes',
+    short: 'Suction',
     icon: 'wind',
     summary: 'How debris gets from the floor into the bin.',
     steps: [
@@ -465,6 +475,7 @@ export const EDU_TOPICS: Record<EduTopic, EduTopicDef> = {
   mopWash: {
     id: 'mopWash',
     title: 'Dock mop washing',
+    short: 'Mop washing',
     icon: 'drop',
     summary: 'What the dock does after the robot comes home.',
     steps: [

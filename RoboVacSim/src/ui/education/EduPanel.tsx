@@ -34,10 +34,10 @@ function TopicList({ current, onPick, compact }: { current: EduTopic; onPick: (t
         const t = EDU_TOPICS[id];
         const on = id === current;
         return (
-          <button key={id} type="button" role="tab" aria-selected={on} className={`edu-topic ${on ? 'on' : ''}`} onClick={() => onPick(id)} data-testid={`edu-topic-${id}`} title={t.summary}>
+          <button key={id} type="button" role="tab" aria-selected={on} aria-label={t.title} className={`edu-topic ${on ? 'on' : ''}`} onClick={() => onPick(id)} data-testid={`edu-topic-${id}`} title={t.summary}>
             <span className="edu-num">{i + 1}</span>
             <Icon name={t.icon} size={14} />
-            <span className="edu-topic-name">{t.title}</span>
+            <span className="edu-topic-name">{compact ? t.short : t.title}</span>
           </button>
         );
       })}

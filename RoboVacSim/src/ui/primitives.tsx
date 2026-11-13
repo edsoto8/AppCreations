@@ -281,7 +281,7 @@ export const Sparkline = memo(function Sparkline({
   }
   const line = pts.join(' ');
   return (
-    <svg className={`spark tone-${tone}`} width={width} height={height} viewBox={`0 0 ${width} ${height}`} role="img" aria-label={label} preserveAspectRatio="none">
+    <svg className={`spark tone-${tone}`} width={width} height={height} style={{ height }} viewBox={`0 0 ${width} ${height}`} role="img" aria-label={label} preserveAspectRatio="none">
       {n > 1 && (
         <>
           <polygon className="spark-fill" points={`0,${height} ${line} ${width},${height}`} />

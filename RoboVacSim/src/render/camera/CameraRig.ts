@@ -90,7 +90,7 @@ export class CameraRig {
       }
       case 'exploded':
         outTarget.set(rx, 0.16, rz);
-        outPos.set(rx + 0.62, 0.72, rz + 0.66);
+        outPos.set(rx + 0.78, 0.82, rz + 0.84);
         break;
       case 'cutaway': {
         const d = fitH * 0.7;

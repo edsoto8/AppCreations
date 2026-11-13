@@ -294,7 +294,7 @@ export class MapRenderer {
       const free = l < freeThreshold;
       if (L.occupancy) {
         if (occupied) over(226, 236, 242, 1);
-        else if (free) over(36, 49, 62, 1);
+        else if (free) over(44, 60, 77, 1);
       }
       if (L.costmap && !occupied) {
         const c = cost[i];

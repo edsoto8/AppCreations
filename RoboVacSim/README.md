@@ -15,6 +15,12 @@ Cleaning is simulated too: spatial dirt that vacuuming and mopping remove pass b
 
 ![Overview](docs/screenshots/01-overview.png)
 
+| Completed mission (coverage tint + heatmap) | Exploded robot | Dock cutaway + education callouts |
+|---|---|---|
+| ![](docs/screenshots/03-completed-coverage.png) | ![](docs/screenshots/cam-exploded.png) | ![](docs/screenshots/edu-dock-cutaway.png) |
+| **LiDAR view** | **Mapping in progress** | **Cutaway** |
+| ![](docs/screenshots/cam-lidar.png) | ![](docs/screenshots/02-mapping.png) | ![](docs/screenshots/cam-cutaway.png) |
+
 ## Quick start
 
 Requires Node 20+ (tested with Node 22).

@@ -2097,7 +2097,7 @@ input[type='range']:focus-visible::-webkit-slider-thumb {
 }
 
 .spark-fill {
-  fill: color-mix(in srgb, var(--tone) 14%, transparent);
+  fill: color-mix(in srgb, var(--tone) 8%, transparent);
   stroke: none;
 }
 
@@ -2377,16 +2377,19 @@ input[type='range']:focus-visible::-webkit-slider-thumb {
 }
 
 .edu-topics.compact {
-  display: flex;
-  gap: 5px;
-  overflow-x: auto;
-  padding-bottom: 4px;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.12) transparent;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
 }
 
 .edu-topics.compact .edu-topic {
-  flex: none;
+  min-height: 28px;
+  padding: 3px 6px;
+  gap: 6px;
+  font-size: 11px;
+}
+
+.edu-topics.compact .edu-topic .icon {
+  display: none;
 }
 
 .edu-off .edu-topics {
@@ -2770,7 +2773,7 @@ input[type='range']:focus-visible::-webkit-slider-thumb {
 
 .shortcut-list li {
   display: grid;
-  grid-template-columns: 110px 1fr;
+  grid-template-columns: 92px 1fr;
   gap: 10px;
   align-items: center;
   color: var(--text-2);
@@ -2881,8 +2884,50 @@ input[type='range']:focus-visible::-webkit-slider-thumb {
   margin-left: 0;
   width: 100%;
   gap: 6px;
-  overflow-x: auto;
-  scrollbar-width: none;
+}
+
+.is-mobile .topbar-actions .select-wrap {
+  padding: 0 4px 0 8px;
+}
+
+.is-mobile .topbar-actions > .select-wrap {
+  flex: none;
+}
+
+.is-mobile .topbar-actions > .select-wrap select {
+  width: 46px;
+}
+
+.is-mobile .scenario {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.is-mobile .scenario .select-wrap {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.is-mobile .scenario .select-wrap select {
+  width: 100%;
+  min-width: 0;
+}
+
+.is-mobile .scenario .select-wrap .icon,
+.is-mobile .reset-label {
+  display: none;
+}
+
+.is-mobile .seed {
+  padding-left: 6px;
+}
+
+.is-mobile .seed input {
+  width: 52px;
+}
+
+.is-mobile .scenario .btn-sm {
+  padding: 0 8px;
 }
 
 .is-mobile .topbar-actions::-webkit-scrollbar {
@@ -2974,6 +3019,16 @@ input[type='range']:focus-visible::-webkit-slider-thumb {
 
 .sheet .tab-body {
   padding: 10px;
+}
+
+.map-sheet .map-foot {
+  flex-wrap: wrap;
+  row-gap: 4px;
+}
+
+.map-sheet .map-legend {
+  margin-left: 0;
+  flex-wrap: wrap;
 }
 
 @media (max-width: 420px) {

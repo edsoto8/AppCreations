@@ -2,7 +2,7 @@ import type { SimSpeed } from '../sim/core/clock';
 import type { CleanMode, SuctionLevel, WaterLevel } from '../sim/config';
 import type { Command, CommandResult, MissionKind } from '../sim/mission/types';
 import type { Simulation } from '../sim/Simulation';
-import type { DirtKind, FloorType, FurnitureKind, ObstacleKind } from '../sim/world/types';
+import type { DirtKind, FloorType, FurnitureKind, ObstacleKind, Rect } from '../sim/world/types';
 
 export type PresetId = 'apartment' | 'family' | 'challenge';
 
@@ -133,6 +133,10 @@ export interface AppApi {
   spill(kind: DirtKind, x: number, y: number): void;
   addObstacleAt(kind: ObstacleKind, x: number, y: number): void;
   addFurnitureAt(kind: FurnitureKind, x: number, y: number): void;
+  /** Add a no-go / no-mop zone (ignored if smaller than 0.15 m on a side). */
+  addZone(kind: 'noGo' | 'noMop', rect: Rect): void;
+  /** Move a furniture item or obstacle to a new centre. */
+  moveItem(kind: 'furniture' | 'obstacle', id: string, x: number, y: number): void;
   /** Drop a random obstacle onto the robot's current planned path (dynamic obstacle demo). */
   dropObstacleOnPath(): void;
   /** Focus camera to a world point (map clicks). */

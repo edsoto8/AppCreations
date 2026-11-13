@@ -182,6 +182,8 @@ export class WorldView {
     this.labels.setRoomsVisible(o.roomLabels);
     const exploded = s.cameraMode === 'exploded' ? Math.max(s.explode, 1) : s.explode;
     this.robot.setExplode(exploded);
+    // Exploded inspection focuses on the robot: hide the dock so lifted parts are not hidden by it.
+    this.dock.model.root.visible = s.cameraMode !== 'exploded';
     this.robot.model.setXray(s.xray || s.cameraMode === 'cutaway');
     this.robot.dustbinTarget = s.dustbinOpen ? 1 : 0;
     this.dock.panelsTarget = s.dockPanels;

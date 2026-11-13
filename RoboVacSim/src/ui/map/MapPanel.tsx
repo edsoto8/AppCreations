@@ -9,7 +9,6 @@ import { useUi } from '../uiStore';
 import { DEFAULT_LAYERS, LAYER_LABELS, MapRenderer, type MapLayers, type MapUiSnapshot } from './mapRenderer';
 
 /** Optional controller method (present on AppController, not yet on AppApi). */
-type ZoneApi = { addZone?: (kind: 'noGo' | 'noMop', rect: Rect) => void };
 
 function readUi(): MapUiSnapshot {
   const s = useStore.getState();
@@ -79,7 +78,7 @@ function LayerMenu({ layers, onChange, onClose }: { layers: MapLayers; onChange:
 
 const LEGEND = [
   ['#e2ecf2', 'Wall / obstacle'],
-  ['#24313e', 'Free (known)'],
+  ['#2c3c4d', 'Free (known)'],
   ['#46e0c8', 'Cleaned'],
   ['#5ad1ff', 'LiDAR'],
   ['#f5b544', 'Trail'],
@@ -195,10 +194,8 @@ export const MapPanel = memo(function MapPanel({ variant = 'card' }: { variant?:
       if (kind && r.dragRect) {
         const rect = r.dragRect;
         r.dragRect = null;
-        const z = a as unknown as ZoneApi;
         if (rect.w < 0.15 || rect.h < 0.15) useStore.getState().notify('Zone too small — drag a larger rectangle', 'warn');
-        else if (typeof z.addZone === 'function') z.addZone(kind, rect);
-        else useStore.getState().notify('Draw zones in the 3D view (map zone drawing unavailable)', 'warn');
+        else a.addZone(kind, rect);
         return;
       }
       if (!d.moved && d.world) onMapClick(a, r, d.world);

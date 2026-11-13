@@ -146,7 +146,7 @@ function ScenarioControls() {
       </label>
       <button type="button" className="btn btn-ghost btn-sm" data-testid="btn-reset" disabled={!api} onClick={() => api?.reset(preset, parsedSeed())} title="Reload the scenario with this preset and seed">
         <Icon name="reset" size={14} />
-        <span>Reset</span>
+        <span className="reset-label">Reset</span>
       </button>
     </div>
   );
