@@ -278,8 +278,10 @@ export class GameBoyModel {
   }
 
   /** World-space centre of the LCD (for camera focus). */
+  /** Where the LCD centre is once the console is assembled (ignores any exploded offset). */
   screenWorldPosition(target: THREE.Vector3): THREE.Vector3 {
-    return this.screen.getWorldPosition(target);
+    this.device.updateWorldMatrix(true, false);
+    return this.device.localToWorld(target.copy(this.screen.position));
   }
 
   update(dt: number): void {
@@ -313,9 +315,13 @@ export class GameBoyModel {
     this.batteryCover.position.set(rest.x, rest.y - slide * 7 - lift * 26, rest.z - lift * 30);
     this.batteryCover.rotation.x = -lift * 0.55;
 
-    const exploding = this.explode.update(dt);
-    if (exploding || this.explode.value > 0) this.applyExplode();
-    if (this.transparency.update(dt)) this.applyTransparency();
+    // Apply on every frame the animation was running, including the frame it reaches its target.
+    const wasExploding = this.explode.active;
+    this.explode.update(dt);
+    if (wasExploding || this.explode.value > 0) this.applyExplode();
+    const wasFading = this.transparency.active;
+    this.transparency.update(dt);
+    if (wasFading) this.applyTransparency();
     this.updateInternalsVisibility();
   }
 

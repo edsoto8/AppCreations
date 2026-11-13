@@ -145,8 +145,10 @@ tests/
 
 **Boundaries.** `games/` imports nothing outside itself and has no Three.js, DOM or Web Audio code. It
 is deterministic: games tick at a fixed 60 Hz and all randomness is injected. `hardware/` and
-`display/BootSequence` are pure as well. Only `models/`, `scene/` and `display/ScreenTexture` import
-Three.js.
+`display/BootSequence` are pure as well. `ui/` never imports Three.js: the label art and lighting
+preset data it needs live in canvas-only modules (`display/LabelArt`, `scene/LightingPresets`).
+Three.js is used by `models/`, `scene/`, `display/ScreenTexture`, the raycasting in
+`interaction/InteractionController` and the composition root `app/main.ts`.
 
 **Data flow.**
 
@@ -174,7 +176,8 @@ game-over flow.
 - The Studio panel's frame-rate readout also shows draw calls (about 110–130 in the normal view).
 - All Three.js geometries, materials and textures are disposed on hot reload.
 
-`window.pocketPixel` exposes a small API for tinkering and tests: `state()`, `step(n)`, `press(b)`,
+On the dev server, or in any build opened with `?debug` in the URL, `window.pocketPixel` exposes a
+small API for tinkering and tests: `state()`, `step(n)`, `press(b)`,
 `release(b)`, `power()`, `cartridge(id)`, `view(name)`, `exploded(on)`, `xray(on)`, `screenPoint(part)`
 and a few more (see `src/app/DebugApi.ts`).
 

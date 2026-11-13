@@ -95,7 +95,8 @@ export class CartridgeRig {
     const state = this.carts.get(id);
     if (!state) return;
     if (this.pendingInsert === id) this.pendingInsert = null;
-    state.progress.animateTo(0, INSERT_SECONDS, Ease.linear);
+    if (state.progress.value <= 0) state.progress.snap(0);
+    else state.progress.animateTo(0, INSERT_SECONDS * state.progress.value + 0.1, Ease.linear);
     if (this.seatedId === id) {
       this.seatedId = null;
       this.onUnseated?.(id);

@@ -2,13 +2,13 @@ import { test, type Page } from '@playwright/test';
 
 /** Regenerates docs/screenshots. Run with `npm run screenshots` (excluded from `npm run e2e`). */
 test.use({ deviceScaleFactor: 2 });
-test.setTimeout(180_000);
+test.setTimeout(900_000);
 
 const shot = (page: Page, name: string) => page.screenshot({ path: `docs/screenshots/${name}.jpg`, quality: 88, type: 'jpeg' });
 const settle = (page: Page, ms = 2500) => page.waitForTimeout(ms);
 
 test('capture screenshots @screenshots', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/?debug');
   await page.waitForFunction(() => typeof (window as any).pocketPixel?.state === 'function');
   await settle(page);
   await shot(page, 'home');
@@ -37,11 +37,11 @@ test('capture screenshots @screenshots', async ({ page }) => {
   await shot(page, 'gameplay-2d');
   await page.keyboard.press('KeyD');
   await page.keyboard.press('KeyE');
-  await page.waitForFunction(() => (window as any).pocketPixel.state().explodeProgress === 1, null, { timeout: 90_000 });
+  await page.waitForFunction(() => (window as any).pocketPixel.state().explodeProgress === 1, null, { timeout: 300_000 });
   await settle(page, 1500);
   await shot(page, 'exploded');
   await page.keyboard.press('KeyE');
-  await page.waitForFunction(() => (window as any).pocketPixel.state().explodeProgress === 0, null, { timeout: 90_000 });
+  await page.waitForFunction(() => (window as any).pocketPixel.state().explodeProgress === 0, null, { timeout: 300_000 });
   await page.keyboard.press('KeyT');
   await page.evaluate(() => (window as any).pocketPixel.lighting('dark'));
   await page.keyboard.press('KeyC');

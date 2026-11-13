@@ -39,8 +39,9 @@ Dependency rules:
 
 - `games/` imports nothing outside `games/`. Pure logic, deterministic, tick-driven.
 - `hardware/` and `display/BootSequence` are pure TypeScript with no Three.js or DOM, and are unit tested.
-- `models/` and `scene/` are the only places that import Three.js. `display/ScreenTexture` bridges the
-  LCD canvas to a Three texture.
+- Three.js is confined to `models/`, `scene/`, `display/ScreenTexture` (bridges the LCD canvas to a
+  texture), the raycasting in `interaction/` and the composition root in `app/`. `ui/` stays
+  Three-free.
 - `ui/` talks to the console only through `ConsoleSystem`'s API and events.
 - `main.ts` wires everything together. Data flows one way: input → ConsoleSystem → framebuffer/audio
   events → renderers.

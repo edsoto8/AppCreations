@@ -559,7 +559,8 @@ function main(): void {
   });
   sceneMgr.start();
 
-  installDebugApi({
+  // Debug/test API: dev server, or any build opened with ?debug (the Playwright tests do this).
+  if (import.meta.env.DEV || new URLSearchParams(window.location.search).has('debug')) installDebugApi({
     machine,
     lcd,
     camera: cameraCtl,

@@ -44,6 +44,8 @@ export class InputManager {
 
   private readonly onKeyDown = (e: KeyboardEvent): void => {
     if (isTyping(e.target)) return;
+    // Let Enter activate a focused UI button or link instead of pressing START.
+    if ((e.code === 'Enter' || e.code === 'NumpadEnter') && isActivatable(e.target)) return;
     const button = KEY_BINDINGS[e.code];
     if (button) {
       e.preventDefault();
@@ -69,6 +71,10 @@ export class InputManager {
     this.held.clear();
     this.buttons.releaseAll('keyboard');
   };
+}
+
+function isActivatable(target: EventTarget | null): boolean {
+  return target instanceof HTMLButtonElement || target instanceof HTMLAnchorElement;
 }
 
 function isTyping(target: EventTarget | null): boolean {

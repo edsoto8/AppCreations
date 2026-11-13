@@ -30,7 +30,7 @@ export interface DebugDeps {
 
 /**
  * `window.pocketPixel`: a small console API for tinkering and for the Playwright tests. It only
- * drives the same public actions the UI uses.
+ * drives the same public actions the UI uses. Installed on the dev server, or with `?debug` in the URL.
  */
 export function installDebugApi(d: DebugDeps): void {
   const api = {
@@ -48,6 +48,7 @@ export function installDebugApi(d: DebugDeps): void {
       lcdAverage: d.lcd.averageIntensity(),
       fps: d.sceneMgr.fps,
       drawCalls: d.sceneMgr.renderer.info.render.calls,
+      cameraDistance: Math.round(d.sceneMgr.camera.position.distanceTo(d.camera.controls.target)),
       ...d.state(),
     }),
     /** Hash of the framebuffer, to detect that the picture changed. */

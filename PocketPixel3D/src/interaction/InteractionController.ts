@@ -32,6 +32,8 @@ const BUTTON_PARTS: Partial<Record<PickId, ButtonId>> = {
 };
 const CLICK_SLOP_PX = 6;
 const DIAL_PIXELS_PER_DETENT = 14;
+/** A second click on the same part within this window is half of a double-click (focus), not a toggle. */
+const DOUBLE_CLICK_MS = 400;
 
 /**
  * Mouse/touch interaction with the 3D model: hover, click-to-press (held while the pointer is
@@ -51,6 +53,7 @@ export class InteractionController {
   private hoverQueued = false;
   private lastMove = { x: 0, y: 0 };
   private lastHoverPart: PickId | null = null;
+  private lastAction: { part: PickId; time: number } | null = null;
   /** Called by the owner so orbiting can be suspended during control gestures. */
   setOrbitEnabled: (enabled: boolean) => void = () => undefined;
 
@@ -67,6 +70,8 @@ export class InteractionController {
     window.addEventListener('pointercancel', this.onPointerUp);
     dom.addEventListener('dblclick', this.onDoubleClick);
     dom.addEventListener('wheel', this.onWheel, { passive: false });
+    dom.addEventListener('lostpointercapture', this.onLostCapture);
+    window.addEventListener('blur', this.cancelGesture);
   }
 
   dispose(): void {
@@ -77,6 +82,8 @@ export class InteractionController {
     window.removeEventListener('pointercancel', this.onPointerUp);
     this.dom.removeEventListener('dblclick', this.onDoubleClick);
     this.dom.removeEventListener('wheel', this.onWheel);
+    this.dom.removeEventListener('lostpointercapture', this.onLostCapture);
+    window.removeEventListener('blur', this.cancelGesture);
   }
 
   /** Raycast at client coordinates; returns the nearest interactive part. */
@@ -110,22 +117,50 @@ export class InteractionController {
   }
 
   private readonly onPointerDown = (e: PointerEvent): void => {
-    if (e.button !== 0 || this.pointerDown) return;
+    if (e.button !== 0) return;
+    if (this.pointerDown) {
+      // A mouse has one pointer: a new press means we missed the last release (e.g. outside the window).
+      if (e.pointerType !== 'mouse') return;
+      this.cancelGesture();
+    }
     const pick = this.pick(e.clientX, e.clientY);
     this.pointerDown = { id: e.pointerId, x: e.clientX, y: e.clientY, pick, moved: false };
     if (!pick) return;
     const button = BUTTON_PARTS[pick.part];
     if (button) {
-      this.hold([button]);
+      this.hold([button], e.pointerId);
     } else if (pick.part === 'dpad') {
-      this.hold(this.dpadDirections(pick));
+      this.hold(this.dpadDirections(pick), e.pointerId);
     } else if (pick.part === 'volume-wheel' || pick.part === 'contrast-wheel') {
       this.dial = { which: pick.part === 'volume-wheel' ? 'volume' : 'contrast', lastY: e.clientY, acc: 0 };
+      this.capture(e.pointerId);
       this.setOrbitEnabled(false);
     }
   };
 
-  private hold(buttons: ButtonId[]): void {
+  private capture(pointerId: number): void {
+    try {
+      this.dom.setPointerCapture(pointerId);
+    } catch {
+      // Pointer already gone; the release path still cleans up.
+    }
+  }
+
+  /** Ends the current gesture without treating it as a click (focus loss, lost capture). */
+  private readonly cancelGesture = (): void => {
+    for (const b of this.heldButtons) this.handlers.pressButton(b, false);
+    this.heldButtons = [];
+    this.dial = null;
+    this.pointerDown = null;
+    this.setOrbitEnabled(true);
+  };
+
+  private readonly onLostCapture = (e: PointerEvent): void => {
+    if (this.pointerDown?.id === e.pointerId) this.cancelGesture();
+  };
+
+  private hold(buttons: ButtonId[], pointerId: number): void {
+    this.capture(pointerId);
     this.setOrbitEnabled(false);
     this.heldButtons = buttons;
     for (const b of buttons) this.handlers.pressButton(b, true);
@@ -199,8 +234,11 @@ export class InteractionController {
       this.handlers.select(null);
       return;
     }
-    // A plain click: act on the part, then show its info.
-    if (!wasHolding && !wasDial) {
+    // A plain click: act on the part, then show its info. The second click of a double-click only
+    // focuses the camera (see onDoubleClick), so it must not toggle the part back.
+    const isSecondClick = this.lastAction !== null && this.lastAction.part === pick.part && e.timeStamp - this.lastAction.time < DOUBLE_CLICK_MS;
+    this.lastAction = isSecondClick ? null : { part: pick.part, time: e.timeStamp };
+    if (!wasHolding && !wasDial && !isSecondClick) {
       switch (pick.part) {
         case 'power-switch':
           this.handlers.togglePower();

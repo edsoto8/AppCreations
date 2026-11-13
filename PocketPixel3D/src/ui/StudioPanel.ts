@@ -1,4 +1,4 @@
-import { LIGHTING_PRESETS, type LightingPresetId } from '../scene/LightingManager';
+import { LIGHTING_PRESETS, type LightingPresetId } from '../scene/LightingPresets';
 import { h } from './dom';
 import { Popover } from './Popover';
 

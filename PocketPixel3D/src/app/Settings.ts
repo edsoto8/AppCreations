@@ -1,5 +1,5 @@
 import type { HighScoreStore } from '../games/GameInterface';
-import type { LightingPresetId } from '../scene/LightingManager';
+import type { LightingPresetId } from '../scene/LightingPresets';
 
 export interface PersistedSettings {
   volume: number;
@@ -78,15 +78,23 @@ export class Settings {
   private saveTimer: number | null = null;
 
   constructor() {
+    window.addEventListener('pagehide', this.flush);
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') this.flush();
+    });
     this.values = sanitizeSettings(read(KEY));
     const rawScores = read(SCORES_KEY);
     this.scores = {};
-    if (rawScores && typeof rawScores === 'object') {
-      for (const [k, v] of Object.entries(rawScores as Record<string, unknown>)) {
-        if (typeof v === 'number' && Number.isFinite(v) && v >= 0) this.scores[k] = Math.floor(v);
-      }
-    }
+    mergeScores(this.scores, rawScores);
   }
+
+  /** Writes pending settings immediately (called when the page is hidden or closed). */
+  readonly flush = (): void => {
+    if (this.saveTimer === null) return;
+    window.clearTimeout(this.saveTimer);
+    this.saveTimer = null;
+    write(KEY, this.values);
+  };
 
   set<K extends keyof PersistedSettings>(key: K, value: PersistedSettings[K]): void {
     this.values[key] = value;
@@ -100,10 +108,20 @@ export class Settings {
   readonly highScores: HighScoreStore = {
     get: (id) => this.scores[id] ?? 0,
     submit: (id, score) => {
-      if (score <= (this.scores[id] ?? 0)) return false;
-      this.scores[id] = Math.floor(score);
+      // Merge with what other tabs may have stored since we loaded, keeping the best of each.
+      mergeScores(this.scores, read(SCORES_KEY));
+      const beaten = score > (this.scores[id] ?? 0);
+      if (beaten) this.scores[id] = Math.floor(score);
       write(SCORES_KEY, this.scores);
-      return true;
+      return beaten;
     },
   };
+}
+
+/** Copies valid, higher scores from untrusted stored data into `into`. */
+function mergeScores(into: Record<string, number>, raw: unknown): void {
+  if (!raw || typeof raw !== 'object') return;
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    if (typeof v === 'number' && Number.isFinite(v) && v >= 0) into[k] = Math.max(into[k] ?? 0, Math.floor(v));
+  }
 }

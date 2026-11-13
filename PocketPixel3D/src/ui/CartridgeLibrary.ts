@@ -1,5 +1,5 @@
 import type { CartridgeDefinition } from '../games/GameInterface';
-import { drawCartridgeLabel } from '../models/PrintTextures';
+import { drawCartridgeLabel } from '../display/LabelArt';
 import { h } from './dom';
 import { Popover } from './Popover';
 

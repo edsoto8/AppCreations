@@ -27,7 +27,7 @@ test.beforeEach(async ({ page }) => {
     if (m.type() === 'error') errors.push(m.text());
   });
   page.on('pageerror', (e) => errors.push(e.message));
-  await page.goto('/');
+  await page.goto('/?debug');
   await page.waitForFunction(() => typeof window.pocketPixel?.state === 'function');
 });
 

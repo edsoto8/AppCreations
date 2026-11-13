@@ -26,11 +26,14 @@ npm run screenshots                     # regenerate docs/screenshots (slow in s
 ## Key Architectural Decisions
 
 - **Dependency rule.** `src/games/**` imports nothing outside `src/games` and never Three.js, DOM or Web
-  Audio. `src/hardware/**` and `display/BootSequence.ts` are pure too. Only `models/`, `scene/` and
-  `display/ScreenTexture.ts` import Three.js.
+  Audio. `src/hardware/**` and `display/BootSequence.ts` are pure too. `src/ui/**` never imports
+  Three.js (use `display/LabelArt.ts`, `scene/LightingPresets.ts`). Three.js lives in `models/`,
+  `scene/`, `display/ScreenTexture.ts`, `interaction/InteractionController.ts` and `app/`.
 - **One input path.** Keyboard (`InputManager`), 3D pointer (`InteractionController`) and touch
   (`ScreenOverlay`) all call `ButtonSystem.press/release` with their own source, so one source can't
   release another's press. Taps shorter than a tick are latched.
+- **Debug API.** `window.pocketPixel` is installed only on the dev server or with `?debug` in the URL;
+  e2e tests open `/?debug`.
 - **Fixed 60 Hz.** `ConsoleSystem.update(dt)` runs whole ticks (max 8 per frame). Tests and the debug
   API call `step()` directly; never rely on frame rate in tests.
 - **One framebuffer.** Games draw shade indices into `FrameBuffer`; `LCDRenderer` produces the 160×144
