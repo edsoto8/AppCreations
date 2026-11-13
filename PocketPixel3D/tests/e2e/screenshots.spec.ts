@@ -5,7 +5,12 @@ test.use({ deviceScaleFactor: 2 });
 test.setTimeout(900_000);
 
 const shot = (page: Page, name: string) => page.screenshot({ path: `docs/screenshots/${name}.jpg`, quality: 88, type: 'jpeg' });
-const settle = (page: Page, ms = 2500) => page.waitForTimeout(ms);
+const settle = async (page: Page, ms = 2500): Promise<void> => {
+  await page.waitForTimeout(ms);
+  // Software GL is slow: wait for any camera flight to finish before capturing.
+  await page.waitForFunction(() => !(window as any).pocketPixel.state().cameraFlying, null, { timeout: 300_000 });
+  await page.waitForTimeout(1500);
+};
 
 test('capture screenshots @screenshots', async ({ page }) => {
   await page.goto('/?debug');

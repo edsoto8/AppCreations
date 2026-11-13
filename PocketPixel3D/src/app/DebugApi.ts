@@ -48,6 +48,7 @@ export function installDebugApi(d: DebugDeps): void {
       lcdAverage: d.lcd.averageIntensity(),
       fps: d.sceneMgr.fps,
       drawCalls: d.sceneMgr.renderer.info.render.calls,
+      cameraFlying: d.camera.flying,
       cameraDistance: Math.round(d.sceneMgr.camera.position.distanceTo(d.camera.controls.target)),
       ...d.state(),
     }),
