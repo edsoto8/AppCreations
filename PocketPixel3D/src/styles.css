@@ -1,6 +1,7 @@
 :root {
   --font: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   --mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  --page: #e7e4dd;
   --ink: #23242a;
   --ink-soft: #5d5f68;
   --panel: rgba(252, 251, 248, 0.82);
@@ -15,7 +16,28 @@
   color-scheme: light;
 }
 
-:root[data-theme='dark'] {
+/*
+ * UI theme. Before the app starts it follows the viewer's theme (data-theme / prefers-color-scheme).
+ * Once running, the lighting preset sets data-studio so the panels always match the backdrop.
+ */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']):not([data-studio]) {
+  --page: #16171b;
+    --ink: #ececf1;
+    --ink-soft: #a3a6b2;
+    --panel: rgba(28, 29, 34, 0.8);
+    --panel-solid: #1c1d22;
+    --line: rgba(255, 255, 255, 0.1);
+    --accent: #d0477f;
+    --warn: #f0b45a;
+    --shadow: 0 10px 30px rgba(0, 0, 0, 0.45), 0 2px 6px rgba(0, 0, 0, 0.3);
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme='dark']:not([data-studio]),
+:root[data-studio='dark'] {
+  --page: #16171b;
   --ink: #ececf1;
   --ink-soft: #a3a6b2;
   --panel: rgba(28, 29, 34, 0.8);
@@ -36,7 +58,7 @@ body {
   margin: 0;
   height: 100%;
   overflow: hidden;
-  background: #e7e4dd;
+  background: var(--page);
   color: var(--ink);
   font-family: var(--font);
   -webkit-font-smoothing: antialiased;
@@ -83,8 +105,8 @@ body {
 /* ---- Brand + hint ---- */
 .brand {
   position: absolute;
-  top: 22px;
-  left: 26px;
+  top: calc(22px + env(safe-area-inset-top, 0px));
+  left: calc(26px + env(safe-area-inset-left, 0px));
   pointer-events: none;
 }
 
@@ -105,7 +127,7 @@ body {
 .hint {
   position: absolute;
   left: 50%;
-  bottom: 92px;
+  bottom: calc(92px + env(safe-area-inset-bottom, 0px));
   transform: translateX(-50%);
   padding: 7px 14px;
   border-radius: 999px;
@@ -124,8 +146,8 @@ body {
 
 .fps {
   position: absolute;
-  top: 22px;
-  right: 26px;
+  top: calc(22px + env(safe-area-inset-top, 0px));
+  right: calc(26px + env(safe-area-inset-right, 0px));
   font: 12px var(--mono);
   color: var(--ink-soft);
   pointer-events: none;
@@ -135,7 +157,7 @@ body {
 .toolbar {
   position: absolute;
   left: 50%;
-  bottom: 22px;
+  bottom: calc(22px + env(safe-area-inset-bottom, 0px));
   transform: translateX(-50%);
   display: flex;
   align-items: center;
@@ -268,8 +290,8 @@ body {
 
 .info-panel {
   position: absolute;
-  top: 84px;
-  right: 22px;
+  top: calc(84px + env(safe-area-inset-top, 0px));
+  right: calc(22px + env(safe-area-inset-right, 0px));
   width: 300px;
   max-height: calc(100vh - 210px);
   overflow: auto;
@@ -324,7 +346,7 @@ body {
 .popover {
   position: absolute;
   left: 50%;
-  bottom: 96px;
+  bottom: calc(96px + env(safe-area-inset-bottom, 0px));
   transform: translateX(-50%);
   width: min(560px, calc(100vw - 24px));
   max-height: calc(100vh - 190px);
@@ -557,7 +579,7 @@ kbd {
 /* ---- Toasts + tooltip ---- */
 .toast-stack {
   position: absolute;
-  top: 22px;
+  top: calc(22px + env(safe-area-inset-top, 0px));
   left: 50%;
   transform: translateX(-50%);
   display: grid;
@@ -614,7 +636,7 @@ kbd {
 .overlay {
   position: absolute;
   top: 50%;
-  left: 26px;
+  left: calc(26px + env(safe-area-inset-left, 0px));
   transform: translateY(-50%);
   display: grid;
   gap: 14px;
@@ -792,8 +814,8 @@ kbd {
 
 @media (max-width: 520px) {
   .brand {
-    top: 14px;
-    left: 16px;
+    top: calc(14px + env(safe-area-inset-top, 0px));
+    left: calc(16px + env(safe-area-inset-left, 0px));
   }
 
   .brand p {
@@ -801,7 +823,7 @@ kbd {
   }
 
   .toolbar {
-    bottom: 12px;
+    bottom: calc(12px + env(safe-area-inset-bottom, 0px));
     flex-wrap: wrap;
     justify-content: center;
     width: calc(100vw - 16px);
@@ -819,12 +841,12 @@ kbd {
   }
 
   .popover {
-    bottom: 126px;
+    bottom: calc(126px + env(safe-area-inset-bottom, 0px));
     max-height: calc(100vh - 150px);
   }
 
   .info-panel {
-    bottom: 126px;
+    bottom: calc(126px + env(safe-area-inset-bottom, 0px));
   }
 
   .library-card {

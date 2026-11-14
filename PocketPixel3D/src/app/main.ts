@@ -33,6 +33,14 @@ const FLOOR_Y = -HALF_H - 24;
 /** Parts on the back of the console: the camera focuses on them from behind. */
 const BACK_PARTS = new Set<PickId>(['back-shell', 'battery-cover', 'batteries', 'cartridge-bay', 'screws', 'cartridge']);
 
+/** The host page's theme: explicit data-theme wins, otherwise the OS preference. */
+function viewerPrefersDark(): boolean {
+  const t = document.documentElement.dataset.theme;
+  if (t === 'dark') return true;
+  if (t === 'light') return false;
+  return window.matchMedia('(prefers-color-scheme: dark)').matches;
+}
+
 function main(): void {
   const app = document.getElementById('app');
   if (!app) throw new Error('#app missing');
@@ -59,7 +67,11 @@ function main(): void {
   const model = new GameBoyModel(mats, aniso);
   scene.add(model.root);
   const lighting = new LightingManager(renderer, scene, FLOOR_Y, stage);
-  lighting.apply(s.lighting);
+  // Until the viewer picks a preset, the studio follows their light/dark theme.
+  let lightingChosen = settings.lightingChosen;
+  const themePreset = (): LightingPresetId => (viewerPrefersDark() ? 'dark' : 'studio');
+  const initialLighting: LightingPresetId = lightingChosen ? s.lighting : themePreset();
+  lighting.apply(initialLighting);
   const rig = new CartridgeRig(CARTRIDGES, mats, aniso, model, FLOOR_Y);
   scene.add(rig.group);
   const screenTex = new ScreenTexture(lcd, aniso);
@@ -87,7 +99,16 @@ function main(): void {
     volume: (v) => machine.volume.set(v),
     contrast: (v) => machine.contrast.set(v),
   });
-  studio.setPreset(s.lighting);
+  studio.setPreset(initialLighting);
+  const followViewerTheme = (): void => {
+    if (lightingChosen) return;
+    const id = themePreset();
+    if (id === lighting.preset) return;
+    lighting.apply(id);
+    studio.setPreset(id);
+  };
+  new MutationObserver(followViewerTheme).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', followViewerTheme);
   studio.setDials(s.volume, s.contrast);
   const overlay = new ScreenOverlay(ui, lcd.lcdCanvas, (b, down) => press(b, down, 'ui'), () => setOverlay(false));
   overlay.setReflection(s.reflection);
@@ -269,6 +290,7 @@ function main(): void {
   }
 
   function setLighting(id: LightingPresetId): void {
+    lightingChosen = true;
     lighting.apply(id);
     studio.setPreset(id);
     settings.set('lighting', id);

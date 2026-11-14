@@ -74,6 +74,8 @@ export function sanitizeSettings(raw: unknown): PersistedSettings {
 
 export class Settings {
   readonly values: PersistedSettings;
+  /** True when the viewer picked a lighting preset before; otherwise lighting follows their theme. */
+  readonly lightingChosen: boolean;
   private readonly scores: Record<string, number>;
   private saveTimer: number | null = null;
 
@@ -82,7 +84,9 @@ export class Settings {
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'hidden') this.flush();
     });
-    this.values = sanitizeSettings(read(KEY));
+    const raw = read(KEY);
+    this.values = sanitizeSettings(raw);
+    this.lightingChosen = !!raw && typeof raw === 'object' && (raw as Record<string, unknown>).lighting === this.values.lighting;
     const rawScores = read(SCORES_KEY);
     this.scores = {};
     mergeScores(this.scores, rawScores);

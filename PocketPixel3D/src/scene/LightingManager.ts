@@ -83,7 +83,8 @@ export class LightingManager {
     this.floor.material.opacity = p.shadowOpacity;
     this.renderer.toneMappingExposure = p.exposure;
     this.backdrop.style.background = p.background;
-    document.documentElement.dataset.theme = p.theme;
+    // UI panels follow the backdrop. (data-theme belongs to the host page's light/dark setting.)
+    document.documentElement.dataset.studio = p.theme;
   }
 
   dispose(): void {

@@ -33,7 +33,12 @@ npm run preview      # serve dist/ on http://localhost:4173
 npm test             # Vitest unit tests (games, hardware, settings)
 npm run e2e          # Playwright browser tests (builds, then serves on :4173)
 npm run screenshots  # regenerate docs/screenshots
+npm run build:artifact  # package dist-artifact/ for publishing as a claude.ai Artifact
 ```
+
+The Artifact package is the production build split into a page fragment with the CSS inlined, plus
+one bundled script (`scripts/build-artifact.mjs`). Inside the Artifact viewer, the default lighting
+follows the viewer's light or dark theme until a preset is picked in the Studio panel.
 
 `@playwright/test` is pinned to 1.63.0. If your machine has a different Chromium build, run
 `npx playwright install chromium` once, or point `PW_CHROMIUM_PATH` at an existing Chromium.
