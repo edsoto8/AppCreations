@@ -19,6 +19,9 @@ public sealed class SqlImportRepositoryTests(SqlServerFixture db) : IClassFixtur
     private void RequireSqlServer() =>
         Assert.SkipUnless(db.IsAvailable, $"Set {SqlServerFixture.EnvironmentVariable} to a SQL Server connection string to run this test.");
 
+    private Task<ImportClaim> BeginAsync(string fileName, string hash, SqlImportRepository? repository = null) =>
+        (repository ?? Repository).BeginImportAsync(Guid.NewGuid(), fileName, hash, 1, Ct);
+
     private static string NewHash() => Convert.ToHexString(Guid.NewGuid().ToByteArray()) + Convert.ToHexString(Guid.NewGuid().ToByteArray());
 
     private static ImportFile Sample(string fileName) =>
@@ -38,7 +41,7 @@ public sealed class SqlImportRepositoryTests(SqlServerFixture db) : IClassFixtur
     {
         RequireSqlServer();
 
-        var claim = await Repository.BeginImportAsync("a.csv", NewHash(), 123, Ct);
+        var claim = await BeginAsync("a.csv", NewHash());
 
         Assert.True(claim.IsNew);
         Assert.Equal(ImportStatus.Processing, claim.Record.Status);
@@ -50,12 +53,41 @@ public sealed class SqlImportRepositoryTests(SqlServerFixture db) : IClassFixtur
     {
         RequireSqlServer();
         var hash = NewHash();
-        var first = await Repository.BeginImportAsync("a.csv", hash, 1, Ct);
+        var first = await BeginAsync("a.csv", hash);
 
-        var second = await Repository.BeginImportAsync("renamed.csv", hash, 1, Ct);
+        var second = await BeginAsync("renamed.csv", hash);
 
         Assert.False(second.IsNew);
         Assert.Equal(first.Record.ImportId, second.Record.ImportId);
+    }
+
+    [Fact]
+    public async Task BeginImport_RetriedWithSameId_RecognisesItsOwnClaim()
+    {
+        RequireSqlServer();
+        var id = Guid.NewGuid();
+        var hash = NewHash();
+        await Repository.BeginImportAsync(id, "a.csv", hash, 1, Ct);
+
+        var retried = await Repository.BeginImportAsync(id, "a.csv", hash, 1, Ct);
+
+        Assert.True(retried.IsNew);
+        Assert.Equal(id, retried.Record.ImportId);
+    }
+
+    [Fact]
+    public async Task MarkFailed_CommittedImport_IsNotChanged()
+    {
+        RequireSqlServer();
+        using var file = Sample("ncr_disputes_20261116.csv");
+        var claim = await BeginAsync(file.FileName, NewHash());
+        await Repository.LoadAndValidateAsync(claim.Record.ImportId, file, Ct);
+
+        await Repository.MarkFailedAsync(claim.Record.ImportId, "Cancelled during Archive.", Ct);
+
+        Assert.Equal(ImportStatus.Imported, (await StateAsync(claim.Record.ImportId)).Status);
+        await using var connection = db.Connect();
+        await connection.ExecuteAsync("DELETE FROM dbo.NcrDisputeStaging WHERE ImportId = @id", new { id = claim.Record.ImportId });
     }
 
     [Fact]
@@ -63,10 +95,10 @@ public sealed class SqlImportRepositoryTests(SqlServerFixture db) : IClassFixtur
     {
         RequireSqlServer();
         var hash = NewHash();
-        var first = await Repository.BeginImportAsync("a.csv", hash, 1, Ct);
+        var first = await BeginAsync("a.csv", hash);
         await Repository.MarkFailedAsync(first.Record.ImportId, "boom", Ct);
 
-        var retry = await Repository.BeginImportAsync("a.csv", hash, 1, Ct);
+        var retry = await BeginAsync("a.csv", hash);
 
         Assert.True(retry.IsNew);
         Assert.NotEqual(first.Record.ImportId, retry.Record.ImportId);
@@ -77,14 +109,14 @@ public sealed class SqlImportRepositoryTests(SqlServerFixture db) : IClassFixtur
     {
         RequireSqlServer();
         var hash = NewHash();
-        var stale = await Repository.BeginImportAsync("a.csv", hash, 1, Ct);
+        var stale = await BeginAsync("a.csv", hash);
         await using (var connection = db.Connect())
         {
             await connection.ExecuteAsync("UPDATE dbo.FileImport SET StartedAtUtc = DATEADD(HOUR, -3, SYSUTCDATETIME()) WHERE ImportId = @id",
                 new { id = stale.Record.ImportId });
         }
 
-        var retry = await Repository.BeginImportAsync("a.csv", hash, 1, Ct);
+        var retry = await BeginAsync("a.csv", hash);
 
         Assert.True(retry.IsNew);
         var (status, _, _, error) = await StateAsync(stale.Record.ImportId);
@@ -98,7 +130,7 @@ public sealed class SqlImportRepositoryTests(SqlServerFixture db) : IClassFixtur
         RequireSqlServer();
         var hash = NewHash();
 
-        var claims = await Task.WhenAll(Enumerable.Range(0, 8).Select(_ => Repository.BeginImportAsync("a.csv", hash, 1, Ct)));
+        var claims = await Task.WhenAll(Enumerable.Range(0, 8).Select(_ => BeginAsync("a.csv", hash)));
 
         Assert.Single(claims, c => c.IsNew);
         Assert.Single(claims.Select(c => c.Record.ImportId).Distinct());
@@ -109,7 +141,7 @@ public sealed class SqlImportRepositoryTests(SqlServerFixture db) : IClassFixtur
     {
         RequireSqlServer();
         using var file = Sample("ncr_disputes_20261116.csv");
-        var claim = await Repository.BeginImportAsync(file.FileName, NewHash(), 1, Ct);
+        var claim = await BeginAsync(file.FileName, NewHash());
 
         var result = await Repository.LoadAndValidateAsync(claim.Record.ImportId, file, Ct);
 
@@ -133,7 +165,7 @@ public sealed class SqlImportRepositoryTests(SqlServerFixture db) : IClassFixtur
     {
         RequireSqlServer();
         using var file = Sample("ncr_disputes_rejected_by_database_example.csv");
-        var claim = await Repository.BeginImportAsync(file.FileName, NewHash(), 1, Ct);
+        var claim = await BeginAsync(file.FileName, NewHash());
 
         var result = await Repository.LoadAndValidateAsync(claim.Record.ImportId, file, Ct);
 
@@ -161,7 +193,7 @@ public sealed class SqlImportRepositoryTests(SqlServerFixture db) : IClassFixtur
 
         using var file = Sample("ncr_disputes_20261116.csv");
         var repository = db.Repository("dbo.usp_TestThrows");
-        var claim = await repository.BeginImportAsync(file.FileName, NewHash(), 1, Ct);
+        var claim = await BeginAsync(file.FileName, NewHash(), repository);
 
         var result = await repository.LoadAndValidateAsync(claim.Record.ImportId, file, Ct);
 
@@ -175,7 +207,7 @@ public sealed class SqlImportRepositoryTests(SqlServerFixture db) : IClassFixtur
     {
         RequireSqlServer();
         using var file = Sample("ncr_disputes_20261116.csv");
-        var claim = await Repository.BeginImportAsync(file.FileName, NewHash(), 1, Ct);
+        var claim = await BeginAsync(file.FileName, NewHash());
         await Repository.LoadAndValidateAsync(claim.Record.ImportId, file, Ct);
 
         var again = await Repository.LoadAndValidateAsync(claim.Record.ImportId, file, Ct);
@@ -190,7 +222,7 @@ public sealed class SqlImportRepositoryTests(SqlServerFixture db) : IClassFixtur
     public async Task MarkArchivePendingThenArchived_EndsImportedWithFirstArchivePath()
     {
         RequireSqlServer();
-        var claim = await Repository.BeginImportAsync("a.csv", NewHash(), 1, Ct);
+        var claim = await BeginAsync("a.csv", NewHash());
         var id = claim.Record.ImportId;
 
         await Repository.MarkArchivePendingAsync(id, "Archive failed: access denied", Ct);

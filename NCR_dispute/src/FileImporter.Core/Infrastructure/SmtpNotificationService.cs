@@ -38,7 +38,16 @@ public sealed class SmtpNotificationService(
             }
 
             await client.SendAsync(new SendRequest(message), ct).ConfigureAwait(false);
-            await client.DisconnectAsync(quit: true, ct).ConfigureAwait(false);
+
+            // The message is delivered. A failed QUIT must not trigger a retry, which would send it twice.
+            try
+            {
+                await client.DisconnectAsync(quit: true, ct).ConfigureAwait(false);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                logger.LogDebug(ex, "Ignoring an error while disconnecting from the SMTP server");
+            }
         }, cancellationToken).ConfigureAwait(false);
 
         logger.LogInformation("Alert e-mail sent to {RecipientCount} recipient(s) for {FileName}", smtp.To.Count, alert.FileName);

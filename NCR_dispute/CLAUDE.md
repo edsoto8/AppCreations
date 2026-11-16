@@ -33,6 +33,8 @@ DOTNET_ENVIRONMENT=Development Database__ConnectionString="..." dotnet run --pro
 
 ## Invariants
 
+- Once `LoadAndValidateAsync` has committed, nothing may mark the import Failed (the `committed` flag in
+  `ProcessFileAsync`; `MarkFailedAsync` only updates Processing rows). Otherwise the next run re-imports it.
 - Never archive a file whose import failed. Never load a file whose hash has an active record
   (Processing, Imported or ArchivePending). `Failed` records never block a retry.
 - An archive failure must not undo or repeat the import: the status becomes ArchivePending and the next

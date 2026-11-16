@@ -20,6 +20,15 @@ AS
 BEGIN
     SET NOCOUNT ON;
 
+    -- Let only one import validate at a time, until its transaction ends. Without this, two files with the same
+    -- DisputeId loaded at the same moment could both pass the "already imported" check below, especially under
+    -- READ_COMMITTED_SNAPSHOT (the Azure SQL default), where neither sees the other's uncommitted rows.
+    DECLARE @Lock INT;
+    EXEC @Lock = sp_getapplock @Resource = N'usp_ValidateNcrDisputeImport', @LockMode = 'Exclusive',
+                               @LockOwner = 'Transaction', @LockTimeout = 60000;
+    IF @Lock < 0
+        THROW 50000, N'Timed out waiting for another import to finish validating. The file will be retried on the next run.', 1;
+
     DECLARE @Errors TABLE (SourceRowNumber INT NOT NULL, Problem NVARCHAR(400) NOT NULL);
 
     -- Values that must convert to real types.

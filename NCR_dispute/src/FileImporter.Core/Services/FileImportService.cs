@@ -12,7 +12,7 @@ namespace FileImporter.Core.Services;
 /// <summary>
 /// Runs the import workflow over the source folder. Each file is processed on its own, so one bad file does not
 /// stop the others:
-/// hash file → claim it in the tracking table (duplicate check) → read and check structure →
+/// read file once and hash it → claim it in the tracking table (duplicate check) → read and check structure →
 /// bulk load + validation procedure + mark Imported (one transaction) → move to archive.
 /// A file is only archived after its data is committed; a failed file stays where it is.
 /// </summary>
@@ -93,16 +93,22 @@ public sealed class FileImportService(
         using var scope = logger.BeginScope(new Dictionary<string, object> { ["FileName"] = fileName });
 
         Guid? importId = null;
+        var committed = false;
         var recordCount = 0;
         var stage = "Reading file";
         try
         {
             logger.LogInformation("Processing {FileName}", fileName);
-            var (hash, size) = await HashFileAsync(path, cancellationToken).ConfigureAwait(false);
+
+            // Read once: the hash and the parsed rows come from the same bytes, even if the file is rewritten later.
+            var content = await File.ReadAllBytesAsync(path, cancellationToken).ConfigureAwait(false);
+            var hash = Convert.ToHexString(SHA256.HashData(content));
 
             stage = "Starting import";
+            // The id is created outside the retry so a retried claim recognises its own record.
+            var newId = Guid.NewGuid();
             var claim = await retryPolicy.ExecuteAsync("start import",
-                ct => repository.BeginImportAsync(fileName, hash, size, ct), cancellationToken).ConfigureAwait(false);
+                ct => repository.BeginImportAsync(newId, fileName, hash, content.LongLength, ct), cancellationToken).ConfigureAwait(false);
             if (!claim.IsNew)
             {
                 return await HandleExistingImportAsync(path, claim.Record, stopwatch, cancellationToken).ConfigureAwait(false);
@@ -112,7 +118,7 @@ public sealed class FileImportService(
             logger.LogInformation("Started import {ImportId} for {FileName} (SHA-256 {FileHash})", importId, fileName, hash);
 
             stage = "File validation";
-            using var file = await reader.ReadAsync(path, cancellationToken).ConfigureAwait(false);
+            using var file = reader.Read(path, content, cancellationToken);
             recordCount = file.RecordCount;
             if (!file.IsValid)
             {
@@ -128,13 +134,15 @@ public sealed class FileImportService(
                     validation.Message ?? "The validation procedure rejected the file.", null, cancellationToken).ConfigureAwait(false);
             }
 
+            // From here on the data is committed: nothing below may mark the import Failed, or the file would be imported again.
+            committed = true;
             logger.LogInformation("Imported {RecordCount} record(s) from {FileName} as {ImportId}", recordCount, fileName, importId);
             return await ArchiveAsync(path, importId.Value, ImportResultKind.Imported, recordCount, stopwatch, cancellationToken).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
             logger.LogWarning("Cancelled while processing {FileName} at stage {Stage}", fileName, stage);
-            if (importId is { } id)
+            if (importId is { } id && !committed)
             {
                 await TryMarkFailedAsync(id, $"Cancelled during {stage}.").ConfigureAwait(false);
             }
@@ -143,7 +151,8 @@ public sealed class FileImportService(
         }
         catch (Exception ex)
         {
-            return await FailAsync(fileName, importId, recordCount, stopwatch, stage, ex.Message, ex, cancellationToken).ConfigureAwait(false);
+            // ArchiveAsync handles its own errors, so this is only reached before the commit. The guard is a safety net.
+            return await FailAsync(fileName, committed ? null : importId, recordCount, stopwatch, stage, ex.Message, ex, cancellationToken).ConfigureAwait(false);
         }
     }
 
@@ -264,13 +273,6 @@ public sealed class FileImportService(
     private void LogOutcome(string fileName, Guid? importId, int recordCount, Stopwatch stopwatch, string status) =>
         logger.LogInformation("Outcome {FileName}: {Status}, {RecordCount} record(s), ImportId {ImportId}, {ElapsedMs} ms",
             fileName, status, recordCount, importId, stopwatch.ElapsedMilliseconds);
-
-    private static async Task<(string Hash, long Size)> HashFileAsync(string path, CancellationToken cancellationToken)
-    {
-        await using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, 81920, useAsync: true);
-        var hash = await SHA256.HashDataAsync(stream, cancellationToken).ConfigureAwait(false);
-        return (Convert.ToHexString(hash), stream.Length);
-    }
 
     private static string Summarize(IReadOnlyList<string> errors)
     {

@@ -17,6 +17,21 @@ public sealed class ImportOptions
     /// <summary>Field delimiter for delimited files.</summary>
     public char Delimiter { get; set; } = ',';
 
+    /// <summary>
+    /// Text encoding of the files, e.g. "utf-8" or "windows-1252". A byte-order mark overrides it. With UTF-8, bytes
+    /// that are not valid UTF-8 fail the file instead of being stored as replacement characters.
+    /// </summary>
+    public string Encoding { get; set; } = "utf-8";
+
+    /// <summary>
+    /// Accepted formats for columns of type Date (.NET custom format strings, invariant culture). Empty means
+    /// <see cref="DefaultDateFormats"/>: ISO formats, which SQL Server converts the same way whatever the login's
+    /// language or DATEFORMAT. If you add e.g. "MM/dd/yyyy", convert with an explicit style in the validation procedure.
+    /// </summary>
+    public List<string> DateFormats { get; set; } = [];
+
+    public static IReadOnlyList<string> DefaultDateFormats { get; } = ["yyyy-MM-dd", "yyyy-MM-dd HH:mm:ss", "yyyy-MM-ddTHH:mm:ss"];
+
     /// <summary>Files changed more recently than this are skipped until the next run, so half-copied files are not read.</summary>
     public int MinFileAgeSeconds { get; set; } = 30;
 

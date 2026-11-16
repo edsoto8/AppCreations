@@ -6,8 +6,8 @@ namespace FileImporter.Core.Abstractions;
 public interface IImportFileReader
 {
     /// <summary>
-    /// Reads the file. Structure and field problems are returned in <see cref="ImportFile.Errors"/>;
-    /// exceptions are only thrown for I/O errors.
+    /// Parses the file content (already read from <paramref name="path"/>, which is used for naming only).
+    /// Structure, encoding and field problems are returned in <see cref="ImportFile.Errors"/>, not thrown.
     /// </summary>
-    Task<ImportFile> ReadAsync(string path, CancellationToken cancellationToken);
+    ImportFile Read(string path, byte[] content, CancellationToken cancellationToken);
 }

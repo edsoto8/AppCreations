@@ -18,16 +18,38 @@ public sealed class CsvFileReader(IOptions<ImportOptions> options) : IImportFile
     /// <summary>Stop collecting errors after this many; the file is rejected either way.</summary>
     internal const int MaxErrors = 100;
 
-    public async Task<ImportFile> ReadAsync(string path, CancellationToken cancellationToken)
+    static CsvFileReader()
     {
-        // The whole file is read up front; DataTable holds every row in memory anyway.
-        string content;
-        using (var reader = new StreamReader(path, Encoding.UTF8, detectEncodingFromByteOrderMarks: true))
+        // Makes code pages such as windows-1252 available for Import:Encoding.
+        Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+    }
+
+    public ImportFile Read(string path, byte[] content, CancellationToken cancellationToken)
+    {
+        string text;
+        try
         {
-            content = await reader.ReadToEndAsync(cancellationToken).ConfigureAwait(false);
+            text = Decode(content, options.Value.Encoding);
+        }
+        catch (DecoderFallbackException)
+        {
+            var empty = Parse(path, string.Empty, options.Value, cancellationToken);
+            return new ImportFile(path, empty.Data,
+                [$"The file is not valid {options.Value.Encoding} text. Save it as UTF-8 or set Import:Encoding (e.g. \"windows-1252\")."]);
         }
 
-        return Parse(path, content, options.Value, cancellationToken);
+        return Parse(path, text, options.Value, cancellationToken);
+    }
+
+    /// <summary>Decodes with the configured encoding (a byte-order mark wins). Invalid UTF-8 throws instead of becoming '\uFFFD'.</summary>
+    internal static string Decode(byte[] content, string encodingName)
+    {
+        var encoding = string.Equals(encodingName, "utf-8", StringComparison.OrdinalIgnoreCase) || string.Equals(encodingName, "utf8", StringComparison.OrdinalIgnoreCase)
+            ? new UTF8Encoding(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true)
+            : Encoding.GetEncoding(encodingName);
+
+        using var reader = new StreamReader(new MemoryStream(content), encoding, detectEncodingFromByteOrderMarks: true);
+        return reader.ReadToEnd();
     }
 
     internal static ImportFile Parse(string path, string content, ImportOptions options, CancellationToken cancellationToken = default)
@@ -69,6 +91,7 @@ public sealed class CsvFileReader(IOptions<ImportOptions> options) : IImportFile
         }
 
         var header = records.Current.Fields.Select(h => h.Trim()).ToArray();
+        var dateFormats = options.DateFormats.Count > 0 ? options.DateFormats.ToArray() : ImportOptions.DefaultDateFormats.ToArray();
         var positions = MapHeader(header, columns, errors);
         if (errors.Count > 0)
         {
@@ -90,7 +113,7 @@ public sealed class CsvFileReader(IOptions<ImportOptions> options) : IImportFile
             for (var i = 0; i < columns.Count; i++)
             {
                 var value = fields[positions[i]].Trim();
-                var problem = CheckValue(columns[i], value);
+                var problem = CheckValue(columns[i], value, dateFormats);
                 if (problem is not null)
                 {
                     errors.Add($"Line {line}, column '{columns[i].SourceName}': {problem}");
@@ -140,7 +163,7 @@ public sealed class CsvFileReader(IOptions<ImportOptions> options) : IImportFile
         return positions;
     }
 
-    private static string? CheckValue(ColumnMapping column, string value)
+    private static string? CheckValue(ColumnMapping column, string value, string[] dateFormats)
     {
         if (value.Length == 0)
         {
@@ -156,21 +179,33 @@ public sealed class CsvFileReader(IOptions<ImportOptions> options) : IImportFile
         {
             ColumnType.Integer => long.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out _),
             ColumnType.Decimal => decimal.TryParse(value, NumberStyles.AllowLeadingSign | NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out _),
-            ColumnType.Date => DateTime.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.None, out _),
+            ColumnType.Date => DateTime.TryParseExact(value, dateFormats, CultureInfo.InvariantCulture, DateTimeStyles.None, out _),
             _ => true,
         };
 
-        return valid ? null : $"'{Shorten(value)}' is not a valid {column.Type.ToString().ToLowerInvariant()}.";
+        if (valid)
+        {
+            return null;
+        }
+
+        return column.Type == ColumnType.Date
+            ? $"'{Shorten(value)}' is not a valid date (expected {string.Join(" or ", dateFormats)})."
+            : $"'{Shorten(value)}' is not a valid {column.Type.ToString().ToLowerInvariant()}.";
     }
 
     private static string Shorten(string value) => value.Length <= 50 ? value : value[..50] + "...";
 
-    /// <summary>Splits the content into records. Blank lines are skipped. Line numbers are 1-based and point at the start of the record.</summary>
+    /// <summary>
+    /// Splits the content into records. Blank lines are skipped. Line numbers are 1-based and point at the start of the
+    /// record. A quoted field may have spaces around the quotes; any other character after the closing quote is an error,
+    /// as is an unclosed quote (both throw <see cref="InvalidDataException"/>).
+    /// </summary>
     internal static IEnumerable<(int Line, List<string> Fields)> ReadRecords(string content, char delimiter)
     {
         var fields = new List<string>();
         var field = new StringBuilder();
         var inQuotes = false;
+        var afterQuote = false; // the current field was quoted and its closing quote has been read
         var line = 1;
         var recordLine = 1;
         var i = 0;
@@ -191,6 +226,7 @@ public sealed class CsvFileReader(IOptions<ImportOptions> options) : IImportFile
                     }
 
                     inQuotes = false;
+                    afterQuote = true;
                 }
                 else
                 {
@@ -206,14 +242,11 @@ public sealed class CsvFileReader(IOptions<ImportOptions> options) : IImportFile
                 continue;
             }
 
-            if (c == '"' && field.Length == 0)
-            {
-                inQuotes = true;
-            }
-            else if (c == delimiter)
+            if (c == delimiter)
             {
                 fields.Add(field.ToString());
                 field.Clear();
+                afterQuote = false;
             }
             else if (c is '\r' or '\n')
             {
@@ -224,6 +257,7 @@ public sealed class CsvFileReader(IOptions<ImportOptions> options) : IImportFile
 
                 fields.Add(field.ToString());
                 field.Clear();
+                afterQuote = false;
                 if (!IsBlank(fields))
                 {
                     yield return (recordLine, fields);
@@ -232,6 +266,18 @@ public sealed class CsvFileReader(IOptions<ImportOptions> options) : IImportFile
                 fields = [];
                 line++;
                 recordLine = line;
+            }
+            else if (afterQuote)
+            {
+                if (!char.IsWhiteSpace(c))
+                {
+                    throw new InvalidDataException($"Line {line}: unexpected '{c}' after a closing quote. Quotes inside a quoted field must be doubled (\"\").");
+                }
+            }
+            else if (c == '"' && string.IsNullOrWhiteSpace(field.ToString()))
+            {
+                field.Clear(); // spaces before the opening quote are not part of the value
+                inQuotes = true;
             }
             else
             {

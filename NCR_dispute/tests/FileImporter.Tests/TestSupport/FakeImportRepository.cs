@@ -23,22 +23,22 @@ public sealed class FakeImportRepository : IImportRepository
 
     public Row this[string fileName] => Rows.Last(r => r.FileName == fileName);
 
-    public Row Seed(string fileName, string fileHash, string status)
+    public Row Seed(string fileName, string fileHash, string status, Guid? importId = null)
     {
-        var row = new Row(Guid.NewGuid(), fileName, fileHash, status, DateTime.UtcNow);
+        var row = new Row(importId ?? Guid.NewGuid(), fileName, fileHash, status, DateTime.UtcNow);
         Rows.Add(row);
         return row;
     }
 
-    public Task<ImportClaim> BeginImportAsync(string fileName, string fileHash, long fileSizeBytes, CancellationToken cancellationToken)
+    public Task<ImportClaim> BeginImportAsync(Guid importId, string fileName, string fileHash, long fileSizeBytes, CancellationToken cancellationToken)
     {
         var existing = Rows.LastOrDefault(r => r.FileHash == fileHash && ActiveStatuses.Contains(r.Status));
         if (existing is not null)
         {
-            return Task.FromResult(new ImportClaim(existing.ToRecord(), IsNew: false));
+            return Task.FromResult(new ImportClaim(existing.ToRecord(), IsNew: existing.ImportId == importId));
         }
 
-        var row = Seed(fileName, fileHash, ImportStatus.Processing);
+        var row = Seed(fileName, fileHash, ImportStatus.Processing, importId);
         return Task.FromResult(new ImportClaim(row.ToRecord(), IsNew: true));
     }
 
@@ -66,8 +66,12 @@ public sealed class FakeImportRepository : IImportRepository
     public Task MarkFailedAsync(Guid importId, string error, CancellationToken cancellationToken)
     {
         var row = Find(importId);
-        row.Status = ImportStatus.Failed;
-        row.Error = error;
+        if (row.Status == ImportStatus.Processing) // like the SQL: a committed import is never failed
+        {
+            row.Status = ImportStatus.Failed;
+            row.Error = error;
+        }
+
         return Task.CompletedTask;
     }
 

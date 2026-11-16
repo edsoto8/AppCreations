@@ -115,7 +115,9 @@ public sealed class CsvFileReaderTests
     }
 
     [Theory]
-    [InlineData("D-1,ACCT-1,yesterday,10.00,x", "'yesterday' is not a valid date.")]
+    [InlineData("D-1,ACCT-1,yesterday,10.00,x", "'yesterday' is not a valid date (expected yyyy-MM-dd or yyyy-MM-dd HH:mm:ss or yyyy-MM-ddTHH:mm:ss).")]
+    [InlineData("D-1,ACCT-1,10:30,10.00,x", "'10:30' is not a valid date (expected yyyy-MM-dd or yyyy-MM-dd HH:mm:ss or yyyy-MM-ddTHH:mm:ss).")]
+    [InlineData("D-1,ACCT-1,03/04/2026,10.00,x", "'03/04/2026' is not a valid date (expected yyyy-MM-dd or yyyy-MM-dd HH:mm:ss or yyyy-MM-ddTHH:mm:ss).")]
     [InlineData("D-1,ACCT-1,2026-10-01,ten,x", "'ten' is not a valid decimal.")]
     [InlineData("D-1,ACCT-1,2026-10-01,\"1,000.00\",x", "'1,000.00' is not a valid decimal.")]
     [InlineData(",ACCT-1,2026-10-01,10.00,x", "a value is required.")]
@@ -182,6 +184,69 @@ public sealed class CsvFileReaderTests
     }
 
     [Fact]
+    public void Parse_ConfiguredDateFormat_IsAccepted()
+    {
+        var options = SampleData.Options();
+        options.DateFormats = ["MM/dd/yyyy"];
+
+        using var file = Parse(SampleData.Header + "\nD-1,ACCT-1,03/04/2026,10.00,x\n", options);
+
+        Assert.True(file.IsValid, string.Join(Environment.NewLine, file.Errors));
+    }
+
+    [Theory]
+    [InlineData("\"He said \"hi\" there\"")]
+    [InlineData("\"abc\"def")]
+    public void Parse_TextAfterClosingQuote_IsAnError(string description)
+    {
+        using var file = Parse(SampleData.Header + "\nD-1,ACCT-1,2026-10-01,10.00," + description + "\n");
+
+        Assert.Contains("after a closing quote", Assert.Single(file.Errors));
+        Assert.Equal(0, file.RecordCount);
+    }
+
+    [Fact]
+    public void Parse_SpacesAroundQuotedField_AreIgnored()
+    {
+        using var file = Parse(SampleData.Header + "\nD-1,ACCT-1,2026-10-01,10.00,  \"Comma, inside\"  \n");
+
+        Assert.True(file.IsValid, string.Join(Environment.NewLine, file.Errors));
+        Assert.Equal("Comma, inside", file.Data.Rows[0]["Notes"]);
+    }
+
+    [Fact]
+    public void Parse_QuoteInsideUnquotedField_IsKeptAsText()
+    {
+        using var file = Parse(SampleData.Header + "\nD-1,ACCT-1,2026-10-01,10.00,5\" screen\n");
+
+        Assert.True(file.IsValid, string.Join(Environment.NewLine, file.Errors));
+        Assert.Equal("5\" screen", file.Data.Rows[0]["Notes"]);
+    }
+
+    [Fact]
+    public void Read_InvalidUtf8_IsAnError()
+    {
+        var bytes = Encoding.Latin1.GetBytes(SampleData.ValidCsv(rows: 1).Replace("Row 1", "Müller"));
+
+        using var file = new CsvFileReader(Microsoft.Extensions.Options.Options.Create(Options)).Read("ansi.csv", bytes, TestContext.Current.CancellationToken);
+
+        Assert.StartsWith("The file is not valid utf-8 text", Assert.Single(file.Errors));
+    }
+
+    [Fact]
+    public void Read_Windows1252Configured_DecodesCorrectly()
+    {
+        var options = SampleData.Options();
+        options.Encoding = "windows-1252";
+        var bytes = Encoding.Latin1.GetBytes(SampleData.ValidCsv(rows: 1).Replace("Row 1", "Müller"));
+
+        using var file = new CsvFileReader(Microsoft.Extensions.Options.Options.Create(options)).Read("ansi.csv", bytes, TestContext.Current.CancellationToken);
+
+        Assert.True(file.IsValid, string.Join(Environment.NewLine, file.Errors));
+        Assert.Equal("Müller", file.Data.Rows[0]["Notes"]);
+    }
+
+    [Fact]
     public void Parse_OtherDelimiter_IsSupported()
     {
         var options = SampleData.Options();
@@ -194,15 +259,13 @@ public sealed class CsvFileReaderTests
     }
 
     [Fact]
-    public async Task ReadAsync_Utf8FileWithBom_ReadsHeaderCorrectly()
+    public void Read_Utf8WithBom_ReadsHeaderCorrectly()
     {
-        using var folder = new TempFolder();
-        var path = Path.Combine(folder.Path, "bom.csv");
-        await File.WriteAllTextAsync(path, SampleData.ValidCsv(rows: 1).Replace("Row 1", "Café"), new UTF8Encoding(encoderShouldEmitUTF8Identifier: true),
-            TestContext.Current.CancellationToken);
+        var bytes = new UTF8Encoding(encoderShouldEmitUTF8Identifier: true).GetPreamble()
+            .Concat(Encoding.UTF8.GetBytes(SampleData.ValidCsv(rows: 1).Replace("Row 1", "Café"))).ToArray();
         var reader = new CsvFileReader(Microsoft.Extensions.Options.Options.Create(Options));
 
-        using var file = await reader.ReadAsync(path, TestContext.Current.CancellationToken);
+        using var file = reader.Read(Path.Combine("in", "bom.csv"), bytes, TestContext.Current.CancellationToken);
 
         Assert.True(file.IsValid, string.Join(Environment.NewLine, file.Errors));
         Assert.Equal("Café", file.Data.Rows[0]["Notes"]);

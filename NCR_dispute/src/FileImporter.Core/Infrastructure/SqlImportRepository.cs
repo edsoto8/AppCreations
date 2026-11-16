@@ -20,7 +20,7 @@ public sealed class SqlImportRepository(IOptions<DatabaseOptions> databaseOption
 
     private DatabaseOptions Db => databaseOptions.Value;
 
-    public async Task<ImportClaim> BeginImportAsync(string fileName, string fileHash, long fileSizeBytes, CancellationToken cancellationToken)
+    public async Task<ImportClaim> BeginImportAsync(Guid importId, string fileName, string fileHash, long fileSizeBytes, CancellationToken cancellationToken)
     {
         // One batch, one transaction: the UPDLOCK/HOLDLOCK read stops two runs from claiming the same file at once.
         // A filtered unique index on FileHash (see sql/01_FileImport.sql) is the backstop.
@@ -57,11 +57,10 @@ public sealed class SqlImportRepository(IOptions<DatabaseOptions> databaseOption
             WHERE ImportId = @ExistingId;
             """;
 
-        var newId = Guid.NewGuid();
         await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
         var record = await connection.QuerySingleAsync<ImportRecord>(Command(sql, new
         {
-            ImportId = newId,
+            ImportId = importId,
             FileName = fileName,
             FileHash = fileHash,
             FileSizeBytes = fileSizeBytes,
@@ -69,7 +68,7 @@ public sealed class SqlImportRepository(IOptions<DatabaseOptions> databaseOption
             Environment.MachineName,
         }, cancellationToken: cancellationToken)).ConfigureAwait(false);
 
-        return new ImportClaim(record, IsNew: record.ImportId == newId);
+        return new ImportClaim(record, IsNew: record.ImportId == importId);
     }
 
     public async Task<ValidationResult> LoadAndValidateAsync(Guid importId, ImportFile file, CancellationToken cancellationToken)
@@ -116,7 +115,7 @@ public sealed class SqlImportRepository(IOptions<DatabaseOptions> databaseOption
         ExecuteAsync($"""
             UPDATE {TrackingTable}
             SET Status = '{ImportStatus.Failed}', ErrorMessage = @Error, CompletedAtUtc = SYSUTCDATETIME()
-            WHERE ImportId = @ImportId;
+            WHERE ImportId = @ImportId AND Status = '{ImportStatus.Processing}';  -- never fail a committed import
             """, new { ImportId = importId, Error = Truncate(error) }, cancellationToken);
 
     public Task MarkArchivePendingAsync(Guid importId, string error, CancellationToken cancellationToken) =>

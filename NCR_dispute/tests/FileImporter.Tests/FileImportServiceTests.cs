@@ -324,15 +324,53 @@ public sealed class FileImportServiceTests : IDisposable
         Assert.True(_h.Folder.Exists("disputes.csv"));
     }
 
+    [Fact]
+    public async Task Run_CancelledAfterCommitDuringArchive_KeepsImportAndNeverReimports()
+    {
+        using var cts = new CancellationTokenSource();
+        _h.Folder.Write("disputes.csv", SampleData.ValidCsv());
+        _h.Archiver.FailuresRemaining = 1;
+        _h.Archiver.Failure = () =>
+        {
+            cts.Cancel();
+            return new OperationCanceledException(cts.Token);
+        };
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => _h.Service.RunAsync(cts.Token));
+
+        Assert.Equal(ImportStatus.Imported, _h.Repository["disputes.csv"].Status);
+        Assert.True(_h.Folder.Exists("disputes.csv"));
+
+        var next = await _h.Service.RunAsync(Ct);
+
+        Assert.Equal(ImportResultKind.AlreadyImported, Assert.Single(next.Outcomes).Kind);
+        Assert.Equal(1, _h.Repository.LoadAttempts);
+        Assert.Equal(3, _h.Repository.LoadedRecords["disputes.csv"]);
+        Assert.True(_h.Folder.IsArchived("disputes.csv"));
+    }
+
+    [Fact]
+    public async Task Run_InvalidUtf8_FailsInsteadOfLoadingGarbledText()
+    {
+        var path = Path.Combine(_h.Folder.Path, "ansi.csv");
+        await File.WriteAllBytesAsync(path, System.Text.Encoding.Latin1.GetBytes(SampleData.ValidCsv(rows: 1).Replace("Row 1", "Müller")), Ct);
+
+        var summary = await _h.Service.RunAsync(Ct);
+
+        Assert.Equal(ImportResultKind.Failed, Assert.Single(summary.Outcomes).Kind);
+        Assert.Contains("not valid utf-8", Assert.Single(_h.Notifier.Alerts).ErrorSummary);
+        Assert.Equal(0, _h.Repository.LoadAttempts);
+    }
+
     private sealed class ThrowingBeginRepository : FakeRepositoryBase
     {
-        public override Task<ImportClaim> BeginImportAsync(string fileName, string fileHash, long fileSizeBytes, CancellationToken cancellationToken) =>
+        public override Task<ImportClaim> BeginImportAsync(Guid importId, string fileName, string fileHash, long fileSizeBytes, CancellationToken cancellationToken) =>
             throw new InvalidOperationException("Cannot open database \"NcrDispute\" requested by the login.");
     }
 
     private abstract class FakeRepositoryBase : Core.Abstractions.IImportRepository
     {
-        public abstract Task<ImportClaim> BeginImportAsync(string fileName, string fileHash, long fileSizeBytes, CancellationToken cancellationToken);
+        public abstract Task<ImportClaim> BeginImportAsync(Guid importId, string fileName, string fileHash, long fileSizeBytes, CancellationToken cancellationToken);
 
         public Task<ValidationResult> LoadAndValidateAsync(Guid importId, ImportFile file, CancellationToken cancellationToken) => throw new NotSupportedException();
 

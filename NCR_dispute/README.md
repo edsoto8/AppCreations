@@ -28,7 +28,9 @@ For each file that matches `Import:FilePattern` in `Import:SourceDirectory` (sub
    a `Processing` record with a new `ImportId`, or finds that the same content is already
    `Processing`, `Imported` or `ArchivePending`. That check is what prevents duplicate imports.
 3. **Read and check the file.** The reader checks the header, field counts, required fields, and the
-   type and length of each value. Any problem fails the file, with line numbers in the error.
+   type and length of each value. Any problem fails the file, with line numbers in the error. The file
+   is read only once, so the hash and the loaded rows always come from the same bytes. Malformed quoting
+   (for example `"a"b`) and text that is not valid in the configured encoding are rejected, not loaded.
 4. **Load and validate in one transaction.** SqlBulkCopy loads the rows into the staging table, tagged
    with the `ImportId` and row number. The validation procedure runs next, and the record is set to
    `Imported`. If validation fails, the whole transaction rolls back.
@@ -58,6 +60,8 @@ Every file is processed on its own, so one bad file never stops the others.
 - **Failed files are retried on every run** until they import or someone removes them. A `Failed`
   record never blocks a retry, so fixing reference data and rerunning is enough. Each failed attempt
   sends another alert.
+- **A committed import is never marked `Failed`**, even if the run is stopped during archiving, so it can
+  never be loaded twice.
 - **Archive failures never cause a re-import.** The data is already committed. On the next run the file
   is recognised by its hash, so only the move is retried and the record goes back to `Imported`.
 - **Crash protection.** If the app dies mid-import, the open transaction rolls back and the record stays
@@ -113,6 +117,8 @@ Later sources override earlier ones:
 | `Import:FilePattern` | `*.csv` | Which files to pick up |
 | `Import:ArchiveFolderName` | `Archive` | Subfolder of the source folder that receives processed files |
 | `Import:Delimiter` | `,` | Field delimiter |
+| `Import:Encoding` | `utf-8` | File encoding, e.g. `windows-1252`. A byte-order mark overrides it. Invalid UTF-8 fails the file instead of loading garbled text |
+| `Import:DateFormats` | ISO (`yyyy-MM-dd`, `yyyy-MM-dd HH:mm:ss`, `yyyy-MM-ddTHH:mm:ss`) | Accepted formats for `Date` columns. If you add a regional format such as `MM/dd/yyyy`, convert it in the validation procedure with an explicit style (`TRY_CONVERT(DATE, x, 101)`) |
 | `Import:MinFileAgeSeconds` | `30` | Skip files modified more recently than this |
 | `Import:ProcessingTimeoutMinutes` | `60` | When a stuck `Processing` record counts as abandoned |
 | `Import:Columns` | example layout | File columns: `SourceName`, `DestinationName`, `Required`, `Type` (`Text`, `Integer`, `Decimal`, `Date`), `MaxLength` |
@@ -210,6 +216,8 @@ FILEIMPORTER_TEST_SQL="Server=localhost,1433;User ID=sa;Password=...;TrustServer
    - To fail: return `IsValid = 0, Message = '...'`, or `THROW` an error with number 50000 or higher.
    - It runs inside the importer's transaction, so it must not `COMMIT` or `ROLLBACK`. This also makes it
      a safe place to copy the rows into your final tables: if anything fails, everything rolls back.
+   - If it checks against data from other files (like the example's "already imported" rule), keep the
+     `sp_getapplock` at the top. It makes concurrent imports validate one at a time.
 4. **Header-less, fixed-width or Excel files:** add a new `IImportFileReader` that returns an `ImportFile`
    (a `DataTable` plus a list of errors), and register it in `ServiceCollectionExtensions.AddFileImporter`.
 5. **Tracking table:** its SQL is in `SqlImportRepository`. Change the script and the class together.

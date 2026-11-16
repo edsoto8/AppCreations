@@ -8,8 +8,10 @@ public interface IImportRepository
     /// <summary>
     /// Creates a "Processing" tracking record for the file, unless a record for the same content (hash) is already
     /// Processing, Imported or ArchivePending. In that case the existing record is returned with IsNew = false.
+    /// <paramref name="importId"/> is the id for a new record; pass the same value when retrying, so a claim that was
+    /// committed before a connection drop is recognised as this file's own (IsNew = true).
     /// </summary>
-    Task<ImportClaim> BeginImportAsync(string fileName, string fileHash, long fileSizeBytes, CancellationToken cancellationToken);
+    Task<ImportClaim> BeginImportAsync(Guid importId, string fileName, string fileHash, long fileSizeBytes, CancellationToken cancellationToken);
 
     /// <summary>
     /// In one transaction: bulk loads the rows into the staging table, runs the validation procedure and, when it
@@ -17,7 +19,7 @@ public interface IImportRepository
     /// </summary>
     Task<ValidationResult> LoadAndValidateAsync(Guid importId, ImportFile file, CancellationToken cancellationToken);
 
-    /// <summary>Sets the record to Failed with the error message.</summary>
+    /// <summary>Sets the record to Failed with the error message. Only a Processing record changes: committed imports are never failed.</summary>
     Task MarkFailedAsync(Guid importId, string error, CancellationToken cancellationToken);
 
     /// <summary>Sets the record to ArchivePending: the data is imported but the file still has to be archived.</summary>

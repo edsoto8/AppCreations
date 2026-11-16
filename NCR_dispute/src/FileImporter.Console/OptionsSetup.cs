@@ -17,6 +17,7 @@ internal static class OptionsSetup
             .Validate(o => !string.IsNullOrWhiteSpace(o.FilePattern), "Import:FilePattern is required.")
             .Validate(o => !string.IsNullOrWhiteSpace(o.ArchiveFolderName) && o.ArchiveFolderName.IndexOfAny(Path.GetInvalidFileNameChars()) < 0,
                 "Import:ArchiveFolderName must be a plain folder name.")
+            .Validate(o => IsSupportedEncoding(o.Encoding), "Import:Encoding is not a known encoding name (e.g. utf-8, windows-1252).")
             .Validate(o => o.Columns.Count > 0, "Import:Columns must list at least one column.")
             .Validate(o => o.Columns.All(c => !string.IsNullOrWhiteSpace(c.SourceName)), "Every Import:Columns entry needs a SourceName.")
             .Validate(o => o.Columns.Select(c => c.Destination).Distinct(StringComparer.OrdinalIgnoreCase).Count() == o.Columns.Count,
@@ -52,4 +53,23 @@ internal static class OptionsSetup
     }
 
     private static bool IsEmail(string? value) => MailAddress.TryCreate(value, out _);
+
+    private static bool IsSupportedEncoding(string? name)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return false;
+        }
+
+        try
+        {
+            System.Text.Encoding.RegisterProvider(System.Text.CodePagesEncodingProvider.Instance);
+            System.Text.Encoding.GetEncoding(name);
+            return true;
+        }
+        catch (ArgumentException)
+        {
+            return false;
+        }
+    }
 }
