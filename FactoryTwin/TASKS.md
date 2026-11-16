@@ -34,9 +34,9 @@ Status: `[x]` done, `[ ]` open, `[~]` partial. Updated at the end of every miles
 - [x] Playwright smoke tests (5) pass
 
 ## M4 Dashboard
-- [ ] KPI tiles, charts, utilisation, inventory, alerts
-- [ ] Inspector panel for every entity kind, product lifecycle
-- [ ] Metrics-vs-log test (invariant 9)
+- [x] KPI tiles (9), charts (production/h, WIP & orders, utilisation trend, inventory), per-machine state bars, cost breakdown, bottleneck card, alerts — dataviz reference palette (dark steps)
+- [x] Inspector panel for stations, conveyors, vehicles, workers, products (full lifecycle), pallets, racks
+- [x] Metrics-vs-log test (invariant 9); dashboard updates throttled to 4 Hz
 
 ## M5 Failures
 - [ ] 8 incident types, incident timeline, recovery actions

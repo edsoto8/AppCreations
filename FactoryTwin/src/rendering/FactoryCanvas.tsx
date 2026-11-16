@@ -23,7 +23,7 @@ export function FactoryCanvas() {
     <Canvas
       shadows="percentage"
       dpr={[1, 2]}
-      camera={{ fov: 42, near: 0.3, far: 700, position: [-38, 42, 52] }}
+      camera={{ fov: 42, near: 0.3, far: 700, position: [-24, 58, 66] }}
       gl={{ antialias: true, powerPreference: 'high-performance', preserveDrawingBuffer: true }}
       onPointerMissed={() => useUi.getState().select(null)}
       data-testid="canvas"

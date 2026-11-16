@@ -8,8 +8,8 @@ import { runtime } from './runtime';
 import { entityWorldPos } from './entityPosition';
 import type { P3 } from './positions';
 
-const HOME_POS = new Vector3(-38, 42, 52);
-const HOME_TARGET = new Vector3(2, 0, 2);
+const HOME_POS = new Vector3(-24, 58, 66);
+const HOME_TARGET = new Vector3(4, 0, -2);
 const TOP_POS = new Vector3(0, 105, 0.01);
 
 /**
