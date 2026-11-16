@@ -39,8 +39,9 @@ Status: `[x]` done, `[ ]` open, `[~]` partial. Updated at the end of every miles
 - [x] Metrics-vs-log test (invariant 9); dashboard updates throttled to 4 Hz
 
 ## M5 Failures
-- [ ] 8 incident types, incident timeline, recovery actions
-- [ ] Scenario export/import, replay
+- [x] 8 incident types, incident timeline, recovery actions (repair now, reroute, reassign worker, expedite materials)
+- [x] Scenario export/import, replay of live interventions reproduces the identical log (injected events run after model events at equal times)
+- [x] Incident tests: each kind visibly changes behaviour (11 tests)
 
 ## M6 Optimization
 - [ ] Parameter editor, baseline save/compare (multi-seed)

@@ -90,8 +90,19 @@ export function optimize(
     }
   }
 
-  const ranked = [...cache.values()].filter((c) => c !== baseline).sort((a, b) => b.objective.mean - a.objective.mean);
-  const top = ranked.slice(0, 3).map((c) => ({
+  // rank by objective; among equal outcomes prefer the smallest change set, and drop candidates
+  // whose result is identical to one already listed (their extra changes had no effect)
+  const nChanges = (c: CandidateResult) => describeChanges(baseline.params, c.params).length;
+  const ranked = [...cache.values()]
+    .filter((c) => c !== baseline)
+    .sort((a, b) => b.objective.mean - a.objective.mean || nChanges(a) - nChanges(b));
+  const distinct: CandidateResult[] = [];
+  for (const c of ranked) {
+    if (distinct.some((d) => Math.abs(d.objective.mean - c.objective.mean) < 1e-6)) continue;
+    distinct.push(c);
+    if (distinct.length === 3) break;
+  }
+  const top = distinct.map((c) => ({
     ...c,
     gain: c.objective.mean - baseline.objective.mean,
     changes: describeChanges(baseline.params, c.params),
