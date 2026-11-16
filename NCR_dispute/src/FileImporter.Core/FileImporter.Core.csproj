@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <PackageReference Include="Dapper" Version="2.1.89" />
+    <PackageReference Include="MailKit" Version="5.0.0" />
+    <PackageReference Include="Microsoft.Data.SqlClient" Version="7.1.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="FileImporter.Tests" />
+  </ItemGroup>
+
+</Project>

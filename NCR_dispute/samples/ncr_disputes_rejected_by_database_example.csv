@@ -1,0 +1,3 @@
+DisputeId,AccountNumber,TransactionDate,Amount,CurrencyCode,ReasonCode,Description
+D-3000001,ACCT-0000201,2026-10-01,125.50,USD,R01,Passes the file checks
+D-3000001,ACCT-0000202,2026-10-02,-5.00,USD,R03,"Duplicate DisputeId and a negative amount, rejected by the validation procedure"

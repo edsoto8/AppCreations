@@ -1,0 +1,20 @@
+<Solution>
+  <Folder Name="/Solution Items/">
+    <File Path="Directory.Build.props" />
+    <File Path="global.json" />
+    <File Path="README.md" />
+  </Folder>
+  <Folder Name="/sql/">
+    <File Path="sql/00_CreateDatabase.sql" />
+    <File Path="sql/01_FileImport.sql" />
+    <File Path="sql/02_NcrDisputeStaging.sql" />
+    <File Path="sql/03_usp_ValidateNcrDisputeImport.sql" />
+  </Folder>
+  <Folder Name="/src/">
+    <Project Path="src/FileImporter.Console/FileImporter.Console.csproj" />
+    <Project Path="src/FileImporter.Core/FileImporter.Core.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/FileImporter.Tests/FileImporter.Tests.csproj" />
+  </Folder>
+</Solution>

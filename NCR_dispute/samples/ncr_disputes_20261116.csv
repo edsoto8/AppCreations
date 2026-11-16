@@ -1,0 +1,9 @@
+DisputeId,AccountNumber,TransactionDate,Amount,CurrencyCode,ReasonCode,Description
+D-1000001,ACCT-0000001,2026-10-01,125.50,USD,R01,Card not present
+D-1000002,ACCT-0000002,2026-10-02,89.99,USD,R03,Duplicate charge
+D-1000003,ACCT-0000003,2026-10-03,1500.00,USD,R07,"Merchandise not received, customer contacted merchant"
+D-1000004,ACCT-0000004,2026-10-04,42.10,USD,R01,
+D-1000005,ACCT-0000005,2026-10-05,310.00,EUR,R12,"Amount differs from receipt ""$300.00"""
+D-1000006,ACCT-0000006,2026-10-06,19.95,USD,R03,Recurring charge after cancellation
+D-1000007,ACCT-0000007,2026-10-07,780.25,USD,R07,Item not as described
+D-1000008,ACCT-0000008,2026-10-08,55.00,GBP,R01,

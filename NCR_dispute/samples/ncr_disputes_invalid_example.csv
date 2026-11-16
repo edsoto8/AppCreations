@@ -1,0 +1,5 @@
+DisputeId,AccountNumber,TransactionDate,Amount,CurrencyCode,ReasonCode,Description
+D-2000001,ACCT-0000101,2026-10-01,125.50,USD,R01,Valid row
+D-2000002,,2026-10-02,89.99,USD,R03,Missing account number
+D-2000003,ACCT-0000103,not-a-date,10.00,USD,R07,Bad date
+D-2000004,ACCT-0000104,2026-10-04,abc,USD,R01,Bad amount
