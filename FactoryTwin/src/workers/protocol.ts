@@ -9,5 +9,5 @@ export type WorkerRequest =
   | { type: 'hash'; id: number };
 
 export type WorkerResponse =
-  | { type: 'state'; snapshot: SimSnapshot; metrics: MetricsSnapshot | null }
+  | { type: 'state'; snapshot: SimSnapshot; metrics: MetricsSnapshot | null; complete: boolean; now: number }
   | { type: 'reply'; id: number; value: unknown };

@@ -24,6 +24,8 @@ export interface Job {
   rate: number;
   /** Waiting for staff mid-job. */
   waiting: boolean;
+  /** Fraction of the current phase already done when it (re)started (after a pause or rate change). */
+  p0?: number;
   /** Inspection: result decided at the end of the test phase. */
   reject?: boolean;
   /** Palletizer: build position the job works on. */
@@ -135,6 +137,7 @@ export abstract class Machine {
     job.waiting = false;
     this.frozen = null;
     const dur = phase.work / rate;
+    job.p0 = phase.total > 0 ? 1 - phase.work / phase.total : 0;
     job.t0 = this.now;
     job.t1 = this.now + dur;
     job.rate = rate;
@@ -272,7 +275,19 @@ export abstract class Machine {
   }
 
   onStaffChange(): void {
-    if (this.job?.waiting && !this.failed) this.beginPhase();
+    const job = this.job;
+    if (job && !job.waiting && !this.failed && this.phaseEvent !== null) {
+      const phase = job.phases[job.idx];
+      const rate = this.rate(phase.kind);
+      if (Math.abs(rate - job.rate) > 1e-9) {
+        // bank the work done at the old rate, then continue (or wait) at the new rate
+        this.f.engine.cancel(this.phaseEvent);
+        this.phaseEvent = null;
+        this.wear.addAge(this.now - this.busySince);
+        phase.work = Math.max(0, phase.work - (this.now - this.busySince) * job.rate);
+        this.beginPhase();
+      }
+    } else if (job?.waiting && !this.failed) this.beginPhase();
     this.updateState();
     this.tryStart();
   }
@@ -297,7 +312,10 @@ export abstract class Machine {
     const job = this.job;
     if (!job) return null;
     const phase = job.phases[Math.min(job.idx, job.phases.length - 1)];
-    const info: PhaseInfo = { name: phase.name, t0: job.t0, t1: job.t1 };
+    // express a resumed phase as one continuous 0..1 progress (virtual start before t0)
+    const p0 = Math.min(0.999, job.p0 ?? 0);
+    const t0 = p0 > 0 && job.t1 > job.t0 ? job.t0 - (p0 * (job.t1 - job.t0)) / (1 - p0) : job.t0;
+    const info: PhaseInfo = { name: phase.name, t0, t1: job.t1 };
     if (this.failed || job.waiting) {
       const done = phase.total > 0 ? 1 - phase.work / phase.total : 0;
       info.frozenProgress = this.frozen ?? done;

@@ -2,7 +2,7 @@ import type { HistoryEntry, MotionSegment, PhaseInfo, Vec2, VehicleKind, Vehicle
 import type { MaterialLot, Pallet, Product } from '../entities/records';
 import { addHistory } from '../entities/records';
 import { StateTracker, WearClock } from '../entities/trackers';
-import { distanceAt, pointAtDistance } from './motion';
+import { distanceAt, pointAtDistance, polylineLength } from './motion';
 import type { Factory } from '../production/factory';
 
 export interface Stop {
@@ -49,6 +49,8 @@ export class Vehicle {
   readonly wear: WearClock;
   readonly history: HistoryEntry[] = [];
   heldPoint: string | null = null;
+  /** Off-graph start point after an interrupted trip (the next move starts here, not at `node`). */
+  detour: Vec2 | null = null;
 
   constructor(
     readonly f: Factory,
@@ -75,11 +77,13 @@ export class Vehicle {
     return this.task !== null;
   }
 
+  /** Busy share of available time: travelling with a task, loading/unloading or queued, over time not off-shift or failed. */
   utilization(now: number): number {
-    const total = this.tracker.total(now) - this.tracker.time('off-shift', now);
-    if (total <= 0) return 0;
-    const idle = this.tracker.time('idle', now);
-    return 1 - idle / total;
+    const t = this.tracker;
+    const avail = t.total(now) - t.time('off-shift', now) - t.time('failed', now);
+    if (avail <= 0) return 0;
+    const busy = t.time('to-pickup', now) + t.time('to-dropoff', now) + t.time('loading', now) + t.time('unloading', now) + t.time('queued', now);
+    return Math.min(1, busy / avail);
   }
 
   snap(): VehicleSnap {
@@ -148,8 +152,14 @@ export abstract class Fleet {
   protected moveTo(v: Vehicle, node: string, step: Step): void {
     v.step = step;
     v.target = node;
-    const { points, length } = this.f.layout.graph.path(v.node, node);
-    this.startMotion(v, points, 0, length);
+    const path = this.f.layout.graph.path(v.node, node);
+    if (v.detour) {
+      const points: Vec2[] = [v.detour, ...path.points];
+      v.detour = null;
+      this.startMotion(v, points, 0, polylineLength(points));
+      return;
+    }
+    this.startMotion(v, path.points, 0, path.length);
   }
 
   private startMotion(v: Vehicle, points: Vec2[], d0: number, length: number): void {
@@ -257,6 +267,7 @@ export abstract class Fleet {
         const p = pointAtDistance(v.motion.points, d);
         v.pos = [p.x, p.z];
         v.node = this.f.layout.nearestNode(v.pos);
+        v.detour = [p.x, p.z];
         v.motion = null;
       }
     }

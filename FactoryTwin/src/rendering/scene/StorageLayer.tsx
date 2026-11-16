@@ -14,10 +14,14 @@ export function StorageLayer({ layout }: { layout: FactoryLayout }) {
   const kitAnims = useMemo(() => layout.cells.map(() => createKitTableAnim()), [layout]);
   const [loads, setLoads] = useState<number[]>(() => layout.rawRacks.map(() => 14));
   const sig = useRef('');
-  useFrame(() => {
+  const last = useRef(0);
+  useFrame(({ clock }) => {
     const rt = runtime.current;
     const snap = rt?.index.snap;
     if (!rt || !snap) return;
+    // rack fill is a slow-moving display: re-evaluate at most twice per second
+    if (clock.elapsedTime - last.current < 0.5) return;
+    last.current = clock.elapsedTime;
     const cfg = rt.scenario.config;
     const next = layout.rawRacks.map((r) => {
       const slots = r.bays * r.levels;

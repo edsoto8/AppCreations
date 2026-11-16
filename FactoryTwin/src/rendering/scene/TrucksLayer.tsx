@@ -33,8 +33,12 @@ function TruckView({ snap, layout, waitingIndex }: { snap: TruckSnap; layout: Fa
 export function TrucksLayer({ layout }: { layout: FactoryLayout }) {
   const [trucks, setTrucks] = useState<TruckSnap[]>([]);
   const sig = useRef('');
+  const ver = useRef(-1);
   useFrame(() => {
-    const list = runtime.current?.index.snap?.trucks ?? [];
+    const ix = runtime.current?.index;
+    if (!ix || ix.version === ver.current) return;
+    ver.current = ix.version;
+    const list = ix.snap?.trucks ?? [];
     const s = list.map((t) => `${t.id}:${t.bay}:${t.state}`).join('|');
     if (s !== sig.current) {
       sig.current = s;

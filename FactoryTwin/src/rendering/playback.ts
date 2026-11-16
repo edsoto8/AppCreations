@@ -11,7 +11,7 @@ export class PlaybackController {
   paused = false;
   skipNight = true;
   /** Hard caps so the UI stays responsive at any speed. */
-  maxSimSecPerFrame = 600;
+  maxSimSecPerFrame = 120;
   maxEventsPerFrame = 5000;
   lastFrameEvents = 0;
 

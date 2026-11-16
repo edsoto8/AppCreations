@@ -10,11 +10,11 @@ self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
   switch (m.type) {
     case 'load':
       await host.load(m.scenario);
-      post({ type: 'state', snapshot: host.snapshot!, metrics: host.metrics! });
+      post({ type: 'state', snapshot: host.snapshot!, metrics: host.metrics!, complete: true, now: host.now });
       break;
     case 'advance':
       host.advanceTo(m.target, m.maxEvents);
-      post({ type: 'state', snapshot: host.snapshot!, metrics: m.withMetrics ? host.metrics! : null });
+      post({ type: 'state', snapshot: host.snapshot!, metrics: m.withMetrics ? host.metrics! : null, complete: host.lastComplete, now: host.now });
       break;
     case 'inject':
       host.inject(m.ev);

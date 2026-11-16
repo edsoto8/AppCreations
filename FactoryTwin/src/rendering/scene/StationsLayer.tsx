@@ -24,6 +24,7 @@ import {
   type RobotAnim,
 } from '../models';
 import { pickHandlers } from './pick';
+import { StatusHalo } from './StatusHalo';
 
 const scratch: number[] = [];
 const lerp = (a: number, b: number, s: number) => a + (b - a) * s;
@@ -107,6 +108,7 @@ function AssemblyCellView({ layout, index }: { layout: FactoryLayout; index: num
   const handlers = pickHandlers({ kind: 'station', id }, () => stationLabel(id));
   return (
     <group {...handlers}>
+      <StatusHalo id={id} position={[cell.robot[0] - 0.4, cell.robot[1] - 0.9]} size={[5.4, 4.6]} />
       <RobotArm anim={robot} position={[cell.robot[0], 0, cell.robot[1]]} />
       <AssemblyMachine anim={machine} position={[cell.machine[0], 0, cell.machine[1]]} />
       <StackLight anim={light} position={[cell.machine[0] + ASSEMBLY_LIGHT_MOUNT[0], ASSEMBLY_LIGHT_MOUNT[1], cell.machine[1] + ASSEMBLY_LIGHT_MOUNT[2]]} />
@@ -139,6 +141,7 @@ function InspectionView({ layout, index }: { layout: FactoryLayout; index: numbe
   });
   return (
     <group {...pickHandlers({ kind: 'station', id }, () => stationLabel(id))}>
+      <StatusHalo id={id} position={pos} size={[3.6, 3.2]} />
       <InspectionGantry anim={gantry} position={[pos[0], 0, pos[1]]} />
       <StackLight anim={light} position={[pos[0] + 1.1, 2.3, pos[1] - 1.1]} />
     </group>
@@ -163,6 +166,7 @@ function PackagingView({ layout }: { layout: FactoryLayout }) {
   });
   return (
     <group {...pickHandlers({ kind: 'station', id: 'pack' }, () => stationLabel('pack'))}>
+      <StatusHalo id="pack" position={c} size={[7, 3.4]} />
       <PackagingMachine anim={pack} position={[c[0], 0, c[1]]} />
       <StackLight anim={light} position={[c[0] + PACKAGING_LIGHT_MOUNT[0], PACKAGING_LIGHT_MOUNT[1], c[1] + PACKAGING_LIGHT_MOUNT[2]]} />
     </group>
@@ -210,6 +214,7 @@ function PalletizerView({ layout }: { layout: FactoryLayout }) {
   });
   return (
     <group {...pickHandlers({ kind: 'station', id: 'pal' }, () => stationLabel('pal'))}>
+      <StatusHalo id="pal" position={c} size={[4.4, 7]} />
       <Palletizer anim={anim} positions={zOffsets} position={[c[0], 0, c[1]]} />
       <StackLight anim={light} position={[c[0] + 1.6, 2.9, c[1] - 2.6]} />
     </group>

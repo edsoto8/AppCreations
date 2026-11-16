@@ -101,7 +101,6 @@ export function ProductsLayer({ layout }: { layout: FactoryLayout }) {
       if (!mesh) continue;
       mesh.count = counts[k];
       mesh.instanceMatrix.needsUpdate = true;
-      mesh.computeBoundingSphere();
     }
   });
 
@@ -163,7 +162,6 @@ export function PalletsLayer({ layout }: { layout: FactoryLayout }) {
     cm.count = c;
     pm.instanceMatrix.needsUpdate = true;
     cm.instanceMatrix.needsUpdate = true;
-    pm.computeBoundingSphere();
     void hidden;
   });
   const palletLabel = (id: string) => {

@@ -31,6 +31,13 @@ export class Incidents {
   private readonly items: IncidentInfo[] = [];
   private readonly waitingRepair = new Map<string, IncidentInfo>();
   private num = 0;
+  /** Latest incident id per effect key; an end event only restores if it is still the latest. */
+  private readonly owner = new Map<string, string>();
+
+  private claim(key: string, info: IncidentInfo, sec: number, n = 0): void {
+    this.owner.set(key, info.id);
+    this.f.engine.in(sec, 'incident.end', `${key}|${info.id}`, n);
+  }
 
   constructor(private readonly f: Factory) {
     f.log.subscribe((r) => {
@@ -99,10 +106,11 @@ export class Incidents {
         const delay = num(ev, 'delayHours', 24);
         const dur = num(ev, 'durationHours', 24);
         const qty = Math.floor((f.inventory.onHand[m] * pct) / 100);
-        this.add(ev, `${m}: ${qty} units quarantined (${pct}%), supplier delayed +${delay} h`, dur * H);
+        const info = this.add(ev, `${m}: ${qty} units quarantined (${pct}%), supplier delayed +${delay} h`, dur * H);
         f.inventory.supplierDelayHours[m] += delay;
         f.inventory.quarantine(m, qty);
-        f.engine.in(dur * H, 'incident.end', `shortage:${m}`, delay);
+        // delays add up per incident, so every shortage removes its own delay
+        f.engine.in(dur * H, 'incident.end', `shortage:${m}|${info.id}`, delay);
         break;
       }
       case 'worker-absence': {
@@ -123,9 +131,9 @@ export class Incidents {
       case 'inspection-spike': {
         const rate = num(ev, 'rejectRate', 0.3);
         const dur = num(ev, 'durationHours', 2);
-        this.add(ev, `Inspection reject rate ${Math.round(rate * 100)}% for ${dur} h`, dur * H);
+        const info = this.add(ev, `Inspection reject rate ${Math.round(rate * 100)}% for ${dur} h`, dur * H);
         f.rejectSpike = rate;
-        f.engine.in(dur * H, 'incident.end', 'spike');
+        this.claim('spike', info, dur * H);
         break;
       }
       case 'order-surge': {
@@ -140,18 +148,18 @@ export class Incidents {
         const dur = num(ev, 'durationHours', 6);
         const factor = num(ev, 'carrierDelayFactor', 3);
         const closed = Math.min(f.shipping.bays.length - 1, Math.round(num(ev, 'baysClosed', 1)));
-        this.add(ev, `${closed} shipping bay(s) closed, carriers ${factor}× slower for ${dur} h`, dur * H);
+        const info = this.add(ev, `${closed} shipping bay(s) closed, carriers ${factor}× slower for ${dur} h`, dur * H);
         f.shipping.closedBays = closed;
         f.shipping.carrierDelayFactor = factor;
-        f.engine.in(dur * H, 'incident.end', 'shipping');
+        this.claim('shipping', info, dur * H);
         break;
       }
       case 'packaging-slowdown': {
         const factor = num(ev, 'factor', 0.5);
         const dur = num(ev, 'durationHours', 3);
-        this.add(ev, `Packaging runs at ${Math.round(factor * 100)}% speed for ${dur} h`, dur * H);
+        const info = this.add(ev, `Packaging runs at ${Math.round(factor * 100)}% speed for ${dur} h`, dur * H);
         f.packaging.incidentSpeed = factor;
-        f.engine.in(dur * H, 'incident.end', 'packaging');
+        this.claim('packaging', info, dur * H);
         break;
       }
       case 'repair-now': {
@@ -179,8 +187,8 @@ export class Incidents {
         if (!cell) return;
         const dur = num(ev, 'durationHours', 2);
         const moved = f.reroute(cell);
-        this.add(ev, `${cell.name}: ${moved} queued unit(s) rerouted to other cells for ${dur} h`, dur * H);
-        f.engine.in(dur * H, 'incident.end', `reroute:${cell.index}`);
+        const info = this.add(ev, `${cell.name}: ${moved} queued unit(s) rerouted to other cells for ${dur} h`, dur * H);
+        this.claim(`reroute:${cell.index}`, info, dur * H);
         break;
       }
       case 'expedite-material': {
@@ -194,8 +202,13 @@ export class Incidents {
     }
   }
 
-  onEnd(key: string, n: number): void {
+  onEnd(raw: string, n: number): void {
     const f = this.f;
+    const [key, id] = raw.split('|');
+    if (!key.startsWith('shortage:')) {
+      if (this.owner.get(key) !== id) return; // a later incident of the same kind is still active
+      this.owner.delete(key);
+    }
     if (key.startsWith('shortage:')) {
       const m = key.split(':')[1] as MaterialId;
       f.inventory.supplierDelayHours[m] = Math.max(0, f.inventory.supplierDelayHours[m] - n);

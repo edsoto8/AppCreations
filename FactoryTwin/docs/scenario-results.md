@@ -10,16 +10,16 @@ The calibrated default plant over 5 days. Baseline and scenario are the same con
 
 | Metric (mean ± std over 3 seeds) | Baseline | Normal operation | Change |
 |---|---|---|---|
-| Throughput (units shipped / day) | 1,142 ± 56.2 | 1,142 ± 56.2 | +0.0% |
-| Operating cost (total) | 223,742 ± 8,280 | 223,742 ± 8,280 | +0.0% |
-| Cost per unit | 39.2 ± 0.5 | 39.2 ± 0.5 | +0.0% |
-| On-time orders | 98.7% ± 2.2% | 98.7% ± 2.2% | +0.0% |
+| Throughput (units shipped / day) | 1,145 ± 55.7 | 1,145 ± 55.7 | +0.0% |
+| Operating cost (total) | 224,144 ± 8,023 | 224,144 ± 8,023 | +0.0% |
+| Cost per unit | 39.2 ± 0.6 | 39.2 ± 0.6 | +0.0% |
+| On-time orders | 99.0% ± 1.7% | 99.0% ± 1.7% | +0.0% |
 | Order lead time (h) | 9.2 ± 5.2 | 9.2 ± 5.2 | +0.0% |
-| Lateness (order-hours) | 4.3 ± 7.5 | 4.3 ± 7.5 | +0.0% |
-| Assembly utilisation | 86.0% ± 3.9% | 86.0% ± 3.9% | +0.0% |
-| Inspection utilisation | 47.2% ± 2.3% | 47.2% ± 2.3% | +0.0% |
-| Packaging utilisation | 61.6% ± 3.7% | 61.6% ± 3.7% | +0.0% |
-| Objective ($/day) | 87,436 ± 4,353 | 87,436 ± 4,353 | +0.0% |
+| Lateness (order-hours) | 2.4 ± 4.1 | 2.4 ± 4.1 | +0.0% |
+| Assembly utilisation | 86.3% ± 3.7% | 86.3% ± 3.7% | +0.0% |
+| Inspection utilisation | 47.3% ± 2.2% | 47.3% ± 2.2% | +0.0% |
+| Packaging utilisation | 61.4% ± 3.3% | 61.4% ± 3.3% | +0.0% |
+| Objective ($/day) | 87,821 ± 4,237 | 87,821 ± 4,237 | +0.0% |
 | Bottleneck (per seed) | Assembly, Assembly, Assembly | Assembly, Assembly, Assembly | |
 
 ## 2. Major equipment breakdown
@@ -30,58 +30,58 @@ Assembly Cell 2 fails at 07:30 on day 1 (main drive replaced: 10 h repair once t
 
 | Metric (mean ± std over 3 seeds) | Normal | Breakdown | Change |
 |---|---|---|---|
-| Throughput (units shipped / day) | 1,000 ± 92.5 | 692.3 ± 9.0 | -30.8% |
-| Operating cost (total) | 42,710 ± 3,205 | 32,469 ± 355.9 | -24.0% |
-| Cost per unit | 42.8 ± 1.9 | 46.9 ± 0.7 | +9.7% |
+| Throughput (units shipped / day) | 1,000 ± 92.5 | 671.7 ± 36.4 | -32.9% |
+| Operating cost (total) | 42,644 ± 3,147 | 32,464 ± 379.8 | -23.9% |
+| Cost per unit | 42.7 ± 1.9 | 48.4 ± 2.1 | +13.4% |
 | On-time orders | 100.0% ± 0.0% | 100.0% ± 0.0% | +0.0% |
-| Order lead time (h) | 2.7 ± 0.2 | 6.6 ± 0.9 | +146.4% |
+| Order lead time (h) | 2.7 ± 0.2 | 6.5 ± 1.1 | +143.4% |
 | Lateness (order-hours) | 0.0 ± 0.0 | 0.0 ± 0.0 | +0.0% |
-| Assembly utilisation | 80.5% ± 7.3% | 55.8% ± 1.0% | -30.6% |
-| Inspection utilisation | 44.6% ± 4.6% | 30.8% ± 0.7% | -30.8% |
-| Packaging utilisation | 57.2% ± 6.0% | 39.6% ± 0.6% | -30.8% |
-| Objective ($/day) | 71,200 ± 5,801 | 45,896 ± 2,478 | -35.5% |
+| Assembly utilisation | 80.3% ± 7.2% | 55.8% ± 1.0% | -30.6% |
+| Inspection utilisation | 44.5% ± 4.6% | 30.8% ± 0.6% | -30.7% |
+| Packaging utilisation | 57.0% ± 5.8% | 39.5% ± 0.6% | -30.7% |
+| Objective ($/day) | 71,265 ± 5,776 | 43,235 ± 3,073 | -39.3% |
 | Bottleneck (per seed) | Assembly, Assembly, Assembly | Assembly, Assembly, Assembly | |
 
 ### Breakdown vs normal, 3 days (recovery)
 
 | Metric (mean ± std over 3 seeds) | Normal | Breakdown | Change |
 |---|---|---|---|
-| Throughput (units shipped / day) | 1,062 ± 64.6 | 966.7 ± 70.0 | -9.0% |
-| Operating cost (total) | 127,058 ± 6,013 | 120,151 ± 7,442 | -5.4% |
-| Cost per unit | 39.9 ± 0.5 | 41.5 ± 0.7 | +3.9% |
+| Throughput (units shipped / day) | 1,062 ± 64.6 | 975.4 ± 77.9 | -8.1% |
+| Operating cost (total) | 127,321 ± 5,826 | 120,376 ± 6,945 | -5.5% |
+| Cost per unit | 40.0 ± 0.6 | 41.2 ± 1.0 | +3.0% |
 | On-time orders | 100.0% ± 0.0% | 100.0% ± 0.0% | +0.0% |
-| Order lead time (h) | 6.4 ± 2.4 | 11.2 ± 4.0 | +75.8% |
+| Order lead time (h) | 6.3 ± 2.3 | 11.1 ± 3.9 | +75.4% |
 | Lateness (order-hours) | 0.0 ± 0.0 | 9.4 ± 16.3 | +0.0% |
-| Assembly utilisation | 80.3% ± 4.4% | 74.8% ± 5.7% | -6.8% |
-| Inspection utilisation | 44.2% ± 3.0% | 41.1% ± 3.0% | -7.1% |
-| Packaging utilisation | 57.3% ± 3.9% | 53.2% ± 3.2% | -7.2% |
-| Objective ($/day) | 79,928 ± 4,494 | 71,278 ± 8,023 | -10.8% |
+| Assembly utilisation | 80.5% ± 4.2% | 75.0% ± 5.3% | -6.9% |
+| Inspection utilisation | 44.4% ± 3.0% | 41.2% ± 2.8% | -7.2% |
+| Packaging utilisation | 57.4% ± 3.9% | 53.2% ± 2.9% | -7.3% |
+| Objective ($/day) | 79,840 ± 4,621 | 72,335 ± 8,644 | -9.4% |
 | Bottleneck (per seed) | Assembly, Assembly, Assembly | Assembly, Assembly, Assembly | |
 
 ## 3. Improved throughput after optimization
 
-Growth demand (+25% orders). The optimizer (hill climbing, 42 candidates, objective = revenue - operating cost - lateness penalty per day, 3 seeds x 4 days per candidate) recommends:
+Growth demand (+25% orders). The optimizer (hill climbing, 60 candidates, objective = revenue - operating cost - lateness penalty per day, 3 seeds x 4 days per candidate) recommends:
 
-1. **+$14,714/day** (throughput 1383 vs 1202 units/day): Inspection stations: 2 → 3; WIP limit per cell: 3 → 4; Assembly speed factor: 1 → 1.2; Packaging speed factor: 1 → 0.9; Dispatch rule (0 priority+EDD, 1 EDD, 2 FIFO): 0 → 1; Reorder point & qty scale: 1 → 1.2
-2. **+$14,522/day** (throughput 1382 vs 1202 units/day): Inspection stations: 2 → 3; Assembly speed factor: 1 → 1.2; Packaging speed factor: 1 → 0.9; Dispatch rule (0 priority+EDD, 1 EDD, 2 FIFO): 0 → 1; Reorder point & qty scale: 1 → 1.2
-3. **+$14,475/day** (throughput 1382 vs 1202 units/day): Inspection stations: 2 → 3; Assembly speed factor: 1 → 1.2; Dispatch rule (0 priority+EDD, 1 EDD, 2 FIFO): 0 → 1; Reorder point & qty scale: 1 → 1.2
+1. **+$20,067/day** (throughput 1462 vs 1206 units/day): Assembly cells: 3 → 4; Inspection stations: 2 → 3; Packaging speed factor: 1 → 1.1; Floaters per shift: 1 → 2; PM interval (busy h, 0 = off): 0 → 10; Dispatch rule (0 priority+EDD, 1 EDD, 2 FIFO): 0 → 1; Reorder point & qty scale: 1 → 1.2
+2. **+$20,063/day** (throughput 1462 vs 1206 units/day): Assembly cells: 3 → 4; Inspection stations: 2 → 3; Packaging speed factor: 1 → 1.1; Floaters per shift: 1 → 2; PM interval (busy h, 0 = off): 0 → 10; Reorder point & qty scale: 1 → 1.2
+3. **+$19,992/day** (throughput 1462 vs 1206 units/day): Assembly cells: 3 → 4; Inspection stations: 2 → 3; Packaging speed factor: 1 → 1.2; Floaters per shift: 1 → 2; PM interval (busy h, 0 = off): 0 → 10; Dispatch rule (0 priority+EDD, 1 EDD, 2 FIFO): 0 → 1; Reorder point & qty scale: 1 → 1.2
 
-The one-click preset applies: `inspection.stations = 3`, `assembly.wipPerCell = 4`, `assembly.speedFactor = 1.2`, `packaging.speedFactor = 0.9`, `orders.dispatchRule = 1`, `materials.reorderScale = 1.2`.
+The one-click preset applies: `assembly.cells = 4`, `inspection.stations = 3`, `packaging.speedFactor = 1.1`, `staffing.floaters = 2`, `assembly.pmIntervalHours = 10`, `orders.dispatchRule = 1`, `materials.reorderScale = 1.2`.
 
 ### Optimized vs growth baseline, 5 days
 
 | Metric (mean ± std over 3 seeds) | Growth baseline | Optimized | Change |
 |---|---|---|---|
-| Throughput (units shipped / day) | 1,220 ± 59.2 | 1,377 ± 73.6 | +12.9% |
-| Operating cost (total) | 237,576 ± 8,847 | 271,205 ± 11,736 | +14.2% |
-| Cost per unit | 39.0 ± 0.5 | 39.4 ± 1.3 | +1.2% |
+| Throughput (units shipped / day) | 1,219 ± 49.9 | 1,441 ± 115.2 | +18.2% |
+| Operating cost (total) | 237,790 ± 8,018 | 281,002 ± 15,574 | +18.2% |
+| Cost per unit | 39.0 ± 0.3 | 39.0 ± 1.0 | +0.1% |
 | On-time orders | 100.0% ± 0.0% | 100.0% ± 0.0% | +0.0% |
-| Order lead time (h) | 10.4 ± 2.9 | 8.2 ± 1.6 | -20.9% |
+| Order lead time (h) | 10.2 ± 2.7 | 5.8 ± 0.2 | -43.2% |
 | Lateness (order-hours) | 237.0 ± 247.0 | 0.0 ± 0.0 | -100.0% |
-| Assembly utilisation | 92.7% ± 4.1% | 90.1% ± 4.9% | -2.7% |
-| Inspection utilisation | 51.1% ± 2.0% | 38.8% ± 2.2% | -24.1% |
-| Packaging utilisation | 66.6% ± 2.4% | 83.9% ± 5.8% | +26.0% |
-| Objective ($/day) | 91,770 ± 6,880 | 104,334 ± 6,967 | +13.7% |
+| Assembly utilisation | 92.8% ± 3.6% | 80.5% ± 5.6% | -13.3% |
+| Inspection utilisation | 51.1% ± 1.8% | 39.5% ± 2.9% | -22.7% |
+| Packaging utilisation | 66.3% ± 2.0% | 69.5% ± 5.7% | +4.8% |
+| Objective ($/day) | 91,821 ± 5,898 | 109,288 ± 9,118 | +19.0% |
 | Bottleneck (per seed) | Assembly, Assembly, Assembly | Assembly, Assembly, Assembly | |
 
-_Report generated in 49 s._
+_Report generated in 71 s._

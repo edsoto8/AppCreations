@@ -575,6 +575,7 @@ export interface BottleneckEntry {
   stage: string;
   score: number;
   utilization: number;
+  failedFrac: number;
   blockedFrac: number;
   starvedFrac: number;
   avgQueue: number;

@@ -50,7 +50,12 @@ Status: `[x]` done, `[ ]` open, `[~]` partial. Updated at the end of every miles
 - [x] `npm run report` → docs/scenario-results.md; the optimized preset is generated from the optimizer's #1 result
 
 ## M7 Polish & validation
-- [ ] Visual polish, perf monitor, draw-call check
-- [ ] Three one-click scenarios with numbers
-- [ ] Playwright smoke + screenshots in docs/
-- [ ] README, final report
+- [x] Visual polish (state halos, overview framing), perf monitor (fps, draw calls vs 400 budget, triangles, events): ~280 draw calls
+- [x] Architecture review findings fixed (D-029–D-034) with regression tests (91 tests)
+- [x] Three one-click scenarios with numbers (docs/scenario-results.md)
+- [x] Playwright smoke (5 pass) + screenshots in docs/
+- [x] README, FINAL_REPORT.md
+
+## Open / next
+- [ ] Measure fps on real GPU hardware (headless SwiftShader only reaches 1–2 fps)
+- [ ] AGV aisle reservations, product changeovers, smarter optimizer (see FINAL_REPORT.md)

@@ -350,6 +350,8 @@ export class Workforce {
     addHistory(w.history, this.f.engine.now, 'Break started');
     this.f.log.write('worker.break', w.id, w.station ?? w.role);
     const st = w.station;
+    // mark the break first so a floater can't pick its own uncovered station back up
+    w.state = 'on-break';
     if (w.role === 'floater' && w.coverTarget) {
       // floater on break: the covered station is uncovered again
       const target = w.coverTarget;

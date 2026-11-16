@@ -304,7 +304,7 @@ export class Factory {
     while (this.infeed.length < cap) {
       let best: Conveyor | null = null;
       for (const c of this.c1) {
-        if (c.headWaiting && (!best || c.headSince < best.headSince)) best = c;
+        if (c.headWaiting && !c.failed && (!best || c.headSince < best.headSince)) best = c;
       }
       if (!best) break;
       const p = best.takeHead();

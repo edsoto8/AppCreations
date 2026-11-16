@@ -8,6 +8,9 @@ import type { WorkerRequest, WorkerResponse } from './protocol';
  */
 export class WorkerSimHost implements SimHost {
   snapshot: SimSnapshot | null = null;
+  /** Engine time and cap status reported by the worker (the playback clock never runs ahead of a capped engine). */
+  now = 0;
+  lastComplete = true;
   metrics: MetricsSnapshot | null = null;
   private readonly worker: Worker;
   private inFlight = false;
@@ -24,6 +27,8 @@ export class WorkerSimHost implements SimHost {
       if (m.type === 'state') {
         this.snapshot = m.snapshot;
         if (m.metrics) this.metrics = m.metrics;
+        this.now = m.now;
+        this.lastComplete = m.complete;
         this.inFlight = false;
         this.loadResolve?.();
         this.loadResolve = null;

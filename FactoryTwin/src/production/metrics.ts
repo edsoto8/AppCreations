@@ -234,13 +234,12 @@ export class Metrics {
     const openT = f.openSeconds(now);
     for (const v of [...f.agvs.vehicles, ...f.forklifts.vehicles]) {
       const t = v.tracker;
-      const busy = t.total(now) - t.time('idle', now) - t.time('off-shift', now) - t.time('failed', now);
       out.push({
         id: v.id,
         name: v.name,
         kind: v.kind,
         stage: v.kind === 'agv' ? 'AGV transport' : 'Forklift',
-        utilization: openT > 0 ? Math.min(1, busy / openT) : 0,
+        utilization: v.utilization(now),
         blockedFrac: openT > 0 ? t.time('queued', now) / openT : 0,
         starvedFrac: 0,
         failedFrac: openT > 0 ? t.time('failed', now) / openT : 0,

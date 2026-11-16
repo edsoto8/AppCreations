@@ -140,12 +140,12 @@ export class Conveyor {
   }
 
   headProduct(): Product | null {
-    return this.headWaiting && this.items.length > 0 ? this.items[0].product : null;
+    return this.headWaiting && !this.failed && this.items.length > 0 ? this.items[0].product : null;
   }
 
   /** Remove and return the head item (only valid while it waits at the end). */
   takeHead(): Product {
-    if (!this.headWaiting || this.items.length === 0) throw new Error(`${this.id}: no head waiting`);
+    if (!this.headWaiting || this.failed || this.items.length === 0) throw new Error(`${this.id}: no head available`);
     this.sync();
     const pos = this.positions();
     const head = this.items.shift()!;
@@ -242,6 +242,7 @@ export class Conveyor {
     this.track();
     this.history.push({ t: this.f.engine.now, text: 'Repaired' });
     this.f.log.write('conveyor.repair', this.id);
-    // Downstream may already be waiting for the head that was frozen
+    // the frozen head can be handed off again
+    if (this.headWaiting) this.sink?.offer(this);
   }
 }

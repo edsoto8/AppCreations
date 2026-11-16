@@ -32,7 +32,7 @@ export function detectBottleneck(resources: ResourceStats[], upstreamQueue: Reco
     const avgQueue = g.reduce((s, r) => s + r.avgQueue, 0) + (upstreamQueue[stage] ?? 0);
     const active = Math.min(1, utilization + failed);
     const score = active * (1 - blockedFrac) + 0.15 * Math.min(1, avgQueue / (8 * n));
-    ranking.push({ stage, score, utilization, blockedFrac, starvedFrac, avgQueue });
+    ranking.push({ stage, score, utilization, failedFrac: failed, blockedFrac, starvedFrac, avgQueue });
   }
   ranking.sort((a, b) => b.score - a.score || STAGE_ORDER.indexOf(a.stage) - STAGE_ORDER.indexOf(b.stage));
   return { ranking, explanation: explain(ranking) };
@@ -46,7 +46,7 @@ function explain(r: BottleneckEntry[]): string {
   const second = r[1];
   const starved = [...r].filter((e) => e !== top).sort((a, b) => b.starvedFrac - a.starvedFrac)[0];
   let s =
-    `${top.stage} is the bottleneck: it was busy or down ${pct(top.utilization)} of its open time, ` +
+    `${top.stage} is the bottleneck: it was busy ${pct(top.utilization)}${top.failedFrac > 0.005 ? ` and down ${pct(top.failedFrac)}` : ''} of its open time, ` +
     `blocked only ${pct(top.blockedFrac)}, with on average ${top.avgQueue.toFixed(1)} units waiting in front of it.`;
   if (starved && starved.starvedFrac > 0.1) s += ` Downstream stations wait on it — ${starved.stage} was starved ${pct(starved.starvedFrac)} of the time.`;
   if (second) {

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { Factory } from '../production/factory';
 import { DAY, H, scenario } from './helpers';
+import type { InjectedEvent } from '../simulation/types';
 
 function hashWithSteps(seed: number, horizon: number, step: number): string {
   const f = new Factory(scenario(seed));
@@ -46,5 +47,30 @@ describe('determinism', () => {
       /* keep stepping */
     }
     expect(b.log.digest()).toBe(a.log.digest());
+  });
+});
+
+describe('determinism through the host API (invariant 7, extended)', () => {
+  it('30 h of playback-like stepping with reads and injected events matches a single jump', async () => {
+    const { LocalSimHost } = await import('../simulation/host');
+    const events: InjectedEvent[] = [
+      { at: 2 * H + 13, kind: 'machine-failure', target: 'cell-0', params: { repairMin: 70 } },
+      { at: 9 * H, kind: 'inspection-spike', params: { rejectRate: 0.3, durationHours: 2 } },
+      { at: 10 * H, kind: 'packaging-slowdown', params: { factor: 0.6, durationHours: 1 } },
+      { at: 15 * H, kind: 'order-surge', params: { orders: 6 } },
+    ];
+    const s = scenario(17, (c) => (c.assembly.failure.mtbfHours = 10), events);
+    const a = new LocalSimHost();
+    await a.load(s);
+    for (let t = 7.3; t < 30 * H; t += 7.3) {
+      a.advanceTo(t, 37);
+      void a.snapshot;
+      void a.metrics;
+    }
+    a.advanceTo(30 * H);
+    const b = new LocalSimHost();
+    await b.load(s);
+    b.advanceTo(30 * H);
+    expect(await a.getLogHash()).toBe(await b.getLogHash());
   });
 });
