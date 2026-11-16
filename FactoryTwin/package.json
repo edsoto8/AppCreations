@@ -1,0 +1,42 @@
+{
+  "name": "factory-twin",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Digital twin of an electronics assembly and packaging factory driven by a deterministic discrete-event simulation.",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc -b",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "playwright test --trace off",
+    "check:30day": "vitest run src/tests/thirtyDay.test.ts",
+    "report": "tsx scripts/scenarioReport.ts",
+    "calibrate": "tsx scripts/calibrate.ts",
+    "screenshots": "node scripts/screenshots.mjs"
+  },
+  "dependencies": {
+    "@react-three/drei": "10.7.9",
+    "@react-three/fiber": "9.8.2",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "react-is": "19.3.1",
+    "recharts": "3.10.1",
+    "three": "0.187.0",
+    "zustand": "5.1.0"
+  },
+  "devDependencies": {
+    "typescript": "5.9.3",
+    "vite": "7.3.8",
+    "@vitejs/plugin-react": "5.2.0",
+    "vitest": "4.1.12",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "@types/three": "0.187.0",
+    "@types/node": "^22.10.0",
+    "@playwright/test": "1.63.0",
+    "tsx": "^4.20.0"
+  }
+}
