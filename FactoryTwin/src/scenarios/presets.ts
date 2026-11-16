@@ -2,6 +2,7 @@ import type { Scenario } from '../simulation/types';
 import { clone } from '../production/factory';
 import { DEFAULT_SEED, defaultConfig, defaultScenario } from './default';
 import { applyParams } from '../optimization/params';
+import { OPTIMIZED_PARAMS } from './optimizedParams';
 
 const H = 3600;
 
@@ -39,16 +40,10 @@ export function growthScenario(seed = DEFAULT_SEED): Scenario {
 
 /**
  * (3) Improved throughput after optimisation: growth demand with the optimizer's top
- * recommendation applied. These values are the #1 result of `npm run report` (hill climbing,
- * budget 60, 3 seeds x 4 days); the report fails loudly if they drift from what it finds.
+ * recommendation applied. OPTIMIZED_PARAMS is written by `npm run report` (hill climbing,
+ * budget 60, 3 seeds x 4 days), so the preset is always the optimizer's own #1 result.
  */
-export const OPTIMIZED_PARAMS: Record<string, number> = {
-  'assembly.speedFactor': 1.3,
-  'packaging.speedFactor': 0.9,
-  'staffing.floaters': 2,
-  'assembly.pmIntervalHours': 20,
-  'orders.dispatchRule': 1,
-};
+export { OPTIMIZED_PARAMS };
 
 export function optimizedScenario(seed = DEFAULT_SEED, params: Record<string, number> = OPTIMIZED_PARAMS): Scenario {
   const s = growthScenario(seed);

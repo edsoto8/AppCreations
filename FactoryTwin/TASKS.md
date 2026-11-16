@@ -44,9 +44,10 @@ Status: `[x]` done, `[ ]` open, `[~]` partial. Updated at the end of every miles
 - [x] Incident tests: each kind visibly changes behaviour (11 tests)
 
 ## M6 Optimization
-- [ ] Parameter editor, baseline save/compare (multi-seed)
-- [ ] Bottleneck detector + explanation + test
-- [ ] Optimizer in a Web Worker, top 3 recommendations
+- [x] Parameter editor (11 bounded parameters), baseline save/compare with N seeds (mean ± std) in a Web Worker
+- [x] Bottleneck detector + plain-language explanation + tests (detector, relieve-bottleneck invariant)
+- [x] Optimizer (hill climbing, fixed budget, common random numbers) in a Web Worker, top 3 distinct recommendations with gain
+- [x] `npm run report` → docs/scenario-results.md; the optimized preset is generated from the optimizer's #1 result
 
 ## M7 Polish & validation
 - [ ] Visual polish, perf monitor, draw-call check
