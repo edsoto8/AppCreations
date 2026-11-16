@@ -161,6 +161,7 @@ export class Factory {
     e.on('mach.pmEnd', (ev) => m(ev.k).onPmEnd());
     e.on('conv.head', (ev) => this.conveyors.get(ev.k)!.onHeadEvent());
     e.on('conv.fail', (ev) => this.conveyors.get(ev.k)!.onWearFailure());
+    e.on('conv.entry', (ev) => this.conveyors.get(ev.k)!.onEntryEvent());
     e.on('veh.arrive', (ev) => {
       const [f, x] = v(ev.k);
       f.onArrive(x);

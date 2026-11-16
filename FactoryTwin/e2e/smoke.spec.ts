@@ -30,6 +30,7 @@ test('play/pause and speed control the simulation clock', async ({ page }) => {
   await expect.poll(async () => clock.textContent(), { timeout: 90_000 }).not.toContain('07:00');
   await page.getByTestId('play').click(); // pause
   await expect(page.getByTestId('play')).toContainText('Play');
+  await page.waitForTimeout(1500); // let the last in-flight frame and the 4 Hz clock sample land
   const frozen = await clock.textContent();
   await page.waitForTimeout(3000);
   expect(await clock.textContent()).toBe(frozen);
@@ -46,13 +47,27 @@ test('dashboard shows live KPIs derived from the simulation', async ({ page }) =
 test('clicking a machine in the 3D view opens the inspector', async ({ page }) => {
   await page.goto('/?t=2&paused=1&select=station:cell-1&cam=focus');
   await expect(page.getByTestId('inspector')).toContainText('Assembly Cell 2');
+  await page.waitForTimeout(8000); // software WebGL runs at ~1 fps: let the focus fly-in finish
   await page.getByText('Clear').click();
   await expect(page.getByTestId('inspector-empty')).toBeVisible();
   // the camera is focused on cell 2: its robot is at the centre of the viewport
   const box = (await page.locator('canvas').boundingBox())!;
   await page.waitForTimeout(4000);
-  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2 - 20);
-  await expect(page.getByTestId('inspector')).toContainText('Assembly Cell 2', { timeout: 60_000 });
+  // probe a few points around the screen centre (robot base, arm, machine) until the cell is hit
+  const insp = page.getByTestId('inspector');
+  let hit = false;
+  for (const [dx, dy] of [[0, 40], [0, 20], [-15, 60], [15, 0], [0, -30], [30, -60]]) {
+    await page.mouse.click(box.x + box.width / 2 + dx, box.y + box.height / 2 + dy);
+    try {
+      await expect(insp).toContainText('Assembly Cell 2', { timeout: 15_000 });
+      hit = true;
+      break;
+    } catch {
+      /* try the next point */
+    }
+  }
+  expect(hit).toBe(true);
+  await expect(insp).toContainText('Utilisation');
 });
 
 test('injecting a failure shows it in the timeline and the machine state', async ({ page }) => {

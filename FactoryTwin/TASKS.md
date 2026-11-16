@@ -25,11 +25,13 @@ Status: `[x]` done, `[ ]` open, `[~]` partial. Updated at the end of every miles
 - [x] Core tests (invariants 1–10, purity, snapshot NaN, determinism) — 85 tests pass; 30 days ≈ 3 s
 
 ## M3 Living factory
-- [ ] Playback controller (1x/2x/5x/10x, pause, reset), local + worker host
-- [ ] Machines animate from phases; beacons from state
-- [ ] Products on belts/buffers/AGVs/pallets via instancing
-- [ ] Workers and vehicles follow motion segments
-- [ ] Selection, hover tooltip, outline, follow camera
+- [x] Playback controller (1x/2x/5x/10x + 60x/300x, pause, reset, skip night), local + worker host (`?worker=1`)
+- [x] Machines animate from phases (robot IK from product positions, gantry sweep, press, palletizer); beacons from state
+- [x] Products on belts/buffers/AGVs/pallets via instancing (selectable)
+- [x] Workers and vehicles follow motion segments (gait from odometer)
+- [x] Selection, hover tooltip, selection ring/beam, focus & follow camera
+- [x] Conveyor entry spacing (stopped belt accepts no new items) + spacing invariant
+- [x] Playwright smoke tests (5) pass
 
 ## M4 Dashboard
 - [ ] KPI tiles, charts, utilisation, inventory, alerts

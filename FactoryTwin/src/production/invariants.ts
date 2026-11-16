@@ -28,6 +28,11 @@ export function checkInvariants(f: Factory): string[] {
   for (const c of f.conveyors.values()) {
     c.items.forEach((it) => note(it.product.id, c.id));
     if (c.items.length > c.capacity) out.push(`${c.id} over capacity ${c.items.length}/${c.capacity}`);
+    const pos = c.positions();
+    for (let i = 1; i < pos.length; i++) {
+      if (pos[i - 1] - pos[i] < c.pitch - 1e-6) out.push(`${c.id} items ${i - 1}/${i} closer than one pitch (${(pos[i - 1] - pos[i]).toFixed(3)} m)`);
+    }
+    if (pos.length && (pos[pos.length - 1] < -1e-6 || pos[0] > c.length + 1e-6)) out.push(`${c.id} item off the belt`);
   }
   f.infeed.forEach((p) => note(p.id, 'infeed'));
   if (f.infeed.length > f.cfg.inspection.infeedCapacity) out.push('infeed over capacity');

@@ -30,9 +30,14 @@ export function CameraRig() {
     camera.position.copy(HOME_POS);
   }, [camera]);
 
+  const lastNonce = useRef(nonce);
   useEffect(() => {
     const g = goal.current;
     const rt = runtime.current;
+    const explicit = nonce !== lastNonce.current;
+    lastNonce.current = nonce;
+    // leaving focus/follow because the selection was cleared keeps the camera where it is
+    if (mode === 'orbit' && !explicit) return;
     if (mode === 'top') {
       g.pos.copy(TOP_POS);
       g.target.set(0, 0, 0);

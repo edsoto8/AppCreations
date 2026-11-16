@@ -82,8 +82,41 @@ export class Conveyor {
     this.queue.update(this.items.length, this.f.engine.now);
   }
 
+  /** True when the entry spot is free: below capacity and the last item has moved one pitch. */
   canEnter(): boolean {
-    return this.items.length < this.capacity;
+    if (this.items.length >= this.capacity) return false;
+    if (this.items.length === 0) return true;
+    this.sync();
+    const pos = this.positions();
+    const tail = pos[pos.length - 1];
+    if (tail >= this.pitch - 1e-9) return true;
+    this.entryWanted = true;
+    this.scheduleEntry(tail);
+    return false;
+  }
+
+  private entryWanted = false;
+  private entryEvent: number | null = null;
+
+  private scheduleEntry(tail?: number): void {
+    if (!this.entryWanted || !this.running || this.entryEvent !== null || this.items.length === 0) return;
+    let t = tail;
+    if (t === undefined) {
+      const pos = this.positions();
+      t = pos[pos.length - 1];
+    }
+    // the tail may itself be held back by accumulation; then space appears on a hand-off instead
+    const natural = this.items[this.items.length - 1];
+    const nat = natural.basePos + (this.beltPos - natural.baseBelt);
+    if (nat > t + 1e-9) return;
+    this.entryEvent = this.f.engine.in(Math.max(0, (this.pitch - t) / this.speed), 'conv.entry', this.id);
+  }
+
+  onEntryEvent(): void {
+    this.entryEvent = null;
+    if (!this.entryWanted) return;
+    this.entryWanted = false;
+    this.onSpace?.();
   }
 
   enter(product: Product): void {
@@ -128,6 +161,10 @@ export class Conveyor {
   }
 
   private scheduleHead(): void {
+    this.f.engine.cancel(this.entryEvent);
+    this.entryEvent = null;
+    this.sync();
+    this.scheduleEntry();
     this.f.engine.cancel(this.headEvent);
     this.headEvent = null;
     if (!this.running || this.items.length === 0 || this.headWaiting) return;
